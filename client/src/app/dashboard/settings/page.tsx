@@ -26,11 +26,11 @@ function SettingsContent() {
         if (user) {
             setSettings({
                 preferredLanguage: user.preferredLanguage || "en",
-                notificationPreferences: user.notificationPreferences || {
-                    email: true,
-                    sms: true,
-                    whatsapp: true,
-                    push: true,
+                notificationPreferences: {
+                    email: user.notificationPreferences?.email ?? true,
+                    sms: user.notificationPreferences?.sms ?? true,
+                    whatsapp: user.notificationPreferences?.whatsapp ?? true,
+                    push: user.notificationPreferences?.push ?? true,
                 },
             });
         }
@@ -111,11 +111,10 @@ function SettingsContent() {
             <div className="max-w-4xl mx-auto">
                 {message && (
                     <div
-                        className={`mb-6 p-4 rounded-lg ${
-                            message.type === "success"
+                        className={`mb-6 p-4 rounded-lg ${message.type === "success"
                                 ? "bg-green-50 border border-green-200 text-green-700"
                                 : "bg-red-50 border border-red-200 text-red-700"
-                        }`}
+                            }`}
                     >
                         {message.text}
                     </div>

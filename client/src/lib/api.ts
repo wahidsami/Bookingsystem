@@ -231,6 +231,7 @@ export interface User {
     phone: string;
     firstName: string;
     lastName: string;
+    createdAt?: string;
     emailVerified: boolean;
     phoneVerified: boolean;
     walletBalance: number;
