@@ -98,7 +98,7 @@ function BookingContent() {
 
     async function fetchStaff(serviceId?: string) {
         if (!tenantId) return;
-        
+
         try {
             setLoading(true);
             const response = await api.get<{
@@ -143,7 +143,7 @@ function BookingContent() {
 
     async function fetchTimeSlotsForDate(date: string, staffId: string) {
         if (!selectedService || !tenantId) return;
-        
+
         try {
             const response = await api.post<{
                 success: boolean;
@@ -176,7 +176,7 @@ function BookingContent() {
                 daysAhead: number | null;
                 message?: string;
             }>(url);
-            
+
             if (response.success && response.slot && response.date && response.daysAhead !== null) {
                 setNextAvailableSlot({
                     slot: response.slot,
@@ -208,11 +208,11 @@ function BookingContent() {
 
     async function handleStaffSelect(staffMember: Staff) {
         setSelectedStaff(staffMember);
-        
+
         if (selectedService && tenantId) {
             await fetchNextAvailableSlot(staffMember.id);
         }
-        
+
         setStep(3);
     }
 
@@ -256,9 +256,9 @@ function BookingContent() {
             if (response.success && response.appointment) {
                 const appointment = response.appointment;
                 const amount = parseFloat(
-                    appointment.price || Number(selectedService.finalPrice).toString()
+                    appointment.price || Number(selectedService.basePrice).toString()
                 );
-                
+
                 const params = new URLSearchParams({
                     appointmentId: appointment.id,
                     amount: amount.toString(),
@@ -267,7 +267,7 @@ function BookingContent() {
                     staffName: selectedStaff.name,
                     dateTime: selectedTime.startTime
                 });
-                
+
                 router.push(`/booking/payment?${params.toString()}`);
             } else {
                 setError("Booking failed. Please try again.");
@@ -307,7 +307,7 @@ function BookingContent() {
                 <div className="container mx-auto px-4 py-4">
                     <div className="flex items-center justify-between mb-4">
                         <Link href="/dashboard" className="flex items-center gap-2">
-                            <div 
+                            <div
                                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                                 style={{ backgroundColor: primaryColor }}
                             >
@@ -352,8 +352,8 @@ function BookingContent() {
                                 <div className="text-right">
                                     <p className="text-sm text-gray-600">{selectedService.duration} min</p>
                                     <p className="font-bold" style={{ color: primaryColor }}>
-                                        {selectedService.finalPrice
-                                            ? Number(selectedService.finalPrice).toFixed(2)
+                                        {selectedService.basePrice
+                                            ? Number(selectedService.basePrice).toFixed(2)
                                             : "0.00"}{" "}
                                         SAR
                                     </p>
@@ -427,8 +427,8 @@ function BookingContent() {
                                                 {service.duration} min
                                             </span>
                                             <span className="text-lg font-bold" style={{ color: primaryColor }}>
-                                                {service.finalPrice
-                                                    ? Number(service.finalPrice).toFixed(2)
+                                                {service.basePrice
+                                                    ? Number(service.basePrice).toFixed(2)
                                                     : "0.00"}{" "}
                                                 SAR
                                             </span>
@@ -678,7 +678,7 @@ function BookingContent() {
                                     <span className="font-semibold">Total:</span>
                                     <span className="text-xl font-bold text-primary">
                                         {selectedService &&
-                                            parseFloat(Number(selectedService.finalPrice).toString()).toFixed(2)}{" "}
+                                            parseFloat(Number(selectedService.basePrice).toString()).toFixed(2)}{" "}
                                         SAR
                                     </span>
                                 </div>

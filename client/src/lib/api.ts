@@ -98,9 +98,9 @@ class ApiClient {
         const url = `${this.baseURL}${endpoint}`;
 
         // Add auth header if token exists
-        const headers: HeadersInit = {
+        const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            ...options.headers,
+            ...(options.headers as Record<string, string>),
         };
 
         if (token) {
@@ -140,7 +140,7 @@ class ApiClient {
      */
     async get<T>(endpoint: string): Promise<T> {
         const response = await this.request(endpoint, { method: 'GET' });
-        
+
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: 'Request failed' }));
             throw new Error(error.message || `HTTP ${response.status}`);
@@ -247,6 +247,11 @@ export interface Tenant {
     status: string;
     servicesCount?: number;
     staffCount?: number;
+    customColors?: {
+        primaryColor: string;
+    };
+    logo?: string;
+    location?: string;
 }
 
 export interface Service {
@@ -267,6 +272,9 @@ export interface Staff {
     skills: string[];
     aiScore?: number;
     recommended?: boolean;
+    image?: string;
+    photo?: string;
+    specialization?: string;
 }
 
 export interface Appointment {
