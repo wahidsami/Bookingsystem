@@ -237,6 +237,12 @@ export interface User {
     loyaltyPoints: number;
     totalBookings: number;
     totalSpent: number;
+    preferredLanguage?: string;
+    notificationPreferences?: {
+        email: boolean;
+        sms: boolean;
+        push?: boolean;
+    };
 }
 
 export interface Tenant {
