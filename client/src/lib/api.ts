@@ -242,6 +242,7 @@ export interface User {
         email: boolean;
         sms: boolean;
         push?: boolean;
+        whatsapp?: boolean;
     };
 }
 
