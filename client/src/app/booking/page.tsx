@@ -99,7 +99,7 @@ function BookingContent() {
 
     async function fetchStaff(serviceId?: string) {
         if (!tenantId || !serviceId) return;
-        
+
         try {
             setLoading(true);
             // Fetch only staff assigned to this specific service
@@ -110,7 +110,7 @@ function BookingContent() {
             }>(`/public/tenant/${tenantId}/services/${serviceId}/staff`);
             if (response.success) {
                 setStaff(response.staff || []);
-                
+
                 // If no staff available for this service, show a helpful error
                 if (response.staff.length === 0) {
                     setError("No staff members are currently assigned to this service. Please contact the salon.");
@@ -152,7 +152,7 @@ function BookingContent() {
 
     async function fetchTimeSlotsForDate(date: string, staffId: string) {
         if (!selectedService || !tenantId) return;
-        
+
         try {
             const response = await api.post<{
                 success: boolean;
@@ -185,7 +185,7 @@ function BookingContent() {
                 daysAhead: number | null;
                 message?: string;
             }>(url);
-            
+
             if (response.success && response.slot && response.date && response.daysAhead !== null) {
                 setNextAvailableSlot({
                     slot: response.slot,
@@ -217,11 +217,11 @@ function BookingContent() {
 
     async function handleStaffSelect(staffMember: Staff) {
         setSelectedStaff(staffMember);
-        
+
         if (selectedService && tenantId) {
             await fetchNextAvailableSlot(staffMember.id);
         }
-        
+
         setStep(3);
     }
 
@@ -265,9 +265,9 @@ function BookingContent() {
             if (response.success && response.appointment) {
                 const appointment = response.appointment;
                 const amount = parseFloat(
-                    appointment.price || Number(selectedService.finalPrice).toString()
+                    appointment.price || Number(selectedService.basePrice).toString()
                 );
-                
+
                 const params = new URLSearchParams({
                     appointmentId: appointment.id,
                     amount: amount.toString(),
@@ -276,7 +276,7 @@ function BookingContent() {
                     staffName: selectedStaff.name,
                     dateTime: selectedTime.startTime
                 });
-                
+
                 router.push(`/booking/payment?${params.toString()}`);
             } else {
                 setError("Booking failed. Please try again.");
@@ -326,7 +326,7 @@ function BookingContent() {
                 <div className="container mx-auto px-4 py-4">
                     <div className="flex items-center justify-between mb-4">
                         <Link href="/dashboard" className="flex items-center gap-2">
-                            <div 
+                            <div
                                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                                 style={{ backgroundColor: primaryColor }}
                             >
@@ -346,8 +346,8 @@ function BookingContent() {
                         <div className="flex items-center gap-4 mb-4">
                             {tenant.logo && (
                                 <img
-                                    src={tenant.logo.startsWith('/') 
-                                        ? `http://localhost:5000${tenant.logo}` 
+                                    src={tenant.logo.startsWith('/')
+                                        ? `http://localhost:5000${tenant.logo}`
                                         : `http://localhost:5000/uploads/${tenant.logo}`}
                                     alt={tenant.name}
                                     className="w-12 h-12 rounded-lg object-cover border border-gray-200"
@@ -376,8 +376,8 @@ function BookingContent() {
                                 <div className="text-right">
                                     <p className="text-sm text-gray-600">{selectedService.duration} min</p>
                                     <p className="font-bold" style={{ color: primaryColor }}>
-                                        <Currency 
-                                            amount={selectedService.finalPrice ? Number(selectedService.finalPrice) : 0} 
+                                        <Currency
+                                            amount={selectedService.basePrice ? Number(selectedService.basePrice) : 0}
                                             locale="en"
                                         />
                                     </p>
@@ -451,8 +451,8 @@ function BookingContent() {
                                                 {service.duration} min
                                             </span>
                                             <span className="text-lg font-bold" style={{ color: primaryColor }}>
-                                                <Currency 
-                                                    amount={service.finalPrice ? Number(service.finalPrice) : 0} 
+                                                <Currency
+                                                    amount={service.basePrice ? Number(service.basePrice) : 0}
                                                     locale="en"
                                                 />
                                             </span>
@@ -729,8 +729,8 @@ function BookingContent() {
                                     <span className="font-semibold">Total:</span>
                                     <span className="text-xl font-bold text-primary">
                                         {selectedService && (
-                                            <Currency 
-                                                amount={Number(selectedService.finalPrice)} 
+                                            <Currency
+                                                amount={Number(selectedService.basePrice)}
                                                 locale="en"
                                             />
                                         )}
