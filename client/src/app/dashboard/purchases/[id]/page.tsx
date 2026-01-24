@@ -63,7 +63,7 @@ function OrderDetailsContent({ params }: { params: { id: string } }) {
             try {
                 setLoading(true);
                 setError(null);
-                const response = await api.get<{ success: boolean; order: Order }>(
+                const response = await api.get<{ success: boolean; order: Order; message?: string }>(
                     `/orders/${params.id}`
                 );
                 if (response.success) {
@@ -295,7 +295,7 @@ function OrderDetailsContent({ params }: { params: { id: string } }) {
                                 <div className="text-base text-gray-600 mt-1">
                                     {(() => {
                                         try {
-                                            const address = typeof order.shippingAddress === 'string' 
+                                            const address = typeof order.shippingAddress === 'string'
                                                 ? JSON.parse(order.shippingAddress)
                                                 : order.shippingAddress;
                                             return (
