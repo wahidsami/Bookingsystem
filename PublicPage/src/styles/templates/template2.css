@@ -1,0 +1,80 @@
+/**
+ * Template 2 - Top Navigation Layout
+ * Classic layout with sticky top navigation
+ */
+
+.template-template2 {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.template-template2 .header-container {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: white;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.template-template2 .main-content {
+  flex: 1;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.template-template2 .footer-container {
+  margin-top: auto;
+}
+
+/* Top Navigation */
+.template-template2 .top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.template-template2 .top-nav-links {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.template-template2 .top-nav-links a {
+  text-decoration: none;
+  color: #374151;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.template-template2 .top-nav-links a:hover {
+  color: var(--color-primary);
+}
+
+.template-template2 .top-nav-links a.active {
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .template-template2 .top-nav {
+    padding: 1rem;
+  }
+
+  .template-template2 .top-nav-links {
+    gap: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .template-template2 .main-content {
+    padding: 1rem;
+  }
+}
+

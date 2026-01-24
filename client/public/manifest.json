@@ -1,0 +1,46 @@
+{
+  "name": "Rifah - Beauty & Wellness Platform",
+  "short_name": "Rifah",
+  "description": "Browse and book beauty and wellness services across multiple salons and spas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8B5CF6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "beauty", "health"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Browse Salons",
+      "short_name": "Browse",
+      "description": "Browse available salons and spas",
+      "url": "/tenants",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "My Bookings",
+      "short_name": "Bookings",
+      "description": "View my booking history",
+      "url": "/dashboard/bookings",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

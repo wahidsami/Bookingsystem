@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Update</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            direction: rtl;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .logo {
+            max-width: 200px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .header p {
+            color: #ffffff;
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 24px;
+            color: #1f2937;
+            margin: 0 0 20px;
+            font-weight: 600;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .message {
+            font-size: 16px;
+            color: #4b5563;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .message-ar {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .message-en {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .rejection-box {
+            background-color: #fee2e2;
+            border-right: 4px solid #ef4444;
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        .rejection-box h3 {
+            color: #dc2626;
+            margin: 0 0 15px;
+            font-size: 20px;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .rejection-box p {
+            color: #991b1b;
+            margin: 10px 0;
+            font-size: 15px;
+            line-height: 1.6;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .reason-box {
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .info-box {
+            background-color: #f9fafb;
+            border-right: 4px solid #6b7280;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        .info-box h3 {
+            color: #374151;
+            margin: 0 0 15px;
+            font-size: 18px;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .info-box p {
+            color: #4b5563;
+            margin: 10px 0;
+            line-height: 1.6;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 5px 0;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .footer a {
+            color: #8B5ADF;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <img src="RifahNewLogoWhite.png" alt="Rifah Platform Logo" class="logo">
+            <div class="icon">📋</div>
+            <h1>تحديث على طلب الانضمام</h1>
+            <p>Application Status Update</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <p class="greeting">عزيزي {{tenantNameAr}} | Dear {{tenantName}},</p>
+
+            <p class="message message-ar">
+                شكراً لاهتمامك بالانضمام إلى منصة رفاه.
+            </p>
+
+            <p class="message message-en">
+                Thank you for your interest in joining Rifah Platform.
+            </p>
+
+            <div class="rejection-box">
+                <h3>⚠️ تحديث حالة الطلب | Application Status</h3>
+                <p>
+                    للأسف، لا يمكننا الموافقة على طلبك في الوقت الحالي.
+                </p>
+                <p class="message-en">
+                    Unfortunately, we are unable to approve your application at this time.
+                </p>
+
+                <div class="reason-box">
+                    <p style="margin: 0; font-weight: 600; color: #1f2937;">
+                        السبب | Reason:
+                    </p>
+                    <p style="margin: 10px 0 0; color: #374151; font-family: 'Poppins', sans-serif;">
+                        {{reason}}
+                    </p>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>🔄 هل يمكنني التقديم مرة أخرى؟ | Can I Reapply?</h3>
+                <p>
+                    <strong>نعم!</strong> يمكنك تقديم طلب جديد بعد معالجة الأسباب المذكورة أعلاه.<br>
+                    <span class="message-en"><strong>Yes!</strong> You can submit a new application after addressing the
+                        reasons mentioned above.</span>
+                </p>
+
+                <p style="margin-top: 20px;">
+                    <strong>خطوات إعادة التقديم | Reapplication Steps:</strong>
+                </p>
+                <p>
+                    1. راجع السبب المذكور وقم بالتعديلات اللازمة<br>
+                    2. تأكد من اكتمال جميع المستندات المطلوبة<br>
+                    3. قدم طلباً جديداً من خلال موقعنا<br><br>
+                    <span class="message-en">
+                        1. Review the reason and make necessary corrections<br>
+                        2. Ensure all required documents are complete<br>
+                        3. Submit a new application through our website
+                    </span>
+                </p>
+            </div>
+
+            <div class="info-box" style="border-right-color: #8B5ADF;">
+                <h3 style="color: #8B5ADF;">💬 هل لديك أسئلة؟ | Have Questions?</h3>
+                <p>
+                    نحن هنا للمساعدة! إذا كان لديك أي استفسارات حول قرار الرفض أو كنت بحاجة إلى توضيح، يرجى التواصل مع
+                    فريق الدعم لدينا.
+                </p>
+                <p class="message-en">
+                    We're here to help! If you have any questions about the rejection decision or need clarification,
+                    please contact our support team.
+                </p>
+                <p style="margin-top: 15px;">
+                    <strong>📧 Email:</strong> <a href="mailto:support@rifah.sa"
+                        style="color: #8B5ADF;">support@rifah.sa</a>
+                </p>
+            </div>
+
+            <p class="message message-ar" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                نقدر اهتمامك بمنصة رفاه ونتطلع إلى فرصة العمل معك في المستقبل.<br>
+                <span class="message-en">We appreciate your interest in Rifah Platform and look forward to the
+                    opportunity to work with you in
+                    the future.</span>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>منصة رفاه | Rifah Platform</strong></p>
+            <p>Email: <a href="mailto:support@rifah.sa">support@rifah.sa</a></p>
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+                © 2024-2026 Rifah Platform. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

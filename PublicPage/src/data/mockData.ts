@@ -1,0 +1,140 @@
+import { Service, Staff, Review } from '../types';
+
+export const services: Service[] = [
+  {
+    id: '1',
+    title: 'Signature Jasmin Massage',
+    description: 'Indulge in our signature full-body massage using jasmine-infused oils. This 90-minute journey combines Swedish and aromatherapy techniques to melt away tension and restore balance.',
+    price: 450,
+    duration: 90,
+    category: 'Massage',
+    image: 'https://images.unsplash.com/photo-1745327883508-b6cd32e5dde5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjBtYXNzYWdlJTIwdHJlYXRtZW50fGVufDF8fHx8MTc2NDM0ODI1N3ww&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.9,
+  },
+  {
+    id: '2',
+    title: 'Luxury Facial Treatment',
+    description: 'Experience our exclusive luxury facial featuring premium skincare products and advanced techniques. Includes deep cleansing, exfoliation, mask, and massage.',
+    price: 380,
+    duration: 75,
+    category: 'Facial',
+    image: 'https://images.unsplash.com/photo-1664549760921-2198b054a592?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmYWNpYWwlMjBzcGElMjB0cmVhdG1lbnR8ZW58MXx8fHwxNzY0MzAxNTgwfDA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.8,
+  },
+  {
+    id: '3',
+    title: 'Deluxe Manicure & Pedicure',
+    description: 'Pamper your hands and feet with our deluxe nail service. Includes soak, exfoliation, massage, cuticle care, shaping, and polish of your choice.',
+    price: 220,
+    duration: 60,
+    category: 'Nails',
+    image: 'https://images.unsplash.com/photo-1700760933910-d3c03aa18b65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtYW5pY3VyZSUyMHNwYXxlbnwxfHx8fDE3NjQzNDgyNTZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.7,
+  },
+  {
+    id: '4',
+    title: 'Aromatherapy Ritual',
+    description: 'A holistic treatment combining essential oils, gentle massage, and meditation techniques to restore your mind-body balance and inner peace.',
+    price: 320,
+    duration: 60,
+    category: 'Wellness',
+    image: 'https://images.unsplash.com/photo-1621554012433-eb02c38e7193?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjBhcm9tYXRoZXJhcHl8ZW58MXx8fHwxNzY0MjY1MzI5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.9,
+  },
+  {
+    id: '5',
+    title: 'Hot Stone Therapy',
+    description: 'Relax with heated volcanic stones placed on key points of your body, combined with therapeutic massage to release deep muscle tension.',
+    price: 400,
+    duration: 80,
+    category: 'Massage',
+    image: 'https://images.unsplash.com/photo-1703135387362-4b749023e1e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBzcGElMjByZWxheGF0aW9ufGVufDF8fHx8MTc2NDMwMzYyMXww&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.8,
+  },
+  {
+    id: '6',
+    title: 'Body Scrub & Wrap',
+    description: 'Exfoliate and nourish your skin with our signature body scrub followed by a detoxifying wrap treatment.',
+    price: 350,
+    duration: 70,
+    category: 'Body',
+    image: 'https://images.unsplash.com/photo-1731336479432-3eb5fdb3ab1c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBzcGElMjBpbnRlcmlvcnxlbnwxfHx8fDE3NjQzMjc3OTB8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.6,
+  },
+];
+
+export const staff: Staff[] = [
+  {
+    id: '1',
+    name: 'Layla Al-Rahman',
+    role: 'Master Therapist',
+    image: 'https://images.unsplash.com/photo-1763873993447-1d0be71a96d9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjBwcm9mZXNzaW9uYWwlMjB3b21hbnxlbnwxfHx8fDE3NjQzNDgyNTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.9,
+    specialties: ['Massage', 'Aromatherapy'],
+  },
+  {
+    id: '2',
+    name: 'Noor Hassan',
+    role: 'Facial Specialist',
+    image: 'https://images.unsplash.com/photo-1606738132449-e3590ddb6793?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjB0aGVyYXBpc3QlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjQzNDgyNTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.8,
+    specialties: ['Facial', 'Skincare'],
+  },
+  {
+    id: '3',
+    name: 'Sara Mohamed',
+    role: 'Wellness Expert',
+    image: 'https://images.unsplash.com/photo-1763873993447-1d0be71a96d9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjBwcm9mZXNzaW9uYWwlMjB3b21hbnxlbnwxfHx8fDE3NjQzNDgyNTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.9,
+    specialties: ['Wellness', 'Body Treatments'],
+  },
+  {
+    id: '4',
+    name: 'Amira Khalil',
+    role: 'Nail Technician',
+    image: 'https://images.unsplash.com/photo-1606738132449-e3590ddb6793?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjB0aGVyYXBpc3QlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjQzNDgyNTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    rating: 4.7,
+    specialties: ['Nails', 'Manicure'],
+  },
+];
+
+export const reviews: Review[] = [
+  {
+    id: '1',
+    name: 'Fatima Al-Saud',
+    rating: 5,
+    comment: 'An absolutely divine experience! The jasmin massage was heavenly and the staff was incredibly professional. The ambiance is so peaceful and luxurious.',
+    date: '2025-11-20',
+    service: 'Signature Jasmin Massage',
+  },
+  {
+    id: '2',
+    name: 'Hala Mansoor',
+    rating: 5,
+    comment: 'Best facial I have ever had! My skin feels amazing and Noor was so knowledgeable about the products. Will definitely be coming back!',
+    date: '2025-11-18',
+    service: 'Luxury Facial Treatment',
+  },
+  {
+    id: '3',
+    name: 'Reem Abdullah',
+    rating: 4,
+    comment: 'Beautiful spa with excellent service. The manicure was perfect and lasted for weeks. Highly recommend!',
+    date: '2025-11-15',
+    service: 'Deluxe Manicure & Pedicure',
+  },
+  {
+    id: '4',
+    name: 'Maha Al-Qahtani',
+    rating: 5,
+    comment: 'A truly relaxing escape from daily stress. The aromatherapy ritual was exactly what I needed. Thank you JASMIN team!',
+    date: '2025-11-10',
+    service: 'Aromatherapy Ritual',
+  },
+];
+
+export const interiorImages = [
+  'https://images.unsplash.com/photo-1731336479432-3eb5fdb3ab1c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBzcGElMjBpbnRlcmlvcnxlbnwxfHx8fDE3NjQzMjc3OTB8MA&ixlib=rb-4.1.0&q=80&w=1080',
+  'https://images.unsplash.com/photo-1703135387362-4b749023e1e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBzcGElMjByZWxheGF0aW9ufGVufDF8fHx8MTc2NDMwMzYyMXww&ixlib=rb-4.1.0&q=80&w=1080',
+  'https://images.unsplash.com/photo-1621554012433-eb02c38e7193?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjBhcm9tYXRoZXJhcHl8ZW58MXx8fHwxNzY0MjY1MzI5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+];

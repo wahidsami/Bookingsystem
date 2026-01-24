@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Approved!</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            direction: rtl;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8B5ADF 0%, #FE01AB 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .logo {
+            max-width: 200px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .header p {
+            color: #ffffff;
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 24px;
+            color: #1f2937;
+            margin: 0 0 20px;
+            font-weight: 600;
+        }
+
+        .greeting-ar {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .greeting-en {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .message {
+            font-size: 16px;
+            color: #4b5563;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .message-ar {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .message-en {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .success-box {
+            background: linear-gradient(135deg, #f3e7ff 0%, #ffe0f7 100%);
+            border-right: 4px solid #8B5ADF;
+            padding: 30px;
+            margin: 30px 0;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .success-box .icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+        }
+
+        .success-box h2 {
+            color: #8B5ADF;
+            margin: 0 0 10px;
+            font-size: 28px;
+        }
+
+        .success-box h2.ar {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .success-box h2.en {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .success-box p {
+            color: #6b21a8;
+            margin: 5px 0;
+            font-size: 16px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #8B5ADF 0%, #FE01AB 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 16px 40px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 18px;
+            margin: 30px 0;
+            box-shadow: 0 4px 6px rgba(139, 90, 223, 0.3);
+            transition: transform 0.2s;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .info-box {
+            background-color: #f9fafb;
+            border-right: 4px solid #8B5ADF;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        .info-box h3 {
+            color: #8B5ADF;
+            margin: 0 0 15px;
+            font-size: 18px;
+        }
+
+        .info-box h3.ar {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .info-box h3.en {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .info-box ul {
+            margin: 0;
+            padding-right: 20px;
+            color: #4b5563;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .info-box li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .info-label {
+            color: #6b7280;
+            font-weight: 600;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .info-value {
+            color: #1f2937;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 5px 0;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .footer a {
+            color: #8B5ADF;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <img src="RifahNewLogoWhite.png" alt="Rifah Platform Logo" class="logo">
+            <h1>تم قبول حسابك!</h1>
+            <p>Your Account Has Been Approved!</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <p class="greeting"><span class="greeting-ar">عزيزي {{tenantNameAr}}</span> | <span class="greeting-en">Dear
+                    {{tenantName}}!</span> 🎊</p>
+
+            <div class="success-box">
+                <div class="icon">✅</div>
+                <h2 class="ar">مبروك!</h2>
+                <h2 class="en">Congratulations!</h2>
+                <p style="font-size: 18px; margin-top: 15px;">
+                    <span class="message-ar">تم قبول طلب انضمامك لمنصة رفاه بنجاح!</span><br>
+                    <span class="message-en">Your application to join Rifah Platform has been approved!</span>
+                </p>
+            </div>
+
+            <p class="message message-ar">
+                يسعدنا انضمامك إلى شبكة رفاه من مقدمي الخدمات المتميزين. يمكنك الآن الوصول الكامل إلى لوحة التحكم الخاصة
+                بك.
+            </p>
+
+            <p class="message message-en">
+                We're thrilled to welcome you to Rifah's network of premium service providers. You now have full access
+                to your dashboard.
+            </p>
+
+            <div style="text-align: center;">
+                <a href="{{loginUrl}}" class="cta-button">
+                    🚀 ابدأ الآن | Get Started
+                </a>
+            </div>
+
+            <div class="info-box">
+                <h3 class="ar">📊 معلومات حسابك</h3>
+                <h3 class="en">Your Account Information</h3>
+                <div class="info-row">
+                    <span class="info-label">البريد الإلكتروني | Email:</span>
+                    <span class="info-value">{{email}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">رابط لوحة التحكم | Dashboard:</span>
+                    <span class="info-value"><a href="{{loginUrl}}" style="color: #8B5ADF;">{{loginUrl}}</a></span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3 class="ar">🎯 الخطوات التالية</h3>
+                <h3 class="en">Next Steps</h3>
+                <ul>
+                    <li>
+                        <strong>أكمل ملفك الشخصي:</strong> أضف شعار صالونك، الصور، وساعات العمل<br>
+                        <span class="message-en"><strong>Complete Your Profile:</strong> Add your salon logo, photos,
+                            and working hours</span>
+                    </li>
+                    <li>
+                        <strong>أضف الخدمات:</strong> قم بإعداد قائمة الخدمات والأسعار<br>
+                        <span class="message-en"><strong>Add Services:</strong> Set up your service menu and
+                            pricing</span>
+                    </li>
+                    <li>
+                        <strong>أضف الموظفين:</strong> قم بإضافة فريق العمل الخاص بك<br>
+                        <span class="message-en"><strong>Add Staff:</strong> Set up your team members</span>
+                    </li>
+                    <li>
+                        <strong>ابدأ في استقبال الحجوزات:</strong> ستبدأ في تلقي الحجوزات من العملاء<br>
+                        <span class="message-en"><strong>Start Accepting Bookings:</strong> You'll start receiving
+                            customer bookings</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="info-box"
+                style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-right-color: #f59e0b;">
+                <h3 style="color: #d97706;" class="ar">🎁 فترة تجريبية مجانية</h3>
+                <h3 style="color: #d97706;" class="en">Free Trial Period</h3>
+                <p style="color: #92400e; font-size: 16px; margin: 10px 0;">
+                    <strong class="message-ar">مبروك! لديك 30 يوماً تجريبياً مجانياً للاستمتاع بجميع ميزات
+                        المنصة.</strong><br>
+                    <strong class="message-en">Congratulations! You have a 30-day free trial to enjoy all platform
+                        features.</strong>
+                </p>
+            </div>
+
+            <p class="message message-ar" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                إذا كنت بحاجة إلى أي مساعدة في البدء، فريق الدعم لدينا جاهز لمساعدتك!<br>
+                <span class="message-en">If you need any help getting started, our support team is ready to assist
+                    you!</span>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>منصة رفاه | Rifah Platform</strong></p>
+            <p>Email: <a href="mailto:support@rifah.sa">support@rifah.sa</a></p>
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+                © 2024-2026 Rifah Platform. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

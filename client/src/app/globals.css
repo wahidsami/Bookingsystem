@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PWA Install Prompt Animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Saudi Riyal Symbol Font */
+@font-face {
+  font-family: 'Claudion';
+  src: url('/fonts/Claudion.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Currency symbol class for Saudi Riyal */
+.riyal-symbol {
+  font-family: 'Claudion', sans-serif;
+  font-weight: 400 !important; /* Force normal weight even in bold parents */
+  font-style: normal;
+}
+
+/* Currency display: Always LTR to keep symbol on left (Central Bank guideline) */
+[dir="ltr"].currency-container,
+.currency-container[dir="ltr"] {
+  direction: ltr !important;
+  unicode-bidi: embed;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 340 82% 52%;
+    --secondary-foreground: 0 0% 100%;
+    --accent: 47 96% 53%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'Cairo', sans-serif;
+  }
+}
+
+@layer components {
+  .gradient-primary {
+    background: linear-gradient(to bottom right, hsl(var(--primary)), hsl(var(--primary) / 0.9), hsl(var(--secondary)));
+  }
+
+  .text-gradient {
+    background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--secondary)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .card-premium {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    transition: all 0.3s;
+  }
+
+  .card-premium:hover {
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  }
+}
+
+@layer utilities {
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+
+  @keyframes scale-in {
+    from {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* RTL Support - Comprehensive Implementation */
+
+/* Arabic font family - Cairo */
+[dir="rtl"] body {
+  font-family: 'Cairo', 'Segoe UI', sans-serif;
+}
+
+/* Base RTL direction - this makes everything flow RTL */
+[dir="rtl"] {
+  direction: rtl;
+}
+
+/* Text alignment - use logical properties */
+[dir="rtl"] .text-start {
+  text-align: right;
+}
+
+[dir="rtl"] .text-end {
+  text-align: left;
+}
+
+/* Input alignment in RTL - default to right */
+[dir="rtl"] input:not([type="email"]):not([type="tel"]):not([type="number"]):not([dir="ltr"]),
+[dir="rtl"] textarea:not([dir="ltr"]),
+[dir="rtl"] select:not([dir="ltr"]) {
+  text-align: right;
+  direction: rtl;
+}
+
+/* Form inputs RTL - preserve LTR for numbers/emails but align right */
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="number"] {
+  direction: ltr;
+  text-align: right;
+}
+
+/* Card inputs (credit cards) stay LTR */
+[dir="rtl"] input[dir="ltr"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Labels default to right in RTL */
+[dir="rtl"] label:not([dir="ltr"]) {
+  text-align: right;
+}
+
+/* Flip arrows/icons in RTL */
+[dir="rtl"] svg[class*="arrow"],
+[dir="rtl"] .arrow-left,
+[dir="rtl"] .arrow-back {
+  transform: scaleX(-1);
+}
+
+/* Smooth transition for RTL switch */
+html {
+  transition: direction 0.2s ease-in-out;
+}
+
+body {
+  transition: font-family 0.2s ease-in-out;
+}

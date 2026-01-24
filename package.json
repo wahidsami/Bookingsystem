@@ -1,0 +1,37 @@
+{
+  "name": "rifah-platform",
+  "version": "1.0.0",
+  "description": "Rifah Multi-Tenant Booking Platform - Root Package",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../admin && npm install && cd ../tenant && npm install",
+    "dev": "concurrently \"npm run dev:docker\" \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:admin\" \"npm run dev:tenant\" \"npm run dev:public\"",
+    "dev:docker": "docker-compose up",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "dev:admin": "cd admin && npm run dev",
+    "dev:tenant": "cd tenant && npm run dev",
+    "dev:public": "cd PublicPage && npm run dev",
+    "start": "concurrently \"npm run start:docker\" \"npm run start:server\" \"npm run start:client\" \"npm run start:admin\" \"npm run start:tenant\"",
+    "start:docker": "docker-compose up -d",
+    "start:server": "cd server && npm start",
+    "start:client": "cd client && npm run build && npm start",
+    "start:admin": "cd admin && npm run build && npm start",
+    "start:tenant": "cd tenant && npm run build && npm start",
+    "stop": "docker-compose down",
+    "seed": "cd server && node seed.js",
+    "test": "cd server && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "booking",
+    "multi-tenant",
+    "salon",
+    "spa"
+  ],
+  "author": "",
+  "license": "ISC"
+}
+

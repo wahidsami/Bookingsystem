@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Saudi Riyal Symbol Font */
+@font-face {
+  font-family: 'Claudion';
+  src: url('/fonts/Claudion.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Currency symbol class for Saudi Riyal */
+.riyal-symbol {
+  font-family: 'Claudion', sans-serif;
+  font-weight: 400 !important; /* Force normal weight even in bold parents */
+  font-style: normal;
+}
+
+/* Currency display: Always LTR to keep symbol on left (Central Bank guideline) */
+[dir="ltr"].currency-container,
+.currency-container[dir="ltr"] {
+  direction: ltr !important;
+  unicode-bidi: embed;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1E293B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}
+
+/* Base styles */
+body {
+  @apply bg-dark-900 text-dark-100;
+}
+
+/* Card styles */
+.card {
+  @apply bg-dark-800 border border-dark-700 rounded-xl;
+}
+
+.card-header {
+  @apply px-6 py-4 border-b border-dark-700;
+}
+
+.card-body {
+  @apply p-6;
+}
+
+/* Stats card */
+.stat-card {
+  @apply card p-6 transition-all duration-300 hover:border-primary-500/50 hover:shadow-lg hover:shadow-primary-500/10;
+}
+
+/* Table styles */
+.admin-table {
+  @apply w-full;
+}
+
+.admin-table th {
+  @apply px-4 py-3 text-left text-xs font-semibold text-dark-400 uppercase tracking-wider bg-dark-800/50;
+}
+
+.admin-table td {
+  @apply px-4 py-4 text-sm text-dark-200;
+}
+
+.admin-table tbody tr {
+  @apply border-b border-dark-700 hover:bg-dark-700/50 transition-colors;
+}
+
+/* Button styles */
+.btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 inline-flex items-center justify-center gap-2;
+}
+
+.btn-primary {
+  @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+}
+
+.btn-secondary {
+  @apply bg-dark-700 text-dark-200 hover:bg-dark-600 border border-dark-600;
+}
+
+.btn-success {
+  @apply bg-success text-white hover:bg-success/90;
+}
+
+.btn-danger {
+  @apply bg-danger text-white hover:bg-danger/90;
+}
+
+.btn-warning {
+  @apply bg-warning text-dark-900 hover:bg-warning/90;
+}
+
+.btn-sm {
+  @apply px-3 py-1.5 text-sm;
+}
+
+/* Input styles */
+.input {
+  @apply w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-dark-100 placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+}
+
+.select {
+  @apply input appearance-none cursor-pointer;
+}
+
+/* Badge styles */
+.badge {
+  @apply px-2.5 py-0.5 rounded-full text-xs font-medium inline-flex items-center;
+}
+
+.badge-success {
+  @apply bg-success/20 text-success;
+}
+
+.badge-warning {
+  @apply bg-warning/20 text-warning;
+}
+
+.badge-danger {
+  @apply bg-danger/20 text-danger;
+}
+
+.badge-info {
+  @apply bg-info/20 text-info;
+}
+
+.badge-primary {
+  @apply bg-primary-500/20 text-primary-400;
+}
+
+/* Sidebar */
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-3 rounded-lg text-dark-300 hover:text-white hover:bg-dark-700/50 transition-all;
+}
+
+.sidebar-link.active {
+  @apply bg-primary-600/20 text-primary-400 border-l-2 border-primary-500;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin rounded-full border-2 border-dark-500 border-t-primary-500;
+}
+

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Rifah</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            direction: rtl;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8B5ADF 0%, #FE01AB 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .logo {
+            max-width: 200px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .header p {
+            color: #ffffff;
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 24px;
+            color: #1f2937;
+            margin: 0 0 20px;
+            font-weight: 600;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .message {
+            font-size: 16px;
+            color: #4b5563;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .message-ar {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .message-en {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .highlight-box {
+            background-color: #f3e7ff;
+            border-right: 4px solid #8B5ADF;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        .highlight-box h3 {
+            color: #8B5ADF;
+            margin: 0 0 10px;
+            font-size: 18px;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .highlight-box p {
+            color: #6b7280;
+            margin: 5px 0;
+            font-size: 14px;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .info-label {
+            color: #6b7280;
+            font-weight: 600;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .info-value {
+            color: #1f2937;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 5px 0;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .footer a {
+            color: #8B5ADF;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <img src="RifahNewLogoWhite.png" alt="Rifah Platform Logo" class="logo">
+            <div class="icon">🎉</div>
+            <h1>مرحباً بك في رفاه</h1>
+            <p>Welcome to Rifah Platform</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <p class="greeting">مرحباً {{tenantNameAr}} | Hello {{tenantName}}! 👋</p>
+
+            <p class="message message-ar">
+                شكراً لتسجيلك في منصة رفاه! نحن سعداء بانضمامك إلينا.
+            </p>
+
+            <p class="message message-en">
+                Thank you for registering with Rifah Platform! We're excited to have you on board.
+            </p>
+
+            <div class="highlight-box">
+                <h3>✅ تم استلام طلبك بنجاح | Application Received</h3>
+                <p>
+                    تم استلام طلب التسجيل الخاص بك بنجاح وهو الآن قيد المراجعة من قبل فريقنا.
+                </p>
+                <p class="message-en">
+                    Your registration request has been successfully received and is now under review by our team.
+                </p>
+                <div class="info-row">
+                    <span class="info-label">البريد الإلكتروني | Email:</span>
+                    <span class="info-value">{{email}}</span>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3>📋 الخطوات التالية | Next Steps</h3>
+                <p class="message-ar">
+                    <strong>1.</strong> سنقوم بمراجعة المستندات والمعلومات الخاصة بك<br>
+                    <strong>2.</strong> ستتلقى إشعاراً بالبريد الإلكتروني بمجرد اكتمال المراجعة<br>
+                    <strong>3.</strong> بعد الموافقة، يمكنك تسجيل الدخول والبدء في استخدام المنصة
+                </p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 15px 0;">
+                <p class="message-en">
+                    <strong>1.</strong> We will review your documents and information<br>
+                    <strong>2.</strong> You'll receive an email notification once the review is complete<br>
+                    <strong>3.</strong> After approval, you can login and start using the platform
+                </p>
+            </div>
+
+            <p class="message message-ar">
+                عادة ما تستغرق عملية المراجعة من 24 إلى 48 ساعة. سنتواصل معك قريباً!
+            </p>
+
+            <p class="message message-en">
+                The review process typically takes 24-48 hours. We'll be in touch soon!
+            </p>
+
+            <p class="message message-ar" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                إذا كان لديك أي أسئلة، لا تتردد في التواصل معنا.<br>
+                <span class="message-en">If you have any questions, feel free to reach out to us.</span>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>منصة رفاه | Rifah Platform</strong></p>
+            <p>Email: <a href="mailto:support@rifah.sa">support@rifah.sa</a></p>
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+                © 2024-2026 Rifah Platform. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

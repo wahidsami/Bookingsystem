@@ -1,0 +1,93 @@
+/**
+ * Theme CSS Variables
+ * These variables are dynamically set by TenantContext based on tenant's theme colors
+ */
+
+:root {
+  --color-primary: #3B82F6;
+  --color-secondary: #8B5CF6;
+  --color-helper: #10B981;
+}
+
+/* Apply theme colors to common UI elements */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 90%, black);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 90%, black);
+}
+
+.text-primary {
+  color: var(--color-primary);
+}
+
+.text-secondary {
+  color: var(--color-secondary);
+}
+
+.text-helper {
+  color: var(--color-helper);
+}
+
+.bg-primary {
+  background-color: var(--color-primary);
+}
+
+.bg-secondary {
+  background-color: var(--color-secondary);
+}
+
+.bg-helper {
+  background-color: var(--color-helper);
+}
+
+.border-primary {
+  border-color: var(--color-primary);
+}
+
+.border-secondary {
+  border-color: var(--color-secondary);
+}
+
+.border-helper {
+  border-color: var(--color-helper);
+}
+
+/* Links */
+a {
+  color: var(--color-primary);
+}
+
+a:hover {
+  color: color-mix(in srgb, var(--color-primary) 80%, black);
+}
+
+/* Focus states */
+*:focus-visible {
+  outline-color: var(--color-primary);
+}
+
+/* Accent elements */
+.accent-primary {
+  background-color: var(--color-primary);
+}
+
+.accent-secondary {
+  background-color: var(--color-secondary);
+}
+
+.accent-helper {
+  background-color: var(--color-helper);
+}
+

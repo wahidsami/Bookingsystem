@@ -1,0 +1,77 @@
+
+> rifah-server@1.0.0 start
+> node src/index.js
+
+Database connection established successfully.
+Unable to connect to the database: Error
+    at Query.run (D:\Waheed\MypProjects\BookingSystem\server\node_modules\sequelize\lib\dialects\postgres\query.js:50:25)
+    at D:\Waheed\MypProjects\BookingSystem\server\node_modules\sequelize\lib\sequelize.js:315:28
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async PostgresQueryInterface.createTable (D:\Waheed\MypProjects\BookingSystem\server\node_modules\sequelize\lib\dialects\abstract\query-interface.js:98:12)
+    at async CustomerInsight.sync (D:\Waheed\MypProjects\BookingSystem\server\node_modules\sequelize\lib\model.js:942:7)
+    at async Sequelize.sync (D:\Waheed\MypProjects\BookingSystem\server\node_modules\sequelize\lib\sequelize.js:377:9)
+    at async startServer (D:\Waheed\MypProjects\BookingSystem\server\src\index.js:41:9) {
+  name: 'SequelizeDatabaseError',
+  parent: error: relation "public.platform_users" does not exist
+      at Parser.parseErrorMessage (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\parser.js:285:98)
+      at Parser.handlePacket (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\parser.js:122:29)
+      at Parser.parse (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\parser.js:35:38)
+      at Socket.<anonymous> (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\index.js:11:42)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at TCP.onStreamRead (node:internal/stream_base_commons:191:23) {
+    length: 119,
+    severity: 'ERROR',
+    code: '42P01',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'namespace.c',
+    line: '428',
+    routine: 'RangeVarGetRelidExtended',
+    sql: `CREATE TABLE IF NOT EXISTS "public"."customer_insights" ("id" UUID , "platformUserId" UUID NOT NULL REFERENCES "public"."platform_users" ("id") ON DELETE NO ACTION ON UPDATE CASCADE, "tenantId" UUID NOT NULL REFERENCES "public"."tenants" ("id") ON DELETE NO ACTION ON UPDATE CASCADE, "totalBookings" INTEGER DEFAULT 0, "totalSpent" DECIMAL(10,2) DEFAULT 0, "averageRating" DECIMAL(3,2), "lastVisit" TIMESTAMP WITH TIME ZONE, "firstVisit" TIMESTAMP WITH TIME ZONE, "favoriteServices" UUID[] DEFAULT ARRAY[]::UUID[], "favoriteStaff" UUID[] DEFAULT ARRAY[]::UUID[], "preferredTimes" VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[], "loyaltyTier" "public"."enum_customer_insights_loyaltyTier" DEFAULT 'bronze', "tenantLoyaltyPoints" INTEGER DEFAULT 0, "notes" TEXT, "tags" VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[], "noShowCount" INTEGER DEFAULT 0, "cancellationCount" INTEGER DEFAULT 0, "averageBookingValue" DECIMAL(10,2) DEFAULT 0, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL, "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL, PRIMARY KEY ("id"));`,
+    parameters: undefined
+  },
+  original: error: relation "public.platform_users" does not exist
+      at Parser.parseErrorMessage (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\parser.js:285:98)
+      at Parser.handlePacket (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\parser.js:122:29)
+      at Parser.parse (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\parser.js:35:38)
+      at Socket.<anonymous> (D:\Waheed\MypProjects\BookingSystem\server\node_modules\pg-protocol\dist\index.js:11:42)
+      at Socket.emit (node:events:524:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at TCP.onStreamRead (node:internal/stream_base_commons:191:23) {
+    length: 119,
+    severity: 'ERROR',
+    code: '42P01',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'namespace.c',
+    line: '428',
+    routine: 'RangeVarGetRelidExtended',
+    sql: `CREATE TABLE IF NOT EXISTS "public"."customer_insights" ("id" UUID , "platformUserId" UUID NOT NULL REFERENCES "public"."platform_users" ("id") ON DELETE NO ACTION ON UPDATE CASCADE, "tenantId" UUID NOT NULL REFERENCES "public"."tenants" ("id") ON DELETE NO ACTION ON UPDATE CASCADE, "totalBookings" INTEGER DEFAULT 0, "totalSpent" DECIMAL(10,2) DEFAULT 0, "averageRating" DECIMAL(3,2), "lastVisit" TIMESTAMP WITH TIME ZONE, "firstVisit" TIMESTAMP WITH TIME ZONE, "favoriteServices" UUID[] DEFAULT ARRAY[]::UUID[], "favoriteStaff" UUID[] DEFAULT ARRAY[]::UUID[], "preferredTimes" VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[], "loyaltyTier" "public"."enum_customer_insights_loyaltyTier" DEFAULT 'bronze', "tenantLoyaltyPoints" INTEGER DEFAULT 0, "notes" TEXT, "tags" VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[], "noShowCount" INTEGER DEFAULT 0, "cancellationCount" INTEGER DEFAULT 0, "averageBookingValue" DECIMAL(10,2) DEFAULT 0, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL, "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL, PRIMARY KEY ("id"));`,
+    parameters: undefined
+  },
+  sql: `CREATE TABLE IF NOT EXISTS "public"."customer_insights" ("id" UUID , "platformUserId" UUID NOT NULL REFERENCES "public"."platform_users" ("id") ON DELETE NO ACTION ON UPDATE CASCADE, "tenantId" UUID NOT NULL REFERENCES "public"."tenants" ("id") ON DELETE NO ACTION ON UPDATE CASCADE, "totalBookings" INTEGER DEFAULT 0, "totalSpent" DECIMAL(10,2) DEFAULT 0, "averageRating" DECIMAL(3,2), "lastVisit" TIMESTAMP WITH TIME ZONE, "firstVisit" TIMESTAMP WITH TIME ZONE, "favoriteServices" UUID[] DEFAULT ARRAY[]::UUID[], "favoriteStaff" UUID[] DEFAULT ARRAY[]::UUID[], "preferredTimes" VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[], "loyaltyTier" "public"."enum_customer_insights_loyaltyTier" DEFAULT 'bronze', "tenantLoyaltyPoints" INTEGER DEFAULT 0, "notes" TEXT, "tags" VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[], "noShowCount" INTEGER DEFAULT 0, "cancellationCount" INTEGER DEFAULT 0, "averageBookingValue" DECIMAL(10,2) DEFAULT 0, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL, "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL, PRIMARY KEY ("id"));`,
+  parameters: {}
+}

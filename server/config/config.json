@@ -1,0 +1,22 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "dev_password",
+    "database": "rifah_shared",
+    "host": "localhost",
+    "port": 5434,
+    "dialect": "postgres",
+    "logging": false
+  },
+  "production": {
+    "use_env_variable": "DATABASE_URL",
+    "dialect": "postgres",
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
+  }
+}
+

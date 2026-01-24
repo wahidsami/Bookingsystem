@@ -1,0 +1,66 @@
+/**
+ * Template 1 - Top Navigation Layout (Updated)
+ * Full-width layout with top navigation
+ */
+
+.template-template1 {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.template-template1 .header-container {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: white;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.template-template1 .main-content {
+  flex: 1;
+  width: 100%;
+}
+
+/* Hero slider and all direct children should be full width */
+.template-template1 .main-content > * {
+  width: 100%;
+  max-width: 100%;
+}
+
+.template-template1 .footer-container {
+  margin-top: auto;
+}
+
+/* Sidebar Navigation */
+.template-template1 .sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.template-template1 .sidebar-nav a {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.template-template1 .sidebar-nav a:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, white);
+  color: var(--color-primary);
+}
+
+.template-template1 .sidebar-nav a.active {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .template-template1 .main-content {
+    padding: 0;
+  }
+}
+

@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: rifah_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: rifah_shared
+    ports:
+      - "5434:5432"
+    volumes:
+      - rifah_pg_data_v3:/var/lib/postgresql/data
+    networks:
+      - rifah_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: rifah_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - rifah_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rifah_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - rifah_network
+
+networks:
+  rifah_network:
+    driver: bridge
+
+volumes:
+  rifah_pg_data_v3:
