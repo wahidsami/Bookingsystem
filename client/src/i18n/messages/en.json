@@ -145,6 +145,25 @@
     "removeCard": "Remove Card",
     "defaultCard": "Default"
   },
+  "payment": {
+    "successTitle": "Payment Successful!",
+    "bookingSuccessMessage": "Your booking has been confirmed.",
+    "productOrderSuccessMessage": "Your order has been placed successfully.",
+    "amountPaid": "Amount Paid",
+    "viewMyBookings": "View My Bookings",
+    "viewMyPurchases": "View My Purchases",
+    "backToHome": "Back to Home"
+  },
+  "purchase": {
+    "orderPlacedTitle": "Order Placed Successfully!",
+    "podSuccessMessage": "Your order has been placed. Please pay when the item is delivered.",
+    "povSuccessMessage": "Your order has been placed. Please pick it up at the salon and pay during your visit.",
+    "orderTotal": "Order Total",
+    "paymentOnDelivery": "Payment due on delivery",
+    "paymentOnVisit": "Payment due on visit",
+    "viewMyPurchases": "View My Purchases",
+    "backToHome": "Back to Home"
+  },
   "wallet": {
     "title": "Wallet & Loyalty",
     "currentBalance": "Current Balance",
@@ -263,4 +282,3 @@
     "notFound": "Not found"
   }
 }
-

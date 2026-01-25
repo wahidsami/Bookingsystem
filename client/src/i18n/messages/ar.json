@@ -145,6 +145,25 @@
     "removeCard": "إزالة البطاقة",
     "defaultCard": "افتراضي"
   },
+  "payment": {
+    "successTitle": "تم الدفع بنجاح!",
+    "bookingSuccessMessage": "تم تأكيد حجزك.",
+    "productOrderSuccessMessage": "تم تقديم طلبك بنجاح.",
+    "amountPaid": "المبلغ المدفوع",
+    "viewMyBookings": "عرض حجوزاتي",
+    "viewMyPurchases": "عرض مشترياتي",
+    "backToHome": "العودة للرئيسية"
+  },
+  "purchase": {
+    "orderPlacedTitle": "تم الطلب بنجاح!",
+    "podSuccessMessage": "تم استلام طلبك. يرجى الدفع عند استلام المنتج.",
+    "povSuccessMessage": "تم استلام طلبك. يرجى الاستلام من الصالون والدفع عند الزيارة.",
+    "orderTotal": "إجمالي الطلب",
+    "paymentOnDelivery": "الدفع مستحق عند الاستلام",
+    "paymentOnVisit": "الدفع مستحق عند الزيارة",
+    "viewMyPurchases": "عرض مشترياتي",
+    "backToHome": "العودة للرئيسية"
+  },
   "wallet": {
     "title": "المحفظة والولاء",
     "currentBalance": "الرصيد الحالي",
@@ -263,4 +282,3 @@
     "notFound": "غير موجود"
   }
 }
-
