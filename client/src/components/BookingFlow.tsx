@@ -59,7 +59,7 @@ export function BookingFlow({
         daysAhead: number;
     } | null>(null);
     const [showManualTimeSelection, setShowManualTimeSelection] = useState(false);
-    
+
     // Payment state
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [bookingData, setBookingData] = useState<{
@@ -126,7 +126,7 @@ export function BookingFlow({
 
     async function fetchStaff(serviceId: string) {
         if (!tenantId || !serviceId) return;
-        
+
         try {
             setLoading(true);
             const response = await api.get<{
@@ -136,7 +136,7 @@ export function BookingFlow({
             }>(`/public/tenant/${tenantId}/services/${serviceId}/staff`);
             if (response.success) {
                 setStaff(response.staff || []);
-                
+
                 if (response.staff.length === 0) {
                     setError("No staff members are currently assigned to this service. Please contact the salon.");
                 }
@@ -193,7 +193,7 @@ export function BookingFlow({
                 daysAhead: number | null;
                 message?: string;
             }>(url);
-            
+
             if (response.success && response.slot && response.date && response.daysAhead !== null) {
                 setNextAvailableSlot({
                     slot: response.slot,
@@ -220,11 +220,11 @@ export function BookingFlow({
 
     async function handleStaffSelect(staffMember: Staff) {
         setSelectedStaff(staffMember);
-        
+
         if (selectedService && tenantId) {
             await fetchNextAvailableSlot(staffMember.id);
         }
-        
+
         setStep(3);
     }
 
@@ -268,9 +268,9 @@ export function BookingFlow({
             if (response.success && response.appointment) {
                 const appointment = response.appointment;
                 const amount = parseFloat(
-                    appointment.price || Number(selectedService.finalPrice).toString()
+                    appointment.price || Number(selectedService.basePrice).toString()
                 );
-                
+
                 // If modal mode, show payment modal
                 if (mode === 'modal') {
                     setBookingData({
@@ -381,7 +381,7 @@ export function BookingFlow({
                                                     <div className="flex items-center gap-4 text-sm text-gray-500">
                                                         <span>{service.duration} min</span>
                                                         <span className="font-bold text-primary">
-                                                            <Currency amount={service.finalPrice ? Number(service.finalPrice) : 0} locale={locale} />
+                                                            <Currency amount={service.basePrice ? Number(service.basePrice) : 0} locale={locale} />
                                                         </span>
                                                     </div>
                                                 </div>
@@ -406,7 +406,7 @@ export function BookingFlow({
                                             <div className="flex items-center gap-3">
                                                 {staffMember.photo || staffMember.image ? (
                                                     <img
-                                                        src={`http://localhost:5000${(staffMember.photo || staffMember.image).startsWith('/') ? (staffMember.photo || staffMember.image) : `/uploads/${staffMember.photo || staffMember.image}`}`}
+                                                        src={`http://localhost:5000${(staffMember.photo || staffMember.image)?.startsWith('/') ? (staffMember.photo || staffMember.image) : `/uploads/${staffMember.photo || staffMember.image}`}`}
                                                         alt={staffMember.name}
                                                         className="w-16 h-16 rounded-full object-cover"
                                                     />
@@ -419,8 +419,8 @@ export function BookingFlow({
                                                 )}
                                                 <div className="flex-1">
                                                     <h4 className="font-semibold text-gray-900">{staffMember.name}</h4>
-                                                    {staffMember.bio && (
-                                                        <p className="text-sm text-gray-600 line-clamp-2">{staffMember.bio}</p>
+                                                    {staffMember.specialization && (
+                                                        <p className="text-sm text-gray-600 line-clamp-2">{staffMember.specialization}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -434,7 +434,7 @@ export function BookingFlow({
                         {step === 3 && selectedService && selectedStaff && (
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-4">Select Date & Time</h3>
-                                
+
                                 {nextAvailableSlot && !showManualTimeSelection && (
                                     <div className="mb-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
                                         <p className="text-sm text-gray-700 mb-2">
@@ -497,11 +497,10 @@ export function BookingFlow({
                                                             <button
                                                                 key={index}
                                                                 onClick={() => handleTimeSelect(slot)}
-                                                                className={`px-4 py-2 border rounded-lg transition-colors ${
-                                                                    selectedTime?.startTime === slot.startTime
-                                                                        ? 'bg-primary text-white border-primary'
-                                                                        : 'border-gray-300 hover:border-primary'
-                                                                }`}
+                                                                className={`px-4 py-2 border rounded-lg transition-colors ${selectedTime?.startTime === slot.startTime
+                                                                    ? 'bg-primary text-white border-primary'
+                                                                    : 'border-gray-300 hover:border-primary'
+                                                                    }`}
                                                             >
                                                                 {formatTimeSlot(slot.startTime)}
                                                             </button>
@@ -551,7 +550,7 @@ export function BookingFlow({
                                         <div className="flex items-center justify-between">
                                             <p className="text-lg font-semibold text-gray-900">Total</p>
                                             <p className="text-2xl font-bold" style={{ color: primaryColor }}>
-                                                <Currency amount={selectedService.finalPrice ? Number(selectedService.finalPrice) : 0} locale={locale} />
+                                                <Currency amount={selectedService.basePrice ? Number(selectedService.basePrice) : 0} locale={locale} />
                                             </p>
                                         </div>
                                     </div>
