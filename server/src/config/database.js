@@ -14,10 +14,10 @@ module.exports = {
         use_env_variable: 'DATABASE_URL',
         dialect: 'postgres',
         dialectOptions: {
-            ssl: {
+            ssl: process.env.DB_SSL === 'true' ? {
                 require: true,
                 rejectUnauthorized: false
-            }
+            } : false
         }
     }
 };
