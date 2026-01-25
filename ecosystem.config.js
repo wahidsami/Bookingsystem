@@ -10,15 +10,14 @@ module.exports = {
                 PORT: 3000
             }
         },
-        // Backend configuration (assumed based on standard setup, can be enabled later if needed)
-        // {
-        //   name: "rifah-server",
-        //   cwd: "./server",
-        //   script: "dist/main.js", // or index.js depending on build
-        //   env: {
-        //     NODE_ENV: "production",
-        //     PORT: 5000
-        //   }
-        // }
+        {
+            name: "rifah-server",
+            cwd: "./server",
+            script: "src/index.js",
+            env: {
+                NODE_ENV: "production",
+                PORT: 5000
+            }
+        }
     ]
 };
