@@ -88,8 +88,8 @@ export default function EditEmployeePage() {
         });
         
         if (emp.photo) {
-          setExistingPhoto(`http://localhost:5000/uploads/${emp.photo}`);
-          setPhotoPreview(`http://localhost:5000/uploads/${emp.photo}`);
+          setExistingPhoto(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${emp.photo}`);
+          setPhotoPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${emp.photo}`);
         }
       } else {
         setError(response.message || "Failed to load employee");

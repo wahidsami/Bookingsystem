@@ -88,8 +88,8 @@ export function HeroSliderTab() {
             ? (slider.backgroundImage.startsWith('http') 
                 ? slider.backgroundImage 
                 : slider.backgroundImage.startsWith('/uploads/')
-                  ? `http://localhost:5000${slider.backgroundImage}`
-                  : `http://localhost:5000/uploads/${slider.backgroundImage}`)
+                  ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${slider.backgroundImage}`
+                  : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`)
             : null
         }));
         console.log('Fixed sliders:', fixedSliders);
@@ -166,7 +166,7 @@ export function HeroSliderTab() {
       setEditingSlider(slider);
       setFormData({ ...slider });
       if (slider.backgroundImage) {
-        setBackgroundImagePreview(slider.backgroundImage.startsWith('http') ? slider.backgroundImage : `http://localhost:5000/uploads/${slider.backgroundImage}`);
+        setBackgroundImagePreview(slider.backgroundImage.startsWith('http') ? slider.backgroundImage : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`);
       } else {
         setBackgroundImagePreview(null);
       }
@@ -269,8 +269,8 @@ export function HeroSliderTab() {
                 ? (slider.backgroundImage.startsWith('http') 
                     ? slider.backgroundImage 
                     : slider.backgroundImage.startsWith('/uploads/')
-                      ? `http://localhost:5000${slider.backgroundImage}`
-                      : `http://localhost:5000/uploads/${slider.backgroundImage}`)
+                      ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${slider.backgroundImage}`
+                      : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`)
                 : null
             }));
             console.log('Fixed sliders to set:', fixedSliders);
@@ -401,7 +401,7 @@ export function HeroSliderTab() {
                 <div className="relative h-48 bg-gray-100">
                   {slider.backgroundImage ? (
                     <img
-                      src={slider.backgroundImage.startsWith('http') ? slider.backgroundImage : `http://localhost:5000/uploads/${slider.backgroundImage}`}
+                      src={slider.backgroundImage.startsWith('http') ? slider.backgroundImage : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`}
                       alt="Hero Slider"
                       className="w-full h-full object-cover"
                     />

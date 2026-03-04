@@ -82,7 +82,7 @@ export function AboutUsTab() {
         const fixImagePaths = (items: any[]) => {
           return items.map((item: any) => {
             if (item.imageUrl && !item.imageUrl.startsWith('http') && !item.imageUrl.startsWith('data:')) {
-              item.imageUrl = `http://localhost:5000/uploads/${item.imageUrl}`;
+              item.imageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${item.imageUrl}`;
             }
             return item;
           });
@@ -94,7 +94,7 @@ export function AboutUsTab() {
         setFacilitiesDescriptionAr(data.facilitiesDescriptionAr || '');
         // Fix facilities images paths
         const facilitiesImgs = (data.facilitiesImages || []).map((img: string) => 
-          img.startsWith('http') ? img : `http://localhost:5000/uploads/${img}`
+          img.startsWith('http') ? img : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${img}`
         );
         setFacilitiesImages(facilitiesImgs);
         setFinalWordTitleEn(data.finalWordTitleEn || '');
@@ -103,7 +103,7 @@ export function AboutUsTab() {
         setFinalWordTextAr(data.finalWordTextAr || '');
         setFinalWordType(data.finalWordType || 'image');
         // Fix final word image path
-        setFinalWordImageUrl(data.finalWordImageUrl ? (data.finalWordImageUrl.startsWith('http') ? data.finalWordImageUrl : `http://localhost:5000/uploads/${data.finalWordImageUrl}`) : null);
+        setFinalWordImageUrl(data.finalWordImageUrl ? (data.finalWordImageUrl.startsWith('http') ? data.finalWordImageUrl : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${data.finalWordImageUrl}`) : null);
         setFinalWordIconName(data.finalWordIconName || '');
       }
     } catch (err: any) {

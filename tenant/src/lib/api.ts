@@ -5,6 +5,9 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
+// Base server URL for media/uploads (strips /api/v1 from the end)
+export const SERVER_URL = API_URL.replace(/\/api\/v1$/, '');
+
 interface ApiResponse<T = any> {
   success: boolean;
   data?: T;

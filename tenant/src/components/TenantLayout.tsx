@@ -95,7 +95,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
             >
               {(user?.logo || user?.profileImage) ? (
                 <img
-                  src={user.logo ? (user.logo.startsWith('http') ? user.logo : `http://localhost:5000${user.logo}`) : user.profileImage}
+                  src={user.logo ? (user.logo.startsWith('http') ? user.logo : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${user.logo}`) : user.profileImage}
                   alt="Business Logo"
                   className="w-12 h-12 rounded-lg object-cover border-2 border-primary/20"
                 />

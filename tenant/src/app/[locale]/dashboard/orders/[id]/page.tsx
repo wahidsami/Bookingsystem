@@ -287,7 +287,7 @@ export default function OrderDetailsPage() {
                 {order.user.photo ? (
                   <>
                     <img
-                      src={order.user.photo.startsWith('/') ? `http://localhost:5000${order.user.photo}` : `http://localhost:5000/uploads/${order.user.photo}`}
+                      src={order.user.photo.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${order.user.photo}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${order.user.photo}`}
                       alt={userName}
                       className="w-16 h-16 rounded-full object-cover"
                       onError={(e) => {
@@ -330,7 +330,7 @@ export default function OrderDetailsPage() {
                 <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   {item.product?.image && (
                     <img
-                      src={item.product.image.startsWith('/') ? `http://localhost:5000${item.product.image}` : `http://localhost:5000/uploads/${item.product.image}`}
+                      src={item.product.image.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${item.product.image}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${item.product.image}`}
                       alt={locale === 'ar' && item.productNameAr ? item.productNameAr : item.productName}
                       className="w-16 h-16 rounded-lg object-cover"
                     />

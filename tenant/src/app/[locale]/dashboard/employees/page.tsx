@@ -216,7 +216,7 @@ export default function EmployeesPage() {
                 <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
                   {employee.photo ? (
                     <img
-                      src={`http://localhost:5000/uploads/${employee.photo}`}
+                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${employee.photo}`}
                       alt={employee.name}
                       className="w-full h-full object-cover"
                     />

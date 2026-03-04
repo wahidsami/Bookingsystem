@@ -59,22 +59,22 @@ export function PagesBannersTab() {
 
         // Set previews for existing banners
         if (pageBanners.services) {
-          setServicesBannerPreview(`http://localhost:5000/uploads/${pageBanners.services}`);
+          setServicesBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.services}`);
         } else {
           setServicesBannerPreview(null);
         }
         if (pageBanners.products) {
-          setProductsBannerPreview(`http://localhost:5000/uploads/${pageBanners.products}`);
+          setProductsBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.products}`);
         } else {
           setProductsBannerPreview(null);
         }
         if (pageBanners.about) {
-          setAboutBannerPreview(`http://localhost:5000/uploads/${pageBanners.about}`);
+          setAboutBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.about}`);
         } else {
           setAboutBannerPreview(null);
         }
         if (pageBanners.contact) {
-          setContactBannerPreview(`http://localhost:5000/uploads/${pageBanners.contact}`);
+          setContactBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.contact}`);
         } else {
           setContactBannerPreview(null);
         }
@@ -214,7 +214,7 @@ export function PagesBannersTab() {
           {hasBanner ? (
             <div className="relative">
               <img
-                src={preview || (existingBanner ? `http://localhost:5000/uploads/${existingBanner}` : '')}
+                src={preview || (existingBanner ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${existingBanner}` : '')}
                 alt={`${title} banner`}
                 className="w-full h-48 object-cover rounded-lg"
               />

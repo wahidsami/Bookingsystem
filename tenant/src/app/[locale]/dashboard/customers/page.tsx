@@ -354,8 +354,8 @@ export default function CustomersPage() {
                                     src={customer.photo.startsWith('http')
                                       ? customer.photo
                                       : customer.photo.startsWith('/')
-                                        ? `http://localhost:5000${customer.photo}`
-                                        : `http://localhost:5000/uploads/${customer.photo}`}
+                                        ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${customer.photo}`
+                                        : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${customer.photo}`}
                                     alt={`${customer.firstName} ${customer.lastName}`}
                                     className="w-10 h-10 rounded-full object-cover"
                                     onError={(e) => {

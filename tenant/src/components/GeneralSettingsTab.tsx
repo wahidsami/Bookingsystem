@@ -85,7 +85,7 @@ export function GeneralSettingsTab() {
         if (generalSettings.logo) {
           setLogoPreview(generalSettings.logo.startsWith('http') 
             ? generalSettings.logo 
-            : `http://localhost:5000/uploads/${generalSettings.logo}`);
+            : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${generalSettings.logo}`);
         }
       }
     } catch (err: any) {

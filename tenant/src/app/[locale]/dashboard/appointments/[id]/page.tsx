@@ -322,8 +322,8 @@ export default function AppointmentDetailsPage() {
                   {appointment.user.photo ? (
                     <img
                       src={appointment.user.photo.startsWith('/') 
-                        ? `http://localhost:5000${appointment.user.photo}` 
-                        : `http://localhost:5000/uploads/${appointment.user.photo}`}
+                        ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${appointment.user.photo}` 
+                        : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${appointment.user.photo}`}
                       alt={userName}
                       className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                       onError={(e) => {

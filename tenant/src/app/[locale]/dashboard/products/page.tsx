@@ -247,7 +247,7 @@ export default function ProductsPage() {
                 <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
                   {product.image ? (
                     <img
-                      src={`http://localhost:5000/uploads/${product.image}`}
+                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${product.image}`}
                       alt={locale === 'ar' ? product.name_ar : product.name_en}
                       className="w-full h-full object-cover"
                     />

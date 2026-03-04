@@ -88,7 +88,7 @@ export default function EditServicePage() {
 
   const loadGlobalSettings = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/settings/global');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/settings/global');
       const data = await response.json();
       if (data.success) {
         setGlobalSettings(data.settings);
@@ -131,7 +131,7 @@ export default function EditServicePage() {
         });
 
         if (service.image) {
-          const imageUrl = `http://localhost:5000/uploads/${service.image}`;
+          const imageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${service.image}`;
           setExistingImage(imageUrl);
           setImagePreview(imageUrl);
         }

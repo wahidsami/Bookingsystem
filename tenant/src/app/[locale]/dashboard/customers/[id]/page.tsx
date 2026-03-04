@@ -230,8 +230,8 @@ export default function CustomerDetailPage() {
                         src={customer.profileImage.startsWith('http')
                           ? customer.profileImage
                           : customer.profileImage.startsWith('/')
-                            ? `http://localhost:5000${customer.profileImage}`
-                            : `http://localhost:5000/uploads/${customer.profileImage}`}
+                            ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${customer.profileImage}`
+                            : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${customer.profileImage}`}
                         alt={`${customer.firstName} ${customer.lastName}`}
                         className="w-24 h-24 rounded-full object-cover"
                         onError={(e) => {

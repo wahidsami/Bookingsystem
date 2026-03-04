@@ -400,7 +400,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
                     {businessInfo.logo ? (
-                      <img src={`http://localhost:5000${businessInfo.logo}`} alt="Logo" className="w-full h-full object-cover" />
+                      <img src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${businessInfo.logo}`} alt="Logo" className="w-full h-full object-cover" />
                     ) : (
                       <PhotoIcon className="w-8 h-8 text-gray-400" />
                     )}

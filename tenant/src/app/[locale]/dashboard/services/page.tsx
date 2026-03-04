@@ -267,7 +267,7 @@ export default function ServicesPage() {
                 <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
                   {service.image ? (
                     <img
-                      src={`http://localhost:5000/uploads/${service.image}`}
+                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${service.image}`}
                       alt={locale === 'ar' ? service.name_ar : service.name_en}
                       className="w-full h-full object-cover"
                     />
@@ -369,7 +369,7 @@ export default function ServicesPage() {
                       <div key={emp.id} className="flex items-center gap-1">
                         {emp.photo ? (
                           <img
-                            src={`http://localhost:5000/uploads/${emp.photo}`}
+                            src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${emp.photo}`}
                             alt={emp.name}
                             className="w-6 h-6 rounded-full object-cover"
                           />

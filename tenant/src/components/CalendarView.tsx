@@ -355,7 +355,7 @@ export function CalendarView({
                         {staff.photo ? (
                           <>
                             <img
-                              src={staff.photo.startsWith('/') ? `http://localhost:5000${staff.photo}` : `http://localhost:5000/uploads/${staff.photo}`}
+                              src={staff.photo.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${staff.photo}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${staff.photo}`}
                               alt={staff.name}
                               className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
                               onError={(e) => {
@@ -446,8 +446,8 @@ export function CalendarView({
                           console.log(`[DEBUG] Has photo:`, !!photoValue);
                           if (photoValue) {
                             const photoPath = photoValue.startsWith('/') 
-                              ? `http://localhost:5000${photoValue}` 
-                              : `http://localhost:5000/uploads/${photoValue}`;
+                              ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${photoValue}` 
+                              : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${photoValue}`;
                             console.log(`[DEBUG] Photo URL:`, photoPath);
                           } else {
                             console.log(`[DEBUG] No photo value for ${userName}`);
@@ -476,8 +476,8 @@ export function CalendarView({
                                     
                                     if (hasValidPhoto) {
                                       const photoUrl = userPhoto.startsWith('/') 
-                                        ? `http://localhost:5000${userPhoto}` 
-                                        : `http://localhost:5000/uploads/${userPhoto}`;
+                                        ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${userPhoto}` 
+                                        : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${userPhoto}`;
                                       
                                       return (
                                         <>

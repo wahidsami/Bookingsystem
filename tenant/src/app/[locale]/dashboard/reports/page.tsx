@@ -357,7 +357,7 @@ export default function ReportsPage() {
                       <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
                           {employee.photo ? (
-                            <img src={`http://localhost:5000${employee.photo}`} alt={employee.name} className="w-10 h-10 rounded-full object-cover" />
+                            <img src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${employee.photo}`} alt={employee.name} className="w-10 h-10 rounded-full object-cover" />
                           ) : (
                             <span className="text-primary-600 font-medium">{employee.name?.charAt(0)}</span>
                           )}

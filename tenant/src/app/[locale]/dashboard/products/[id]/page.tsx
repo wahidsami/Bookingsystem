@@ -100,8 +100,8 @@ export default function EditProductPage() {
         });
         
         if (prod.image) {
-          setExistingImage(`http://localhost:5000/uploads/${prod.image}`);
-          setImagePreview(`http://localhost:5000/uploads/${prod.image}`);
+          setExistingImage(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${prod.image}`);
+          setImagePreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${prod.image}`);
         }
       } else {
         setError(response.message || "Failed to load product");
