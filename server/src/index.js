@@ -227,55 +227,57 @@ const startServer = async () => {
         console.log('Database connection established successfully.');
 
         // Sync models in dependency order
-        await db.SuperAdmin.sync({ alter: true });
-        await db.ActivityLog.sync({ alter: true });
+        // ⚠️ TEMPORARY: force:true drops and recreates all tables for fresh deployment
+        // TODO: Change back to force:false after first successful deploy
+        await db.SuperAdmin.sync({ force: true });
+        await db.ActivityLog.sync({ force: true });
 
         // Subscription System (must be before Tenant sync for foreign keys)
-        await db.SubscriptionPackage.sync({ alter: true }); // Base packages
+        await db.SubscriptionPackage.sync({ force: true }); // Base packages
 
-        await db.Tenant.sync({ alter: true });
+        await db.Tenant.sync({ force: true });
 
         // Subscription relationships (after Tenant)
-        await db.TenantSubscription.sync({ alter: true }); // Tenant subscriptions
-        await db.TenantUsage.sync({ alter: true }); // Usage tracking
-        await db.UsageAlert.sync({ alter: true }); // Usage alerts
+        await db.TenantSubscription.sync({ force: true }); // Tenant subscriptions
+        await db.TenantUsage.sync({ force: true }); // Usage tracking
+        await db.UsageAlert.sync({ force: true }); // Usage alerts
 
-        await db.PlatformUser.sync({ alter: true }); // Must be before PaymentMethod, Transaction, CustomerInsight
-        await db.PaymentMethod.sync({ alter: true });
-        await db.User.sync({ alter: true });
-        await db.Service.sync({ alter: true });
-        await db.Product.sync({ alter: true }); // New: Product catalog
-        await db.Customer.sync({ alter: true });
-        await db.Staff.sync({ alter: true });
-        await db.ServiceEmployee.sync({ alter: true }); // New: Service-Employee junction
-        await db.StaffSchedule.sync({ alter: true }); // Legacy schedule (kept for backward compatibility)
+        await db.PlatformUser.sync({ force: true }); // Must be before PaymentMethod, Transaction, CustomerInsight
+        await db.PaymentMethod.sync({ force: true });
+        await db.User.sync({ force: true });
+        await db.Service.sync({ force: true });
+        await db.Product.sync({ force: true }); // New: Product catalog
+        await db.Customer.sync({ force: true });
+        await db.Staff.sync({ force: true });
+        await db.ServiceEmployee.sync({ force: true }); // New: Service-Employee junction
+        await db.StaffSchedule.sync({ force: true }); // Legacy schedule (kept for backward compatibility)
         // New scheduling models (Phase 3)
         try {
-            await db.StaffShift.sync({ alter: true });
+            await db.StaffShift.sync({ force: true });
         } catch (err) {
             console.warn('⚠️  StaffShift sync warning:', err.message);
         }
         try {
-            await db.StaffBreak.sync({ alter: true });
+            await db.StaffBreak.sync({ force: true });
         } catch (err) {
             console.warn('⚠️  StaffBreak sync warning:', err.message);
         }
         try {
-            await db.StaffTimeOff.sync({ alter: true });
+            await db.StaffTimeOff.sync({ force: true });
         } catch (err) {
             console.warn('⚠️  StaffTimeOff sync warning:', err.message);
         }
         try {
-            await db.StaffScheduleOverride.sync({ alter: true });
+            await db.StaffScheduleOverride.sync({ force: true });
         } catch (err) {
             console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
         }
-        await db.Appointment.sync({ alter: true });
-        await db.CustomerInsight.sync({ alter: true });
-        await db.Transaction.sync({ alter: true });
-        await db.Order.sync({ alter: true }); // Order system
-        await db.OrderItem.sync({ alter: true }); // Order items
-        await db.PublicPageData.sync({ alter: true }); // Public page data
+        await db.Appointment.sync({ force: true });
+        await db.CustomerInsight.sync({ force: true });
+        await db.Transaction.sync({ force: true });
+        await db.Order.sync({ force: true }); // Order system
+        await db.OrderItem.sync({ force: true }); // Order items
+        await db.PublicPageData.sync({ force: true }); // Public page data
 
         console.log('✅ Database synced successfully.');
 
