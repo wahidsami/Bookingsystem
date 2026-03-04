@@ -818,7 +818,7 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
 
     const fetchPackages = async () => {
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/subscriptions/packages');
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/subscriptions/packages`);
             const data = await response.json();
             if (data.success) {
                 setPackages(data.packages.filter((pkg: any) => pkg.isActive));
