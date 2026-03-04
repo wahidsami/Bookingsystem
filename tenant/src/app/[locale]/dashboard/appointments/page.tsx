@@ -13,6 +13,7 @@ interface Service {
   id: string;
   name_en: string;
   name_ar: string;
+  duration: number;
 }
 
 interface Employee {
@@ -242,8 +243,8 @@ export default function AppointmentsPage() {
             <button
               onClick={() => setViewMode('list')}
               className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'list'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-primary text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               {t("listView")}
@@ -251,8 +252,8 @@ export default function AppointmentsPage() {
             <button
               onClick={() => setViewMode('calendar')}
               className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'calendar'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-primary text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               {t("calendarView")}
