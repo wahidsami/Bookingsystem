@@ -227,8 +227,8 @@ export default function CustomerDetailPage() {
                   {customer.profileImage ? (
                     <>
                       <img
-                        src={customer.profileImage.startsWith('http') 
-                          ? customer.profileImage 
+                        src={customer.profileImage.startsWith('http')
+                          ? customer.profileImage
                           : customer.profileImage.startsWith('/')
                             ? `http://localhost:5000${customer.profileImage}`
                             : `http://localhost:5000/uploads/${customer.profileImage}`}
@@ -260,11 +260,10 @@ export default function CustomerDetailPage() {
                     {t(customer.loyaltyTier)} • {customer.loyaltyPoints} {t('points')}
                   </span>
                   {customer.customerType && (
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      customer.customerType === 'both' ? 'bg-blue-100 text-blue-800' :
-                      customer.customerType === 'service_only' ? 'bg-purple-100 text-purple-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${customer.customerType === 'both' ? 'bg-blue-100 text-blue-800' :
+                        customer.customerType === 'service_only' ? 'bg-purple-100 text-purple-800' :
+                          'bg-green-100 text-green-800'
+                      }`}>
                       {customer.customerType === 'both' && '📅🛍️ ' + (t('both') || 'Both')}
                       {customer.customerType === 'service_only' && '📅 ' + (t('servicesOnly') || 'Services Only')}
                       {customer.customerType === 'product_only' && '🛍️ ' + (t('productsOnly') || 'Products Only')}
@@ -505,27 +504,25 @@ export default function CustomerDetailPage() {
               <CalendarIcon className="w-5 h-5" />
               {t('completeHistory') || 'Complete History'}
             </h3>
-            
+
             {/* Tab Navigation */}
             <div className="flex gap-2 mb-4 border-b border-gray-200" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
               <button
                 onClick={() => setHistoryTab('all')}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  historyTab === 'all'
+                className={`px-4 py-2 text-sm font-medium transition-colors ${historyTab === 'all'
                     ? 'border-b-2 border-primary-500 text-primary-600'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 {t('all') || 'All'} ({((customer.allAppointments || customer.recentAppointments || []).length + (customer.allOrders || customer.recentOrders || []).length)})
               </button>
               {(customer.allAppointments || customer.recentAppointments || []).length > 0 && (
                 <button
                   onClick={() => setHistoryTab('appointments')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    historyTab === 'appointments'
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${historyTab === 'appointments'
                       ? 'border-b-2 border-blue-500 text-blue-600'
                       : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                    }`}
                 >
                   📅 {t('appointments') || 'Appointments'} ({(customer.allAppointments || customer.recentAppointments || []).length})
                 </button>
@@ -533,11 +530,10 @@ export default function CustomerDetailPage() {
               {/* Always show Purchases tab */}
               <button
                 onClick={() => setHistoryTab('purchases')}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  historyTab === 'purchases'
+                className={`px-4 py-2 text-sm font-medium transition-colors ${historyTab === 'purchases'
                     ? 'border-b-2 border-green-500 text-green-600'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 🛍️ {t('purchases') || 'Purchases'} ({(customer.allOrders || customer.recentOrders || []).length})
               </button>
@@ -547,41 +543,37 @@ export default function CustomerDetailPage() {
             <div className="flex gap-2 flex-wrap mb-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
               <button
                 onClick={() => setHistoryFilter('all')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                  historyFilter === 'all'
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${historyFilter === 'all'
                     ? 'bg-primary-100 text-primary-700 border border-primary-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {t('all') || 'All'}
               </button>
               <button
                 onClick={() => setHistoryFilter('completed')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                  historyFilter === 'completed'
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${historyFilter === 'completed'
                     ? 'bg-green-100 text-green-700 border border-green-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 ✓ {t('completed') || 'Completed'}
               </button>
               <button
                 onClick={() => setHistoryFilter('pending')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                  historyFilter === 'pending'
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${historyFilter === 'pending'
                     ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 ⏳ {t('pending') || 'Pending'}
               </button>
               <button
                 onClick={() => setHistoryFilter('cancelled')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                  historyFilter === 'cancelled'
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${historyFilter === 'cancelled'
                     ? 'bg-red-100 text-red-700 border border-red-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 ✗ {t('cancelled') || 'Cancelled'}
               </button>
@@ -617,13 +609,13 @@ export default function CustomerDetailPage() {
             }
 
             // Sort by date (most recent first)
-            allItems.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+            allItems.sort((a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime());
 
             if (allItems.length === 0) {
               // Show specific message based on selected tab
               let emptyMessage = t('noHistory') || 'No history found';
               let emptyIcon = <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />;
-              
+
               if (historyTab === 'purchases') {
                 emptyMessage = t('noPurchasesYet') || 'No purchases yet';
                 emptyIcon = <span className="text-6xl mb-4">🛍️</span>;
@@ -631,7 +623,7 @@ export default function CustomerDetailPage() {
                 emptyMessage = t('noAppointments') || 'No appointments yet';
                 emptyIcon = <span className="text-6xl mb-4">📅</span>;
               }
-              
+
               return (
                 <div className="text-center py-12">
                   {emptyIcon}
