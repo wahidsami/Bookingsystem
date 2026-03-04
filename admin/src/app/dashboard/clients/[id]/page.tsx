@@ -338,7 +338,7 @@ export default function ClientDetailsPage() {
                   <div>
                     <p className="text-dark-400 text-xs mb-2">Business Logo</p>
                     <img 
-                      src={`http://localhost:5000/uploads/${tenant.logo}`} 
+                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${tenant.logo}`} 
                       alt="Business Logo" 
                       className="h-16 w-16 object-cover rounded-lg border border-dark-600"
                       onError={(e) => {
@@ -544,7 +544,7 @@ export default function ClientDetailsPage() {
                       )}
                       {hasDocument ? (
                         <a
-                          href={`http://localhost:5000/uploads/${documentPath}`}
+                          href={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${documentPath}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-secondary btn-sm w-full"

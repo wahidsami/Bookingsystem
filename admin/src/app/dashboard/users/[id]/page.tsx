@@ -167,7 +167,7 @@ export default function UserDetailsPage() {
             <div className="w-16 h-16 rounded-full bg-primary-500/20 flex items-center justify-center text-3xl">
               {user.profileImage ? (
                 <img
-                  src={`http://localhost:5000${user.profileImage}`}
+                  src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${user.profileImage}`}
                   alt=""
                   className="w-16 h-16 rounded-full object-cover"
                 />

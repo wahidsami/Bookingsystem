@@ -41,7 +41,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         const token = sessionStorage.getItem("rifah_admin_token");
         if (!token) return;
         
-        const response = await fetch("http://localhost:5000/api/v1/admin/tenants/pending", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/admin/tenants/pending`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await response.json();

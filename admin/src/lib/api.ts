@@ -1,5 +1,8 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
+// Base server URL for media/uploads (without /api/v1)
+export const SERVER_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
+
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface ApiOptions {
