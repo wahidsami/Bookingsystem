@@ -60,7 +60,7 @@ export default function AppointmentsPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState("");
-  
+
   // Filters
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
@@ -116,7 +116,7 @@ export default function AppointmentsPage() {
 
   const loadEmployees = async () => {
     try {
-      const response = await tenantApi.getEmployees(undefined, true);
+      const response = await tenantApi.getEmployees({ isActive: true });
       if (response.success) {
         setEmployees(response.employees || []);
       }
@@ -129,7 +129,7 @@ export default function AppointmentsPage() {
     try {
       setLoading(true);
       setError("");
-      
+
       const params: any = {
         startDate,
         endDate,
@@ -140,7 +140,7 @@ export default function AppointmentsPage() {
       if (filterStatus) params.status = filterStatus;
 
       const response = await tenantApi.getAppointments(params);
-      
+
       if (response.success) {
         setAppointments(response.appointments || []);
       } else {
@@ -241,21 +241,19 @@ export default function AppointmentsPage() {
           <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                viewMode === 'list'
+              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'list'
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("listView")}
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                viewMode === 'calendar'
+              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'calendar'
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("calendarView")}
             </button>
@@ -371,7 +369,7 @@ export default function AppointmentsPage() {
           {appointments.map((appointment) => {
             const start = formatDateTime(appointment.startTime);
             const end = formatDateTime(appointment.endTime);
-            const userName = appointment.user 
+            const userName = appointment.user
               ? `${appointment.user.firstName} ${appointment.user.lastName}`.trim()
               : t("unknownCustomer");
 
@@ -397,7 +395,7 @@ export default function AppointmentsPage() {
                         {t("with")} {appointment.staff.name}
                       </p>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2 mb-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(appointment.status)}`}>
                         {getStatusLabel(appointment.status)}
