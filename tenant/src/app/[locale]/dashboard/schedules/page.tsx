@@ -6,17 +6,17 @@ import { tenantApi } from "@/lib/api";
 // import { useTranslations } from "next-intl"; // Not used for now
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { 
-  CalendarIcon, 
-  ClockIcon, 
-  PauseIcon, 
-  NoSymbolIcon, 
-  ExclamationCircleIcon, 
-  PlusIcon, 
-  PencilIcon, 
-  TrashIcon, 
-  CheckIcon, 
-  XMarkIcon 
+import {
+  CalendarIcon,
+  ClockIcon,
+  PauseIcon,
+  NoSymbolIcon,
+  ExclamationCircleIcon,
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  CheckIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 interface Employee {
@@ -48,6 +48,8 @@ interface Break {
   label: string | null;
   isRecurring: boolean;
   isActive: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 interface TimeOff {
@@ -81,13 +83,13 @@ export default function SchedulesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('shifts');
-  
+
   // Data states
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [breaks, setBreaks] = useState<Break[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [overrides, setOverrides] = useState<Override[]>([]);
-  
+
   // Modal states
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [showBreakModal, setShowBreakModal] = useState(false);
@@ -231,7 +233,7 @@ export default function SchedulesPage() {
     }
   };
 
-  const dayNames = locale === 'ar' 
+  const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -247,7 +249,7 @@ export default function SchedulesPage() {
               {locale === 'ar' ? 'إدارة الجداول' : 'Schedule Management'}
             </h1>
             <p className="text-gray-600">
-              {locale === 'ar' 
+              {locale === 'ar'
                 ? 'إدارة جداول الموظفين، الاستراحات، الإجازات، والاستثناءات'
                 : 'Manage employee schedules, breaks, time off, and exceptions'}
             </p>
@@ -278,44 +280,40 @@ export default function SchedulesPage() {
               <nav className={`flex ${isRTL ? 'flex-row-reverse' : ''} -mb-px`}>
                 <button
                   onClick={() => setActiveTab('shifts')}
-                  className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                    activeTab === 'shifts'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'shifts'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <ClockIcon className="w-4 h-4 inline mr-2" />
                   {locale === 'ar' ? 'الورديات' : 'Shifts'}
                 </button>
                 <button
                   onClick={() => setActiveTab('breaks')}
-                  className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                    activeTab === 'breaks'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'breaks'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <PauseIcon className="w-4 h-4 inline mr-2" />
                   {locale === 'ar' ? 'الاستراحات' : 'Breaks'}
                 </button>
                 <button
                   onClick={() => setActiveTab('timeoff')}
-                  className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                    activeTab === 'timeoff'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'timeoff'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <NoSymbolIcon className="w-4 h-4 inline mr-2" />
                   {locale === 'ar' ? 'الإجازات' : 'Time Off'}
                 </button>
                 <button
                   onClick={() => setActiveTab('overrides')}
-                  className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                    activeTab === 'overrides'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'overrides'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <ExclamationCircleIcon className="w-4 h-4 inline mr-2" />
                   {locale === 'ar' ? 'الاستثناءات' : 'Overrides'}
@@ -330,7 +328,7 @@ export default function SchedulesPage() {
                   shifts={shifts}
                   employeeName={selectedEmployee?.name || ''}
                   onAdd={() => { setEditingItem(null); setShowShiftModal(true); }}
-                  onEdit={(shift) => { setEditingItem(shift); setShowShiftModal(true); }}
+                  onEdit={(shift: Shift) => { setEditingItem(shift); setShowShiftModal(true); }}
                   onDelete={handleDeleteShift}
                   onRefresh={loadScheduleData}
                   locale={locale}
@@ -343,7 +341,7 @@ export default function SchedulesPage() {
                   breaks={breaks}
                   employeeName={selectedEmployee?.name || ''}
                   onAdd={() => { setEditingItem(null); setShowBreakModal(true); }}
-                  onEdit={(breakItem) => { setEditingItem(breakItem); setShowBreakModal(true); }}
+                  onEdit={(breakItem: Break) => { setEditingItem(breakItem); setShowBreakModal(true); }}
                   onDelete={handleDeleteBreak}
                   onRefresh={loadScheduleData}
                   locale={locale}
@@ -356,7 +354,7 @@ export default function SchedulesPage() {
                   timeOff={timeOff}
                   employeeName={selectedEmployee?.name || ''}
                   onAdd={() => { setEditingItem(null); setShowTimeOffModal(true); }}
-                  onEdit={(item) => { setEditingItem(item); setShowTimeOffModal(true); }}
+                  onEdit={(item: TimeOff) => { setEditingItem(item); setShowTimeOffModal(true); }}
                   onDelete={handleDeleteTimeOff}
                   onRefresh={loadScheduleData}
                   locale={locale}
@@ -369,7 +367,7 @@ export default function SchedulesPage() {
                   overrides={overrides}
                   employeeName={selectedEmployee?.name || ''}
                   onAdd={() => { setEditingItem(null); setShowOverrideModal(true); }}
-                  onEdit={(override) => { setEditingItem(override); setShowOverrideModal(true); }}
+                  onEdit={(override: Override) => { setEditingItem(override); setShowOverrideModal(true); }}
                   onDelete={handleDeleteOverride}
                   onRefresh={loadScheduleData}
                   locale={locale}
@@ -434,8 +432,26 @@ export default function SchedulesPage() {
 }
 
 // Shifts Tab Component
-function ShiftsTab({ shifts, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
-  const dayNames = locale === 'ar' 
+function ShiftsTab({
+  shifts,
+  employeeName,
+  onAdd,
+  onEdit,
+  onDelete,
+  onRefresh,
+  locale,
+  isRTL
+}: {
+  shifts: Shift[],
+  employeeName: string,
+  onAdd: () => void,
+  onEdit: (item: Shift) => void,
+  onDelete: (id: string) => void,
+  onRefresh: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
+  const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -523,7 +539,7 @@ function ShiftsTab({ shifts, employeeName, onAdd, onEdit, onDelete, locale, isRT
             {locale === 'ar' ? 'لا توجد ورديات' : 'No shifts configured'}
           </div>
           <p className="text-sm text-gray-400">
-            {locale === 'ar' 
+            {locale === 'ar'
               ? 'انقر على "إضافة وردية" لبدء إضافة جداول العمل'
               : 'Click "Add Shift" to start adding work schedules'}
           </p>
@@ -534,8 +550,26 @@ function ShiftsTab({ shifts, employeeName, onAdd, onEdit, onDelete, locale, isRT
 }
 
 // Breaks Tab Component
-function BreaksTab({ breaks, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
-  const dayNames = locale === 'ar' 
+function BreaksTab({
+  breaks,
+  employeeName,
+  onAdd,
+  onEdit,
+  onDelete,
+  onRefresh,
+  locale,
+  isRTL
+}: {
+  breaks: Break[],
+  employeeName: string,
+  onAdd: () => void,
+  onEdit: (item: Break) => void,
+  onDelete: (id: string) => void,
+  onRefresh: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
+  const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -559,7 +593,7 @@ function BreaksTab({ breaks, employeeName, onAdd, onEdit, onDelete, locale, isRT
           <div key={breakItem.id} className="p-4 bg-gray-50 rounded-lg flex items-center justify-between">
             <div>
               <div className="font-medium">
-                {breakItem.isRecurring && breakItem.dayOfWeek !== null 
+                {breakItem.isRecurring && breakItem.dayOfWeek !== null
                   ? dayNames[breakItem.dayOfWeek]
                   : breakItem.specificDate || 'N/A'}
                 {' - '}
@@ -572,10 +606,10 @@ function BreaksTab({ breaks, employeeName, onAdd, onEdit, onDelete, locale, isRT
             </div>
             <div className="flex gap-2">
               <button onClick={() => onEdit(breakItem)} className="p-2 text-primary hover:bg-primary/10 rounded">
-                <Edit className="w-4 h-4" />
+                <PencilIcon className="w-4 h-4" />
               </button>
               <button onClick={() => onDelete(breakItem.id)} className="p-2 text-red-600 hover:bg-red-50 rounded">
-                <Trash2 className="w-4 h-4" />
+                <TrashIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -592,7 +626,25 @@ function BreaksTab({ breaks, employeeName, onAdd, onEdit, onDelete, locale, isRT
 }
 
 // Time Off Tab Component
-function TimeOffTab({ timeOff, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
+function TimeOffTab({
+  timeOff,
+  employeeName,
+  onAdd,
+  onEdit,
+  onDelete,
+  onRefresh,
+  locale,
+  isRTL
+}: {
+  timeOff: TimeOff[],
+  employeeName: string,
+  onAdd: () => void,
+  onEdit: (item: TimeOff) => void,
+  onDelete: (id: string) => void,
+  onRefresh: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -628,10 +680,10 @@ function TimeOffTab({ timeOff, employeeName, onAdd, onEdit, onDelete, locale, is
             </div>
             <div className="flex gap-2">
               <button onClick={() => onEdit(item)} className="p-2 text-primary hover:bg-primary/10 rounded">
-                <Edit className="w-4 h-4" />
+                <PencilIcon className="w-4 h-4" />
               </button>
               <button onClick={() => onDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded">
-                <Trash2 className="w-4 h-4" />
+                <TrashIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -648,7 +700,25 @@ function TimeOffTab({ timeOff, employeeName, onAdd, onEdit, onDelete, locale, is
 }
 
 // Overrides Tab Component
-function OverridesTab({ overrides, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
+function OverridesTab({
+  overrides,
+  employeeName,
+  onAdd,
+  onEdit,
+  onDelete,
+  onRefresh,
+  locale,
+  isRTL
+}: {
+  overrides: Override[],
+  employeeName: string,
+  onAdd: () => void,
+  onEdit: (item: Override) => void,
+  onDelete: (id: string) => void,
+  onRefresh: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -688,10 +758,10 @@ function OverridesTab({ overrides, employeeName, onAdd, onEdit, onDelete, locale
             </div>
             <div className="flex gap-2">
               <button onClick={() => onEdit(override)} className="p-2 text-primary hover:bg-primary/10 rounded">
-                <Edit className="w-4 h-4" />
+                <PencilIcon className="w-4 h-4" />
               </button>
               <button onClick={() => onDelete(override.id)} className="p-2 text-red-600 hover:bg-red-50 rounded">
-                <Trash2 className="w-4 h-4" />
+                <TrashIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -708,7 +778,22 @@ function OverridesTab({ overrides, employeeName, onAdd, onEdit, onDelete, locale
 }
 
 // Shift Modal Component
-function ShiftModal({ employeeId, employeeName, shift, onClose, onSave, locale, isRTL }: any) {
+function ShiftModal({
+  employeeId,
+  employeeName,
+  shift,
+  onClose,
+  onSave,
+  locale
+}: {
+  employeeId: string,
+  employeeName: string,
+  shift: Shift | null,
+  onClose: () => void,
+  onSave: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
   const [formData, setFormData] = useState({
     isRecurring: shift?.isRecurring !== false,
     dayOfWeek: shift?.dayOfWeek ?? null,
@@ -759,7 +844,7 @@ function ShiftModal({ employeeId, employeeName, shift, onClose, onSave, locale, 
     }
   };
 
-  const dayNames = locale === 'ar' 
+  const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -770,7 +855,7 @@ function ShiftModal({ employeeId, employeeName, shift, onClose, onSave, locale, 
           {shift ? (locale === 'ar' ? 'تعديل الوردية' : 'Edit Shift') : (locale === 'ar' ? 'إضافة وردية' : 'Add Shift')}
         </h2>
         <p className="text-sm text-gray-600 mb-4">
-          {locale === 'ar' 
+          {locale === 'ar'
             ? 'حدد نوع الوردية: دورية (تتكرر كل أسبوع) أو لمرة واحدة (تاريخ محدد)'
             : 'Choose shift type: Recurring (repeats weekly) or One-time (specific date)'}
         </p>
@@ -886,7 +971,22 @@ function ShiftModal({ employeeId, employeeName, shift, onClose, onSave, locale, 
 }
 
 // Break Modal Component
-function BreakModal({ employeeId, employeeName, breakItem, onClose, onSave, locale, isRTL }: any) {
+function BreakModal({
+  employeeId,
+  employeeName,
+  breakItem,
+  onClose,
+  onSave,
+  locale
+}: {
+  employeeId: string,
+  employeeName: string,
+  breakItem: Break | null,
+  onClose: () => void,
+  onSave: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
   const [formData, setFormData] = useState({
     isRecurring: breakItem?.isRecurring !== false,
     dayOfWeek: breakItem?.dayOfWeek ?? null,
@@ -939,7 +1039,7 @@ function BreakModal({ employeeId, employeeName, breakItem, onClose, onSave, loca
     }
   };
 
-  const dayNames = locale === 'ar' 
+  const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -1075,7 +1175,22 @@ function BreakModal({ employeeId, employeeName, breakItem, onClose, onSave, loca
 }
 
 // Time Off Modal Component
-function TimeOffModal({ employeeId, employeeName, timeOff, onClose, onSave, locale, isRTL }: any) {
+function TimeOffModal({
+  employeeId,
+  employeeName,
+  timeOff,
+  onClose,
+  onSave,
+  locale
+}: {
+  employeeId: string,
+  employeeName: string,
+  timeOff: TimeOff | null,
+  onClose: () => void,
+  onSave: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
   const [formData, setFormData] = useState({
     startDate: timeOff?.startDate || '',
     endDate: timeOff?.endDate || '',
@@ -1093,7 +1208,7 @@ function TimeOffModal({ employeeId, employeeName, timeOff, onClose, onSave, loca
         startDate: formData.startDate,
         endDate: formData.endDate,
         type: formData.type,
-        reason: formData.reason || null
+        reason: formData.reason || undefined
       };
 
       if (timeOff) {
@@ -1180,7 +1295,22 @@ function TimeOffModal({ employeeId, employeeName, timeOff, onClose, onSave, loca
 }
 
 // Override Modal Component
-function OverrideModal({ employeeId, employeeName, override, onClose, onSave, locale, isRTL }: any) {
+function OverrideModal({
+  employeeId,
+  employeeName,
+  override,
+  onClose,
+  onSave,
+  locale
+}: {
+  employeeId: string,
+  employeeName: string,
+  override: Override | null,
+  onClose: () => void,
+  onSave: () => void,
+  locale: string,
+  isRTL: boolean
+}) {
   const [formData, setFormData] = useState({
     date: override?.date || '',
     type: override?.type || 'override',
