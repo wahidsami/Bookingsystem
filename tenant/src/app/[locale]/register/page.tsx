@@ -294,7 +294,7 @@ const Step2Documentation = ({ formData, handleChange, handleFileChange, errors }
             {/* Commercial Registration */}
             <div className="border border-gray-200 rounded-lg p-6 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">{t('step2.cr.title')}</h3>
-                
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('step2.cr.number')} <span className="text-red-500">*</span>
@@ -329,7 +329,7 @@ const Step2Documentation = ({ formData, handleChange, handleFileChange, errors }
             {/* Tax Certificate */}
             <div className="border border-gray-200 rounded-lg p-6 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">{t('step2.tax.title')}</h3>
-                
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('step2.tax.number')} <span className="text-red-500">*</span>
@@ -364,7 +364,7 @@ const Step2Documentation = ({ formData, handleChange, handleFileChange, errors }
             {/* Business License */}
             <div className="border border-gray-200 rounded-lg p-6 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">{t('step2.license.title')}</h3>
-                
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('step2.license.number')} <span className="text-red-500">*</span>
@@ -789,11 +789,10 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                             onClick={() => handleChange({
                                 target: { name: 'serviceRanking', value: star }
                             } as any)}
-                            className={`text-3xl ${
-                                star <= formData.serviceRanking
+                            className={`text-3xl ${star <= formData.serviceRanking
                                     ? 'text-yellow-400'
                                     : 'text-gray-300'
-                            }`}
+                                }`}
                         >
                             ★
                         </button>
@@ -867,22 +866,20 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                 <button
                     type="button"
                     onClick={() => setSelectedTab('monthly')}
-                    className={`px-6 py-3 font-medium transition ${
-                        selectedTab === 'monthly'
+                    className={`px-6 py-3 font-medium transition ${selectedTab === 'monthly'
                             ? 'text-purple-600 border-b-2 border-purple-600'
                             : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                        }`}
                 >
                     Monthly
                 </button>
                 <button
                     type="button"
                     onClick={() => setSelectedTab('sixMonth')}
-                    className={`px-6 py-3 font-medium transition ${
-                        selectedTab === 'sixMonth'
+                    className={`px-6 py-3 font-medium transition ${selectedTab === 'sixMonth'
                             ? 'text-purple-600 border-b-2 border-purple-600'
                             : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                        }`}
                 >
                     6 Months
                     <span className="ml-2 text-xs text-green-600 font-semibold">Save 10%</span>
@@ -890,11 +887,10 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                 <button
                     type="button"
                     onClick={() => setSelectedTab('annual')}
-                    className={`px-6 py-3 font-medium transition ${
-                        selectedTab === 'annual'
+                    className={`px-6 py-3 font-medium transition ${selectedTab === 'annual'
                             ? 'text-purple-600 border-b-2 border-purple-600'
                             : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                        }`}
                 >
                     Annual
                     <span className="ml-2 text-xs text-green-600 font-semibold">Save 17%</span>
@@ -917,11 +913,10 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                         return (
                             <div
                                 key={pkg.id}
-                                className={`relative border-2 rounded-lg p-6 cursor-pointer transition ${
-                                    isSelected
+                                className={`relative border-2 rounded-lg p-6 cursor-pointer transition ${isSelected
                                         ? 'border-purple-600 bg-purple-50'
                                         : 'border-gray-200 hover:border-purple-300'
-                                } ${pkg.isFeatured ? 'ring-2 ring-purple-500' : ''}`}
+                                    } ${pkg.isFeatured ? 'ring-2 ring-purple-500' : ''}`}
                                 onClick={() => handlePackageSelect(pkg.id, selectedTab)}
                             >
                                 {pkg.isFeatured && (
@@ -996,7 +991,7 @@ const Step7ServiceAgreement = ({ formData, handleChange, errors }: any) => {
             <div className="border border-gray-300 rounded-lg p-6 max-h-96 overflow-y-auto bg-gray-50">
                 <div className="prose prose-sm max-w-none">
                     <h3 className="text-lg font-bold mb-4">{t('step7.agreementTitle')}</h3>
-                    
+
                     <div className="space-y-4 text-gray-700">
                         <p>{t('step7.section1.title')}</p>
                         <p>{t('step7.section1.content')}</p>
@@ -1070,26 +1065,26 @@ export default function RegisterPage() {
         city: '',
         country: 'Saudi Arabia',
         googleMapLink: '',
-        
+
         // Step 2: Official Documentation
         crNumber: '',
         taxNumber: '',
         licenseNumber: '',
-        
+
         // Step 3: Contact Person
         contactPersonNameAr: '',
         contactPersonNameEn: '',
         contactPersonEmail: '',
         contactPersonMobile: '',
         contactPersonPosition: '',
-        
+
         // Step 4: Owner Details
         ownerNameAr: '',
         ownerNameEn: '',
         ownerPhone: '',
         ownerEmail: '',
         ownerNationalId: '',
-        
+
         // Step 5: Business Details
         providesHomeServices: false,
         staffCount: '',
@@ -1099,11 +1094,11 @@ export default function RegisterPage() {
         serviceRanking: 0,
         advertiseOnSocialMedia: false,
         wantsRifahPromotion: false,
-        
+
         // Step 6: Subscription Package
         selectedPackageId: '',
         selectedBillingPeriod: 'monthly',
-        
+
         // Step 7: Service Agreement
         acceptedServiceAgreement: false
     });
@@ -1118,7 +1113,7 @@ export default function RegisterPage() {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
-        
+
         setFormData(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
@@ -1241,7 +1236,7 @@ export default function RegisterPage() {
 
             submitData.append('preferredLanguage', locale);
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/auth/tenant/register', {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/auth/tenant/register`, {
                 method: 'POST',
                 body: submitData
             });
@@ -1271,7 +1266,7 @@ export default function RegisterPage() {
     return (
         <div className="min-h-screen relative py-12 px-4">
             {/* Background Image - No Overlay */}
-            <div 
+            <div
                 className="fixed inset-0 z-0"
                 style={{
                     backgroundImage: 'url(/regbg.jpg)',
@@ -1282,7 +1277,7 @@ export default function RegisterPage() {
             ></div>
 
             {/* Back to Home Button */}
-            <Link 
+            <Link
                 href={`/${locale}`}
                 className="fixed top-6 left-6 z-20 bg-white/90 backdrop-blur-sm text-purple-900 hover:bg-white px-4 py-2 rounded-lg transition flex items-center gap-2 shadow-lg font-semibold"
             >
@@ -1297,10 +1292,10 @@ export default function RegisterPage() {
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-4">
                         <div className="bg-white rounded-full p-4 shadow-xl">
-                            <Image 
-                                src="/refahlogo.svg" 
-                                alt="Rifah Logo" 
-                                width={80} 
+                            <Image
+                                src="/refahlogo.svg"
+                                alt="Rifah Logo"
+                                width={80}
                                 height={80}
                                 className="w-20 h-20"
                             />
@@ -1319,25 +1314,22 @@ export default function RegisterPage() {
                             <div key={step} className="flex-1">
                                 <div className="flex items-center">
                                     <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                                            step <= currentStep
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${step <= currentStep
                                                 ? 'bg-purple-600 text-white shadow-lg'
                                                 : 'bg-gray-200 text-gray-600'
-                                        }`}
+                                            }`}
                                     >
                                         {step}
                                     </div>
                                     {step < 7 && (
                                         <div
-                                            className={`flex-1 h-1 mx-2 rounded ${
-                                                step < currentStep ? 'bg-purple-600' : 'bg-gray-300'
-                                            }`}
+                                            className={`flex-1 h-1 mx-2 rounded ${step < currentStep ? 'bg-purple-600' : 'bg-gray-300'
+                                                }`}
                                         />
                                     )}
                                 </div>
-                                <div className={`text-xs text-center mt-2 font-semibold ${
-                                    step <= currentStep ? 'text-purple-900' : 'text-gray-600'
-                                }`}>
+                                <div className={`text-xs text-center mt-2 font-semibold ${step <= currentStep ? 'text-purple-900' : 'text-gray-600'
+                                    }`}>
                                     {t(`steps.step${step}`)}
                                 </div>
                             </div>
