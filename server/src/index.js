@@ -226,60 +226,56 @@ const startServer = async () => {
         await db.sequelize.authenticate();
         console.log('Database connection established successfully.');
 
-        // Sync models in dependency order (FAST MODE - no alterations)
-        await db.SuperAdmin.sync({ force: false });
-        await db.ActivityLog.sync({ force: false }); // Changed from alter: true for faster startup
+        // Sync models in dependency order
+        await db.SuperAdmin.sync({ alter: true });
+        await db.ActivityLog.sync({ alter: true });
 
         // Subscription System (must be before Tenant sync for foreign keys)
-        await db.SubscriptionPackage.sync({ force: false }); // Base packages
+        await db.SubscriptionPackage.sync({ alter: true }); // Base packages
 
-        await db.Tenant.sync({ force: false }); // Changed from alter: true for faster startup
+        await db.Tenant.sync({ alter: true });
 
         // Subscription relationships (after Tenant)
-        await db.TenantSubscription.sync({ force: false }); // Tenant subscriptions
-        await db.TenantUsage.sync({ force: false }); // Usage tracking
-        await db.UsageAlert.sync({ force: false }); // Usage alerts
+        await db.TenantSubscription.sync({ alter: true }); // Tenant subscriptions
+        await db.TenantUsage.sync({ alter: true }); // Usage tracking
+        await db.UsageAlert.sync({ alter: true }); // Usage alerts
 
-        // TenantSettings - SKIP for now (will add later when needed)
-        // await db.TenantSettings.sync({ force: false });
-
-        await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
-        await db.PaymentMethod.sync({ force: false });
-        await db.User.sync({ force: false });
-        await db.Service.sync({ force: false }); // Columns already exist in DB
-        await db.Product.sync({ force: false }); // New: Product catalog
-        await db.Customer.sync({ force: false });
-        await db.Staff.sync({ force: false }); // Don't alter to avoid issues with existing data
-        await db.ServiceEmployee.sync({ force: false }); // New: Service-Employee junction
-        await db.StaffSchedule.sync({ force: false }); // Legacy schedule (kept for backward compatibility)
-        // New scheduling models (Phase 3) - use force: false to create if missing, but don't alter existing
-        // Note: If tables already exist with different schema, they won't be modified
+        await db.PlatformUser.sync({ alter: true }); // Must be before PaymentMethod, Transaction, CustomerInsight
+        await db.PaymentMethod.sync({ alter: true });
+        await db.User.sync({ alter: true });
+        await db.Service.sync({ alter: true });
+        await db.Product.sync({ alter: true }); // New: Product catalog
+        await db.Customer.sync({ alter: true });
+        await db.Staff.sync({ alter: true });
+        await db.ServiceEmployee.sync({ alter: true }); // New: Service-Employee junction
+        await db.StaffSchedule.sync({ alter: true }); // Legacy schedule (kept for backward compatibility)
+        // New scheduling models (Phase 3)
         try {
-            await db.StaffShift.sync({ force: false });
+            await db.StaffShift.sync({ alter: true });
         } catch (err) {
             console.warn('⚠️  StaffShift sync warning:', err.message);
         }
         try {
-            await db.StaffBreak.sync({ force: false });
+            await db.StaffBreak.sync({ alter: true });
         } catch (err) {
             console.warn('⚠️  StaffBreak sync warning:', err.message);
         }
         try {
-            await db.StaffTimeOff.sync({ force: false });
+            await db.StaffTimeOff.sync({ alter: true });
         } catch (err) {
             console.warn('⚠️  StaffTimeOff sync warning:', err.message);
         }
         try {
-            await db.StaffScheduleOverride.sync({ force: false });
+            await db.StaffScheduleOverride.sync({ alter: true });
         } catch (err) {
             console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
         }
-        await db.Appointment.sync({ force: false }); // Don't alter to avoid issues with existing data
-        await db.CustomerInsight.sync({ force: false });
-        await db.Transaction.sync({ force: false });
-        await db.Order.sync({ force: false }); // Order system
-        await db.OrderItem.sync({ force: false }); // Order items
-        await db.PublicPageData.sync({ force: false }); // Public page data
+        await db.Appointment.sync({ alter: true });
+        await db.CustomerInsight.sync({ alter: true });
+        await db.Transaction.sync({ alter: true });
+        await db.Order.sync({ alter: true }); // Order system
+        await db.OrderItem.sync({ alter: true }); // Order items
+        await db.PublicPageData.sync({ alter: true }); // Public page data
 
         console.log('✅ Database synced successfully.');
 
