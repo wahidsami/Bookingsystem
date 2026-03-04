@@ -55,8 +55,8 @@ export default function NewServicePage() {
     category: "General",
     duration: "30",
     includes: [] as string[],
-    benefits: [] as {en: string, ar: string}[],
-    whatToExpect: [] as {en: string, ar: string}[],
+    benefits: [] as { en: string, ar: string }[],
+    whatToExpect: [] as { en: string, ar: string }[],
     hasOffer: false,
     offerDetails: "",
     hasGift: false,
@@ -69,8 +69,8 @@ export default function NewServicePage() {
     availableHomeVisit: false
   });
   const [newInclude, setNewInclude] = useState("");
-  const [newBenefit, setNewBenefit] = useState({en: "", ar: ""});
-  const [newWhatToExpect, setNewWhatToExpect] = useState({en: "", ar: ""});
+  const [newBenefit, setNewBenefit] = useState({ en: "", ar: "" });
+  const [newWhatToExpect, setNewWhatToExpect] = useState({ en: "", ar: "" });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -94,7 +94,7 @@ export default function NewServicePage() {
 
   const loadEmployees = async () => {
     try {
-      const response = await tenantApi.getEmployees(undefined, true); // Only active employees
+      const response = await tenantApi.getEmployees({ isActive: true }); // Only active employees
       if (response.success) {
         setEmployees(response.employees || []);
       }
@@ -158,9 +158,9 @@ export default function NewServicePage() {
     if (newBenefit.en.trim() && newBenefit.ar.trim()) {
       setFormData(prev => ({
         ...prev,
-        benefits: [...prev.benefits, {en: newBenefit.en.trim(), ar: newBenefit.ar.trim()}]
+        benefits: [...prev.benefits, { en: newBenefit.en.trim(), ar: newBenefit.ar.trim() }]
       }));
-      setNewBenefit({en: "", ar: ""});
+      setNewBenefit({ en: "", ar: "" });
     }
   };
 
@@ -175,9 +175,9 @@ export default function NewServicePage() {
     if (newWhatToExpect.en.trim() && newWhatToExpect.ar.trim()) {
       setFormData(prev => ({
         ...prev,
-        whatToExpect: [...prev.whatToExpect, {en: newWhatToExpect.en.trim(), ar: newWhatToExpect.ar.trim()}]
+        whatToExpect: [...prev.whatToExpect, { en: newWhatToExpect.en.trim(), ar: newWhatToExpect.ar.trim() }]
       }));
-      setNewWhatToExpect({en: "", ar: ""});
+      setNewWhatToExpect({ en: "", ar: "" });
     }
   };
 
@@ -214,29 +214,29 @@ export default function NewServicePage() {
 
     try {
       const submitData = new FormData();
-      
+
       // Basic info
       submitData.append("name_en", formData.name_en);
       submitData.append("name_ar", formData.name_ar);
       if (formData.description_en) submitData.append("description_en", formData.description_en);
       if (formData.description_ar) submitData.append("description_ar", formData.description_ar);
-      
+
       // Pricing (tax and commission rates are controlled by admin, not sent from frontend)
       submitData.append("rawPrice", formData.rawPrice);
-      
+
       // Service details
       submitData.append("category", formData.category);
       submitData.append("duration", formData.duration);
       submitData.append("includes", JSON.stringify(formData.includes));
       submitData.append("benefits", JSON.stringify(formData.benefits));
       submitData.append("whatToExpect", JSON.stringify(formData.whatToExpect));
-      
+
       // Offers
       submitData.append("hasOffer", formData.hasOffer.toString());
       if (formData.hasOffer && formData.offerDetails) {
         submitData.append("offerDetails", formData.offerDetails);
       }
-      
+
       // Gifts
       submitData.append("hasGift", formData.hasGift.toString());
       if (formData.hasGift) {
@@ -247,22 +247,22 @@ export default function NewServicePage() {
           submitData.append("giftDetails", formData.giftProductId);
         }
       }
-      
+
       // Employees
       submitData.append("employeeIds", JSON.stringify(formData.employeeIds));
-      
+
       // Status
       submitData.append("isActive", formData.isActive.toString());
       submitData.append("availableInCenter", formData.availableInCenter.toString());
       submitData.append("availableHomeVisit", formData.availableHomeVisit.toString());
-      
+
       // Image
       if (imageFile) {
         submitData.append("image", imageFile);
       }
 
       const response = await tenantApi.createService(submitData);
-      
+
       if (response.success) {
         router.push(`/${locale}/dashboard/services`);
       } else {
@@ -312,7 +312,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -416,7 +416,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("serviceAvailability")}
               </h3>
-              
+
               <div className="space-y-3">
                 <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <input
@@ -428,7 +428,7 @@ export default function NewServicePage() {
                   />
                   <label className="font-medium text-gray-700">{t("availableInCenter")}</label>
                 </div>
-                
+
                 <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <input
                     type="checkbox"
@@ -447,7 +447,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("includes")} <span className="text-gray-400">({t("optional")})</span>
               </h3>
-              
+
               <div className="space-y-4">
                 <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <input
@@ -463,7 +463,7 @@ export default function NewServicePage() {
                     {t("add")}
                   </button>
                 </div>
-                
+
                 {formData.includes.length > 0 && (
                   <div className={`flex flex-wrap gap-2 ${isRTL ? 'justify-end' : ''}`}>
                     {formData.includes.map((item, index) => (
@@ -488,13 +488,13 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("benefitsList")} <span className="text-gray-400">({t("optional")})</span>
               </h3>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <input
                     type="text"
                     value={newBenefit.en}
-                    onChange={(e) => setNewBenefit(prev => ({...prev, en: e.target.value}))}
+                    onChange={(e) => setNewBenefit(prev => ({ ...prev, en: e.target.value }))}
                     placeholder={locale === 'ar' ? 'Benefit (English)...' : 'Benefit (English)...'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
@@ -502,7 +502,7 @@ export default function NewServicePage() {
                   <input
                     type="text"
                     value={newBenefit.ar}
-                    onChange={(e) => setNewBenefit(prev => ({...prev, ar: e.target.value}))}
+                    onChange={(e) => setNewBenefit(prev => ({ ...prev, ar: e.target.value }))}
                     placeholder={locale === 'ar' ? 'الفائدة (بالعربية)...' : 'الفائدة (بالعربية)...'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left', direction: 'rtl' }}
@@ -552,13 +552,13 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("whatToExpect")} <span className="text-gray-400">({t("optional")})</span>
               </h3>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <input
                     type="text"
                     value={newWhatToExpect.en}
-                    onChange={(e) => setNewWhatToExpect(prev => ({...prev, en: e.target.value}))}
+                    onChange={(e) => setNewWhatToExpect(prev => ({ ...prev, en: e.target.value }))}
                     placeholder={locale === 'ar' ? 'What to Expect (English)...' : 'What to Expect (English)...'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
@@ -566,7 +566,7 @@ export default function NewServicePage() {
                   <input
                     type="text"
                     value={newWhatToExpect.ar}
-                    onChange={(e) => setNewWhatToExpect(prev => ({...prev, ar: e.target.value}))}
+                    onChange={(e) => setNewWhatToExpect(prev => ({ ...prev, ar: e.target.value }))}
                     placeholder={locale === 'ar' ? 'ما يمكن توقعه (بالعربية)...' : 'ما يمكن توقعه (بالعربية)...'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left', direction: 'rtl' }}
@@ -620,7 +620,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("image")}
               </h3>
-              
+
               <div className="space-y-4">
                 {imagePreview ? (
                   <div className="relative">
@@ -645,7 +645,7 @@ export default function NewServicePage() {
                     <span className="text-6xl">💇</span>
                   </div>
                 )}
-                
+
                 <label className="block">
                   <input
                     type="file"
@@ -665,7 +665,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'التسعير' : 'Pricing'}
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -747,7 +747,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("assignEmployees")} <span className="text-red-500">*</span>
               </h3>
-              
+
               {employees.length === 0 ? (
                 <p className="text-gray-600 text-sm" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {t("noEmployees")} <Link href={`/${locale}/dashboard/employees/new`} className="text-primary underline">{t("addEmployee")}</Link>
@@ -778,7 +778,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("offers")}
               </h3>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <input
@@ -790,7 +790,7 @@ export default function NewServicePage() {
                   />
                   <label className="font-medium text-gray-700">{t("hasOffer")}</label>
                 </div>
-                
+
                 {formData.hasOffer && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -816,7 +816,7 @@ export default function NewServicePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("gifts")}
               </h3>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <input
@@ -828,7 +828,7 @@ export default function NewServicePage() {
                   />
                   <label className="font-medium text-gray-700">{t("hasGift")}</label>
                 </div>
-                
+
                 {formData.hasGift && (
                   <>
                     <div>
@@ -847,7 +847,7 @@ export default function NewServicePage() {
                         <option value="product">{t("giftTypeProduct")}</option>
                       </select>
                     </div>
-                    
+
                     {formData.giftType === "text" ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
