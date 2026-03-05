@@ -119,7 +119,7 @@ export default function FinancialOverviewPage() {
             <div className="rounded-lg border border-gray-600 bg-gray-800 p-6">
               <p className="text-sm font-medium text-gray-300">Total Revenue</p>
               <p className="mt-2 text-2xl font-bold text-white">
-                SAR {summary.total_revenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                SAR {(summary?.total_revenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-gray-400">from all customers</p>
             </div>
@@ -127,11 +127,11 @@ export default function FinancialOverviewPage() {
             <div className="rounded-lg border border-green-600 bg-green-900 p-6">
               <p className="text-sm font-medium text-green-200">Your Commission</p>
               <p className="mt-2 text-2xl font-bold text-green-400">
-                SAR {summary.your_earnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                SAR {(summary?.your_earnings || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-green-300">
-                {summary.total_revenue > 0
-                  ? ((summary.your_earnings / summary.total_revenue) * 100).toFixed(1)
+                {(summary?.total_revenue || 0) > 0
+                  ? (((summary?.your_earnings || 0) / (summary?.total_revenue || 1)) * 100).toFixed(1)
                   : '0'}
                 % of total
               </p>
