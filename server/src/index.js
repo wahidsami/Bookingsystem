@@ -19,23 +19,34 @@ const app = express();
 const getCorsOrigins = () => {
     const env = process.env.NODE_ENV || 'development';
 
-    if (env === 'production') {
-        return (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean) || [
-            'https://rifah.sa',
-            'https://www.rifah.sa',
-            'https://admin.rifah.sa',
-            'https://tenant.rifah.sa',
-            'https://public.rifah.sa'
-        ];
+    // Parse environment variable if it exists
+    if (process.env.CORS_ORIGINS) {
+        const parsed = process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+        if (parsed.length > 0) return parsed;
     }
 
-    // Development
+    const defaultProdOrigins = [
+        'https://rifah.sa',
+        'https://www.rifah.sa',
+        'https://admin.rifah.sa',
+        'https://tenant.rifah.sa',
+        'https://public.rifah.sa',
+        'https://radmin.unifinitylab.com',
+        'https://rtenant.unifinitylab.com'
+    ];
+
+    if (env === 'production') {
+        return defaultProdOrigins;
+    }
+
+    // Development fallback (includes prod domains just in case NODE_ENV isn't set right)
     return [
-        'http://localhost:3000',   // Client App
-        'http://localhost:3001',   // Legacy
-        'http://localhost:3002',   // Admin Dashboard
-        'http://localhost:3003',   // Tenant Dashboard
-        'http://localhost:3004',   // Public Page
+        ...defaultProdOrigins,
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'http://localhost:3003',
+        'http://localhost:3004',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:3002',
         'http://127.0.0.1:3003',
