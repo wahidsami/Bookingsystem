@@ -18,6 +18,7 @@ interface ApiResponse<T = any> {
 
 class TenantApiClient {
   private baseUrl: string;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -61,28 +62,38 @@ class TenantApiClient {
    * Refresh access token using refresh token
    */
   private async refreshAccessToken(): Promise<boolean> {
-    try {
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) return false;
-
-      const response = await fetch(`${this.baseUrl}/auth/tenant/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.accessToken) {
-        sessionStorage.setItem('rifah_tenant_access_token', data.accessToken);
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      return false;
+    if (this.refreshPromise) {
+      return this.refreshPromise;
     }
+
+    this.refreshPromise = (async () => {
+      try {
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken) return false;
+
+        const response = await fetch(`${this.baseUrl}/auth/tenant/refresh-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.accessToken) {
+          sessionStorage.setItem('rifah_tenant_access_token', data.accessToken);
+          return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   /**
@@ -92,7 +103,14 @@ class TenantApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const accessToken = this.getAccessToken();
+    let accessToken = this.getAccessToken();
+
+    // Pre-emptively refresh token if access token is missing but refresh token exists
+    // Prevents sending guaranteed 401 unauthenticated requests on new tabs
+    if (!accessToken && this.getRefreshToken()) {
+      await this.refreshAccessToken();
+      accessToken = this.getAccessToken();
+    }
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
