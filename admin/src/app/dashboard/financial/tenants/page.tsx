@@ -149,10 +149,10 @@ export default function TenantLeaderboardPage() {
       'Tenant Name': tenant.name,
       'Plan': tenant.plan,
       'Bookings': tenant.bookings,
-      'Gross Revenue': `SAR ${tenant.gross_revenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
-      'Your Commission': `SAR ${tenant.your_commission.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
-      'Tenant Revenue': `SAR ${tenant.tenant_earned.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
-      'Avg Per Booking': `SAR ${tenant.avg_per_booking.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Gross Revenue': `SAR ${(tenant.gross_revenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Your Commission': `SAR ${(tenant.your_commission || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Tenant Revenue': `SAR ${(tenant.tenant_earned || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Avg Per Booking': `SAR ${(tenant.avg_per_booking || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
       'Active Days': tenant.active_days,
     }));
     exportToCSV(exportData, `tenant-leaderboard-${format(new Date(), 'yyyy-MM-dd')}`);
@@ -271,7 +271,7 @@ export default function TenantLeaderboardPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Total Tenant Revenue</p>
               <p className="mt-2 text-2xl font-bold">
-                SAR {totalRevenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                SAR {(totalRevenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-gray-500">from {totalTenants} active tenants</p>
             </div>
@@ -283,7 +283,7 @@ export default function TenantLeaderboardPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Average Revenue</p>
               <p className="mt-2 text-2xl font-bold">
-                SAR {averageRevenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                SAR {(averageRevenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-gray-500">per tenant</p>
             </div>
@@ -364,16 +364,16 @@ export default function TenantLeaderboardPage() {
                       <td className="px-4 py-3 text-right">{item.bookings}</td>
                       <td className="px-4 py-3 text-right">{item.active_days}</td>
                       <td className="px-4 py-3 text-right">
-                        SAR {item.gross_revenue.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(item.gross_revenue || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        SAR {item.tenant_earned.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(item.tenant_earned || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-green-600">
-                        SAR {item.your_commission.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(item.your_commission || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        SAR {item.avg_per_booking.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(item.avg_per_booking || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <Link href={`/dashboard/financial/tenants/${item.id}`}>

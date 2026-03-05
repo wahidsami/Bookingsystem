@@ -136,8 +136,8 @@ export default function TenantDetailPage() {
       'Days Worked': emp.days_worked,
       'Avg Duration (min)': emp.avg_duration_minutes,
       'Commission Rate': `${emp.commissionRate}%`,
-      'Commission Earned': `SAR ${emp.commission_earned.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
-      'Value Handled': `SAR ${emp.total_value_handled.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Commission Earned': `SAR ${(emp.commission_earned || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Value Handled': `SAR ${(emp.total_value_handled || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
     }));
     exportToCSV(exportData, `${tenant?.name}-staff-${format(new Date(), 'yyyy-MM-dd')}`);
   };
@@ -147,9 +147,9 @@ export default function TenantDetailPage() {
       'Date': format(new Date(txn.createdAt), 'yyyy-MM-dd HH:mm:ss'),
       'Type': txn.transaction_type,
       'Item': txn.item_name,
-      'Amount': `SAR ${txn.amount.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
-      'Platform Fee': `SAR ${txn.your_fee.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
-      'Tenant Revenue': `SAR ${txn.tenant_revenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Amount': `SAR ${(txn.amount || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Platform Fee': `SAR ${(txn.your_fee || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
+      'Tenant Revenue': `SAR ${(txn.tenant_revenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`,
       'Payment Method': txn.paymentMethod || 'N/A',
       'Status': txn.payment_status,
     }));
@@ -224,7 +224,7 @@ export default function TenantDetailPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <p className="text-sm font-medium text-gray-600">Gross Revenue</p>
           <p className="mt-2 text-2xl font-bold">
-            SAR {tenant.gross_revenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+            SAR ${(tenant.gross_revenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
           </p>
           <p className="text-xs text-gray-500">from customers</p>
         </div>
@@ -232,7 +232,7 @@ export default function TenantDetailPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <p className="text-sm font-medium text-gray-600">Net Revenue</p>
           <p className="mt-2 text-2xl font-bold text-green-600">
-            SAR {tenant.net_revenue.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+            SAR ${(tenant.net_revenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
           </p>
           <p className="text-xs text-gray-500">after commission</p>
         </div>
@@ -241,14 +241,14 @@ export default function TenantDetailPage() {
           <p className="text-sm font-medium text-gray-600">Bookings</p>
           <p className="mt-2 text-2xl font-bold">{tenant.total_bookings}</p>
           <p className="text-xs text-gray-500">
-            Avg: SAR {tenant.avg_booking_value.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+            Avg: SAR ${(tenant.avg_booking_value || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
           </p>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <p className="text-sm font-medium text-gray-600">Your Commission</p>
           <p className="mt-2 text-2xl font-bold text-orange-600">
-            SAR {tenant.platform_commission.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+            SAR ${(tenant.platform_commission || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
           </p>
           <p className="text-xs text-gray-500">paid to you</p>
         </div>
@@ -296,10 +296,10 @@ export default function TenantDetailPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        SAR {emp.commission_earned.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(emp.commission_earned || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        SAR {emp.total_value_handled.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(emp.total_value_handled || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                     </tr>
                   ))}
@@ -347,24 +347,23 @@ export default function TenantDetailPage() {
                       </td>
                       <td className="px-4 py-3">{tx.item_name}</td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        SAR {tx.amount.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(tx.amount || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-right text-orange-600">
-                        SAR {tx.your_fee.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(tx.your_fee || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        SAR {tx.tenant_revenue.toLocaleString('en-SA', { maximumFractionDigits: 2 })}
+                        SAR {(tx.tenant_revenue || 0).toLocaleString('en-SA', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-sm">{tx.paymentMethod}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-block rounded px-2 py-1 text-xs font-semibold ${
-                            tx.payment_status === 'completed'
+                          className={`inline-block rounded px-2 py-1 text-xs font-semibold ${tx.payment_status === 'completed'
                               ? 'bg-green-100 text-green-800'
                               : tx.payment_status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
                         >
                           {tx.payment_status}
                         </span>
