@@ -60,8 +60,8 @@ export default function FinancialOverviewPage() {
       ]);
 
       if (summaryRes.success) setSummary(summaryRes.data);
-      if (monthlyRes.success) setMonthly(monthlyRes.data);
-      if (commissionRes.success) setCommissionBreakdown(commissionRes.data);
+      if (monthlyRes.success) setMonthly(monthlyRes.data || []);
+      if (commissionRes.success) setCommissionBreakdown(commissionRes.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
       console.error('Error:', err);
@@ -88,7 +88,7 @@ export default function FinancialOverviewPage() {
 
   // Calculate chart height based on data
   const maxRevenue = Math.max(
-    ...(monthly.map((m) => m.total_revenue) || [0]),
+    ...(monthly?.map((m) => m.total_revenue || 0) || [0]),
     summary?.total_revenue || 0
   );
 
@@ -192,9 +192,9 @@ export default function FinancialOverviewPage() {
               <div className="flex items-end justify-between gap-2 overflow-x-auto" style={{ height: '300px', minWidth: '100%' }}>
                 {monthly.length > 0 ? (
                   monthly.map((month, idx) => {
-                    const totalHeight = Math.max((month.total_revenue / maxRevenue) * 100, 2);
-                    const yourHeight = Math.max((month.your_earnings / maxRevenue) * 100, 2);
-                    const tenantHeight = Math.max((month.tenant_earnings / maxRevenue) * 100, 2);
+                    const totalHeight = Math.max(((month.total_revenue || 0) / (maxRevenue || 1)) * 100, 2);
+                    const yourHeight = Math.max(((month.your_earnings || 0) / (maxRevenue || 1)) * 100, 2);
+                    const tenantHeight = Math.max(((month.tenant_earnings || 0) / (maxRevenue || 1)) * 100, 2);
 
                     return (
                       <div key={idx} className="flex flex-1 flex-col items-center justify-end gap-1 min-w-max">
@@ -262,8 +262,8 @@ export default function FinancialOverviewPage() {
                 <div style={{ width: '200px', height: '200px' }} className="relative flex items-center justify-center">
                   <svg width="200" height="200" className="transform -rotate-90">
                     {commissionBreakdown.map((item, idx) => {
-                      const total = commissionBreakdown.reduce((sum, p) => sum + p.your_earnings, 0);
-                      const percentage = (item.your_earnings / total) * 100;
+                      const total = commissionBreakdown.reduce((sum, p) => sum + (p.your_earnings || 0), 0);
+                      const percentage = total > 0 ? ((item.your_earnings || 0) / total) * 100 : 0;
                       const circumference = 2 * Math.PI * 60;
                       const offset = circumference * ((100 - percentage) / 100);
 
@@ -280,7 +280,7 @@ export default function FinancialOverviewPage() {
                       let cumulativeOffset = 0;
                       for (let i = 0; i < idx; i++) {
                         cumulativeOffset +=
-                          (commissionBreakdown[i].your_earnings / total) * circumference;
+                          ((commissionBreakdown[i].your_earnings || 0) / (total || 1)) * circumference;
                       }
 
                       return (
@@ -303,7 +303,7 @@ export default function FinancialOverviewPage() {
                     <p className="text-xl font-bold text-white">
                       SAR{' '}
                       {commissionBreakdown
-                        .reduce((sum, p) => sum + p.your_earnings, 0)
+                        .reduce((sum, p) => sum + (p.your_earnings || 0), 0)
                         .toLocaleString('en-SA', { maximumFractionDigits: 0 })}
                     </p>
                   </div>
@@ -321,8 +321,8 @@ export default function FinancialOverviewPage() {
                       '#EC4899',
                     ];
                     const color = colors[idx % colors.length];
-                    const total = commissionBreakdown.reduce((sum, p) => sum + p.your_earnings, 0);
-                    const percentage = ((item.your_earnings / total) * 100).toFixed(1);
+                    const total = commissionBreakdown.reduce((sum, p) => sum + (p.your_earnings || 0), 0);
+                    const percentage = total > 0 ? (((item.your_earnings || 0) / total) * 100).toFixed(1) : '0.0';
 
                     return (
                       <div key={idx} className="flex items-center gap-2 text-sm">
