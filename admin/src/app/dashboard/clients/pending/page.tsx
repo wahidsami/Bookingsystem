@@ -154,7 +154,7 @@ export default function PendingClientsPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-white">{tenant.name}</h3>
                       <p className="text-sm text-dark-400 capitalize">
-                        {tenant.businessType?.replace("_", " ")} • {tenant.city || "Location not set"}
+                        {String(tenant.businessType || "").replace("_", " ")} • {tenant.city || "Location not set"}
                       </p>
                     </div>
                   </div>

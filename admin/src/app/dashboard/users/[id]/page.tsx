@@ -200,8 +200,8 @@ export default function UserDetailsPage() {
             <p className="text-dark-400 text-xs font-medium">Completed</p>
             <p className="text-2xl font-bold text-success mt-1">{stats?.completedBookings || 0}</p>
           </div>
-          <div className="card p-4 cursor-pointer hover:border-primary-500/50" 
-               onClick={() => setAdjustModal({ open: true, type: "wallet" })}>
+          <div className="card p-4 cursor-pointer hover:border-primary-500/50"
+            onClick={() => setAdjustModal({ open: true, type: "wallet" })}>
             <p className="text-dark-400 text-xs font-medium">Wallet Balance</p>
             <p className="text-2xl font-bold text-white mt-1">
               <Currency amount={user.walletBalance} />
@@ -209,7 +209,7 @@ export default function UserDetailsPage() {
             <p className="text-xs text-primary-400 mt-1">Click to adjust</p>
           </div>
           <div className="card p-4 cursor-pointer hover:border-primary-500/50"
-               onClick={() => setAdjustModal({ open: true, type: "loyalty" })}>
+            onClick={() => setAdjustModal({ open: true, type: "loyalty" })}>
             <p className="text-dark-400 text-xs font-medium">Loyalty Points</p>
             <p className="text-2xl font-bold text-white mt-1">{user.loyaltyPoints || 0}</p>
             <p className="text-xs text-primary-400 mt-1">Click to adjust</p>
@@ -345,7 +345,7 @@ export default function UserDetailsPage() {
                 <tbody>
                   {transactions.slice(0, 10).map((tx) => (
                     <tr key={tx.id}>
-                      <td className="text-white capitalize">{tx.type?.replace("_", " ")}</td>
+                      <td className="text-white capitalize">{String(tx.type || "").replace("_", " ")}</td>
                       <td className={tx.type === "refund" ? "text-success" : "text-white"}>
                         {tx.type === "refund" ? "+" : "-"}
                         <Currency amount={parseFloat(tx.amount.toString())} />

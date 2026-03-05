@@ -141,7 +141,7 @@ export default function ActivitiesPage() {
                             </span>{" "}
                             a{" "}
                             <span className="text-dark-300">
-                              {activity.entityType.replace("_", " ")}
+                              {String(activity.entityType || "").replace("_", " ")}
                             </span>
                           </p>
                           {activity.details && Object.keys(activity.details).length > 0 && (

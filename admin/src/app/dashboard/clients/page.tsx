@@ -245,7 +245,7 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className="capitalize text-dark-300">
-                            {tenant.businessType?.replace("_", " ") || "-"}
+                            {String(tenant.businessType || "").replace("_", " ")}
                           </span>
                         </td>
                         <td>
@@ -262,7 +262,7 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className={`badge ${getPlanBadge(tenant.plan)}`}>
-                            {tenant.plan?.replace("_", " ")}
+                            {String(tenant.plan || "").replace("_", " ")}
                           </span>
                         </td>
                         <td className="text-dark-400 text-sm">

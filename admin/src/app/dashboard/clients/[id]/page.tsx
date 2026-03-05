@@ -211,7 +211,7 @@ export default function ClientDetailsPage() {
                 <span className={`badge ${statusBadge.class}`}>{statusBadge.text}</span>
               </div>
               <p className="text-dark-400 mt-1 capitalize">
-                {tenant.businessType?.replace("_", " ")} • {tenant.city || "Location not set"}
+                {String(tenant.businessType || "").replace("_", " ")} • {tenant.city || "Location not set"}
               </p>
               <p className="text-dark-500 text-sm mt-1">ID: {tenant.id}</p>
             </div>
@@ -293,11 +293,10 @@ export default function ClientDetailsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`py-3 px-1 border-b-2 transition-colors ${
-                  activeTab === tab.id
+                className={`py-3 px-1 border-b-2 transition-colors ${activeTab === tab.id
                     ? "border-primary-500 text-primary-400"
                     : "border-transparent text-dark-400 hover:text-dark-200"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -326,7 +325,7 @@ export default function ClientDetailsPage() {
                   <div>
                     <p className="text-dark-400 text-xs">Type</p>
                     <p className="text-white mt-1 capitalize">
-                      {tenant.businessType?.replace("_", " ") || "-"}
+                      {String(tenant.businessType || "").replace("_", " ")}
                     </p>
                   </div>
                   <div>
@@ -337,9 +336,9 @@ export default function ClientDetailsPage() {
                 {tenant.logo && (
                   <div>
                     <p className="text-dark-400 text-xs mb-2">Business Logo</p>
-                    <img 
-                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${tenant.logo}`} 
-                      alt="Business Logo" 
+                    <img
+                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${tenant.logo}`}
+                      alt="Business Logo"
                       className="h-16 w-16 object-cover rounded-lg border border-dark-600"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23333' width='100' height='100'/%3E%3Ctext fill='%23666' font-size='14' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3ENo Logo%3C/text%3E%3C/svg%3E";
@@ -389,9 +388,9 @@ export default function ClientDetailsPage() {
                 {(tenant as any).googleMapLink && (
                   <div>
                     <p className="text-dark-400 text-xs">Google Maps</p>
-                    <a 
-                      href={(tenant as any).googleMapLink} 
-                      target="_blank" 
+                    <a
+                      href={(tenant as any).googleMapLink}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary-400 hover:underline mt-1 text-sm"
                     >
@@ -473,7 +472,7 @@ export default function ClientDetailsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-dark-400 text-xs">Plan</p>
-                    <p className="text-white mt-1 capitalize">{tenant.plan?.replace("_", " ")}</p>
+                    <p className="text-white mt-1 capitalize">{String(tenant.plan || "").replace("_", " ")}</p>
                   </div>
                   <div>
                     <p className="text-dark-400 text-xs">Status</p>
@@ -509,18 +508,18 @@ export default function ClientDetailsPage() {
             <div className="card-body">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { 
-                    key: "crDocument", 
+                  {
+                    key: "crDocument",
                     label: "Commercial Registration",
                     number: (tenant as any).crNumber
                   },
-                  { 
-                    key: "taxDocument", 
+                  {
+                    key: "taxDocument",
                     label: "Tax Certificate",
                     number: (tenant as any).taxNumber
                   },
-                  { 
-                    key: "licenseDocument", 
+                  {
+                    key: "licenseDocument",
                     label: "Business License",
                     number: (tenant as any).licenseNumber
                   },
