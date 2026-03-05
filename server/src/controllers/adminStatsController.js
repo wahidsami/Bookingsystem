@@ -2,119 +2,72 @@ const db = require('../models');
 const { Op } = require('sequelize');
 
 /**
- * Get platform dashboard statistics
+ * Get platform dashboard statistics - fault-tolerant version
+ * Every query is individually guarded so a single table issue never causes a 500
  */
 const getDashboardStats = async (req, res) => {
     try {
-        // Get date ranges
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
         const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+        // Safe helpers
+        const safeCount = async (model, opts = {}) => {
+            try { return await model.count(opts); } catch (e) { console.warn('safeCount error:', e.message); return 0; }
+        };
+        const safeSum = async (model, col, opts = {}) => {
+            try { return (await model.sum(col, opts)) || 0; } catch (e) { console.warn('safeSum error:', e.message); return 0; }
+        };
 
         // Tenant stats
-        const totalTenants = await db.Tenant.count();
-        const pendingTenants = await db.Tenant.count({ where: { status: 'pending' } });
-        const approvedTenants = await db.Tenant.count({ where: { status: 'approved' } });
-        const suspendedTenants = await db.Tenant.count({ where: { status: 'suspended' } });
-
-        const newTenantsThisMonth = await db.Tenant.count({
-            where: {
-                createdAt: { [Op.gte]: thisMonthStart }
-            }
-        });
-
-        const newTenantsLastMonth = await db.Tenant.count({
-            where: {
-                createdAt: {
-                    [Op.gte]: lastMonthStart,
-                    [Op.lt]: thisMonthStart
-                }
-            }
-        });
+        const [totalTenants, pendingTenants, approvedTenants, suspendedTenants, newTenantsThisMonth, newTenantsLastMonth] = await Promise.all([
+            safeCount(db.Tenant),
+            safeCount(db.Tenant, { where: { status: 'pending' } }),
+            safeCount(db.Tenant, { where: { status: 'approved' } }),
+            safeCount(db.Tenant, { where: { status: 'suspended' } }),
+            safeCount(db.Tenant, { where: { createdAt: { [Op.gte]: thisMonthStart } } }),
+            safeCount(db.Tenant, { where: { createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } }),
+        ]);
 
         // User stats
-        const totalUsers = await db.PlatformUser.count();
-        const newUsersThisMonth = await db.PlatformUser.count({
-            where: {
-                createdAt: { [Op.gte]: thisMonthStart }
-            }
-        });
-
-        const newUsersLastMonth = await db.PlatformUser.count({
-            where: {
-                createdAt: {
-                    [Op.gte]: lastMonthStart,
-                    [Op.lt]: thisMonthStart
-                }
-            }
-        });
+        const [totalUsers, newUsersThisMonth, newUsersLastMonth] = await Promise.all([
+            safeCount(db.PlatformUser),
+            safeCount(db.PlatformUser, { where: { createdAt: { [Op.gte]: thisMonthStart } } }),
+            safeCount(db.PlatformUser, { where: { createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } }),
+        ]);
 
         // Transaction stats
-        const totalTransactions = await db.Transaction.count();
-        const totalRevenue = await db.Transaction.sum('platformFee', {
-            where: { status: 'completed' }
-        }) || 0;
+        const [totalRevenue, revenueThisMonth, revenueLastMonth] = await Promise.all([
+            safeSum(db.Transaction, 'platformFee', { where: { status: 'completed' } }),
+            safeSum(db.Transaction, 'platformFee', { where: { status: 'completed', createdAt: { [Op.gte]: thisMonthStart } } }),
+            safeSum(db.Transaction, 'platformFee', { where: { status: 'completed', createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } }),
+        ]);
 
-        const revenueThisMonth = await db.Transaction.sum('platformFee', {
-            where: {
-                status: 'completed',
-                createdAt: { [Op.gte]: thisMonthStart }
-            }
-        }) || 0;
-
-        const revenueLastMonth = await db.Transaction.sum('platformFee', {
-            where: {
-                status: 'completed',
-                createdAt: {
-                    [Op.gte]: lastMonthStart,
-                    [Op.lt]: thisMonthStart
-                }
-            }
-        }) || 0;
-
-        // Booking stats - wrapped in try/catch since appointments table may have ENUM issues
-        let totalBookings = 0, bookingsThisMonth = 0, bookingsLastMonth = 0;
-        try {
-            totalBookings = await db.Appointment.count();
-            bookingsThisMonth = await db.Appointment.count({ where: { createdAt: { [Op.gte]: thisMonthStart } } });
-            bookingsLastMonth = await db.Appointment.count({ where: { createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } });
-        } catch (apptErr) {
-            console.warn('Appointment count skipped (schema issue):', apptErr.message);
-        }
+        // Booking stats
+        const [totalBookings, bookingsThisMonth, bookingsLastMonth] = await Promise.all([
+            safeCount(db.Appointment),
+            safeCount(db.Appointment, { where: { createdAt: { [Op.gte]: thisMonthStart } } }),
+            safeCount(db.Appointment, { where: { createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } }),
+        ]);
 
         // Tenant by type breakdown
-        const tenantsByType = await db.Tenant.findAll({
-            attributes: [
-                'businessType',
-                [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-            ],
-            where: { status: 'approved' },
-            group: ['businessType']
-        });
+        let tenantsByType = [];
+        try {
+            const rows = await db.Tenant.findAll({
+                attributes: ['businessType', [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']],
+                where: { status: 'approved' },
+                group: ['businessType']
+            });
+            tenantsByType = rows.map(t => ({ type: t.businessType, count: parseInt(t.getDataValue('count')) }));
+        } catch (e) {
+            console.warn('tenantsByType query failed:', e.message);
+        }
 
-        // Tenant by plan breakdown - plan column is in TenantSubscription, not Tenant
-        // Return empty array to avoid querying non-existent column
-        const tenantsByPlan = [];
-
-        // Calculate growth percentages
-        const tenantGrowth = newTenantsLastMonth > 0
-            ? ((newTenantsThisMonth - newTenantsLastMonth) / newTenantsLastMonth * 100).toFixed(1)
-            : newTenantsThisMonth > 0 ? 100 : 0;
-
-        const userGrowth = newUsersLastMonth > 0
-            ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth * 100).toFixed(1)
-            : newUsersThisMonth > 0 ? 100 : 0;
-
-        const revenueGrowth = revenueLastMonth > 0
-            ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth * 100).toFixed(1)
-            : revenueThisMonth > 0 ? 100 : 0;
-
-        const bookingGrowth = bookingsLastMonth > 0
-            ? ((bookingsThisMonth - bookingsLastMonth) / bookingsLastMonth * 100).toFixed(1)
-            : bookingsThisMonth > 0 ? 100 : 0;
+        // Growth calc helper
+        const calcGrowth = (cur, last) => last > 0
+            ? parseFloat(((cur - last) / last * 100).toFixed(1))
+            : (cur > 0 ? 100 : 0);
 
         res.json({
             success: true,
@@ -125,32 +78,26 @@ const getDashboardStats = async (req, res) => {
                     approved: approvedTenants,
                     suspended: suspendedTenants,
                     newThisMonth: newTenantsThisMonth,
-                    growth: parseFloat(tenantGrowth)
+                    growth: calcGrowth(newTenantsThisMonth, newTenantsLastMonth)
                 },
                 users: {
                     total: totalUsers,
                     newThisMonth: newUsersThisMonth,
-                    growth: parseFloat(userGrowth)
+                    growth: calcGrowth(newUsersThisMonth, newUsersLastMonth)
                 },
                 bookings: {
                     total: totalBookings,
                     thisMonth: bookingsThisMonth,
-                    growth: parseFloat(bookingGrowth)
+                    growth: calcGrowth(bookingsThisMonth, bookingsLastMonth)
                 },
                 revenue: {
-                    total: parseFloat(totalRevenue.toFixed(2)),
-                    thisMonth: parseFloat(revenueThisMonth.toFixed(2)),
-                    growth: parseFloat(revenueGrowth)
+                    total: parseFloat(Number(totalRevenue).toFixed(2)),
+                    thisMonth: parseFloat(Number(revenueThisMonth).toFixed(2)),
+                    growth: calcGrowth(revenueThisMonth, revenueLastMonth)
                 },
                 breakdowns: {
-                    tenantsByType: tenantsByType.map(t => ({
-                        type: t.businessType,
-                        count: parseInt(t.getDataValue('count'))
-                    })),
-                    tenantsByPlan: tenantsByPlan.map(t => ({
-                        plan: t.plan,
-                        count: parseInt(t.getDataValue('count'))
-                    }))
+                    tenantsByType,
+                    tenantsByPlan: []
                 }
             }
         });
@@ -198,77 +145,45 @@ const getChartData = async (req, res) => {
     try {
         const { period = '30d' } = req.query;
 
-        // Calculate date range
         let startDate;
         switch (period) {
-            case '7d':
-                startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                break;
-            case '30d':
-                startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                break;
-            case '90d':
-                startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-                break;
-            default:
-                startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            case '7d': startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); break;
+            case '90d': startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); break;
+            default: startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         }
 
-        // Get daily user registrations
-        const userRegistrations = await db.PlatformUser.findAll({
-            attributes: [
-                [db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'date'],
-                [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-            ],
-            where: {
-                createdAt: { [Op.gte]: startDate }
-            },
-            group: [db.sequelize.fn('DATE', db.sequelize.col('createdAt'))],
-            order: [[db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'ASC']]
-        });
+        const safeChartQuery = async (model) => {
+            try {
+                return await model.findAll({
+                    attributes: [
+                        [db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'date'],
+                        [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
+                    ],
+                    where: { createdAt: { [Op.gte]: startDate } },
+                    group: [db.sequelize.fn('DATE', db.sequelize.col('createdAt'))],
+                    order: [[db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'ASC']]
+                });
+            } catch (e) {
+                console.warn('Chart query failed for', model.name, ':', e.message);
+                return [];
+            }
+        };
 
-        // Get daily tenant registrations
-        const tenantRegistrations = await db.Tenant.findAll({
-            attributes: [
-                [db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'date'],
-                [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-            ],
-            where: {
-                createdAt: { [Op.gte]: startDate }
-            },
-            group: [db.sequelize.fn('DATE', db.sequelize.col('createdAt'))],
-            order: [[db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'ASC']]
-        });
+        const [userRows, tenantRows, bookingRows] = await Promise.all([
+            safeChartQuery(db.PlatformUser),
+            safeChartQuery(db.Tenant),
+            safeChartQuery(db.Appointment),
+        ]);
 
-        // Get daily bookings
-        const bookings = await db.Appointment.findAll({
-            attributes: [
-                [db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'date'],
-                [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-            ],
-            where: {
-                createdAt: { [Op.gte]: startDate }
-            },
-            group: [db.sequelize.fn('DATE', db.sequelize.col('createdAt'))],
-            order: [[db.sequelize.fn('DATE', db.sequelize.col('createdAt')), 'ASC']]
-        });
+        const mapRows = rows => rows.map(r => ({ date: r.getDataValue('date'), count: parseInt(r.getDataValue('count')) }));
 
         res.json({
             success: true,
             chartData: {
                 period,
-                userRegistrations: userRegistrations.map(r => ({
-                    date: r.getDataValue('date'),
-                    count: parseInt(r.getDataValue('count'))
-                })),
-                tenantRegistrations: tenantRegistrations.map(r => ({
-                    date: r.getDataValue('date'),
-                    count: parseInt(r.getDataValue('count'))
-                })),
-                bookings: bookings.map(r => ({
-                    date: r.getDataValue('date'),
-                    count: parseInt(r.getDataValue('count'))
-                }))
+                userRegistrations: mapRows(userRows),
+                tenantRegistrations: mapRows(tenantRows),
+                bookings: mapRows(bookingRows)
             }
         });
 
@@ -287,4 +202,3 @@ module.exports = {
     getRecentActivities,
     getChartData
 };
-
