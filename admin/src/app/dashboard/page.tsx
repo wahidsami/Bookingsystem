@@ -139,29 +139,23 @@ export default function DashboardPage() {
             <div className="card-body text-center py-12">
               <div className="text-6xl mb-4">⚠️</div>
               <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
-              <p className="text-dark-300 mb-6">{error}</p>
-              <div className="space-y-4">
-                <div className="text-sm text-dark-400 space-y-2">
-                  <p>Please ensure:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Docker Desktop is running</li>
-                    <li>PostgreSQL container is started: <code className="bg-dark-800 px-2 py-1 rounded">docker-compose up -d</code></li>
-                    <li>Backend server is running: <code className="bg-dark-800 px-2 py-1 rounded">cd server && npm run dev</code></li>
-                  </ul>
-                </div>
-                <button
-                  onClick={loadData}
-                  className="btn btn-primary"
-                >
-                  Retry Connection
-                </button>
-              </div>
+              <p className="text-dark-300 mb-2">Failed to fetch statistics from the server.</p>
+              <p className="text-dark-400 text-sm mb-6">
+                The backend API may be temporarily unavailable. Please try again in a moment.
+              </p>
+              <button
+                onClick={loadData}
+                className="btn btn-primary"
+              >
+                Retry Connection
+              </button>
             </div>
           </div>
         </div>
       </AdminLayout>
     );
   }
+
 
   return (
     <AdminLayout>
