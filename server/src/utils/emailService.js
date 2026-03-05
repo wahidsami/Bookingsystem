@@ -1,23 +1,23 @@
-const sgMail = require('@sendgrid/mail');
+const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
 
 /**
- * Email Service Utility - SendGrid
- * Handles sending emails using SendGrid API
+ * Email Service Utility - Resend
+ * Handles sending emails using Resend API
  */
 
-// Initialize SendGrid with API key
-const initializeSendGrid = () => {
-    const apiKey = process.env.SENDGRID_API_KEY;
+let resendClient = null;
 
+const getResendClient = () => {
+    if (resendClient) return resendClient;
+    const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-        console.error('[Email] SENDGRID_API_KEY not found in environment variables');
-        return false;
+        console.error('[Email] RESEND_API_KEY not found in environment variables');
+        return null;
     }
-
-    sgMail.setApiKey(apiKey);
-    return true;
+    resendClient = new Resend(apiKey);
+    return resendClient;
 };
 
 /**
@@ -33,9 +33,14 @@ const sendEmail = async (options) => {
     try {
         const { to, subject, template, data } = options;
 
-        // Initialize SendGrid
-        if (!initializeSendGrid()) {
-            throw new Error('SendGrid not initialized - missing API key');
+        const client = getResendClient();
+        if (!client) {
+            throw new Error('Resend not initialized - missing RESEND_API_KEY');
+        }
+
+        const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL;
+        if (!fromEmail) {
+            throw new Error('Resend from address not set - set RESEND_FROM_EMAIL or FROM_EMAIL (e.g. Rifah <onboarding@yourdomain.com>)');
         }
 
         // Load template
@@ -53,59 +58,50 @@ const sendEmail = async (options) => {
             htmlContent = htmlContent.replace(placeholder, data[key] || '');
         });
 
-        // Replace local logo path with CID for email embedding
+        // Resend supports inline images via contentId; keep cid:logo in HTML
         htmlContent = htmlContent.replace(/src="RifahNewLogoWhite\.png"/g, 'src="cid:logo"');
 
-        // Load logo and convert to base64
         const logoPath = path.join(__dirname, '../templates/emails', 'RifahNewLogoWhite.png');
-        let attachments = [];
+        const attachments = [];
 
         if (fs.existsSync(logoPath)) {
             const logoBuffer = fs.readFileSync(logoPath);
-            const logoBase64 = logoBuffer.toString('base64');
-
             attachments.push({
-                content: logoBase64,
                 filename: 'logo.png',
-                type: 'image/png',
-                disposition: 'inline',
-                content_id: 'logo'
+                content: logoBuffer.toString('base64'),
+                contentId: 'logo'
             });
         }
 
-        // Email message object
-        const msg = {
-            to,
-            from: {
-                email: process.env.SENDGRID_FROM_EMAIL,
-                name: 'Rifah Platform'
-            },
+        const payload = {
+            from: fromEmail.includes('<') ? fromEmail : `Rifah Platform <${fromEmail}>`,
+            to: Array.isArray(to) ? to : [to],
             subject,
-            html: htmlContent,
-            attachments: attachments
+            html: htmlContent
         };
 
-        // Send email
-        const response = await sgMail.send(msg);
+        if (attachments.length > 0) {
+            payload.attachments = attachments;
+        }
 
-        console.log(`[Email] Sent successfully to ${to}`);
-        console.log(`[Email] SendGrid Status Code: ${response[0].statusCode}`);
+        const { data: result, error } = await client.emails.send(payload);
 
+        if (error) {
+            console.error('[Email] Resend API error:', error);
+            return {
+                success: false,
+                error: error.message || JSON.stringify(error)
+            };
+        }
+
+        console.log(`[Email] Sent successfully to ${to}`, result?.id ? `(id: ${result.id})` : '');
         return {
             success: true,
-            statusCode: response[0].statusCode,
-            messageId: response[0].headers['x-message-id']
+            messageId: result?.id
         };
 
     } catch (error) {
-        console.error(`[Email] Failed to send email:`, error.message);
-
-        if (error.response) {
-            console.error(`[Email] SendGrid Error Details:`, error.response.body);
-        }
-
-        // Don't throw error - just log it
-        // We don't want email failures to crash the app
+        console.error('[Email] Failed to send email:', error.message);
         return {
             success: false,
             error: error.message
@@ -130,9 +126,11 @@ const sendWelcomeEmail = async (tenantData) => {
 };
 
 /**
- * Send approval email
+ * Send approval email (includes dashboard/login link; optional payment link via data.paymentUrl)
  */
 const sendApprovalEmail = async (tenantData) => {
+    const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
+    const paymentUrl = process.env.TENANT_PAYMENT_LINK_URL || loginUrl; // use same as login if not set
     return sendEmail({
         to: tenantData.email,
         subject: 'Congratulations! Your Rifah Account is Approved ✨',
@@ -141,7 +139,8 @@ const sendApprovalEmail = async (tenantData) => {
             tenantName: tenantData.name_en || tenantData.name,
             tenantNameAr: tenantData.name_ar || tenantData.nameAr,
             email: tenantData.email,
-            loginUrl: process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login'
+            loginUrl,
+            paymentUrl
         }
     });
 };
