@@ -790,8 +790,8 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 target: { name: 'serviceRanking', value: star }
                             } as any)}
                             className={`text-3xl ${star <= formData.serviceRanking
-                                    ? 'text-yellow-400'
-                                    : 'text-gray-300'
+                                ? 'text-yellow-400'
+                                : 'text-gray-300'
                                 }`}
                         >
                             ★
@@ -867,8 +867,8 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                     type="button"
                     onClick={() => setSelectedTab('monthly')}
                     className={`px-6 py-3 font-medium transition ${selectedTab === 'monthly'
-                            ? 'text-purple-600 border-b-2 border-purple-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-purple-600 border-b-2 border-purple-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     Monthly
@@ -877,8 +877,8 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                     type="button"
                     onClick={() => setSelectedTab('sixMonth')}
                     className={`px-6 py-3 font-medium transition ${selectedTab === 'sixMonth'
-                            ? 'text-purple-600 border-b-2 border-purple-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-purple-600 border-b-2 border-purple-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     6 Months
@@ -888,8 +888,8 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                     type="button"
                     onClick={() => setSelectedTab('annual')}
                     className={`px-6 py-3 font-medium transition ${selectedTab === 'annual'
-                            ? 'text-purple-600 border-b-2 border-purple-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-purple-600 border-b-2 border-purple-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     Annual
@@ -914,8 +914,8 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                             <div
                                 key={pkg.id}
                                 className={`relative border-2 rounded-lg p-6 cursor-pointer transition ${isSelected
-                                        ? 'border-purple-600 bg-purple-50'
-                                        : 'border-gray-200 hover:border-purple-300'
+                                    ? 'border-purple-600 bg-purple-50'
+                                    : 'border-gray-200 hover:border-purple-300'
                                     } ${pkg.isFeatured ? 'ring-2 ring-purple-500' : ''}`}
                                 onClick={() => handlePackageSelect(pkg.id, selectedTab)}
                             >
@@ -1047,6 +1047,7 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<any>({});
+    const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
     const [formData, setFormData] = useState({
         // Step 1: Entity Details
@@ -1252,8 +1253,9 @@ export default function RegisterPage() {
                 localStorage.setItem('tenant_token', data.accessToken);
             }
 
-            // Redirect to dashboard with success message
-            router.push(`/${locale}/dashboard?registered=true`);
+            // Show thank-you screen instead of redirecting
+            setRegistrationSuccess(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
 
         } catch (err: any) {
             console.error('Registration error:', err);
@@ -1262,6 +1264,77 @@ export default function RegisterPage() {
             setLoading(false);
         }
     };
+
+    // Thank-you / pending approval screen
+    if (registrationSuccess) {
+        return (
+            <div className="min-h-screen relative flex items-center justify-center py-12 px-4">
+                <div
+                    className="fixed inset-0 z-0"
+                    style={{
+                        backgroundImage: 'url(/regbg.jpg)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat'
+                    }}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 via-purple-800/75 to-pink-900/80"></div>
+                </div>
+                <div className="relative z-10 max-w-2xl mx-auto text-center">
+                    <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-white/50">
+                        {/* Success Icon */}
+                        <div className="flex justify-center mb-6">
+                            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-xl">
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <h1 className="text-3xl md:text-4xl font-bold text-purple-900 mb-4 font-cairo">
+                            {locale === 'ar' ? '🎉 شكراً لتسجيلك معنا!' : '🎉 Thank You for Registering!'}
+                        </h1>
+
+                        <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+                            {locale === 'ar'
+                                ? 'تم استلام طلبك بنجاح. طلبك قيد المراجعة الآن من قبل فريقنا وسنتواصل معك خلال 1-3 أيام عمل.'
+                                : 'Your registration request has been received successfully. Our team is reviewing your application and will get back to you within 1–3 business days.'}
+                        </p>
+
+                        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6 mb-8 text-right space-y-3">
+                            <div className="flex items-center gap-3 justify-center">
+                                <span className="text-2xl">📋</span>
+                                <span className="text-purple-800 font-semibold">
+                                    {locale === 'ar' ? 'حالة الطلب: قيد المراجعة' : 'Status: Under Review'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3 justify-center">
+                                <span className="text-2xl">📧</span>
+                                <span className="text-gray-700 text-sm">
+                                    {locale === 'ar'
+                                        ? 'ستصلك رسالة بريد إلكتروني عند الموافقة على طلبك'
+                                        : 'You will receive an email once your application is approved'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3 justify-center">
+                                <span className="text-2xl">⏱️</span>
+                                <span className="text-gray-700 text-sm">
+                                    {locale === 'ar' ? 'وقت المراجعة: 1-3 أيام عمل' : 'Review time: 1–3 business days'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <Link
+                            href={`/${locale}`}
+                            className="inline-block px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg"
+                        >
+                            {locale === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen relative py-12 px-4">
@@ -1315,8 +1388,8 @@ export default function RegisterPage() {
                                 <div className="flex items-center">
                                     <div
                                         className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${step <= currentStep
-                                                ? 'bg-purple-600 text-white shadow-lg'
-                                                : 'bg-gray-200 text-gray-600'
+                                            ? 'bg-purple-600 text-white shadow-lg'
+                                            : 'bg-gray-200 text-gray-600'
                                             }`}
                                     >
                                         {step}
