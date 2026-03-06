@@ -112,6 +112,10 @@ class AdminApi {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/reject`, 'POST', { body: { reason } });
   }
 
+  async requestMoreInfo(id: string, message: string) {
+    return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/request-more-info`, 'POST', { body: { message } });
+  }
+
   async suspendTenant(id: string, reason: string) {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/suspend`, 'POST', { body: { reason } });
   }

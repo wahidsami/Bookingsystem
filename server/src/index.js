@@ -155,6 +155,8 @@ app.use('/api/v1/auth/tenant', authLimiter, tenantAuthRoutes); // New: Tenant au
 // Apply strict auth limiting to admin authentication
 app.use('/api/v1/auth/admin', authLimiter, superAdminAuthRoutes); // Super Admin auth
 app.use('/api/v1/admin', adminRoutes); // Admin APIs
+// Tenant subscription payment (link token or Bearer; must be before /api/v1/tenant)
+app.use('/api/v1/tenant/subscription', require('./routes/tenantSubscriptionPaymentRoutes'));
 app.use('/api/v1/tenant', tenantRoutes); // Tenant dashboard APIs (protected)
 app.get('/api/v1/settings/global', adminSettingsController.getGlobalSettings); // Public global settings endpoint
 app.use('/api/v1/bookings', bookingRoutes);
@@ -299,6 +301,9 @@ const startServer = async () => {
 
         app.listen(PORT, () => {
             console.log(`🚀 Server is running on port ${PORT}`);
+            // Expire payment_pending tenants every hour (48h window)
+            const { expirePaymentPendingTenants } = require('./utils/initializeTenantSubscription');
+            setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
         });
     } catch (error) {
         console.error('Unable to connect to the database:', error);

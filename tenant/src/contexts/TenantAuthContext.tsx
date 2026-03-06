@@ -72,7 +72,15 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       
       if (response.success && response.tenant) {
         setUser(response.tenant);
-        router.push('/ar/dashboard');
+        const locale = typeof window !== 'undefined' && window.location.pathname.startsWith('/en') ? 'en' : 'ar';
+        const status = response.tenant?.status;
+        if (status === 'payment_pending') {
+          router.push(`/${locale}/subscription/pay`);
+        } else if (status === 'more_info_required') {
+          router.push(`/${locale}/onboarding/more-info`);
+        } else {
+          router.push(`/${locale}/dashboard`);
+        }
       } else {
         throw new Error(response.message || 'Login failed');
       }

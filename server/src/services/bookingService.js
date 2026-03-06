@@ -38,7 +38,7 @@ class BookingService {
         // Validate tenant exists and is active
         const tenant = await db.Tenant.findByPk(tenantId, { transaction: finalTransaction });
         if (!tenant) throw new Error('Tenant not found');
-        if (tenant.status !== 'approved') {
+        if (tenant.status !== 'active') {
             throw new Error(`Tenant account is ${tenant.status}. Please contact support.`);
         }
 

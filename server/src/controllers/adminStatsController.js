@@ -20,11 +20,11 @@ const getDashboardStats = async (req, res) => {
             try { return (await model.sum(col, opts)) || 0; } catch (e) { console.warn('safeSum error:', e.message); return 0; }
         };
 
-        // Tenant stats
+        // Tenant stats (pending = pending_approval, approved/active = active)
         const [totalTenants, pendingTenants, approvedTenants, suspendedTenants, newTenantsThisMonth, newTenantsLastMonth] = await Promise.all([
             safeCount(db.Tenant),
-            safeCount(db.Tenant, { where: { status: 'pending' } }),
-            safeCount(db.Tenant, { where: { status: 'approved' } }),
+            safeCount(db.Tenant, { where: { status: 'pending_approval' } }),
+            safeCount(db.Tenant, { where: { status: 'active' } }),
             safeCount(db.Tenant, { where: { status: 'suspended' } }),
             safeCount(db.Tenant, { where: { createdAt: { [Op.gte]: thisMonthStart } } }),
             safeCount(db.Tenant, { where: { createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } }),
@@ -56,7 +56,7 @@ const getDashboardStats = async (req, res) => {
         try {
             const rows = await db.Tenant.findAll({
                 attributes: ['businessType', [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']],
-                where: { status: 'approved' },
+                where: { status: 'active' },
                 group: ['businessType']
             });
             tenantsByType = rows.map(t => ({ type: t.businessType, count: parseInt(t.getDataValue('count')) }));

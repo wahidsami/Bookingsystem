@@ -266,8 +266,8 @@ exports.register = async (req, res) => {
             advertiseOnSocialMedia: advertiseOnSocialMedia === 'true' || advertiseOnSocialMedia === true,
             wantsRifahPromotion: wantsRifahPromotion === 'true' || wantsRifahPromotion === true,
 
-            // Status
-            status: 'pending', // Requires admin approval
+            // Status (Option A: single submit → pending_approval)
+            status: 'pending_approval',
 
             // Settings
             settings: {
@@ -340,7 +340,7 @@ exports.register = async (req, res) => {
                 businessName: name_en,
                 businessType,
                 email,
-                status: 'pending',
+                status: 'pending_approval',
                 selectedPackage: subscriptionPackage?.name || 'None'
             }
         }, { transaction });
@@ -423,6 +423,61 @@ exports.register = async (req, res) => {
             success: false,
             message: 'Registration failed. Please try again.',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * Resubmit request after more_info_required (tenant must be authenticated)
+ * PUT /api/v1/tenant/resubmit-request
+ */
+exports.resubmitRequest = async (req, res) => {
+    try {
+        const tenant = req.tenant;
+        if (!tenant) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required'
+            });
+        }
+        if (tenant.status !== 'more_info_required') {
+            return res.status(400).json({
+                success: false,
+                message: `Resubmit only allowed when status is more_info_required (current: ${tenant.status})`
+            });
+        }
+
+        await tenant.update({
+            status: 'pending_approval',
+            moreInfoMessage: null
+        });
+
+        const { db } = require('../models');
+        await db.ActivityLog.create({
+            entityType: 'tenant',
+            entityId: tenant.id,
+            action: 'resubmitted',
+            performedByType: 'tenant',
+            performedById: tenant.id,
+            details: {},
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+
+        res.json({
+            success: true,
+            message: 'Application resubmitted for review.',
+            tenant: {
+                id: tenant.id,
+                status: tenant.status
+            }
+        });
+    } catch (error) {
+        console.error('Resubmit request error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to resubmit',
+            error: error.message
         });
     }
 };

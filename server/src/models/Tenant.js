@@ -294,10 +294,24 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             allowNull: true
         },
-        // Approval Status (for super admin)
+        // Onboarding & lifecycle status (see plan: REGISTERED → PLAN_SELECTED → PENDING_APPROVAL → ... → ACTIVE)
         status: {
-            type: DataTypes.ENUM('pending', 'approved', 'rejected', 'suspended', 'inactive'),
-            defaultValue: 'pending'
+            type: DataTypes.ENUM(
+                'registered', 'plan_selected', 'pending_approval', 'more_info_required',
+                'payment_pending', 'payment_success', 'payment_failed', 'payment_expired',
+                'active', 'rejected', 'suspended', 'inactive'
+            ),
+            defaultValue: 'pending_approval'
+        },
+        paymentDueAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'When payment must be completed (48h after approval)'
+        },
+        moreInfoMessage: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+            comment: 'Admin message when status is more_info_required'
         },
         approvedAt: {
             type: DataTypes.DATE,

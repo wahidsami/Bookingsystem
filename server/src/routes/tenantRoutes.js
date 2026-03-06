@@ -18,6 +18,7 @@ const tenantSettingsController = require('../controllers/tenantSettingsControlle
 const tenantReportsController = require('../controllers/tenantReportsController');
 const tenantPublicPageController = require('../controllers/tenantPublicPageController');
 const tenantScheduleController = require('../controllers/tenantScheduleController');
+const tenantRegistrationController = require('../controllers/tenantRegistrationController');
 const { authenticateTenant } = require('../middleware/authTenant');
 const multer = require('multer');
 const path = require('path');
@@ -36,6 +37,9 @@ const settingsUpload = multer({ storage: settingsStorage });
 
 // All routes require authentication
 router.use(authenticateTenant);
+
+// Onboarding: resubmit after more_info_required
+router.put('/resubmit-request', tenantRegistrationController.resubmitRequest);
 
 // Profile management
 router.get('/profile', tenantAuthController.getProfile);

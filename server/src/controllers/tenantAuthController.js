@@ -59,28 +59,19 @@ const login = async (req, res) => {
       });
     }
 
-    // Check account status
-    if (tenant.status === 'pending') {
+    // Block login for terminal/invalid statuses
+    const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+    if (blockedStatuses.includes(tenant.status)) {
       return res.status(403).json({
         success: false,
-        message: 'Your account is pending approval. Please wait for admin approval.',
-        status: 'pending'
-      });
-    }
-
-    if (tenant.status === 'rejected') {
-      return res.status(403).json({
-        success: false,
-        message: 'Your account has been rejected. Please contact support.',
-        status: 'rejected'
-      });
-    }
-
-    if (tenant.status === 'suspended') {
-      return res.status(403).json({
-        success: false,
-        message: 'Your account has been suspended. Please contact support.',
-        status: 'suspended'
+        message: tenant.status === 'rejected'
+          ? 'Your account has been rejected. Please contact support.'
+          : tenant.status === 'suspended'
+            ? 'Your account has been suspended. Please contact support.'
+            : tenant.status === 'payment_expired'
+              ? 'Payment window expired. Please contact support.'
+              : `Account is ${tenant.status}. Please contact support.`,
+        status: tenant.status
       });
     }
 
@@ -183,7 +174,8 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    if (tenant.status !== 'approved') {
+    const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+    if (blockedStatuses.includes(tenant.status)) {
       return res.status(403).json({
         success: false,
         message: `Account is ${tenant.status}`,

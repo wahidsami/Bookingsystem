@@ -72,7 +72,7 @@ const listTenants = async (req, res) => {
 const getPendingTenants = async (req, res) => {
     try {
         const tenants = await db.Tenant.findAll({
-            where: { status: 'pending' },
+            where: { status: 'pending_approval' },
             order: [['createdAt', 'ASC']]
         });
 
@@ -145,7 +145,7 @@ const getTenantDetails = async (req, res) => {
 };
 
 /**
- * Approve tenant
+ * Approve tenant → set payment_pending, send payment link (48h window). Activation happens after payment.
  */
 const approveTenant = async (req, res) => {
     try {
@@ -161,30 +161,22 @@ const approveTenant = async (req, res) => {
             });
         }
 
-        if (tenant.status !== 'pending') {
+        if (tenant.status !== 'pending_approval') {
             return res.status(400).json({
                 success: false,
                 message: `Cannot approve tenant with status: ${tenant.status}`
             });
         }
 
-        // Update tenant status
-        await tenant.update({
-            status: 'approved',
-            approvedAt: new Date(),
-            approvedBy: req.adminId,
-            planStartDate: new Date(),
-            planEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days trial
-        });
+        const now = new Date();
+        const paymentDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
 
-        // Initialize subscription and usage tracking
-        const { initializeTenantSubscription } = require('../utils/initializeTenantSubscription');
-        try {
-            await initializeTenantSubscription(tenant.id, 'free-trial');
-        } catch (subscriptionError) {
-            console.error('Failed to initialize subscription:', subscriptionError);
-            // Don't fail the approval if subscription init fails
-        }
+        await tenant.update({
+            status: 'payment_pending',
+            paymentDueAt,
+            approvedAt: now,
+            approvedBy: req.adminId
+        });
 
         // Log activity
         await db.ActivityLog.create({
@@ -194,21 +186,29 @@ const approveTenant = async (req, res) => {
             performedByType: 'super_admin',
             performedById: req.adminId,
             performedByName: req.adminName,
-            details: { notes },
+            details: { notes, paymentDueAt },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
         });
 
-        // Send approval email (don't wait for it, don't fail if it errors)
+        // Generate payment link with short-lived token (valid until paymentDueAt)
+        const jwt = require('jsonwebtoken');
+        const paymentToken = jwt.sign(
+            { tenantId: tenant.id, action: 'subscription_payment' },
+            process.env.JWT_SECRET,
+            { expiresIn: '48h' }
+        );
+        const baseUrl = (process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003').replace(/\/$/, '');
+        const paymentUrl = `${baseUrl}/ar/subscription/pay?token=${paymentToken}`;
+
         const { sendApprovalEmail } = require('../utils/emailService');
-        sendApprovalEmail(tenant).catch(err => {
+        sendApprovalEmail(tenant, { paymentUrl, paymentDueAt }).catch(err => {
             console.error('[Approval] Failed to send approval email:', err.message);
-            // Don't throw - email failure shouldn't affect approval
         });
 
         res.json({
             success: true,
-            message: 'Tenant approved successfully. Free trial subscription activated.',
+            message: 'Tenant approved. Payment link sent. Account will activate after payment within 48 hours.',
             tenant
         });
 
@@ -246,14 +246,13 @@ const rejectTenant = async (req, res) => {
             });
         }
 
-        if (tenant.status !== 'pending') {
+        if (tenant.status !== 'pending_approval') {
             return res.status(400).json({
                 success: false,
                 message: `Cannot reject tenant with status: ${tenant.status}`
             });
         }
 
-        // Update tenant status
         await tenant.update({
             status: 'rejected',
             rejectionReason: reason
@@ -290,6 +289,83 @@ const rejectTenant = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to reject tenant',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Request more info from tenant (sets more_info_required, stores message)
+ */
+const requestMoreInfo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { message } = req.body;
+
+        if (!message || !message.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Message is required'
+            });
+        }
+
+        const tenant = await db.Tenant.findByPk(id);
+        if (!tenant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tenant not found'
+            });
+        }
+
+        if (tenant.status !== 'pending_approval') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot request more info for tenant with status: ${tenant.status}`
+            });
+        }
+
+        await tenant.update({
+            status: 'more_info_required',
+            moreInfoMessage: message.trim()
+        });
+
+        await db.ActivityLog.create({
+            entityType: 'tenant',
+            entityId: tenant.id,
+            action: 'more_info_required',
+            performedByType: 'super_admin',
+            performedById: req.adminId,
+            performedByName: req.adminName,
+            details: { message: message.trim() },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+
+        // Optional: send email to tenant with message and link to resubmit
+        const { sendEmail } = require('../utils/emailService');
+        const resubmitUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003';
+        sendEmail({
+            to: tenant.email,
+            subject: 'Rifah – More information required',
+            template: 'more_info_required',
+            data: {
+                tenantName: tenant.name_en || tenant.name,
+                tenantNameAr: tenant.name_ar || tenant.nameAr,
+                message: message.trim(),
+                resubmitUrl
+            }
+        }).catch(err => console.error('[MoreInfo] Email failed:', err.message));
+
+        res.json({
+            success: true,
+            message: 'More info requested. Tenant notified.',
+            tenant
+        });
+    } catch (error) {
+        console.error('Request more info error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to request more info',
             error: error.message
         });
     }
@@ -376,7 +452,7 @@ const activateTenant = async (req, res) => {
         const previousStatus = tenant.status;
 
         await tenant.update({
-            status: 'approved',
+            status: 'active',
             suspensionReason: null
         });
 
@@ -389,7 +465,7 @@ const activateTenant = async (req, res) => {
             performedById: req.adminId,
             performedByName: req.adminName,
             previousValue: { status: previousStatus },
-            newValue: { status: 'approved' },
+            newValue: { status: 'active' },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
         });
@@ -541,6 +617,7 @@ module.exports = {
     getTenantDetails,
     approveTenant,
     rejectTenant,
+    requestMoreInfo,
     suspendTenant,
     activateTenant,
     updateTenant,

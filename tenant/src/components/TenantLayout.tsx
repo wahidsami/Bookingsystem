@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname, useParams } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTenantAuth } from "@/contexts/TenantAuthContext";
 import { useTranslations } from "next-intl";
@@ -13,10 +14,20 @@ interface TenantLayoutProps {
 export function TenantLayout({ children }: TenantLayoutProps) {
   const pathname = usePathname();
   const params = useParams();
+  const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
   const { user, logout } = useTenantAuth();
   const t = useTranslations("Navigation");
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.status === 'payment_pending' && !pathname?.includes('/subscription/pay')) {
+      router.replace(`/${locale}/subscription/pay`);
+    } else if (user.status === 'more_info_required' && !pathname?.includes('/onboarding/more-info')) {
+      router.replace(`/${locale}/onboarding/more-info`);
+    }
+  }, [user?.status, pathname, locale, router]);
 
   const navigation = [
     { name: t("dashboard"), href: `/${locale}/dashboard`, icon: "📊" },

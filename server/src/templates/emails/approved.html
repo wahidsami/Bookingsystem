@@ -247,10 +247,14 @@
             </p>
 
             <div style="text-align: center;">
-                <a href="{{loginUrl}}" class="cta-button">
-                    🚀 ابدأ الآن | Get Started
+                <a href="{{paymentUrl}}" class="cta-button">
+                    💳 ادفع الآن | Complete Payment
                 </a>
             </div>
+            <p class="message" style="text-align: center; margin-top: 10px;">
+                <strong class="message-ar">يرجى إكمال الدفع خلال 48 ساعة.</strong><br>
+                <strong class="message-en">Please complete payment within 48 hours (by {{paymentDueText}}).</strong>
+            </p>
 
             <div class="info-box">
                 <h3 class="ar">📊 معلومات حسابك</h3>
@@ -260,8 +264,8 @@
                     <span class="info-value">{{email}}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">رابط لوحة التحكم | Dashboard:</span>
-                    <span class="info-value"><a href="{{loginUrl}}" style="color: #8B5ADF;">{{loginUrl}}</a></span>
+                    <span class="info-label">رابط الدفع | Payment link:</span>
+                    <span class="info-value"><a href="{{paymentUrl}}" style="color: #8B5ADF;">{{paymentUrl}}</a></span>
                 </div>
             </div>
 
@@ -293,13 +297,11 @@
 
             <div class="info-box"
                 style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-right-color: #f59e0b;">
-                <h3 style="color: #d97706;" class="ar">🎁 فترة تجريبية مجانية</h3>
-                <h3 style="color: #d97706;" class="en">Free Trial Period</h3>
+                <h3 style="color: #d97706;" class="ar">⏰ مدة الدفع 48 ساعة</h3>
+                <h3 style="color: #d97706;" class="en">48-Hour Payment Window</h3>
                 <p style="color: #92400e; font-size: 16px; margin: 10px 0;">
-                    <strong class="message-ar">مبروك! لديك 30 يوماً تجريبياً مجانياً للاستمتاع بجميع ميزات
-                        المنصة.</strong><br>
-                    <strong class="message-en">Congratulations! You have a 30-day free trial to enjoy all platform
-                        features.</strong>
+                    <strong class="message-ar">أكمل الدفع خلال 48 ساعة لتفعيل حسابك.</strong><br>
+                    <strong class="message-en">Complete payment within 48 hours to activate your account.</strong>
                 </p>
             </div>
 

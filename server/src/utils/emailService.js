@@ -126,21 +126,28 @@ const sendWelcomeEmail = async (tenantData) => {
 };
 
 /**
- * Send approval email (includes dashboard/login link; optional payment link via data.paymentUrl)
+ * Send approval email with payment link (48h window)
+ * @param {Object} tenantData - Tenant record
+ * @param {Object} [options] - { paymentUrl, paymentDueAt }
  */
-const sendApprovalEmail = async (tenantData) => {
+const sendApprovalEmail = async (tenantData, options = {}) => {
     const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
-    const paymentUrl = process.env.TENANT_PAYMENT_LINK_URL || loginUrl; // use same as login if not set
+    const paymentUrl = options.paymentUrl || process.env.TENANT_PAYMENT_LINK_URL || loginUrl;
+    const paymentDueAt = options.paymentDueAt;
+    const paymentDueText = paymentDueAt
+        ? new Date(paymentDueAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+        : '48 hours';
     return sendEmail({
         to: tenantData.email,
-        subject: 'Congratulations! Your Rifah Account is Approved ✨',
+        subject: 'Congratulations! Complete Your Payment – Rifah Account Approved ✨',
         template: 'approved',
         data: {
             tenantName: tenantData.name_en || tenantData.name,
             tenantNameAr: tenantData.name_ar || tenantData.nameAr,
             email: tenantData.email,
             loginUrl,
-            paymentUrl
+            paymentUrl,
+            paymentDueText
         }
     });
 };

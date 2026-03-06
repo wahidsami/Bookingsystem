@@ -33,6 +33,11 @@ export default function PendingClientsPage() {
     tenantId: null,
   });
   const [rejectReason, setRejectReason] = useState("");
+  const [moreInfoModal, setMoreInfoModal] = useState<{ open: boolean; tenantId: string | null }>({
+    open: false,
+    tenantId: null,
+  });
+  const [moreInfoMessage, setMoreInfoMessage] = useState("");
 
   useEffect(() => {
     loadPendingTenants();
@@ -82,6 +87,25 @@ export default function PendingClientsPage() {
     } catch (error) {
       console.error("Failed to reject tenant:", error);
       alert("Failed to reject tenant");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRequestMoreInfo = async () => {
+    if (!moreInfoModal.tenantId || !moreInfoMessage.trim()) return;
+
+    setActionLoading(moreInfoModal.tenantId);
+    try {
+      const response = await adminApi.requestMoreInfo(moreInfoModal.tenantId, moreInfoMessage);
+      if (response.success) {
+        setTenants(tenants.filter((t) => t.id !== moreInfoModal.tenantId));
+        setMoreInfoModal({ open: false, tenantId: null });
+        setMoreInfoMessage("");
+      }
+    } catch (error) {
+      console.error("Failed to request more info:", error);
+      alert("Failed to send request");
     } finally {
       setActionLoading(null);
     }
@@ -240,6 +264,13 @@ export default function PendingClientsPage() {
                         View Details
                       </Link>
                       <button
+                        onClick={() => setMoreInfoModal({ open: true, tenantId: tenant.id })}
+                        disabled={actionLoading === tenant.id}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Request More Info
+                      </button>
+                      <button
                         onClick={() => setRejectModal({ open: true, tenantId: tenant.id })}
                         disabled={actionLoading === tenant.id}
                         className="btn btn-danger btn-sm"
@@ -303,6 +334,47 @@ export default function PendingClientsPage() {
                     className="btn btn-danger"
                   >
                     {actionLoading ? "Rejecting..." : "Reject Application"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Request More Info Modal */}
+        {moreInfoModal.open && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="card w-full max-w-md">
+              <div className="card-header">
+                <h3 className="font-semibold text-white">Request More Information</h3>
+              </div>
+              <div className="card-body space-y-4">
+                <p className="text-dark-300 text-sm">
+                  Send a message describing what additional documents or information you need. The applicant will be notified and can resubmit.
+                </p>
+                <textarea
+                  value={moreInfoMessage}
+                  onChange={(e) => setMoreInfoMessage(e.target.value)}
+                  placeholder="Enter your message..."
+                  rows={4}
+                  className="input"
+                />
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setMoreInfoModal({ open: false, tenantId: null });
+                      setMoreInfoMessage("");
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRequestMoreInfo}
+                    disabled={!moreInfoMessage.trim() || actionLoading !== null}
+                    className="btn btn-primary"
+                  >
+                    {actionLoading ? "Sending..." : "Send Request"}
                   </button>
                 </div>
               </div>

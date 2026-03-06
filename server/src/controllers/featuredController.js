@@ -24,7 +24,7 @@ const getFeaturedTenants = async (req, res) => {
                 {
                     model: db.Tenant,
                     as: 'tenant',
-                    where: { status: 'approved' },
+                    where: { status: 'active' },
                     attributes: [
                         'id',
                         'businessNameEn',

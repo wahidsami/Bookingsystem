@@ -15,7 +15,7 @@ exports.getAllTenants = async (req, res) => {
         const { search } = req.query;
 
         const where = {
-            status: ['active', 'approved'] // Include both active and approved tenants
+            status: 'active' // Only list active (paid) tenants
         };
 
         if (search) {

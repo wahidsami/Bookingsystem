@@ -1301,6 +1301,45 @@ class TenantApiClient {
   async checkHotDealsLimits(): Promise<any> {
     return this.get('/tenant/hot-deals/limits');
   }
+
+  /**
+   * Subscription payment (fake gateway) – get session. Use token from email link or Bearer.
+   */
+  async getSubscriptionPaymentSession(token?: string): Promise<any> {
+    const url = token
+      ? `${this.baseUrl}/tenant/subscription/payment?token=${encodeURIComponent(token)}`
+      : `${this.baseUrl}/tenant/subscription/payment`;
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    const accessToken = this.getAccessToken();
+    if (!token && accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(url, { headers });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to load payment session');
+    return data;
+  }
+
+  /**
+   * Submit subscription payment (fake: success true/false).
+   */
+  async submitSubscriptionPayment(success: boolean, token?: string): Promise<any> {
+    const url = `${this.baseUrl}/tenant/subscription/pay`;
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    const accessToken = this.getAccessToken();
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const body: any = { success };
+    if (token) body.token = token;
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok && !data.success) throw new Error(data.message || 'Payment failed');
+    return data;
+  }
+
+  /**
+   * Resubmit request after more info (status more_info_required).
+   */
+  async resubmitRequest(): Promise<any> {
+    return this.put('/tenant/resubmit-request');
+  }
 }
 
 // Export singleton instance

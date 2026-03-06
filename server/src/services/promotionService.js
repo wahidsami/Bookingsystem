@@ -80,7 +80,7 @@ const canCreateHotDeal = async (tenantId) => {
     const currentDeals = await db.HotDeal.count({
         where: {
             tenantId,
-            status: ['active', 'approved']
+            status: 'active'
         }
     });
 

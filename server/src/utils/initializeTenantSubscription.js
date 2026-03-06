@@ -182,9 +182,81 @@ async function checkExpiringSubscriptions() {
     }
 }
 
+/**
+ * Activate tenant after successful subscription payment (set subscription active, create usage, set tenant active)
+ */
+async function activateTenantAfterPayment(tenantId) {
+    const now = new Date();
+    const tenant = await db.Tenant.findByPk(tenantId);
+    if (!tenant) throw new Error('Tenant not found');
+    const subscription = await db.TenantSubscription.findOne({
+        where: { tenantId },
+        include: [{ model: db.SubscriptionPackage, as: 'package' }]
+    });
+    if (subscription) {
+        const periodEnd = new Date(now);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        await subscription.update({
+            status: 'active',
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+            nextBillingDate: periodEnd
+        });
+    } else {
+        await initializeTenantSubscription(tenantId, 'free-trial');
+    }
+    let usage = await db.TenantUsage.findOne({ where: { tenantId } });
+    if (!usage) {
+        await db.TenantUsage.create({
+            tenantId,
+            currentPeriod: now.toISOString().substring(0, 7),
+            bookingsThisMonth: 0,
+            bookingsTotal: 0,
+            activeStaff: 0,
+            activeServices: 0,
+            activeProducts: 0,
+            storageUsedMB: 0,
+            emailCampaignsThisMonth: 0,
+            smsCampaignsThisMonth: 0,
+            apiCallsThisMonth: 0,
+            lastResetDate: now
+        });
+    }
+    await tenant.update({ status: 'active' });
+    console.log(`✅ Activated tenant ${tenantId} after payment`);
+}
+
+/**
+ * Expire tenants in payment_pending whose paymentDueAt has passed (set status to payment_expired)
+ * Run periodically (e.g. every hour)
+ */
+async function expirePaymentPendingTenants() {
+    try {
+        const now = new Date();
+        const tenants = await db.Tenant.findAll({
+            where: {
+                status: 'payment_pending',
+                paymentDueAt: { [db.Sequelize.Op.lt]: now }
+            }
+        });
+        for (const t of tenants) {
+            await t.update({ status: 'payment_expired' });
+        }
+        if (tenants.length > 0) {
+            console.log(`[Cron] Expired ${tenants.length} tenant(s) payment window (payment_pending → payment_expired)`);
+        }
+        return tenants.length;
+    } catch (error) {
+        console.error('expirePaymentPendingTenants error:', error);
+        return 0;
+    }
+}
+
 module.exports = {
     initializeTenantSubscription,
+    activateTenantAfterPayment,
     resetMonthlyUsage,
-    checkExpiringSubscriptions
+    checkExpiringSubscriptions,
+    expirePaymentPendingTenants
 };
 

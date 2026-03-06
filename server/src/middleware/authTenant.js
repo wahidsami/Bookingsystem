@@ -48,8 +48,9 @@ const authenticateTenant = async (req, res, next) => {
       });
     }
 
-    // Check if tenant account is active
-    if (tenant.status === 'suspended' || tenant.status === 'rejected') {
+    // Block access for terminal/invalid statuses (allow onboarding + payment_pending + active)
+    const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+    if (blockedStatuses.includes(tenant.status)) {
       return res.status(403).json({
         success: false,
         message: `Account is ${tenant.status}. Please contact support.`
@@ -108,7 +109,7 @@ const optionalTenantAuth = async (req, res, next) => {
         attributes: { exclude: ['password'] }
       });
 
-      if (tenant && tenant.status === 'approved') {
+      if (tenant && (tenant.status === 'active' || tenant.status === 'approved')) {
         req.tenantId = tenant.id;
         req.tenant = tenant;
         req.userId = decoded.id;

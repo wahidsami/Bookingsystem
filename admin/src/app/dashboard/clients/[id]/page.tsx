@@ -68,6 +68,8 @@ export default function ClientDetailsPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "documents" | "activity" | "settings">("overview");
   const [suspendModal, setSuspendModal] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
+  const [moreInfoModal, setMoreInfoModal] = useState(false);
+  const [moreInfoMessage, setMoreInfoMessage] = useState("");
 
   useEffect(() => {
     if (params.id) {
@@ -90,13 +92,13 @@ export default function ClientDetailsPage() {
   };
 
   const handleApprove = async () => {
-    if (!confirm("Are you sure you want to approve this client?")) return;
+    if (!confirm("Are you sure you want to approve this client? A payment link will be sent (48h window).")) return;
 
     setActionLoading(true);
     try {
       const response = await adminApi.approveTenant(tenant!.id);
       if (response.success) {
-        setTenant({ ...tenant!, status: "approved", approvedAt: new Date().toISOString() });
+        setTenant({ ...tenant!, status: "payment_pending", approvedAt: new Date().toISOString() });
         loadTenantDetails();
       }
     } catch (error) {
@@ -134,7 +136,7 @@ export default function ClientDetailsPage() {
     try {
       const response = await adminApi.activateTenant(tenant!.id);
       if (response.success) {
-        setTenant({ ...tenant!, status: "approved", suspensionReason: "" });
+        setTenant({ ...tenant!, status: "active", suspensionReason: "" });
         loadTenantDetails();
       }
     } catch (error) {
@@ -145,14 +147,44 @@ export default function ClientDetailsPage() {
     }
   };
 
+  const handleRequestMoreInfo = async () => {
+    if (!moreInfoMessage.trim()) return;
+
+    setActionLoading(true);
+    try {
+      const response = await adminApi.requestMoreInfo(tenant!.id, moreInfoMessage);
+      if (response.success) {
+        setTenant({ ...tenant!, status: "more_info_required" });
+        setMoreInfoModal(false);
+        setMoreInfoMessage("");
+        loadTenantDetails();
+      }
+    } catch (error) {
+      console.error("Failed to request more info:", error);
+      alert("Failed to send request");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { class: string; text: string }> = {
+      registered: { class: "badge-info", text: "Registered" },
+      plan_selected: { class: "badge-info", text: "Plan Selected" },
+      pending_approval: { class: "badge-warning", text: "Pending Approval" },
+      more_info_required: { class: "badge-warning", text: "More Info Required" },
+      payment_pending: { class: "badge-warning", text: "Payment Pending" },
+      payment_success: { class: "badge-success", text: "Payment Success" },
+      payment_failed: { class: "badge-danger", text: "Payment Failed" },
+      payment_expired: { class: "badge-danger", text: "Payment Expired" },
+      active: { class: "badge-success", text: "Active" },
       pending: { class: "badge-warning", text: "Pending" },
       approved: { class: "badge-success", text: "Approved" },
       rejected: { class: "badge-danger", text: "Rejected" },
       suspended: { class: "badge-danger", text: "Suspended" },
+      inactive: { class: "badge-info", text: "Inactive" },
     };
-    return badges[status] || { class: "badge-info", text: status };
+    return badges[status] || { class: "badge-info", text: (status || "").replace(/_/g, " ") };
   };
 
   const formatDate = (dateString: string) => {
@@ -220,12 +252,21 @@ export default function ClientDetailsPage() {
             <Link href="/dashboard/clients" className="btn btn-secondary">
               ← Back
             </Link>
-            {tenant.status === "pending" && (
-              <button onClick={handleApprove} disabled={actionLoading} className="btn btn-success">
-                ✓ Approve
-              </button>
+            {(tenant.status === "pending" || tenant.status === "pending_approval") && (
+              <>
+                <button
+                  onClick={() => setMoreInfoModal(true)}
+                  disabled={actionLoading}
+                  className="btn btn-secondary"
+                >
+                  Request More Info
+                </button>
+                <button onClick={handleApprove} disabled={actionLoading} className="btn btn-success">
+                  ✓ Approve
+                </button>
+              </>
             )}
-            {tenant.status === "approved" && (
+            {(tenant.status === "active" || tenant.status === "approved") && (
               <button
                 onClick={() => setSuspendModal(true)}
                 disabled={actionLoading}
@@ -254,6 +295,13 @@ export default function ClientDetailsPage() {
           <div className="bg-danger/10 border border-danger/20 rounded-xl p-4">
             <p className="text-danger font-medium">Rejected</p>
             <p className="text-dark-300 text-sm mt-1">Reason: {tenant.rejectionReason}</p>
+          </div>
+        )}
+
+        {(tenant as any).moreInfoMessage && (
+          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">
+            <p className="text-warning font-medium">More info requested</p>
+            <p className="text-dark-300 text-sm mt-1">{(tenant as any).moreInfoMessage}</p>
           </div>
         )}
 
@@ -645,6 +693,47 @@ export default function ClientDetailsPage() {
                     className="btn btn-danger"
                   >
                     {actionLoading ? "Processing..." : "Suspend Client"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Request More Info Modal */}
+        {moreInfoModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="card w-full max-w-md">
+              <div className="card-header">
+                <h3 className="font-semibold text-white">Request More Information</h3>
+              </div>
+              <div className="card-body space-y-4">
+                <p className="text-dark-300 text-sm">
+                  Send a message to the applicant describing what additional documents or information you need. They will be able to resubmit.
+                </p>
+                <textarea
+                  value={moreInfoMessage}
+                  onChange={(e) => setMoreInfoMessage(e.target.value)}
+                  placeholder="Enter your message..."
+                  rows={4}
+                  className="input"
+                />
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setMoreInfoModal(false);
+                      setMoreInfoMessage("");
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRequestMoreInfo}
+                    disabled={!moreInfoMessage.trim() || actionLoading}
+                    className="btn btn-primary"
+                  >
+                    {actionLoading ? "Sending..." : "Send Request"}
                   </button>
                 </div>
               </div>
