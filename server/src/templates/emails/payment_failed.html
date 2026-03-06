@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Failed</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f3f4f6; margin: 0; padding: 0; direction: rtl; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 20px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; }
+        .content { padding: 40px 30px; }
+        .message { font-size: 16px; color: #4b5563; line-height: 1.6; margin-bottom: 20px; }
+        .info-box { background: #fffbeb; border-right: 4px solid #f59e0b; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        .info-box p { color: #92400e; margin: 10px 0; }
+        .cta-button { display: inline-block; background: linear-gradient(135deg, #8B5ADF 0%, #FE01AB 100%); color: #fff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; margin-top: 15px; }
+        .footer { background: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb; }
+        .footer p { color: #6b7280; font-size: 14px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>فشل الدفع | Payment Failed</h1>
+        </div>
+        <div class="content">
+            <p class="message">عزيزي {{tenantNameAr}} | Dear {{tenantName}},</p>
+            <p class="message">لم يتم إتمام الدفع. لا يزال بإمكانك المحاولة مرة أخرى قبل انتهاء مدة الرابط (48 ساعة).</p>
+            <p class="message">Payment could not be completed. You can try again before the link expires (48 hours).</p>
+            <div class="info-box">
+                <p><strong>أعد المحاولة | Try again</strong></p>
+                <p>يمكنك المحاولة مرة أخرى عبر الرابط في بريد الموافقة (خلال 48 ساعة)، أو تواصل مع الدعم للمساعدة.</p>
+                <p>You can try again via the link in your approval email (within 48 hours), or contact support for help.</p>
+                <a href="{{loginUrl}}" class="cta-button">تسجيل الدخول | Login</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p><strong>منصة رفاه | Rifah Platform</strong></p>
+            <p>Email: <a href="mailto:support@rifah.sa">support@rifah.sa</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -135,6 +135,8 @@ async function submitPayment(req, res) {
         const now = new Date();
         if (tenant.paymentDueAt && tenant.paymentDueAt < now) {
             await tenant.update({ status: 'payment_expired' });
+            const { sendPaymentExpiredEmail } = require('../utils/emailService');
+            sendPaymentExpiredEmail(tenant).catch(err => console.error('[Payment] Expired email failed:', err.message));
             return res.status(400).json({
                 success: false,
                 message: 'Payment window has expired.',
@@ -146,6 +148,8 @@ async function submitPayment(req, res) {
             await tenant.update({ status: 'payment_success' });
             const { activateTenantAfterPayment } = require('../utils/initializeTenantSubscription');
             await activateTenantAfterPayment(tenant.id);
+            const { sendPaymentSuccessEmail } = require('../utils/emailService');
+            sendPaymentSuccessEmail(tenant).catch(err => console.error('[Payment] Success email failed:', err.message));
             return res.json({
                 success: true,
                 message: 'Payment successful. Your account is now active.',
@@ -153,6 +157,8 @@ async function submitPayment(req, res) {
             });
         }
         await tenant.update({ status: 'payment_failed' });
+        const { sendPaymentFailedEmail } = require('../utils/emailService');
+        sendPaymentFailedEmail(tenant).catch(err => console.error('[Payment] Failed email failed:', err.message));
         return res.json({
             success: false,
             message: 'Payment failed. You can try again before the link expires.',

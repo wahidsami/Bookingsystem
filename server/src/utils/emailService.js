@@ -168,9 +168,63 @@ const sendRejectionEmail = async (tenantData, reason) => {
     });
 };
 
+/**
+ * Send payment window expired email
+ */
+const sendPaymentExpiredEmail = async (tenantData) => {
+    const supportEmail = process.env.SUPPORT_EMAIL || 'support@rifah.sa';
+    return sendEmail({
+        to: tenantData.email,
+        subject: 'Rifah – Payment window expired',
+        template: 'payment_expired',
+        data: {
+            tenantName: tenantData.name_en || tenantData.name,
+            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
+            supportEmail
+        }
+    });
+};
+
+/**
+ * Send payment success email (account active)
+ */
+const sendPaymentSuccessEmail = async (tenantData) => {
+    const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
+    return sendEmail({
+        to: tenantData.email,
+        subject: 'Rifah – Payment successful, your account is active',
+        template: 'payment_success',
+        data: {
+            tenantName: tenantData.name_en || tenantData.name,
+            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
+            loginUrl
+        }
+    });
+};
+
+/**
+ * Send payment failed email (can retry within 48h)
+ */
+const sendPaymentFailedEmail = async (tenantData) => {
+    const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
+    return sendEmail({
+        to: tenantData.email,
+        subject: 'Rifah – Payment could not be completed',
+        template: 'payment_failed',
+        data: {
+            tenantName: tenantData.name_en || tenantData.name,
+            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
+            loginUrl
+        }
+    });
+};
+
 module.exports = {
     sendEmail,
     sendWelcomeEmail,
     sendApprovalEmail,
-    sendRejectionEmail
+    sendRejectionEmail,
+    sendPaymentExpiredEmail,
+    sendPaymentSuccessEmail,
+    sendPaymentFailedEmail
 };

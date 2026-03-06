@@ -239,8 +239,10 @@ async function expirePaymentPendingTenants() {
                 paymentDueAt: { [db.Sequelize.Op.lt]: now }
             }
         });
+        const { sendPaymentExpiredEmail } = require('./emailService');
         for (const t of tenants) {
             await t.update({ status: 'payment_expired' });
+            sendPaymentExpiredEmail(t).catch(err => console.error('[Cron] Payment expired email failed:', err.message));
         }
         if (tenants.length > 0) {
             console.log(`[Cron] Expired ${tenants.length} tenant(s) payment window (payment_pending → payment_expired)`);
