@@ -19,13 +19,10 @@ export async function GET(
     // The path already includes 'uploads/profiles/...' so don't add /uploads again
     const imageUrl = `${SERVER_URL}/${imagePath}`;
 
-    console.log('Proxying image:', imageUrl);
-
     try {
         const response = await fetch(imageUrl);
         
         if (!response.ok) {
-            console.error('Backend returned:', response.status, response.statusText);
             return new Response('Image not found', { status: 404 });
         }
 
@@ -39,7 +36,6 @@ export async function GET(
             },
         });
     } catch (error) {
-        console.error('Error proxying image:', error);
         return new Response('Error loading image', { status: 500 });
     }
 }

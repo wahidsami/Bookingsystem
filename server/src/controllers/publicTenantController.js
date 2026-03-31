@@ -50,8 +50,6 @@ exports.getAllTenants = async (req, res) => {
             tenants.map(async (tenant) => {
                 const tenantData = tenant.toJSON();
                 
-                console.log('🔍 Counting for tenant:', tenantData.id, tenantData.name);
-                
                 const [servicesCount, staffCount] = await Promise.all([
                     db.Service.count({
                         where: { tenantId: tenantData.id, isActive: true }
@@ -85,8 +83,6 @@ exports.getAllTenants = async (req, res) => {
                 });
 
                 const isAvailable = availableShifts > 0;
-
-                console.log('  📊 Services:', servicesCount, 'Staff:', staffCount, 'Available:', isAvailable);
 
                 return {
                     ...tenantData,

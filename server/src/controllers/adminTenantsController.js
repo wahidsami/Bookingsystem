@@ -1,5 +1,5 @@
 const db = require('../models');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
 
 /**
@@ -125,12 +125,17 @@ const getTenantDetails = async (req, res) => {
             limit: 50
         });
 
-        // Get booking stats
-        const bookingStats = await getBookingStats(tenant.dbSchema);
+        // Get live tenant stats from shared tables
+        const bookingStats = await getBookingStats(tenant.id, tenant.stats);
+        const tenantData = tenant.toJSON();
+        tenantData.stats = {
+            ...(tenantData.stats || {}),
+            ...bookingStats
+        };
 
         res.json({
             success: true,
-            tenant,
+            tenant: tenantData,
             activities,
             bookingStats
         });
@@ -595,20 +600,92 @@ const getTenantActivities = async (req, res) => {
 };
 
 // Helper function to get booking stats for a tenant
-async function getBookingStats(dbSchema) {
+async function getBookingStats(tenantId, fallbackStats = {}) {
     try {
-        // This would query the tenant's schema for booking stats
-        // For now, return mock data
+        const [
+            totalBookings,
+            completedBookings,
+            cancelledBookings,
+            bookingRevenue,
+            orderRevenue,
+            bookingCustomers,
+            orderCustomers,
+            ratingAggregate
+        ] = await Promise.all([
+            db.Appointment.count({
+                where: { tenantId }
+            }),
+            db.Appointment.count({
+                where: { tenantId, status: 'completed' }
+            }),
+            db.Appointment.count({
+                where: { tenantId, status: 'cancelled' }
+            }),
+            db.Appointment.sum('price', {
+                where: { tenantId, status: 'completed' }
+            }),
+            db.Order.sum('totalAmount', {
+                where: {
+                    tenantId,
+                    paymentStatus: 'paid',
+                    status: {
+                        [Op.notIn]: ['cancelled', 'refunded']
+                    }
+                }
+            }),
+            db.Appointment.findAll({
+                where: {
+                    tenantId,
+                    platformUserId: { [Op.ne]: null }
+                },
+                attributes: [[fn('DISTINCT', col('platformUserId')), 'platformUserId']],
+                raw: true
+            }),
+            db.Order.findAll({
+                where: {
+                    tenantId,
+                    platformUserId: { [Op.ne]: null }
+                },
+                attributes: [[fn('DISTINCT', col('platformUserId')), 'platformUserId']],
+                raw: true
+            }),
+            db.CustomerInsight.findOne({
+                where: {
+                    tenantId,
+                    averageRating: { [Op.ne]: null }
+                },
+                attributes: [[fn('AVG', col('averageRating')), 'averageRating']],
+                raw: true
+            })
+        ]);
+
+        const customerIds = new Set([
+            ...bookingCustomers.map((row) => row.platformUserId).filter(Boolean),
+            ...orderCustomers.map((row) => row.platformUserId).filter(Boolean)
+        ]);
+
+        const resolvedAverageRating = Number.parseFloat(
+            ratingAggregate?.averageRating ?? fallbackStats?.averageRating ?? 0
+        ) || 0;
+
         return {
-            totalBookings: 0,
-            completedBookings: 0,
-            cancelledBookings: 0,
-            totalRevenue: 0,
-            averageRating: 0
+            totalBookings,
+            completedBookings,
+            cancelledBookings,
+            totalRevenue: Number.parseFloat(bookingRevenue || 0) + Number.parseFloat(orderRevenue || 0),
+            totalCustomers: customerIds.size,
+            averageRating: resolvedAverageRating
         };
     } catch (error) {
         console.error('Get booking stats error:', error);
-        return null;
+        return {
+            totalBookings: fallbackStats?.totalBookings || 0,
+            completedBookings: 0,
+            cancelledBookings: 0,
+            totalRevenue: Number.parseFloat(fallbackStats?.totalRevenue || 0),
+            totalCustomers: fallbackStats?.totalCustomers || 0,
+            averageRating: Number.parseFloat(fallbackStats?.averageRating || 0)
+        };
     }
 }
 
