@@ -7,6 +7,18 @@ const db = require('../models');
 const { Op } = require('sequelize');
 
 class OrderService {
+    _calculateShippingFee(deliveryType, shippingFee = null, deliveryMethod = 'standard') {
+        if (deliveryType !== 'delivery') {
+            return 0;
+        }
+
+        if (shippingFee !== null && shippingFee !== undefined && !Number.isNaN(Number(shippingFee))) {
+            return parseFloat(Number(shippingFee).toFixed(2));
+        }
+
+        return deliveryMethod === 'express' ? 50 : 25;
+    }
+
     /**
      * Create a new order
      * @param {Object} orderData - Order data
@@ -23,7 +35,9 @@ class OrderService {
                 items, // Array of {productId, quantity}
                 paymentMethod, // 'online', 'cash_on_delivery', 'pay_on_visit'
                 deliveryType = 'pickup', // 'pickup' or 'delivery'
+                deliveryMethod = 'standard',
                 shippingAddress = null,
+                shippingFee = null,
                 pickupDate = null,
                 notes = null
             } = orderData;
@@ -111,8 +125,8 @@ class OrderService {
             const platformFee = parseFloat((subtotal * 0.025).toFixed(2));
 
             // Calculate total
-            const shippingFee = deliveryType === 'delivery' ? parseFloat((orderData.shippingFee || 0).toFixed(2)) : 0;
-            const totalAmount = parseFloat((subtotal + totalTax + shippingFee).toFixed(2));
+            const finalShippingFee = this._calculateShippingFee(deliveryType, shippingFee, deliveryMethod);
+            const totalAmount = parseFloat((subtotal + totalTax + finalShippingFee).toFixed(2));
 
             // Determine payment status
             const paymentStatus = paymentMethod === 'online' ? 'pending' : 'pending'; // Will be updated after payment
@@ -137,7 +151,7 @@ class OrderService {
                 notes,
                 subtotal: parseFloat(subtotal.toFixed(2)),
                 taxAmount: parseFloat(totalTax.toFixed(2)),
-                shippingFee,
+                shippingFee: finalShippingFee,
                 platformFee,
                 totalAmount
             }, { transaction });
@@ -149,13 +163,6 @@ class OrderService {
                     ...itemData
                 }, { transaction });
             }
-
-            // Update user stats
-            await db.PlatformUser.increment('totalSpent', {
-                by: totalAmount,
-                where: { id: platformUserId },
-                transaction
-            });
 
             if (shouldCommit) {
                 await transaction.commit();
@@ -208,6 +215,8 @@ class OrderService {
                 throw new Error('Order not found');
             }
 
+            const previousPaymentStatus = order.paymentStatus;
+
             // Update payment status
             await order.update({
                 paymentStatus,
@@ -217,6 +226,14 @@ class OrderService {
             // If payment confirmed and order was pending, update status
             if (paymentStatus === 'paid' && order.status === 'pending') {
                 await order.update({ status: 'confirmed' }, { transaction });
+            }
+
+            if (previousPaymentStatus !== 'paid' && paymentStatus === 'paid') {
+                await db.PlatformUser.increment('totalSpent', {
+                    by: parseFloat(order.totalAmount || 0),
+                    where: { id: order.platformUserId },
+                    transaction
+                });
             }
 
             if (shouldCommit) {
@@ -355,18 +372,6 @@ class OrderService {
         if (paymentStatus) {
             where.paymentStatus = paymentStatus;
         }
-
-        // Filter: Only show orders that should be visible
-        // - Online payments: only if paymentStatus is 'paid'
-        // - POD/POV: always show (they don't require immediate payment)
-        where[Op.or] = [
-            { paymentMethod: 'cash_on_delivery' },
-            { paymentMethod: 'pay_on_visit' },
-            { 
-                paymentMethod: 'online',
-                paymentStatus: 'paid'
-            }
-        ];
 
         if (startDate || endDate) {
             where.createdAt = {};

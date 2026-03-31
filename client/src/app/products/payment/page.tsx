@@ -34,7 +34,6 @@ function ProductPaymentContent() {
     });
 
     useEffect(() => {
-        // Get order data from query params
         const orderId = searchParams.get("orderId");
         const amount = searchParams.get("amount");
         const tenantId = searchParams.get("tenantId");
@@ -49,10 +48,45 @@ function ProductPaymentContent() {
                 productName: productName || "Product",
                 quantity: parseInt(quantity || "1")
             });
+        } else if (orderId) {
+            loadOrderData(orderId);
         } else {
             setError("Missing order information");
         }
     }, [searchParams]);
+
+    const loadOrderData = async (orderId: string) => {
+        try {
+            setLoading(true);
+            setError("");
+
+            const response = await api.get<{ success: boolean; order: any }>(`/orders/${orderId}`);
+
+            if (!response.success || !response.order) {
+                setError("Unable to load order information");
+                return;
+            }
+
+            const order = response.order;
+            const firstItem = order.items?.[0];
+            const quantity = Array.isArray(order.items)
+                ? order.items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0)
+                : 1;
+
+            setOrderData({
+                orderId: order.id,
+                amount: parseFloat(order.totalAmount),
+                tenantId: order.tenant?.id || "",
+                productName: firstItem?.productName || "Product",
+                quantity: quantity || 1
+            });
+        } catch (error: any) {
+            console.error("Failed to load order for payment:", error);
+            setError(error.message || "Unable to load order information");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const formatCardNumber = (value: string) => {
         const cleaned = value.replace(/\s/g, "");

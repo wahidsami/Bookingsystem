@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const publicTenantController = require('../controllers/publicTenantController');
+const { optionalAuth } = require('../middleware/authUser');
 
 // Get all active tenants (for browse/discovery)
 router.get('/tenants', publicTenantController.getAllTenants);
@@ -33,7 +34,7 @@ router.get('/tenant/:tenantId/staff', publicTenantController.getPublicStaff);
 router.post('/tenant/:tenantId/bookings', publicTenantController.createPublicBooking);
 
 // Orders (public, no auth)
-router.post('/tenant/:tenantId/orders', publicTenantController.createPublicOrder);
+router.post('/tenant/:tenantId/orders', optionalAuth, publicTenantController.createPublicOrder);
 
 // Contact form
 router.post('/tenant/:tenantId/contact', publicTenantController.submitContactForm);

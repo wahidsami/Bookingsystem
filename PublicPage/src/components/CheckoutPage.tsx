@@ -26,7 +26,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const deliveryCharge = checkoutData.deliveryType === 'delivery' ? 30 : 0;
+  const deliveryCharge = checkoutData.deliveryType === 'delivery' ? 25 : 0;
   const subtotal = getCartTotal();
   const vat = subtotal * 0.15;
   const total = subtotal + deliveryCharge + vat;
@@ -100,9 +100,6 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
       if (checkoutData.paymentMethod === 'online') {
         paymentMethod = 'online';
       } else if (checkoutData.paymentMethod === 'pay-on-delivery') {
-        paymentMethod = 'cash-on-delivery';
-      } else if (checkoutData.paymentMethod === 'booking-fee') {
-        // Booking fee is not supported for orders, default to cash-on-delivery
         paymentMethod = 'cash-on-delivery';
       }
 
@@ -342,17 +339,6 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
                 <h4 className="mb-2">Online Payment</h4>
                 <p className="text-gray-600">Secure payment with credit/debit card</p>
               </button>
-              <button
-                onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'booking-fee' })}
-                className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  checkoutData.paymentMethod === 'booking-fee'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-gray-200 hover:border-[var(--color-primary)]/50'
-                }`}
-              >
-                <h4 className="mb-2">Pay Booking Fee Only</h4>
-                <p className="text-gray-600">Pay <Currency amount={50} /> now, rest on delivery</p>
-              </button>
             </div>
           </div>
         );
@@ -486,10 +472,10 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
               }
               className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-full hover:bg-[var(--color-primary-dark)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting 
-                ? 'Processing...' 
-                : currentStep === 'summary' 
-                  ? 'Confirm & Pay' 
+              {isSubmitting
+                ? 'Processing...'
+                : currentStep === 'summary'
+                  ? 'Place Order'
                   : 'Continue'
               }
             </button>

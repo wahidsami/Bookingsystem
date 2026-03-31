@@ -35,22 +35,6 @@ exports.getOrders = async (req, res) => {
         // Payment status filter
         if (paymentStatus) {
             where.paymentStatus = paymentStatus;
-        } else {
-            // Default filter: Only show orders that should be visible
-            // - Online payments: only if paymentStatus is 'paid'
-            // - POD/POV: always show (they don't require immediate payment)
-            where[Op.and] = [
-                {
-                    [Op.or]: [
-                        { paymentMethod: 'cash_on_delivery' },
-                        { paymentMethod: 'pay_on_visit' },
-                        { 
-                            paymentMethod: 'online',
-                            paymentStatus: 'paid'
-                        }
-                    ]
-                }
-            ];
         }
 
         // Date filter

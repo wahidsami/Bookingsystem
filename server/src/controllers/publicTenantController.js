@@ -872,6 +872,7 @@ exports.createPublicOrder = async (req, res) => {
             deliveryMethod, // 'standard' or 'express'
             paymentMethod // 'online' or 'cash-on-delivery'
         } = req.body;
+        const authenticatedUserId = req.userId || null;
 
         // Validate required fields
         if (!items || !Array.isArray(items) || items.length === 0) {
@@ -888,90 +889,28 @@ exports.createPublicOrder = async (req, res) => {
             });
         }
 
-        // Get or create customer
-        let customer = await db.Customer.findOne({
-            where: {
-                tenantId,
-                email: customerEmail
-            }
-        });
+        const userService = require('../services/userService');
+        const orderService = require('../services/orderService');
 
-        if (!customer) {
-            customer = await db.Customer.create({
-                tenantId,
-                name: customerName,
-                email: customerEmail,
-                phone: customerPhone
-            });
-        }
+        let platformUserId = authenticatedUserId;
 
-        // Calculate order total
-        let subtotal = 0;
-        const orderItems = [];
+        if (!platformUserId) {
+            const nameParts = customerName.trim().split(/\s+/);
+            const firstName = nameParts[0] || 'Guest';
+            const lastName = nameParts.slice(1).join(' ') || 'User';
 
-        for (const item of items) {
-            const product = await db.Product.findOne({
-                where: { id: item.productId, tenantId, isAvailable: true }
-            });
-
-            if (!product) {
-                return res.status(404).json({
-                    success: false,
-                    message: `Product ${item.productId} not found`
-                });
-            }
-
-            const itemTotal = product.price * item.quantity;
-            subtotal += itemTotal;
-
-            orderItems.push({
-                productId: product.id,
-                productName: product.name_en,
-                quantity: item.quantity,
-                unitPrice: product.price,
-                total: itemTotal
-            });
-        }
-
-        // Calculate delivery fee
-        const deliveryFee = deliveryMethod === 'express' ? 50 : (subtotal >= 200 ? 0 : 25);
-        const tax = subtotal * 0.15; // 15% VAT
-        const total = subtotal + tax + deliveryFee;
-
-        // Generate order number
-        const orderNumber = await db.Order.generateOrderNumber();
-
-        // Create order using Order model
-        // For public orders, we need to create or find a guest user
-        // First, try to find existing user by email
-        let guestUser = await db.PlatformUser.findOne({
-            where: {
-                email: customerEmail
-            }
-        });
-
-        if (!guestUser) {
-            // Create a guest user for public orders
-            // Split name into first and last
-            const nameParts = customerName.trim().split(' ');
-            const firstName = nameParts[0] || customerName;
-            const lastName = nameParts.slice(1).join(' ') || firstName;
-            
-            guestUser = await db.PlatformUser.create({
-                email: customerEmail,
+            const platformUser = await userService.findOrCreatePlatformUser({
+                email: customerEmail || null,
                 phone: customerPhone,
-                firstName: firstName,
-                lastName: lastName,
-                emailVerified: false,
-                phoneVerified: false,
-                // Generate a random password for guest users
-                password: require('crypto').randomBytes(32).toString('hex')
+                firstName,
+                lastName
             });
+
+            platformUserId = platformUser.id;
         }
 
         // Prepare shipping address as JSONB
-        // shippingAddress can be a string (from frontend) or we use individual fields
-        const shippingAddressData = shippingAddress || (city && district) ? {
+        const shippingAddressData = (shippingAddress || (city && district)) ? {
             street: street || (typeof shippingAddress === 'string' ? shippingAddress.split(',')[0] : '') || '',
             city: city || '',
             district: district || '',
@@ -982,43 +921,40 @@ exports.createPublicOrder = async (req, res) => {
             notes: notes || ''
         } : null;
 
-        // Create the order
-        const order = await db.Order.create({
-            orderNumber,
-            platformUserId: guestUser.id,
+        const normalizedPaymentMethod = paymentMethod === 'online' ? 'online' : 'cash_on_delivery';
+        const deliveryType = shippingAddressData ? 'delivery' : 'pickup';
+
+        const order = await orderService.createOrder({
+            platformUserId,
             tenantId,
-            status: paymentMethod === 'cash-on-delivery' ? 'pending' : 'confirmed',
-            paymentMethod: paymentMethod === 'online' ? 'online' : 'cash_on_delivery',
-            paymentStatus: paymentMethod === 'online' ? 'paid' : 'pending',
-            deliveryType: shippingAddress ? 'delivery' : 'pickup',
+            items,
+            paymentMethod: normalizedPaymentMethod,
+            deliveryType,
+            deliveryMethod: deliveryMethod || 'standard',
             shippingAddress: shippingAddressData,
-            subtotal: subtotal,
-            taxAmount: tax,
-            shippingFee: deliveryFee,
-            platformFee: 0, // No platform fee for now
-            totalAmount: total,
-            notes: null
+            notes: notes || null
         });
 
-        // Create order items
-        for (const item of orderItems) {
-            await db.OrderItem.create({
-                orderId: order.id,
-                productId: item.productId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: item.total
-            });
+        let finalOrder = order;
+        if (normalizedPaymentMethod === 'online') {
+            await orderService.updatePaymentStatus(order.id, 'paid');
+            finalOrder = await orderService.getOrderById(order.id);
         }
 
         res.json({
             success: true,
             message: 'Order created successfully',
             data: {
-                orderId: order.id,
-                orderReference: order.orderNumber,
-                total,
-                items: orderItems
+                orderId: finalOrder.id,
+                orderReference: finalOrder.orderNumber,
+                total: finalOrder.totalAmount,
+                items: (finalOrder.items || []).map(item => ({
+                    productId: item.productId,
+                    productName: item.productName,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    total: item.totalPrice
+                }))
             }
         });
     } catch (error) {

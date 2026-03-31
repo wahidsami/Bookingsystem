@@ -367,19 +367,23 @@ class PaymentService {
             }
         });
 
+        const wasPaid = order.paymentStatus === 'paid';
+
         // Update order payment status and order status
         // Note: paymentMethod field should NOT be updated - it's already set to 'online' when order was created
         // The card brand information is stored in the transaction metadata
         await order.update({ 
             paymentStatus: 'paid',
-            status: order.status === 'pending' ? 'confirmed' : order.status
+            status: order.status === 'pending' ? 'confirmed' : order.status,
+            paidAt: new Date()
         });
 
-        // Update platform user stats (already done in order creation, but ensure consistency)
-        await db.PlatformUser.increment('totalSpent', {
-            by: parseFloat(amount),
-            where: { id: platformUserId }
-        });
+        if (!wasPaid) {
+            await db.PlatformUser.increment('totalSpent', {
+                by: parseFloat(order.totalAmount || amount),
+                where: { id: platformUserId }
+            });
+        }
 
         return {
             transaction,
