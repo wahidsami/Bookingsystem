@@ -13,6 +13,7 @@ const {
     PaymentProcessingError
 } = require('../utils/paymentErrorHandler');
 const logger = require('../utils/productionLogger');
+const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 
 class PaymentService {
     /**
@@ -208,9 +209,14 @@ class PaymentService {
         // Update appointment status and payment information
         await appointment.update({ 
             status: 'confirmed',
-            paymentStatus: 'paid',
+            paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
             paymentMethod: paymentMethodName,
-            paidAt: new Date()
+            paidAt: new Date(),
+            depositAmount: 0,
+            depositPaid: true,
+            remainderAmount: 0,
+            remainderPaid: true,
+            totalPaid: parseFloat(amount)
         });
 
         // Update platform user stats

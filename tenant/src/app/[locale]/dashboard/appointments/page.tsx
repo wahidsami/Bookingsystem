@@ -36,7 +36,7 @@ interface Appointment {
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'paid' | 'refunded' | 'partially_refunded';
+  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'refunded' | 'partially_refunded';
   price: number;
   rawPrice?: number;
   taxAmount?: number;
@@ -183,7 +183,8 @@ export default function AppointmentsPage() {
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-100 text-green-800';
+      case 'fully_paid': return 'bg-green-100 text-green-800';
+      case 'deposit_paid': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'refunded': return 'bg-red-100 text-red-800';
       case 'partially_refunded': return 'bg-orange-100 text-orange-800';
@@ -205,7 +206,8 @@ export default function AppointmentsPage() {
   const getPaymentStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return t("paymentPending");
-      case 'paid': return t("paid");
+      case 'fully_paid': return t("paid");
+      case 'deposit_paid': return locale === 'ar' ? 'تم دفع العربون' : 'Deposit Paid';
       case 'refunded': return t("refunded");
       case 'partially_refunded': return t("partiallyRefunded");
       default: return status;

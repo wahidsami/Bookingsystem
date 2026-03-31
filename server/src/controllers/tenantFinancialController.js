@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 
 /**
  * Get financial overview/summary
@@ -93,7 +94,7 @@ exports.getFinancialOverview = async (req, res) => {
             appointmentTotals.totalTenantRevenue += parseFloat(appt.tenantRevenue || 0);
             appointmentTotals.totalEmployeeCommissions += parseFloat(appt.employeeCommission || 0);
 
-            if (appt.paymentStatus === 'paid') {
+            if (isAppointmentFullyPaid(appt.paymentStatus)) {
                 appointmentTotals.paidBookings++;
             } else {
                 appointmentTotals.pendingPayments += parseFloat(appt.price || 0);
@@ -254,7 +255,7 @@ exports.getEmployeeRevenue = async (req, res) => {
             appointments.forEach(appt => {
                 stats.totalRevenueGenerated += parseFloat(appt.rawPrice || appt.price || 0);
                 stats.totalCommission += parseFloat(appt.employeeCommission || 0);
-                if (appt.paymentStatus === 'paid') {
+                if (isAppointmentFullyPaid(appt.paymentStatus)) {
                     stats.paidBookings++;
                 }
             });
@@ -726,7 +727,7 @@ exports.getEmployeeFinancialDetails = async (req, res) => {
         const stats = {
             totalBookings: appointments.length,
             completedBookings: appointments.filter(a => a.status === 'completed').length,
-            paidBookings: appointments.filter(a => a.paymentStatus === 'paid').length,
+            paidBookings: appointments.filter(a => isAppointmentFullyPaid(a.paymentStatus)).length,
             totalRevenueGenerated: 0,
             totalCommission: 0
         };

@@ -9,7 +9,7 @@ interface Appointment {
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'paid' | 'refunded' | 'partially_refunded';
+  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'refunded' | 'partially_refunded';
   price: number;
   notes?: string;
   service: {

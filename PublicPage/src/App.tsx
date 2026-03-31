@@ -86,7 +86,9 @@ function AppContent() {
             path="/"
             element={
               <LandingPage
-                onBookNow={() => setIsBookingModalOpen(true)}
+                onBookNow={() => {
+                  navigate(`${basePath}/services`);
+                }}
                 onServiceClick={(serviceId) => {
                   navigate(`${basePath}/services/${serviceId}`);
                 }}

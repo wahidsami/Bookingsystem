@@ -195,11 +195,6 @@ class BookingService {
                 where: { id: platformUserId },
                 transaction: finalTransaction
             });
-            await db.PlatformUser.increment('totalSpent', {
-                by: pricing.price,
-                where: { id: platformUserId },
-                transaction: finalTransaction
-            });
 
             // Update CustomerInsight
             await this._updateCustomerInsight(
@@ -207,7 +202,7 @@ class BookingService {
                 tenantId,
                 serviceId,
                 finalStaffId,
-                pricing.price,
+                0,
                 start,
                 finalTransaction
             );
@@ -560,7 +555,7 @@ class BookingService {
      * Create or update CustomerInsight for a platform user at a specific tenant
      * @private
      */
-    async _updateCustomerInsight(platformUserId, tenantId, serviceId, staffId, amount, visitDate, transaction = null) {
+    async _updateCustomerInsight(platformUserId, tenantId, serviceId, staffId, amountSpent, visitDate, transaction = null) {
         const [customerInsight, created] = await db.CustomerInsight.findOrCreate({
             where: {
                 platformUserId,
@@ -580,7 +575,9 @@ class BookingService {
 
         // Update stats
         await customerInsight.increment('totalBookings', { transaction: transaction });
-        await customerInsight.increment('totalSpent', { by: amount, transaction: transaction });
+        if (amountSpent > 0) {
+            await customerInsight.increment('totalSpent', { by: amountSpent, transaction: transaction });
+        }
         await customerInsight.update({ lastVisit: visitDate }, { transaction: transaction });
 
         // Update favorite services

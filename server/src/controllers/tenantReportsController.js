@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 
 /**
  * Get dashboard summary report
@@ -41,7 +42,7 @@ exports.getDashboardSummary = async (req, res) => {
         
         const completedAppointments = appointments.filter(a => a.status === 'completed');
         const totalRevenue = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
-        const paidRevenue = completedAppointments.filter(a => a.paymentStatus === 'paid')
+        const paidRevenue = completedAppointments.filter(a => isAppointmentFullyPaid(a.paymentStatus))
             .reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
         const pendingRevenue = completedAppointments.filter(a => a.paymentStatus === 'pending')
             .reduce((sum, a) => sum + parseFloat(a.price || 0), 0);

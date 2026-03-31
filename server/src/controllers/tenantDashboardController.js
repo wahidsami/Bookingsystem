@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 
 /**
  * Get Dashboard Statistics
@@ -227,7 +228,7 @@ const getRevenueChartData = async (req, res) => {
                     [Op.gte]: daysAgo
                 },
                 status: 'completed',
-                paymentStatus: 'paid'
+                paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
             },
             group: [db.sequelize.fn('DATE', db.sequelize.col('startTime'))],
             raw: true

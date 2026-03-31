@@ -46,7 +46,7 @@ interface Appointment {
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'paid' | 'refunded' | 'partially_refunded';
+  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'refunded' | 'partially_refunded';
   paymentMethod?: string;
   paidAt?: string;
   price: number;
@@ -170,7 +170,8 @@ export default function AppointmentDetailsPage() {
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-100 text-green-800 border-green-300';
+      case 'fully_paid': return 'bg-green-100 text-green-800 border-green-300';
+      case 'deposit_paid': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'refunded': return 'bg-red-100 text-red-800 border-red-300';
       case 'partially_refunded': return 'bg-orange-100 text-orange-800 border-orange-300';
@@ -192,7 +193,8 @@ export default function AppointmentDetailsPage() {
   const getPaymentStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return t("paymentPending");
-      case 'paid': return t("paid");
+      case 'fully_paid': return t("paid");
+      case 'deposit_paid': return locale === 'ar' ? 'تم دفع العربون' : 'Deposit Paid';
       case 'refunded': return t("refunded");
       case 'partially_refunded': return t("partiallyRefunded");
       default: return status;
@@ -487,7 +489,7 @@ export default function AppointmentDetailsPage() {
               )}
               {appointment.paymentStatus === 'pending' && (
                 <button
-                  onClick={() => handlePaymentUpdate('paid', 'cash')}
+                  onClick={() => handlePaymentUpdate('fully_paid', 'cash')}
                   disabled={updating}
                   className="w-full btn btn-success"
                 >
@@ -507,7 +509,7 @@ export default function AppointmentDetailsPage() {
           </div>
 
           {/* Payment Info */}
-          {appointment.paymentStatus === 'paid' && appointment.paidAt && (
+          {(appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'deposit_paid') && appointment.paidAt && (
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("paymentInfo")}

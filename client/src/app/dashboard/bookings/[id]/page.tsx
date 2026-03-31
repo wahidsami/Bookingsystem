@@ -110,7 +110,8 @@ function BookingDetailsContent() {
 
     const getPaymentStatusText = (status: string) => {
         switch (status) {
-            case "paid": return "Paid";
+            case "fully_paid": return "Paid";
+            case "deposit_paid": return "Deposit Paid";
             case "pending": return "Pending";
             case "refunded": return "Refunded";
             case "partially_refunded": return "Partially Refunded";

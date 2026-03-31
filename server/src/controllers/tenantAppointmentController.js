@@ -6,6 +6,7 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const { Sequelize } = require('sequelize');
+const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 
 /**
  * Get all appointments for the authenticated tenant
@@ -320,7 +321,13 @@ exports.updatePaymentStatus = async (req, res) => {
         const { id } = req.params;
         const { paymentStatus, paymentMethod } = req.body;
 
-        const validPaymentStatuses = ['pending', 'paid', 'refunded', 'partially_refunded'];
+        const validPaymentStatuses = [
+            APPOINTMENT_PAYMENT_STATUS.PENDING,
+            APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
+            APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
+            APPOINTMENT_PAYMENT_STATUS.REFUNDED,
+            APPOINTMENT_PAYMENT_STATUS.PARTIALLY_REFUNDED
+        ];
         if (!validPaymentStatuses.includes(paymentStatus)) {
             await transaction.rollback();
             return res.status(400).json({
@@ -350,15 +357,55 @@ exports.updatePaymentStatus = async (req, res) => {
             });
         }
 
+        const previousTotalPaid = parseFloat(appointment.totalPaid || 0);
+
         appointment.paymentStatus = paymentStatus;
         if (paymentMethod) {
             appointment.paymentMethod = paymentMethod;
         }
-        if (paymentStatus === 'paid') {
+        if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
             appointment.paidAt = new Date();
+            appointment.depositAmount = 0;
+            appointment.depositPaid = true;
+            appointment.remainderAmount = 0;
+            appointment.remainderPaid = true;
+            appointment.totalPaid = appointment.price;
+        } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
+            appointment.depositPaid = true;
+            appointment.remainderPaid = false;
+            if (!appointment.depositAmount || parseFloat(appointment.depositAmount) === 0) {
+                const depositAmount = parseFloat((parseFloat(appointment.price || 0) * 0.25).toFixed(2));
+                appointment.depositAmount = depositAmount;
+                appointment.remainderAmount = parseFloat((parseFloat(appointment.price || 0) - depositAmount).toFixed(2));
+                appointment.totalPaid = depositAmount;
+            }
+            appointment.paidAt = appointment.paidAt || new Date();
+        } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
+            appointment.paidAt = null;
+            appointment.depositPaid = false;
+            appointment.remainderPaid = false;
+            appointment.totalPaid = 0;
         }
 
         await appointment.save({ transaction });
+
+        const nextTotalPaid = parseFloat(appointment.totalPaid || 0);
+        const paymentDelta = parseFloat((nextTotalPaid - previousTotalPaid).toFixed(2));
+
+        if (appointment.platformUserId && paymentDelta > 0) {
+            await db.PlatformUser.increment('totalSpent', {
+                by: paymentDelta,
+                where: { id: appointment.platformUserId },
+                transaction
+            });
+
+            await db.CustomerInsight.increment('totalSpent', {
+                by: paymentDelta,
+                where: { platformUserId: appointment.platformUserId, tenantId },
+                transaction
+            });
+        }
+
         await transaction.commit();
 
         res.json({
@@ -424,7 +471,8 @@ exports.getAppointmentStats = async (req, res) => {
             },
             byPaymentStatus: {
                 pending: 0,
-                paid: 0,
+                deposit_paid: 0,
+                fully_paid: 0,
                 refunded: 0,
                 partially_refunded: 0
             },

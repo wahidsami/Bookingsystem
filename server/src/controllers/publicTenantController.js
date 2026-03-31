@@ -6,6 +6,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 
 /**
  * Get all active tenants (public listing)
@@ -749,6 +750,59 @@ exports.createPublicBooking = async (req, res) => {
             bookingFee = 50; // Default booking fee (can be configured later)
         }
 
+        if (paymentMethod === 'online-full') {
+            const totalPaid = parseFloat(appointment.price || 0);
+
+            await appointment.update({
+                paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
+                paymentMethod: 'mock_online',
+                paidAt: new Date(),
+                depositAmount: 0,
+                depositPaid: true,
+                remainderAmount: 0,
+                remainderPaid: true,
+                totalPaid
+            });
+
+            await db.PlatformUser.increment('totalSpent', {
+                by: totalPaid,
+                where: { id: platformUser.id }
+            });
+
+            await db.CustomerInsight.increment('totalSpent', {
+                by: totalPaid,
+                where: { platformUserId: platformUser.id, tenantId }
+            });
+        } else if (paymentMethod === 'booking-fee') {
+            const totalPrice = parseFloat(appointment.price || 0);
+            const safeBookingFee = Math.min(bookingFee, totalPrice);
+
+            await appointment.update({
+                paymentStatus: APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
+                paymentMethod: 'mock_booking_fee',
+                paidAt: new Date(),
+                depositAmount: safeBookingFee,
+                depositPaid: safeBookingFee > 0,
+                remainderAmount: parseFloat((totalPrice - safeBookingFee).toFixed(2)),
+                remainderPaid: false,
+                totalPaid: safeBookingFee
+            });
+
+            if (safeBookingFee > 0) {
+                await db.PlatformUser.increment('totalSpent', {
+                    by: safeBookingFee,
+                    where: { id: platformUser.id }
+                });
+
+                await db.CustomerInsight.increment('totalSpent', {
+                    by: safeBookingFee,
+                    where: { platformUserId: platformUser.id, tenantId }
+                });
+            }
+        }
+
+        await appointment.reload();
+
         res.json({
             success: true,
             message: 'Booking created successfully',
@@ -760,6 +814,7 @@ exports.createPublicBooking = async (req, res) => {
                     startTime: appointment.startTime,
                     endTime: appointment.endTime,
                     status: appointment.status,
+                    paymentStatus: appointment.paymentStatus,
                     service: {
                         id: service.id,
                         name_en: service.name_en,
