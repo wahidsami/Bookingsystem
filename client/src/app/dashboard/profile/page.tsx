@@ -6,6 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
+import { API_BASE_URL, toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface UserProfile {
     id: string;
@@ -146,7 +147,7 @@ function ProfileContent() {
             const formData = new FormData();
             formData.append('photo', file);
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/users/profile/photo`, {
+            const response = await fetch(`${API_BASE_URL}/users/profile/photo`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${sessionStorage.getItem('rifah_access_token')}`,
@@ -200,7 +201,7 @@ function ProfileContent() {
                             <div className="relative">
                                 {profile?.profileImage ? (
                                     <img
-                                        src={`http://localhost:5000${profile.profileImage}`}
+                                        src={toAbsoluteMediaUrl(profile.profileImage) || undefined}
                                         alt="Profile"
                                         className="w-24 h-24 rounded-full object-cover border-4 border-primary/20"
                                         onError={(e) => {

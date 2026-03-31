@@ -3,7 +3,7 @@
  * Handles all API calls to the backend public endpoints
  */
 
-const API_BASE_URL = 'http://localhost:5000/api/v1/public';
+import { API_BASE_URL, PUBLIC_API_BASE_URL } from './env';
 
 export interface WorkingDay {
   open: string;
@@ -135,7 +135,7 @@ class PublicAPI {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_BASE_URL;
+    this.baseUrl = PUBLIC_API_BASE_URL;
   }
 
   // Get stored access token
@@ -151,7 +151,7 @@ class PublicAPI {
     if (!refreshToken) return null;
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/user/refresh-token', {
+      const response = await fetch(`${API_BASE_URL}/auth/user/refresh-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -332,7 +332,6 @@ class PublicAPI {
     };
   }> {
     // Use the booking API endpoint (not public API)
-    const API_BASE_URL = 'http://localhost:5000/api/v1';
     const response = await fetch(`${API_BASE_URL}/bookings/search`, {
       method: 'POST',
       headers: {

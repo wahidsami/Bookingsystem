@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Service, Staff, Tenant } from "@/lib/api";
 import Link from "next/link";
+import { buildPublicTenantUrl, toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface TimeSlot {
     startTime: string;
@@ -202,7 +203,7 @@ function BookingContent() {
 
     function handleViewServiceDetails(service: Service) {
         if (tenant?.slug) {
-            window.open(`http://localhost:3004/t/${tenant.slug}/services/${service.id}`, "_blank");
+            window.open(buildPublicTenantUrl(tenant.slug, `/services/${service.id}`), "_blank");
         }
     }
 
@@ -327,7 +328,7 @@ function BookingContent() {
                         <div className="flex items-center gap-4 mb-4">
                             {tenant.logo && (
                                 <img
-                                    src={`http://localhost:5000/uploads/${tenant.logo}`}
+                                    src={toAbsoluteMediaUrl(tenant.logo) || undefined}
                                     alt={tenant.name}
                                     className="w-12 h-12 rounded-lg object-cover"
                                 />
@@ -480,7 +481,7 @@ function BookingContent() {
                                             <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
                                                 {(member.image || member.photo) ? (
                                                     <img
-                                                        src={`http://localhost:5000/uploads/${member.image || member.photo}`}
+                                                        src={toAbsoluteMediaUrl(member.image || member.photo) || undefined}
                                                         alt={member.name}
                                                         className="w-full h-full object-cover"
                                                     />

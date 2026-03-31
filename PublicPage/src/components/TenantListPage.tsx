@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Search, Loader2 } from 'lucide-react';
 import { publicAPI, Tenant } from '../lib/api';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 export const TenantListPage: React.FC = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -118,7 +119,7 @@ export const TenantListPage: React.FC = () => {
                   <div className="mb-4 h-32 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                     {(tenant as any).logo || (tenant as any).profileImage ? (
                       <img
-                        src={`http://localhost:5000/uploads/${(tenant as any).logo || (tenant as any).profileImage}`}
+                        src={toAbsoluteMediaUrl((tenant as any).logo || (tenant as any).profileImage) || undefined}
                         alt={tenant.name_en || tenant.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {

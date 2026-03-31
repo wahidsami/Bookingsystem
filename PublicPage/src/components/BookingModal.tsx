@@ -6,6 +6,7 @@ import { useTenant } from '../context/TenantContext';
 import { useAuth } from '../context/AuthContext';
 import { Currency } from './Currency';
 import { LoginModal } from './LoginModal';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -417,9 +418,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
                   <p className="text-gray-600 text-sm">We'll assign the best available therapist</p>
                 </button>
                 {staff.map((member) => {
-                  const imageUrl = member.image 
-                    ? (member.image.startsWith('http') ? member.image : `http://localhost:5000/uploads/${member.image}`)
-                    : 'https://via.placeholder.com/150';
+                  const imageUrl = toAbsoluteMediaUrl(member.image) || 'https://via.placeholder.com/150';
                   return (
                     <button
                       key={member.id}

@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useTenant } from '../context/TenantContext';
 import { publicAPI, Product } from '../lib/api';
 import { Currency } from './Currency';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -82,7 +83,7 @@ export const ProductDetailPage: React.FC = () => {
 
   const productName = product.name_en || product.name_ar || 'Product';
   const productDescription = product.description_en || product.description_ar || '';
-  const productImages = product.images?.map(img => `http://localhost:5000${img}`) || [];
+  const productImages = product.images?.map((img) => toAbsoluteMediaUrl(img)).filter((img): img is string => Boolean(img)) || [];
   const productIngredients = product.ingredients_en || product.ingredients_ar || '';
   const productHowToUse = product.howToUse_en || product.howToUse_ar || '';
   const productFeatures = product.features_en || product.features_ar || '';
@@ -292,8 +293,8 @@ export const ProductDetailPage: React.FC = () => {
                       id: relatedProduct.id,
                       name: relatedProduct.name_en || relatedProduct.name_ar || 'Product',
                       price: relatedProduct.price,
-                      image: relatedProduct.images && relatedProduct.images.length > 0 
-                        ? `http://localhost:5000${relatedProduct.images[0]}` 
+                      image: relatedProduct.images && relatedProduct.images.length > 0
+                        ? toAbsoluteMediaUrl(relatedProduct.images[0])
                         : null,
                     });
                   }}

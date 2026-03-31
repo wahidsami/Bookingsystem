@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useTenant } from '../context/TenantContext';
 import { useAuth } from '../context/AuthContext';
 import { LoginModal } from './LoginModal';
+import { buildClientAppUrl, toAbsoluteMediaUrl } from '../lib/env';
 
 interface HeaderProps {
   onCartClick: () => void;
@@ -51,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({ onCartClick }) => {
           >
             {tenantLogo ? (
               <img 
-                src={`http://localhost:5000${tenantLogo}`}
+                src={toAbsoluteMediaUrl(tenantLogo) || undefined}
                 alt={tenantName}
                 className="h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                 onError={(e) => {
@@ -137,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({ onCartClick }) => {
                 >
                   {user.photo ? (
                     <img
-                      src={user.photo.startsWith('/') ? `http://localhost:5000${user.photo}` : `http://localhost:5000/uploads/${user.photo}`}
+                      src={toAbsoluteMediaUrl(user.photo) || undefined}
                       alt={`${user.firstName} ${user.lastName}`}
                       className="w-8 h-8 rounded-full object-cover"
                       onError={(e) => {
@@ -162,28 +163,28 @@ export const Header: React.FC<HeaderProps> = ({ onCartClick }) => {
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
                     <a
-                      href="http://localhost:3000/dashboard"
+                      href={buildClientAppUrl('/dashboard')}
                       onClick={() => setShowUserMenu(false)}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       My Dashboard
                     </a>
                     <a
-                      href="http://localhost:3000/dashboard/bookings"
+                      href={buildClientAppUrl('/dashboard/bookings')}
                       onClick={() => setShowUserMenu(false)}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       My Bookings
                     </a>
                     <a
-                      href="http://localhost:3000/dashboard/purchases"
+                      href={buildClientAppUrl('/dashboard/purchases')}
                       onClick={() => setShowUserMenu(false)}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       My Purchases
                     </a>
                     <a
-                      href="http://localhost:3000/dashboard/profile"
+                      href={buildClientAppUrl('/dashboard/profile')}
                       onClick={() => setShowUserMenu(false)}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >

@@ -3,7 +3,7 @@
  * Handles authentication, token management, and secure API calls
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { API_BASE_URL } from "@/lib/runtime";
 
 // Secure token storage using httpOnly cookies (handled by backend)
 // For client-side, we use sessionStorage (more secure than localStorage)

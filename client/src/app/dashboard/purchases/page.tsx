@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface OrderItem {
     id: string;
@@ -274,7 +275,7 @@ function PurchasesContent() {
                                         <div className="flex items-center gap-4">
                                             {order.items[0].productImage && (
                                                 <img
-                                                    src={`http://localhost:5000${order.items[0].productImage.startsWith('/') ? order.items[0].productImage : `/uploads/${order.items[0].productImage}`}`}
+                                                    src={toAbsoluteMediaUrl(order.items[0].productImage) || undefined}
                                                     alt={order.items[0].productName}
                                                     className="w-16 h-16 rounded-lg object-cover"
                                                 />

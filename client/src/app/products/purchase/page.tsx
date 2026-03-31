@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface Product {
     id: string;
@@ -271,7 +272,7 @@ function PurchaseContent() {
                             <div className="flex gap-4">
                                 {product.images && product.images.length > 0 && (
                                     <img
-                                        src={`http://localhost:5000${product.images[0].startsWith('/') ? product.images[0] : `/uploads/${product.images[0]}`}`}
+                                        src={toAbsoluteMediaUrl(product.images[0]) || undefined}
                                         alt={product.name_en}
                                         className="w-24 h-24 rounded-lg object-cover"
                                     />

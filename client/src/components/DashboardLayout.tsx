@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { BRANDING } from "@/config/branding";
+import { toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -184,7 +185,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         >
                             {user?.profileImage ? (
                                 <img
-                                    src={`http://localhost:5000${user.profileImage}`}
+                                    src={toAbsoluteMediaUrl(user.profileImage) || undefined}
                                     alt="Profile"
                                     className="w-10 h-10 rounded-full object-cover"
                                     onError={(e) => {

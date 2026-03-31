@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, Clock, Facebook, Instagram, Twitter, Linkedin, Youtube, Video, MessageCircle } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 interface FooterProps {
   onNavigate?: (page: 'home' | 'services' | 'products' | 'about' | 'contact') => void;
@@ -56,7 +57,7 @@ export const Footer: React.FC<FooterProps> = () => {
           <div>
             {tenantLogo ? (
               <img 
-                src={`http://localhost:5000${tenantLogo}`}
+                src={toAbsoluteMediaUrl(tenantLogo) || undefined}
                 alt={tenantName}
                 className="h-20 w-auto object-contain mb-4 brightness-0 invert"
                 onError={(e) => {

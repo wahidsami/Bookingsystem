@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { buildPublicTenantUrl } from "@/lib/runtime";
 
 /**
  * Tenant Detail Page - Unified Implementation
@@ -25,8 +26,7 @@ export default function TenantDetailPage() {
     if (!slug) return;
 
     // Redirect to PublicPage (the unified tenant page)
-    // PublicPage runs on port 3004 and has all features
-    const publicPageUrl = `http://localhost:3004/t/${slug}`;
+    const publicPageUrl = buildPublicTenantUrl(slug);
     
     // Small delay to show loading state, then redirect
     const timer = setTimeout(() => {
@@ -63,7 +63,7 @@ export default function TenantDetailPage() {
         <div className="text-sm text-gray-500">
           <p>If you're not redirected automatically,</p>
           <a
-            href={`http://localhost:3004/t/${slug}`}
+            href={buildPublicTenantUrl(slug)}
             className="text-primary hover:underline font-medium"
           >
             click here to continue

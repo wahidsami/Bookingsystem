@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 export const InteriorCarousel: React.FC = () => {
   const { pageData } = useTenant();
@@ -9,7 +10,9 @@ export const InteriorCarousel: React.FC = () => {
 
   // Get facilities images from About Us data
   const facilitiesImages = pageData?.aboutUs?.facilitiesImages || [];
-  const images = facilitiesImages.map(img => `http://localhost:5000${img}`);
+  const images = facilitiesImages
+    .map((img) => toAbsoluteMediaUrl(img))
+    .filter((img): img is string => Boolean(img));
 
   // If no facilities images, don't render the component
   if (images.length === 0) {

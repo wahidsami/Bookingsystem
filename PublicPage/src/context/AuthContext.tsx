@@ -4,8 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+import { API_BASE_URL, buildClientAppUrl } from '../lib/env';
 
 export interface User {
   id: string;
@@ -188,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!options?.skipRedirect) {
           // For PublicPage, we might want to redirect to client app dashboard
           // But for now, we'll stay on the page
-          window.location.href = 'http://localhost:3000/dashboard';
+          window.location.href = buildClientAppUrl('/dashboard');
         }
       } else {
         throw new Error('Login failed');
@@ -230,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             sessionStorage.removeItem('rifah_return_after_register');
             window.location.href = returnUrl;
           } else {
-            window.location.href = 'http://localhost:3000/dashboard';
+            window.location.href = buildClientAppUrl('/dashboard');
           }
         }
       } else {

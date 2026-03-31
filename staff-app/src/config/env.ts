@@ -6,5 +6,7 @@ export function getApiUrl(): string {
   if (fromEnv && fromEnv.length > 0) return fromEnv.replace(/\/$/, '');
   const fromExtra = Constants.expoConfig?.extra?.apiUrl as string | undefined;
   if (fromExtra && fromExtra.length > 0) return fromExtra.replace(/\/$/, '');
+  const legacyEnv = process.env.NEXT_PUBLIC_API_URL;
+  if (legacyEnv && legacyEnv.length > 0) return legacyEnv.replace(/\/$/, '');
   return 'http://localhost:5000/api/v1';
 }

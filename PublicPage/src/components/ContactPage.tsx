@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Phone, Mail, MapPin, Clock, CheckCircle, Instagram, Facebook, Twitter, Linkedin, Youtube, Video, MessageCircle, Send } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
 import { publicAPI } from '../lib/api';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 export const ContactPage: React.FC = () => {
   const { tenant, tenantId, pageData } = useTenant();
@@ -149,13 +150,11 @@ export const ContactPage: React.FC = () => {
 
   // Get banner from pageBanners field (dedicated column), then fallback to About Us hero image or default
   const contactBanner = pageData?.pageBanners?.contact;
-  const bannerImage = contactBanner
-    ? `http://localhost:5000${contactBanner.startsWith('/uploads/') ? contactBanner : `/uploads/${contactBanner}`}`
-    : null;
+  const bannerImage = toAbsoluteMediaUrl(contactBanner);
   
   // Hero image from About Us page data or default (fallback)
-  const heroImage = bannerImage || (pageData?.aboutUs?.heroImage 
-    ? `http://localhost:5000${pageData.aboutUs.heroImage}`
+  const heroImage = bannerImage || (toAbsoluteMediaUrl(pageData?.aboutUs?.heroImage)
+    ? toAbsoluteMediaUrl(pageData?.aboutUs?.heroImage)
     : 'https://images.unsplash.com/photo-1619695662967-3e739a597f47?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGElMjBjYW5kbGVzJTIwcmVsYXhhdGlvbnxlbnwxfHx8fDE3NjQzMzQxMDB8MA&ixlib=rb-4.1.0&q=80&w=1080');
 
   return (

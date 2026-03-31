@@ -5,6 +5,7 @@ import { ProductCard } from './ProductCard';
 import { useCart } from '../context/CartContext';
 import { useTenant } from '../context/TenantContext';
 import { publicAPI, Product } from '../lib/api';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 interface ProductsListingPageProps {
   onProductClick?: (productId: string) => void;
@@ -21,9 +22,7 @@ export const ProductsListingPage: React.FC<ProductsListingPageProps> = () => {
 
   // Get banner from pageBanners field (dedicated column)
   const productsBanner = pageData?.pageBanners?.products;
-  const bannerImage = productsBanner
-    ? `http://localhost:5000${productsBanner.startsWith('/uploads/') ? productsBanner : `/uploads/${productsBanner}`}`
-    : null;
+  const bannerImage = toAbsoluteMediaUrl(productsBanner);
 
   useEffect(() => {
     const loadProducts = async () => {

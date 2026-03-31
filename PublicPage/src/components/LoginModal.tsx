@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { buildClientAppUrl } from '../lib/env';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -142,7 +143,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               type="button"
               onClick={() => {
                 onClose();
-                window.location.href = 'http://localhost:3000/forgot-password';
+                window.location.href = buildClientAppUrl('/forgot-password');
               }}
               className="text-sm text-[var(--color-primary)] hover:underline"
             >
@@ -174,7 +175,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     sessionStorage.setItem('rifah_return_after_register', window.location.href);
                   }
                   // Navigate to register page
-                  window.location.href = 'http://localhost:3000/register';
+                  window.location.href = buildClientAppUrl('/register');
                 }}
                 className="text-[var(--color-primary)] font-semibold hover:underline"
               >

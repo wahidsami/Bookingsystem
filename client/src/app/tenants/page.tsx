@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { api, Tenant } from "@/lib/api";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { toAbsoluteMediaUrl } from "@/lib/runtime";
 
 export default function TenantsPage() {
     const { isAuthenticated } = useAuth();
@@ -106,7 +107,7 @@ export default function TenantsPage() {
                                 <div className="relative h-56 bg-gradient-to-br from-primary/5 to-secondary/5 flex items-center justify-center p-8">
                                     {tenant.logo ? (
                                         <img
-                                            src={`http://localhost:5000${tenant.logo}`}
+                                            src={toAbsoluteMediaUrl(tenant.logo) || undefined}
                                             alt={tenant.name}
                                             className="max-w-full max-h-full object-contain drop-shadow-lg"
                                             onError={(e) => {

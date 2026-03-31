@@ -7,6 +7,7 @@ import { api, Service, Staff, Tenant } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PaymentModal } from "@/components/PaymentModal";
+import { toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface TimeSlot {
     startTime: string;
@@ -406,7 +407,7 @@ export function BookingFlow({
                                             <div className="flex items-center gap-3">
                                                 {staffMember.photo || staffMember.image ? (
                                                     <img
-                                                        src={`http://localhost:5000${(staffMember.photo || staffMember.image)?.startsWith('/') ? (staffMember.photo || staffMember.image) : `/uploads/${staffMember.photo || staffMember.image}`}`}
+                                                        src={toAbsoluteMediaUrl(staffMember.photo || staffMember.image) || undefined}
                                                         alt={staffMember.name}
                                                         className="w-16 h-16 rounded-full object-cover"
                                                     />

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PaymentModal } from "@/components/PaymentModal";
+import { toAbsoluteMediaUrl } from "@/lib/runtime";
 
 interface Product {
     id: string;
@@ -266,7 +267,7 @@ export function ProductPurchaseFlow({
                                         <div className="flex gap-4">
                                             {product.images && product.images.length > 0 && (
                                                 <img
-                                                    src={`http://localhost:5000${product.images[0].startsWith('/') ? product.images[0] : `/uploads/${product.images[0]}`}`}
+                                                    src={toAbsoluteMediaUrl(product.images[0]) || undefined}
                                                     alt={product.name_en}
                                                     className="w-20 h-20 rounded-lg object-cover"
                                                 />

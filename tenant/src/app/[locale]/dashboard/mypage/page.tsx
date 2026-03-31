@@ -17,6 +17,8 @@ import { GeneralSettingsTab } from '@/components/GeneralSettingsTab';
 import { PagesBannersTab } from '@/components/PagesBannersTab';
 import { tenantApi } from '@/lib/api';
 
+const PUBLIC_PAGE_URL = (process.env.NEXT_PUBLIC_PUBLIC_PAGE_URL || 'http://localhost:3004').replace(/\/+$/, '');
+
 export default function MyPagePage() {
   const t = useTranslations('MyPage');
   const locale = useLocale();
@@ -47,8 +49,7 @@ export default function MyPagePage() {
   const handleViewPage = () => {
     if (tenantSlug) {
       // Open public page in new tab
-      // PublicPage runs on port 3004
-      const publicPageUrl = `http://localhost:3004/t/${tenantSlug}`;
+      const publicPageUrl = `${PUBLIC_PAGE_URL}/t/${tenantSlug}`;
       window.open(publicPageUrl, '_blank');
     }
   };

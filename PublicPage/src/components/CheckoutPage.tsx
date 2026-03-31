@@ -7,6 +7,7 @@ import { publicAPI } from '../lib/api';
 import { useTenant } from '../context/TenantContext';
 import { useAuth } from '../context/AuthContext';
 import { LoginModal } from './LoginModal';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 interface CheckoutPageProps {
   onBack: () => void;
@@ -387,13 +388,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
                   // Format image URL - handle different formats
                   const productImageRaw = item.product.image;
                   const productImage = productImageRaw
-                    ? productImageRaw.startsWith('http')
-                      ? productImageRaw
-                      : `http://localhost:5000${productImageRaw.startsWith('/uploads/')
-                          ? productImageRaw
-                          : productImageRaw.startsWith('/')
-                            ? `/uploads${productImageRaw}`
-                            : `/uploads/${productImageRaw}`}`
+                    ? toAbsoluteMediaUrl(productImageRaw)
                     : null;
 
                   return (

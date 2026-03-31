@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { Staff } from '../lib/api';
+import { toAbsoluteMediaUrl } from '../lib/env';
 
 interface StaffCardProps {
   staff: Staff;
@@ -17,13 +18,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({ staff, selectable, selecte
   // 2. Relative with slash: /tenants/staff/filename
   // 3. Relative without slash: tenants/staff/filename
   const staffImageRaw = staff.image;
-  const staffImage = staffImageRaw 
-    ? `http://localhost:5000${staffImageRaw.startsWith('/uploads/') 
-        ? staffImageRaw 
-        : staffImageRaw.startsWith('/') 
-          ? `/uploads${staffImageRaw}` 
-          : `/uploads/${staffImageRaw}`}`
-    : null;
+  const staffImage = toAbsoluteMediaUrl(staffImageRaw);
   
   const rating = typeof staff.rating === 'number' ? staff.rating.toFixed(1) : '5.0';
   const specialties = Array.isArray(staff.skills) ? staff.skills : [];
