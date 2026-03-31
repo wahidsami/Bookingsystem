@@ -10,8 +10,17 @@ validateEnvironment();
 
 const db = require('./models');
 const redisService = require('./services/redisService');
+const { getTenantDashboardBaseUrl } = require('./utils/url');
 
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
+const parsedTrustProxy = Number.parseInt(process.env.TRUST_PROXY || '1', 10);
+const trustProxyValue = Number.isNaN(parsedTrustProxy) ? process.env.TRUST_PROXY : parsedTrustProxy;
+let server = null;
+let expiryInterval = null;
+
+app.disable('x-powered-by');
+app.set('trust proxy', trustProxyValue);
 
 // ========================================
 // CORS Configuration - Environment-based
@@ -100,7 +109,7 @@ app.use('/uploads', (req, res, next) => {
 
 // Configure helmet AFTER static files - DISABLE CORP completely
 // Only enable helmet in production, or configure it to not block images
-if (process.env.NODE_ENV === 'production') {
+if (isProduction) {
     app.use(helmet({
         contentSecurityPolicy: {
             directives: {
@@ -120,7 +129,8 @@ if (process.env.NODE_ENV === 'production') {
     }));
 }
 
-app.use(express.json());
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 
 // Rate limiting middleware
 const {
@@ -191,47 +201,88 @@ app.get('/', (req, res) => {
     res.json({ message: 'Rifah API is running' });
 });
 
-// Test endpoint to verify uploads directory
-app.get('/test-uploads', (req, res) => {
-    const uploadsPath = path.join(__dirname, '../uploads');
-    const fs = require('fs');
-    try {
-        const exists = fs.existsSync(uploadsPath);
-        const files = exists ? fs.readdirSync(path.join(uploadsPath, 'profiles')) : [];
-        res.json({
-            uploadsPath,
-            exists,
-            files: files.slice(0, 5) // First 5 files
-        });
-    } catch (error) {
-        res.json({ error: error.message, uploadsPath });
-    }
-});
+if (!isProduction && process.env.ENABLE_DIAGNOSTIC_ROUTES === 'true') {
+    app.get('/test-uploads', (req, res) => {
+        const uploadsPath = path.join(__dirname, '../uploads');
+        const fs = require('fs');
+
+        try {
+            const exists = fs.existsSync(uploadsPath);
+            const files = exists ? fs.readdirSync(path.join(uploadsPath, 'profiles')) : [];
+            res.json({
+                uploadsPath,
+                exists,
+                files: files.slice(0, 5)
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to inspect uploads directory',
+                uploadsPath
+            });
+        }
+    });
+}
 
 // Create default super admin
 const createDefaultSuperAdmin = async () => {
     try {
         const existingAdmin = await db.SuperAdmin.findOne({ where: { role: 'super_admin' } });
-        if (!existingAdmin) {
-            await db.SuperAdmin.create({
-                email: 'admin@rifah.sa',
-                password: 'RifahAdmin@2024', // Will be hashed automatically
-                firstName: 'Super',
-                lastName: 'Admin',
-                role: 'super_admin',
-                permissions: {
-                    tenants: { view: true, create: true, edit: true, delete: true, approve: true },
-                    users: { view: true, create: true, edit: true, delete: true },
-                    financial: { view: true, export: true, refund: true },
-                    settings: { view: true, edit: true }
-                }
-            });
-            console.log('✅ Default Super Admin created: admin@rifah.sa / RifahAdmin@2024');
+        if (existingAdmin) {
+            return;
         }
+
+        const shouldSeedDefaultSuperAdmin = process.env.ENABLE_DEFAULT_SUPER_ADMIN === 'true';
+
+        if (!shouldSeedDefaultSuperAdmin) {
+            console.warn('⚠️  No super admin exists. Set ENABLE_DEFAULT_SUPER_ADMIN=true with seed credentials to create one intentionally.');
+            return;
+        }
+
+        const defaultAdminEmail = process.env.DEFAULT_SUPER_ADMIN_EMAIL;
+        const defaultAdminPassword = process.env.DEFAULT_SUPER_ADMIN_PASSWORD;
+
+        if (!defaultAdminEmail || !defaultAdminPassword) {
+            throw new Error('DEFAULT_SUPER_ADMIN_EMAIL and DEFAULT_SUPER_ADMIN_PASSWORD are required when ENABLE_DEFAULT_SUPER_ADMIN=true');
+        }
+
+        if (defaultAdminPassword.length < 12) {
+            throw new Error('DEFAULT_SUPER_ADMIN_PASSWORD must be at least 12 characters long');
+        }
+
+        await db.SuperAdmin.create({
+            email: defaultAdminEmail.toLowerCase(),
+            password: defaultAdminPassword,
+            firstName: 'Super',
+            lastName: 'Admin',
+            role: 'super_admin',
+            permissions: {
+                tenants: { view: true, create: true, edit: true, delete: true, approve: true },
+                users: { view: true, create: true, edit: true, delete: true },
+                financial: { view: true, export: true, refund: true },
+                settings: { view: true, edit: true }
+            }
+        });
+        console.log(`✅ Default Super Admin created for ${defaultAdminEmail}`);
     } catch (error) {
         console.log('Super admin setup:', error.message);
     }
 };
+
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Route not found'
+    });
+});
+
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal server error'
+    });
+});
 
 // Database Connection and Server Start
 const startServer = async () => {
@@ -299,15 +350,53 @@ const startServer = async () => {
         const { seedDefaultPackages } = require('./utils/seedPackages');
         await seedDefaultPackages();
 
-        app.listen(PORT, () => {
+        if (isProduction && !getTenantDashboardBaseUrl()) {
+            console.warn('⚠️  Tenant dashboard base URL is not configured. Email-generated links may be incomplete.');
+        }
+
+        server = app.listen(PORT, () => {
             console.log(`🚀 Server is running on port ${PORT}`);
             // Expire payment_pending tenants every hour (48h window)
             const { expirePaymentPendingTenants } = require('./utils/initializeTenantSubscription');
-            setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
+            expiryInterval = setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
         });
     } catch (error) {
         console.error('Unable to connect to the database:', error);
+        process.exit(1);
     }
 };
+
+const shutdown = async (signal) => {
+    console.log(`\n${signal} received, shutting down gracefully...`);
+
+    if (expiryInterval) {
+        clearInterval(expiryInterval);
+        expiryInterval = null;
+    }
+
+    try {
+        if (server) {
+            await new Promise((resolve, reject) => {
+                server.close((error) => {
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve();
+                });
+            });
+        }
+
+        await redisService.closeRedis();
+        await db.sequelize.close();
+        process.exit(0);
+    } catch (error) {
+        console.error('Graceful shutdown failed:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 startServer();

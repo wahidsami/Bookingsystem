@@ -1,6 +1,7 @@
 const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
+const { getTenantDashboardLoginUrl } = require('./url');
 
 /**
  * Email Service Utility - Resend
@@ -131,7 +132,7 @@ const sendWelcomeEmail = async (tenantData) => {
  * @param {Object} [options] - { paymentUrl, paymentDueAt }
  */
 const sendApprovalEmail = async (tenantData, options = {}) => {
-    const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
+    const loginUrl = getTenantDashboardLoginUrl('ar');
     const paymentUrl = options.paymentUrl || process.env.TENANT_PAYMENT_LINK_URL || loginUrl;
     const paymentDueAt = options.paymentDueAt;
     const paymentDueText = paymentDueAt
@@ -189,7 +190,7 @@ const sendPaymentExpiredEmail = async (tenantData) => {
  * Send payment success email (account active)
  */
 const sendPaymentSuccessEmail = async (tenantData) => {
-    const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
+    const loginUrl = getTenantDashboardLoginUrl('ar');
     return sendEmail({
         to: tenantData.email,
         subject: 'Rifah – Payment successful, your account is active',
@@ -206,7 +207,7 @@ const sendPaymentSuccessEmail = async (tenantData) => {
  * Send payment failed email (can retry within 48h)
  */
 const sendPaymentFailedEmail = async (tenantData) => {
-    const loginUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003/ar/login';
+    const loginUrl = getTenantDashboardLoginUrl('ar');
     return sendEmail({
         to: tenantData.email,
         subject: 'Rifah – Payment could not be completed',

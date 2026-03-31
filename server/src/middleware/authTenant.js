@@ -6,6 +6,7 @@
 
 const jwt = require('jsonwebtoken');
 const db = require('../models');
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Authenticate Tenant User (Required Auth)
@@ -26,7 +27,7 @@ const authenticateTenant = async (req, res, next) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     // Check if it's a tenant token (not platform user or admin)
     if (decoded.type !== 'tenant') {
@@ -102,7 +103,7 @@ const optionalTenantAuth = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     if (decoded.type === 'tenant') {
       const tenant = await db.Tenant.findByPk(decoded.id, {

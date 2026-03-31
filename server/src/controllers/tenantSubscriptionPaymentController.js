@@ -4,7 +4,7 @@
  */
 const db = require('../models');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Middleware: set req.tenant from Bearer (tenant with payment_pending) or query/body token

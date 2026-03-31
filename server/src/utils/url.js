@@ -1,0 +1,92 @@
+const normalizeBaseUrl = (value) => {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+
+    return value.trim().replace(/\/+$/, '');
+};
+
+const stripLoginPath = (value) => value.replace(/\/[a-z]{2}\/login$/i, '').replace(/\/login$/i, '');
+
+const getTenantDashboardBaseUrl = () => {
+    const configuredUrl = stripLoginPath(normalizeBaseUrl(
+        process.env.TENANT_DASHBOARD_BASE_URL || process.env.TENANT_DASHBOARD_URL
+    ));
+
+    if (configuredUrl) {
+        return configuredUrl;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        return 'http://localhost:3003';
+    }
+
+    return '';
+};
+
+const getTenantDashboardLoginUrl = (locale = 'ar') => {
+    const explicitLoginUrl = normalizeBaseUrl(process.env.TENANT_DASHBOARD_LOGIN_URL);
+
+    if (explicitLoginUrl) {
+        return explicitLoginUrl;
+    }
+
+    const baseUrl = getTenantDashboardBaseUrl();
+
+    if (!baseUrl) {
+        return '';
+    }
+
+    if (/\/[a-z]{2}\/login$/i.test(baseUrl) || /\/login$/i.test(baseUrl)) {
+        return baseUrl;
+    }
+
+    return `${baseUrl}/${locale}/login`;
+};
+
+const getServerPublicUrl = () => {
+    const configuredUrl = normalizeBaseUrl(process.env.SERVER_PUBLIC_URL);
+
+    if (configuredUrl) {
+        return configuredUrl;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        return 'http://localhost:5000';
+    }
+
+    return '';
+};
+
+const buildPublicAssetUrl = (assetPath) => {
+    if (!assetPath || typeof assetPath !== 'string') {
+        return assetPath;
+    }
+
+    if (/^https?:\/\//i.test(assetPath)) {
+        return assetPath;
+    }
+
+    let normalizedPath = assetPath;
+
+    if (normalizedPath.startsWith('profiles/')) {
+        normalizedPath = `/uploads/${normalizedPath}`;
+    } else if (normalizedPath.startsWith('uploads/')) {
+        normalizedPath = `/${normalizedPath}`;
+    } else if (!normalizedPath.startsWith('/uploads/')) {
+        normalizedPath = normalizedPath.startsWith('/')
+            ? normalizedPath
+            : `/uploads/profiles/${normalizedPath}`;
+    }
+
+    const publicUrl = getServerPublicUrl();
+    return publicUrl ? `${publicUrl}${normalizedPath}` : normalizedPath;
+};
+
+module.exports = {
+    normalizeBaseUrl,
+    getTenantDashboardBaseUrl,
+    getTenantDashboardLoginUrl,
+    getServerPublicUrl,
+    buildPublicAssetUrl
+};

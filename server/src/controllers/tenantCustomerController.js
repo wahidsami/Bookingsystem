@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const { buildPublicAssetUrl } = require('../utils/url');
 
 /**
  * Get all customers who have booked with this tenant
@@ -190,16 +191,7 @@ exports.getCustomers = async (req, res) => {
             }
 
             // Format profile image URL
-            let photoUrl = customer.profileImage;
-            if (photoUrl && !photoUrl.startsWith('http')) {
-                if (photoUrl.startsWith('/')) {
-                    photoUrl = `http://localhost:5000${photoUrl}`;
-                } else if (photoUrl.startsWith('profiles/')) {
-                    photoUrl = `http://localhost:5000/uploads/${photoUrl}`;
-                } else {
-                    photoUrl = `http://localhost:5000/uploads/profiles/${photoUrl}`;
-                }
-            }
+            const photoUrl = buildPublicAssetUrl(customer.profileImage);
 
             return {
                 id: customer.id,
@@ -445,16 +437,7 @@ exports.getCustomer = async (req, res) => {
 
         const customerJson = customer.toJSON();
         // Ensure profileImage is properly formatted
-        if (customerJson.profileImage && !customerJson.profileImage.startsWith('http')) {
-            // Handle both /uploads/profiles/ and /uploads/ paths
-            if (customerJson.profileImage.startsWith('/')) {
-                customerJson.profileImage = `http://localhost:5000${customerJson.profileImage}`;
-            } else if (customerJson.profileImage.startsWith('profiles/')) {
-                customerJson.profileImage = `http://localhost:5000/uploads/${customerJson.profileImage}`;
-            } else {
-                customerJson.profileImage = `http://localhost:5000/uploads/profiles/${customerJson.profileImage}`;
-            }
-        }
+        customerJson.profileImage = buildPublicAssetUrl(customerJson.profileImage);
 
         const customerData = {
             ...customerJson,

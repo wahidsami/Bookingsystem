@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../models');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'rifah-super-admin-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Authenticate Super Admin

@@ -7,7 +7,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const db = require('../models');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
@@ -28,7 +29,7 @@ const generateAccessToken = (tenantId) => {
 const generateRefreshToken = (tenantId) => {
   return jwt.sign(
     { id: tenantId, type: 'tenant', isRefresh: true },
-    JWT_SECRET,
+    JWT_REFRESH_SECRET,
     { expiresIn: JWT_REFRESH_EXPIRES_IN }
   );
 };
@@ -155,7 +156,7 @@ const refreshToken = async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
 
     if (decoded.type !== 'tenant' || !decoded.isRefresh) {
       return res.status(403).json({

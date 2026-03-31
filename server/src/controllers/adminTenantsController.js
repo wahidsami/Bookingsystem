@@ -1,5 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const { getTenantDashboardBaseUrl } = require('../utils/url');
 
 /**
  * Get all tenants with filters and pagination
@@ -198,7 +199,7 @@ const approveTenant = async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '48h' }
         );
-        const baseUrl = (process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003').replace(/\/$/, '');
+        const baseUrl = getTenantDashboardBaseUrl();
         const paymentUrl = `${baseUrl}/ar/subscription/pay?token=${paymentToken}`;
 
         const { sendApprovalEmail } = require('../utils/emailService');
@@ -343,7 +344,7 @@ const requestMoreInfo = async (req, res) => {
 
         // Optional: send email to tenant with message and link to resubmit
         const { sendEmail } = require('../utils/emailService');
-        const resubmitUrl = process.env.TENANT_DASHBOARD_URL || 'http://localhost:3003';
+        const resubmitUrl = getTenantDashboardBaseUrl();
         sendEmail({
             to: tenant.email,
             subject: 'Rifah – More information required',

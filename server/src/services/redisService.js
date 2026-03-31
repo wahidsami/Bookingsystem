@@ -43,6 +43,23 @@ function getRedisClient() {
 }
 
 /**
+ * Close Redis client gracefully
+ */
+async function closeRedis() {
+    if (!redisClient) {
+        return;
+    }
+
+    try {
+        await redisClient.quit();
+    } catch (error) {
+        console.warn('Redis shutdown warning:', error.message);
+    } finally {
+        redisClient = null;
+    }
+}
+
+/**
  * Acquire a lock for a booking slot
  * @param {string} key - Lock key (e.g., "booking:staffId:startTime")
  * @param {number} ttl - Time to live in seconds (default 300 = 5 minutes)
@@ -108,6 +125,7 @@ async function isLocked(key) {
 module.exports = {
     initRedis,
     getRedisClient,
+    closeRedis,
     acquireLock,
     releaseLock,
     isLocked

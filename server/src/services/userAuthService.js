@@ -4,7 +4,7 @@ const db = require('../models');
 
 // Use environment variables, with validation to happen at startup
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m'; // Access token expires in 15 minutes
 const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d'; // Refresh token expires in 7 days
 
@@ -162,7 +162,7 @@ class UserAuthService {
     async refreshToken(refreshToken) {
         try {
             // Verify refresh token
-            const decoded = jwt.verify(refreshToken, JWT_SECRET);
+            const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
 
             // Find user
             const user = await db.PlatformUser.findByPk(decoded.userId);
@@ -318,7 +318,7 @@ class UserAuthService {
             expiresIn: JWT_EXPIRES_IN
         });
 
-        const refreshToken = jwt.sign(payload, JWT_SECRET, {
+        const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, {
             expiresIn: REFRESH_TOKEN_EXPIRES_IN
         });
 

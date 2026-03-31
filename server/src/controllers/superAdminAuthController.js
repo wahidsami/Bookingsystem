@@ -1,7 +1,8 @@
 const db = require('../models');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'rifah-super-admin-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = '24h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
@@ -60,7 +61,7 @@ const login = async (req, res) => {
 
         const refreshToken = jwt.sign(
             { adminId: admin.id, type: 'refresh_super_admin' },
-            JWT_SECRET,
+            JWT_REFRESH_SECRET,
             { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
         );
 
@@ -115,7 +116,7 @@ const refreshToken = async (req, res) => {
         }
 
         // Verify refresh token
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_REFRESH_SECRET);
 
         if (decoded.type !== 'refresh_super_admin') {
             return res.status(401).json({

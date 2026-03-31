@@ -4,13 +4,18 @@
  */
 const rateLimit = require('express-rate-limit');
 
+const parseLimit = (value, fallback) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 /**
  * General API rate limiter
  * Limits: 100 requests per 15 minutes per IP
  */
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500, // TEMP increased for testing (was 100)
+    max: parseLimit(process.env.RATE_LIMIT_GENERAL_MAX, 300),
     message: {
         success: false,
         message: 'Too many requests from this IP, please try again later.'
@@ -26,7 +31,7 @@ const generalLimiter = rateLimit({
  */
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // TEMP increased for testing (was 5)
+    max: parseLimit(process.env.RATE_LIMIT_AUTH_MAX, process.env.NODE_ENV === 'production' ? 10 : 50),
     message: {
         success: false,
         message: 'Too many authentication attempts. Please try again after 15 minutes.'
@@ -42,7 +47,7 @@ const authLimiter = rateLimit({
  */
 const passwordResetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 attempts per window
+    max: parseLimit(process.env.RATE_LIMIT_PASSWORD_RESET_MAX, 3),
     message: {
         success: false,
         message: 'Too many password reset attempts. Please try again later.'
@@ -59,7 +64,7 @@ const passwordResetLimiter = rateLimit({
  */
 const paymentLimiter = rateLimit({
     windowMs: 30 * 60 * 1000, // 30 minutes
-    max: 10, // 10 attempts per window
+    max: parseLimit(process.env.RATE_LIMIT_PAYMENT_MAX, 10),
     message: {
         success: false,
         message: 'Too many payment attempts. Please try again later.'
@@ -78,7 +83,7 @@ const paymentLimiter = rateLimit({
  */
 const emailVerificationLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // 5 attempts per window
+    max: parseLimit(process.env.RATE_LIMIT_EMAIL_VERIFICATION_MAX, 5),
     message: {
         success: false,
         message: 'Too many email verification attempts. Please try again later.'
@@ -94,7 +99,7 @@ const emailVerificationLimiter = rateLimit({
  */
 const phoneVerificationLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // 5 attempts per window
+    max: parseLimit(process.env.RATE_LIMIT_PHONE_VERIFICATION_MAX, 5),
     message: {
         success: false,
         message: 'Too many phone verification attempts. Please try again later.'
@@ -113,7 +118,7 @@ const phoneVerificationLimiter = rateLimit({
  */
 const uploadLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20, // 20 uploads per window
+    max: parseLimit(process.env.RATE_LIMIT_UPLOAD_MAX, 20),
     message: {
         success: false,
         message: 'Too many file uploads. Please try again later.'
