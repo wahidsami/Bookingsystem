@@ -132,9 +132,9 @@ export default function LoginPage() {
                 />
                 <span className="mr-2 text-sm text-gray-700">{t("rememberMe")}</span>
               </label>
-              <a href="/forgot-password" className="text-sm text-purple-600 hover:underline">
+              <Link href={`/${locale}/forgot-password`} className="text-sm text-purple-600 hover:underline">
                 {t("forgotPassword")}
-              </a>
+              </Link>
             </div>
 
             {/* Submit Button */}
