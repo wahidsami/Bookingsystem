@@ -205,7 +205,7 @@ const approveTenant = async (req, res) => {
             { expiresIn: '48h' }
         );
         const baseUrl = getTenantDashboardBaseUrl();
-        const paymentUrl = `${baseUrl}/ar/subscription/pay?token=${paymentToken}`;
+        const paymentUrl = `${baseUrl}/ar/payment?token=${paymentToken}`;
 
         const { sendApprovalEmail } = require('../utils/emailService');
         sendApprovalEmail(tenant, { paymentUrl, paymentDueAt }).catch(err => {

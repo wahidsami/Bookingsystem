@@ -22,8 +22,8 @@ export function TenantLayout({ children }: TenantLayoutProps) {
 
   useEffect(() => {
     if (!user) return;
-    if (user.status === 'payment_pending' && !pathname?.includes('/subscription/pay')) {
-      router.replace(`/${locale}/subscription/pay`);
+    if (user.status === 'payment_pending' && !pathname?.includes('/payment') && !pathname?.includes('/subscription/pay')) {
+      router.replace(`/${locale}/payment`);
     } else if (user.status === 'more_info_required' && !pathname?.includes('/onboarding/more-info')) {
       router.replace(`/${locale}/onboarding/more-info`);
     }
