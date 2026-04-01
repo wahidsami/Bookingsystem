@@ -15,6 +15,22 @@ This folder now contains production-oriented starter data for the `Kamy Salon` t
 - Product data is complete from a catalog perspective, but product creation in the live tenant dashboard still requires at least one image per product.
 - Hot deals use `fixed_amount` instead of `fixed`, which matches the current backend contract.
 
+## Import Command
+
+From the repo root:
+
+`npm run seed:tenant -- --tenant-slug <tenant-slug> --seed-dir "../seeds/Kamy Salon"`
+
+Or from `server/`:
+
+`npm run import:tenant-seed -- --tenant-slug <tenant-slug> --seed-dir "../seeds/Kamy Salon"`
+
+Useful flags:
+
+- `--tenant-name "Kamy Salon"` to match by business name instead of slug
+- `--dry-run` to validate without saving
+- `--create-staff-users` to create staff login accounts from employee emails
+
 ## Category Normalization
 
 The original source categories were normalized to the current tenant dashboard options:
