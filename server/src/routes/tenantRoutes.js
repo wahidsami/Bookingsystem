@@ -22,7 +22,9 @@ const tenantRegistrationController = require('../controllers/tenantRegistrationC
 const tenantBillsController = require('../controllers/tenantBillsController');
 const tenantMessagesController = require('../controllers/tenantMessagesController');
 const tenantPayrollController = require('../controllers/tenantPayrollController');
-const { authenticateTenant } = require('../middleware/authTenant');
+const tenantNotificationController = require('../controllers/tenantNotificationController');
+const aiController = require('../controllers/tenant/aiController');
+const { authenticateTenant, checkTenantFeature } = require('../middleware/authTenant');
 const multer = require('multer');
 const path = require('path');
 
@@ -122,6 +124,13 @@ router.put('/payroll/:id/status', tenantPayrollController.updatePayrollStatus);
 router.get('/reviews', tenantPayrollController.getAllReviews);
 router.patch('/reviews/:id', tenantPayrollController.updateReview);
 
+// Customer push notifications
+router.get('/notifications/usage', tenantNotificationController.getPushUsage);
+router.post('/notifications/send', tenantNotificationController.sendMarketingPush);
+router.get('/notifications/history', tenantNotificationController.getPushHistory);
+router.get('/notifications/history/:id', tenantNotificationController.getPushHistoryDetail);
+router.get('/notifications/history/:id/recipients', tenantNotificationController.getPushHistoryRecipients);
+
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);
 router.get('/settings', tenantSettingsController.getSettings);
@@ -173,5 +182,11 @@ router.get('/employees/:id/overrides', tenantScheduleController.getOverrides);
 router.post('/employees/:id/overrides', tenantScheduleController.createOverride);
 router.put('/employees/:id/overrides/:overrideId', tenantScheduleController.updateOverride);
 router.delete('/employees/:id/overrides/:overrideId', tenantScheduleController.deleteOverride);
+
+// AI helper
+router.post('/ai/generate-product', checkTenantFeature('hasAIContentAssistant'), aiController.generateProduct);
+router.post('/ai/generate-service', checkTenantFeature('hasAIContentAssistant'), aiController.generateService);
+router.post('/ai/generate-about-us', checkTenantFeature('hasAIContentAssistant'), aiController.generateAboutUs);
+router.post('/ai/translate', checkTenantFeature('hasAIContentAssistant'), aiController.translateText);
 
 module.exports = router;

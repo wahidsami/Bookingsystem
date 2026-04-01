@@ -307,6 +307,8 @@ const startServer = async () => {
         await db.Bill.sync({ force: false }); // Subscription invoices
         await db.TenantUsage.sync({ force: false }); // Usage tracking
         await db.UsageAlert.sync({ force: false }); // Usage alerts
+        await db.TenantPushUsage.sync({ force: false }); // Marketing push quota usage
+        await db.TenantPushCampaign.sync({ force: false }); // Marketing push campaign history
         await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
 
         await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
@@ -344,6 +346,7 @@ const startServer = async () => {
         await db.Review.sync({ force: false }); // Customer reviews
         await db.CustomerInsight.sync({ force: false });
         await db.Transaction.sync({ force: false });
+        await db.TenantPushCampaignRecipient.sync({ force: false }); // Marketing push recipients
         await db.StaffPayroll.sync({ force: false }); // Payroll records
         await db.Order.sync({ force: false }); // Order system
         await db.OrderItem.sync({ force: false }); // Order items

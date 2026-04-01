@@ -1,0 +1,230 @@
+const { Op } = require('sequelize');
+const db = require('../models');
+const customerNotificationService = require('../services/customerNotificationService');
+
+function parsePage(query) {
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 20, 1), 100);
+    const offset = (page - 1) * limit;
+    return { page, limit, offset };
+}
+
+exports.getPushUsage = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        if (!tenantId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const usage = await customerNotificationService.getTenantPushUsage(tenantId);
+        return res.json({ success: true, data: usage });
+    } catch (error) {
+        console.error('Get push usage error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.sendMarketingPush = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        if (!tenantId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const { platformUserIds, audience, title, body, linkType, serviceId } = req.body;
+        if (!title || typeof title !== 'string' || !body || typeof body !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'title and body are required'
+            });
+        }
+
+        const pushData = {
+            linkType: linkType || 'tenant',
+            audienceType: audience === 'all_booked' ? 'all_booked' : 'selected'
+        };
+
+        if (serviceId && (linkType === 'service' || !linkType)) {
+            const service = await db.Service.findOne({
+                where: { id: serviceId, tenantId, isActive: true },
+                attributes: ['id', 'hasGift', 'giftDetails']
+            });
+
+            if (!service) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Service not found or does not belong to your tenant'
+                });
+            }
+
+            pushData.linkType = 'service';
+            pushData.serviceId = String(service.id);
+            pushData.hasGift = service.hasGift ? 'true' : 'false';
+            pushData.giftSummary = service.hasGift && service.giftDetails
+                ? String(service.giftDetails).slice(0, 200)
+                : '';
+        }
+
+        let userIds = Array.isArray(platformUserIds) ? platformUserIds : [];
+        if (userIds.length === 0 && audience === 'all_booked') {
+            const appointmentUserIds = await db.Appointment.findAll({
+                where: { tenantId, platformUserId: { [Op.ne]: null } },
+                attributes: [[db.sequelize.fn('DISTINCT', db.sequelize.col('platformUserId')), 'platformUserId']],
+                raw: true
+            });
+
+            const orderUserIds = await db.Order.findAll({
+                where: { tenantId },
+                attributes: [[db.sequelize.fn('DISTINCT', db.sequelize.col('platformUserId')), 'platformUserId']],
+                raw: true
+            });
+
+            const userIdSet = new Set([
+                ...appointmentUserIds.map((row) => row.platformUserId).filter(Boolean),
+                ...orderUserIds.map((row) => row.platformUserId).filter(Boolean)
+            ]);
+            userIds = [...userIdSet];
+        }
+
+        if (userIds.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No customers to send to',
+                data: { sent: 0 }
+            });
+        }
+
+        const result = await customerNotificationService.sendTenantMarketingPush(
+            tenantId,
+            userIds,
+            title.trim(),
+            body.trim(),
+            pushData
+        );
+
+        if (result.limitReached) {
+            return res.status(403).json({
+                success: false,
+                message: 'Monthly push limit reached. Upgrade your plan for more.'
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: `Push sent to ${result.sent} customer(s)`,
+            data: { sent: result.sent }
+        });
+    } catch (error) {
+        console.error('Send marketing push error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getPushHistory = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        if (!tenantId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const { page, limit, offset } = parsePage(req.query);
+        const { count, rows } = await db.TenantPushCampaign.findAndCountAll({
+            where: { tenantId },
+            order: [['sentAt', 'DESC']],
+            limit,
+            offset,
+            attributes: ['id', 'title', 'body', 'data', 'audienceType', 'recipientCount', 'sentAt']
+        });
+
+        const campaigns = rows.map((campaign) => {
+            const item = campaign.toJSON();
+            item.bodyTruncated = item.body
+                ? (item.body.length > 120 ? `${item.body.slice(0, 120)}...` : item.body)
+                : '';
+            return item;
+        });
+
+        return res.json({
+            success: true,
+            campaigns,
+            pagination: {
+                total: count,
+                page,
+                limit,
+                totalPages: Math.ceil(count / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Get push history error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getPushHistoryDetail = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const { id } = req.params;
+
+        if (!tenantId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const campaign = await db.TenantPushCampaign.findOne({
+            where: { id, tenantId },
+            attributes: ['id', 'title', 'body', 'data', 'audienceType', 'recipientCount', 'sentAt']
+        });
+
+        if (!campaign) {
+            return res.status(404).json({ success: false, message: 'Campaign not found' });
+        }
+
+        return res.json({ success: true, campaign: campaign.toJSON() });
+    } catch (error) {
+        console.error('Get push history detail error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getPushHistoryRecipients = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const { id } = req.params;
+
+        if (!tenantId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const campaign = await db.TenantPushCampaign.findOne({
+            where: { id, tenantId },
+            attributes: ['id']
+        });
+
+        if (!campaign) {
+            return res.status(404).json({ success: false, message: 'Campaign not found' });
+        }
+
+        const recipients = await db.TenantPushCampaignRecipient.findAll({
+            where: { campaignId: campaign.id },
+            include: [{
+                model: db.PlatformUser,
+                as: 'platformUser',
+                attributes: ['id', 'email', 'firstName', 'lastName'],
+                required: false
+            }],
+            order: [['createdAt', 'ASC']]
+        });
+
+        return res.json({
+            success: true,
+            recipients: recipients.map((recipient) => ({
+                platformUserId: recipient.platformUserId,
+                email: recipient.platformUser?.email || null,
+                firstName: recipient.platformUser?.firstName || null,
+                lastName: recipient.platformUser?.lastName || null
+            }))
+        });
+    } catch (error) {
+        console.error('Get push history recipients error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};

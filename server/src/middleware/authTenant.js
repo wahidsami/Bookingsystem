@@ -139,24 +139,45 @@ const checkTenantFeature = (feature) => {
         });
       }
 
-      // Get tenant settings to check subscription/features
-      const settings = await db.TenantSettings.findOne({
-        where: { tenantId: req.tenantId }
-      });
+      const { Op } = require('sequelize');
+      const tenantId = req.tenantId;
 
-      // Check if tenant has access to the feature
-      // This can be expanded based on subscription tiers
-      const features = settings?.features || {};
-      
-      if (!features[feature]) {
-        return res.status(403).json({
-          success: false,
-          message: `This feature (${feature}) is not available in your current plan`,
-          upgradeRequired: true
-        });
+      const settings = await db.TenantSettings.findOne({ where: { tenantId } });
+      const tenantFeatures = settings?.features || {};
+      if (tenantFeatures[feature] === true) {
+        return next();
       }
 
-      next();
+      const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+      const subResult = await getActiveSubscriptionForTenant(tenantId, {
+        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+      });
+      if (subResult?.package?.limits?.[feature] === true) {
+        return next();
+      }
+
+      const tenantPlan = req.tenant.plan || '';
+      const planBase = tenantPlan.split('_')[0];
+
+      const planPackage = await db.SubscriptionPackage.findOne({
+        where: {
+          [Op.or]: [
+            { slug: { [Op.iLike]: `%${planBase}%` } },
+            { name: { [Op.iLike]: `%${planBase}%` } }
+          ],
+          isActive: true
+        }
+      });
+
+      if (planPackage?.limits?.[feature] === true) {
+        return next();
+      }
+
+      return res.status(403).json({
+        success: false,
+        message: `This feature (${feature}) is not available in your current plan`,
+        upgradeRequired: true
+      });
     } catch (error) {
       console.error('Feature check error:', error);
       res.status(500).json({
