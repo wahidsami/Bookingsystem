@@ -1,0 +1,332 @@
+[
+  {
+    "name_en": "Haircut & Styling",
+    "name_ar": "قص وتصفيف الشعر",
+    "description_en": "A complete haircut and styling session tailored to the guest's face shape, hair texture, and preferred finish.",
+    "description_ar": "جلسة متكاملة لقص وتصفيف الشعر حسب شكل الوجه وطبيعة الشعر والنتيجة المطلوبة.",
+    "category": "Hair Services",
+    "duration": 45,
+    "rawPrice": 120,
+    "includes": ["Consultation", "Hair wash", "Cut", "Finish styling"],
+    "benefits": [
+      { "en": "Fresh shape and polished finish", "ar": "إطلالة متجددة ولمسة نهائية أنيقة" },
+      { "en": "Easy everyday maintenance", "ar": "سهولة في العناية اليومية" }
+    ],
+    "whatToExpect": [
+      { "en": "Short consultation before the cut begins", "ar": "استشارة قصيرة قبل بدء القص" },
+      { "en": "Final styling based on the selected look", "ar": "تصفيف نهائي حسب الإطلالة المختارة" }
+    ],
+    "employeeEmails": ["priya@kamy.sa", "anjali@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Hair Coloring",
+    "name_ar": "صبغ الشعر",
+    "description_en": "Professional coloring service for full coverage, root retouch, or tone refresh with consultation included.",
+    "description_ar": "خدمة صبغ احترافية لتغطية كاملة أو تجديد الجذور أو تحديث اللون مع استشارة مسبقة.",
+    "category": "Hair Services",
+    "duration": 90,
+    "rawPrice": 300,
+    "includes": ["Color consultation", "Application", "Rinse", "Basic finish"],
+    "benefits": [
+      { "en": "Balanced tone and glossy result", "ar": "لون متوازن ولمعان جميل" },
+      { "en": "Tailored to skin tone and hair condition", "ar": "مصممة بما يناسب لون البشرة وحالة الشعر" }
+    ],
+    "whatToExpect": [
+      { "en": "Shade discussion and hair-condition check", "ar": "مناقشة الدرجة وفحص حالة الشعر" },
+      { "en": "Processing time varies by desired result", "ar": "مدة الانتظار تختلف حسب النتيجة المطلوبة" }
+    ],
+    "employeeEmails": ["priya@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Keratin Treatment",
+    "name_ar": "علاج الكيراتين",
+    "description_en": "Smoothing and repair treatment that helps reduce frizz, improve shine, and support manageable hair texture.",
+    "description_ar": "علاج لتنعيم الشعر وتقليل الهيشان وتحسين اللمعان وسهولة التصفيف.",
+    "category": "Hair Services",
+    "duration": 120,
+    "rawPrice": 500,
+    "includes": ["Hair assessment", "Keratin application", "Heat sealing", "Aftercare tips"],
+    "benefits": [
+      { "en": "Reduced frizz and smoother texture", "ar": "تقليل الهيشان وملمس أكثر نعومة" },
+      { "en": "Faster styling after treatment", "ar": "تصفيف أسرع بعد العلاج" }
+    ],
+    "whatToExpect": [
+      { "en": "Hair is sectioned and treated carefully", "ar": "يتم تقسيم الشعر وتطبيق العلاج بعناية" },
+      { "en": "Aftercare guidance is provided at the end", "ar": "يتم توضيح تعليمات العناية بعد الجلسة" }
+    ],
+    "employeeEmails": ["anjali@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Blow Dry",
+    "name_ar": "استشوار",
+    "description_en": "Quick wash-and-blow style for smooth volume, soft waves, or an everyday polished finish.",
+    "description_ar": "غسيل وتجفيف احترافي يمنح الشعر نعومة أو تموجات خفيفة أو إطلالة يومية مرتبة.",
+    "category": "Hair Services",
+    "duration": 30,
+    "rawPrice": 80,
+    "includes": ["Wash", "Blow dry", "Basic styling"],
+    "benefits": [
+      { "en": "Fast polished look", "ar": "إطلالة مرتبة بسرعة" },
+      { "en": "Adds movement and shine", "ar": "يضيف حيوية ولمعاناً للشعر" }
+    ],
+    "whatToExpect": [
+      { "en": "Service starts with a wash if needed", "ar": "تبدأ الخدمة بغسل الشعر عند الحاجة" },
+      { "en": "Finishing depends on preferred style", "ar": "النتيجة النهائية حسب التصفيف المطلوب" }
+    ],
+    "employeeEmails": ["priya@kamy.sa", "anjali@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Manicure",
+    "name_ar": "مانيكير",
+    "description_en": "Classic manicure focused on nail shaping, cuticle care, and a clean salon-ready finish.",
+    "description_ar": "مانيكير كلاسيكي يشمل تهذيب الأظافر والعناية بالجلد المحيط ولمسة نهائية مرتبة.",
+    "category": "Nail Services",
+    "duration": 30,
+    "rawPrice": 80,
+    "includes": ["Nail shaping", "Cuticle care", "Hand refresh", "Polish option"],
+    "benefits": [
+      { "en": "Cleaner nail appearance", "ar": "مظهر أنظف للأظافر" },
+      { "en": "Better hand presentation", "ar": "مظهر أجمل لليدين" }
+    ],
+    "whatToExpect": [
+      { "en": "Nails are cleaned and shaped first", "ar": "يتم تنظيف وتهذيب الأظافر أولاً" },
+      { "en": "Polish finish can be added based on preference", "ar": "يمكن إضافة طلاء حسب الرغبة" }
+    ],
+    "employeeEmails": ["maria@kamy.sa", "angelica@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Pedicure",
+    "name_ar": "باديكير",
+    "description_en": "Foot care session that refreshes nails, softens rough areas, and leaves feet looking well groomed.",
+    "description_ar": "جلسة عناية بالقدمين تنعش الأظافر وتخفف الجفاف وتمنح مظهراً مرتباً للقدمين.",
+    "category": "Nail Services",
+    "duration": 45,
+    "rawPrice": 100,
+    "includes": ["Foot soak", "Nail shaping", "Cuticle care", "Basic polish"],
+    "benefits": [
+      { "en": "Improved comfort and appearance", "ar": "راحة أكبر ومظهر أفضل" },
+      { "en": "Better nail and foot hygiene", "ar": "عناية ونظافة أفضل للقدمين" }
+    ],
+    "whatToExpect": [
+      { "en": "Feet are soaked before nail care begins", "ar": "يتم نقع القدمين قبل بدء العناية" },
+      { "en": "Treatment focuses on both comfort and presentation", "ar": "تركز الجلسة على الراحة والمظهر معاً" }
+    ],
+    "employeeEmails": ["maria@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Gel Nails",
+    "name_ar": "أظافر جل",
+    "description_en": "Longer-wear gel nail service designed for glossy finish, shape control, and event-ready durability.",
+    "description_ar": "خدمة أظافر جل تدوم لفترة أطول مع لمعان واضح وثبات مناسب للمناسبات.",
+    "category": "Nail Services",
+    "duration": 60,
+    "rawPrice": 150,
+    "includes": ["Prep", "Gel application", "Curing", "Finishing touch"],
+    "benefits": [
+      { "en": "Durable high-shine result", "ar": "نتيجة لامعة وثابتة" },
+      { "en": "Ideal for longer wear", "ar": "مناسبة للاستخدام لفترة أطول" }
+    ],
+    "whatToExpect": [
+      { "en": "Natural nails are prepared carefully before application", "ar": "يتم تجهيز الأظافر الطبيعية بعناية قبل التطبيق" },
+      { "en": "Gel is cured in layers for strength and finish", "ar": "يتم تثبيت الجل على مراحل للحصول على ثبات ولمعان" }
+    ],
+    "employeeEmails": ["angelica@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Facial Treatment",
+    "name_ar": "تنظيف البشرة",
+    "description_en": "Foundational facial treatment that refreshes the skin, removes buildup, and restores a clearer surface.",
+    "description_ar": "جلسة أساسية لتنظيف البشرة وإنعاشها وإزالة التراكمات واستعادة صفاء المظهر.",
+    "category": "Facial & Skin Care",
+    "duration": 60,
+    "rawPrice": 200,
+    "includes": ["Skin cleanse", "Steam or prep", "Mask", "Moisturizing finish"],
+    "benefits": [
+      { "en": "Cleaner and brighter skin appearance", "ar": "بشرة أنظف وأكثر إشراقاً" },
+      { "en": "Helps reduce dullness", "ar": "يساعد على تقليل البهتان" }
+    ],
+    "whatToExpect": [
+      { "en": "Skin is assessed before products are selected", "ar": "يتم تقييم البشرة قبل اختيار المنتجات" },
+      { "en": "A calming finish is applied after treatment", "ar": "يتم وضع لمسات مهدئة بعد انتهاء الجلسة" }
+    ],
+    "employeeEmails": ["neha@kamy.sa", "grace@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Deep Cleansing Facial",
+    "name_ar": "تنظيف عميق للبشرة",
+    "description_en": "Extended facial focused on deeper pore care, excess oil control, and clearer post-treatment texture.",
+    "description_ar": "جلسة تنظيف عميق للبشرة تركز على المسام والدهون الزائدة وتحسين ملمس البشرة بعد الجلسة.",
+    "category": "Facial & Skin Care",
+    "duration": 75,
+    "rawPrice": 250,
+    "includes": ["Deep cleanse", "Targeted extraction prep", "Mask", "Aftercare finish"],
+    "benefits": [
+      { "en": "Improved skin texture", "ar": "تحسن في ملمس البشرة" },
+      { "en": "Better pore and oil management", "ar": "تحكم أفضل في المسام والدهون" }
+    ],
+    "whatToExpect": [
+      { "en": "This service takes longer than a basic facial", "ar": "هذه الجلسة أطول من تنظيف البشرة الأساسي" },
+      { "en": "Skin may look freshly treated right after the session", "ar": "قد تبدو البشرة منعشة وواضحة فور انتهاء الجلسة" }
+    ],
+    "employeeEmails": ["grace@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Anti-Aging Treatment",
+    "name_ar": "علاج مكافحة الشيخوخة",
+    "description_en": "Targeted skin treatment focused on firmness, hydration support, and visible skin smoothness.",
+    "description_ar": "علاج مخصص لدعم شد البشرة والترطيب وتحسين نعومة المظهر العام.",
+    "category": "Facial & Skin Care",
+    "duration": 90,
+    "rawPrice": 350,
+    "includes": ["Skin analysis", "Active treatment", "Massage", "Hydration finish"],
+    "benefits": [
+      { "en": "Supports smoother-looking skin", "ar": "يدعم مظهراً أكثر نعومة للبشرة" },
+      { "en": "Helps improve skin comfort and hydration", "ar": "يساعد على تحسين الراحة والترطيب" }
+    ],
+    "whatToExpect": [
+      { "en": "Products are selected based on skin response", "ar": "يتم اختيار المنتجات حسب استجابة البشرة" },
+      { "en": "Service includes a slower treatment pace for comfort", "ar": "تتضمن الجلسة وتيرة هادئة لزيادة الراحة" }
+    ],
+    "employeeEmails": ["neha@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Relaxing Massage",
+    "name_ar": "مساج استرخائي",
+    "description_en": "A calming full-body massage designed to ease tension, reduce stress, and improve overall relaxation.",
+    "description_ar": "مساج استرخائي للجسم يهدف إلى تخفيف التوتر وتقليل الإجهاد وتعزيز الراحة العامة.",
+    "category": "Massage & Body",
+    "duration": 60,
+    "rawPrice": 250,
+    "includes": ["Consultation", "Body massage", "Relaxation finish"],
+    "benefits": [
+      { "en": "Helps reduce daily stress", "ar": "يساعد على تخفيف ضغوط اليوم" },
+      { "en": "Supports body relaxation", "ar": "يدعم استرخاء الجسم" }
+    ],
+    "whatToExpect": [
+      { "en": "Pressure is adjusted to guest comfort", "ar": "يتم تعديل الضغط حسب راحة العميلة" },
+      { "en": "A calm room setup is used during the session", "ar": "تتم الجلسة في أجواء هادئة ومريحة" }
+    ],
+    "employeeEmails": ["kavita@kamy.sa", "jennifer@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Hot Stone Massage",
+    "name_ar": "مساج الأحجار الساخنة",
+    "description_en": "Comforting hot stone massage that combines warm stone placement with flowing bodywork for deeper relaxation.",
+    "description_ar": "مساج بالأحجار الساخنة يجمع بين حرارة الأحجار وحركات التدليك لمنح استرخاء أعمق.",
+    "category": "Massage & Body",
+    "duration": 75,
+    "rawPrice": 300,
+    "includes": ["Consultation", "Warm stone placement", "Body massage", "Cooldown finish"],
+    "benefits": [
+      { "en": "Deep relaxation effect", "ar": "إحساس عميق بالاسترخاء" },
+      { "en": "Soothing warmth for tense areas", "ar": "حرارة مهدئة للمناطق المشدودة" }
+    ],
+    "whatToExpect": [
+      { "en": "Warm stones are introduced gradually", "ar": "يتم استخدام الأحجار الدافئة بشكل تدريجي" },
+      { "en": "The therapist monitors comfort throughout the service", "ar": "تتم متابعة مستوى الراحة طوال الجلسة" }
+    ],
+    "employeeEmails": ["jennifer@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  },
+  {
+    "name_en": "Bridal Makeup",
+    "name_ar": "مكياج عروس",
+    "description_en": "Premium bridal makeup service created for photography, event longevity, and a polished signature finish.",
+    "description_ar": "خدمة مكياج عروس احترافية مصممة للصور والثبات خلال المناسبة مع نتيجة نهائية راقية.",
+    "category": "Bridal Services",
+    "duration": 120,
+    "rawPrice": 800,
+    "includes": ["Consultation", "Skin prep", "Full makeup application", "Setting finish"],
+    "benefits": [
+      { "en": "Photo-ready bridal finish", "ar": "إطلالة عروس جاهزة للتصوير" },
+      { "en": "Long-wear application", "ar": "ثبات مناسب لساعات طويلة" }
+    ],
+    "whatToExpect": [
+      { "en": "Look planning is confirmed before application", "ar": "يتم اعتماد الإطلالة قبل بدء التطبيق" },
+      { "en": "Skin prep and setting are included for longevity", "ar": "يشمل التحضير والتثبيت لثبات أفضل" }
+    ],
+    "employeeEmails": ["riya@kamy.sa", "camille@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": true,
+    "isActive": true
+  },
+  {
+    "name_en": "Evening Makeup",
+    "name_ar": "مكياج سهرة",
+    "description_en": "Event makeup service for polished evening glam, soft elegance, or bold occasion styling.",
+    "description_ar": "خدمة مكياج سهرة لإطلالة مناسبة أنيقة سواء كانت ناعمة أو أكثر جرأة حسب الرغبة.",
+    "category": "Makeup",
+    "duration": 60,
+    "rawPrice": 350,
+    "includes": ["Skin prep", "Makeup application", "Setting finish"],
+    "benefits": [
+      { "en": "Refined event-ready appearance", "ar": "إطلالة مناسبة جاهزة للمناسبات" },
+      { "en": "Customized finish for the occasion", "ar": "نتيجة مصممة حسب المناسبة" }
+    ],
+    "whatToExpect": [
+      { "en": "Look intensity is adjusted to guest preference", "ar": "يتم تعديل قوة الإطلالة حسب الرغبة" },
+      { "en": "Service ends with setting products for better wear", "ar": "تنتهي الجلسة بمنتجات تثبيت لثبات أفضل" }
+    ],
+    "employeeEmails": ["riya@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": true,
+    "isActive": true
+  },
+  {
+    "name_en": "VIP Full Package",
+    "name_ar": "باقة كبار الشخصيات",
+    "description_en": "A premium combination package covering hair, skin, and makeup preparation for high-value special occasions.",
+    "description_ar": "باقة مميزة تجمع بين تجهيز الشعر والبشرة والمكياج للمناسبات الخاصة الراقية.",
+    "category": "General",
+    "duration": 180,
+    "rawPrice": 1200,
+    "includes": ["Hair styling", "Facial prep", "Full makeup", "Priority service"],
+    "benefits": [
+      { "en": "Complete beauty preparation in one booking", "ar": "تجهيز متكامل في حجز واحد" },
+      { "en": "Coordinated service across specialties", "ar": "تنسيق متكامل بين أكثر من تخصص" }
+    ],
+    "whatToExpect": [
+      { "en": "Service is coordinated across multiple specialists", "ar": "يتم تنسيق الباقة بين أكثر من مختصة" },
+      { "en": "Timing is reserved for a longer premium session", "ar": "يتم تخصيص وقت أطول لجلسة مميزة" }
+    ],
+    "employeeEmails": ["priya@kamy.sa", "neha@kamy.sa", "riya@kamy.sa"],
+    "availableInCenter": true,
+    "availableHomeVisit": false,
+    "isActive": true
+  }
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "employeeEmail": "priya@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 1, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 2, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 3, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 4, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 5, "startTime": "14:00", "endTime": "22:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "anjali@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 1, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 2, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 3, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 4, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 5, "startTime": "15:00", "endTime": "23:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "neha@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 1, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 2, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 3, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 4, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 5, "startTime": "14:00", "endTime": "22:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "kavita@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 1, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 2, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 3, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 4, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 5, "startTime": "15:00", "endTime": "23:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "maria@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 1, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 2, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 3, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 4, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 5, "startTime": "14:00", "endTime": "22:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "angelica@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 1, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 2, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 3, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 4, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 5, "startTime": "15:00", "endTime": "23:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "jennifer@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 1, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 2, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 3, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 4, "startTime": "10:00", "endTime": "18:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Morning Shift" },
+      { "dayOfWeek": 5, "startTime": "14:00", "endTime": "22:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "grace@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 1, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 2, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 3, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 4, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 5, "startTime": "15:00", "endTime": "23:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "riya@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 1, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 2, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 3, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 4, "startTime": "13:00", "endTime": "21:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Evening Shift" },
+      { "dayOfWeek": 5, "startTime": "15:00", "endTime": "23:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "14:00", "endTime": "22:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  },
+  {
+    "employeeEmail": "camille@kamy.sa",
+    "weeklyShifts": [
+      { "dayOfWeek": 0, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 1, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 2, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 3, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 4, "startTime": "11:00", "endTime": "19:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Day Shift" },
+      { "dayOfWeek": 5, "startTime": "14:00", "endTime": "22:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Friday Shift" },
+      { "dayOfWeek": 6, "startTime": "12:00", "endTime": "20:00", "isRecurring": true, "startDate": "2026-04-01", "label": "Weekend Shift" }
+    ]
+  }
+]
