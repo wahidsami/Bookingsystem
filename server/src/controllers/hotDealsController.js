@@ -7,6 +7,25 @@ const db = require('../models');
 const promotionService = require('../services/promotionService');
 const { Op } = require('sequelize');
 
+const serializeHotDeal = (deal) => {
+    if (!deal) return null;
+
+    const plainDeal = typeof deal.get === 'function' ? deal.get({ plain: true }) : { ...deal };
+    const service = plainDeal.service
+        ? {
+            ...plainDeal.service,
+            name: plainDeal.service.name || plainDeal.service.name_en || plainDeal.service.name_ar || null
+        }
+        : null;
+
+    return {
+        ...plainDeal,
+        service,
+        serviceName: service?.name || null,
+        redemptionCount: plainDeal.redemptionCount ?? plainDeal.currentRedemptions ?? 0
+    };
+};
+
 /**
  * Get hot deals limits for current tenant
  * GET /api/v1/tenant/hot-deals/limits
@@ -95,7 +114,7 @@ const getTenantHotDeals = async (req, res) => {
 
         res.json({
             success: true,
-            deals
+            deals: deals.map(serializeHotDeal)
         });
     } catch (error) {
         console.error('Get tenant hot deals error:', error);
@@ -107,12 +126,50 @@ const getTenantHotDeals = async (req, res) => {
 };
 
 /**
+ * Get a single hot deal for a tenant
+ * GET /api/v1/tenant/hot-deals/:id
+ */
+const getTenantHotDealById = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+
+        const deal = await db.HotDeal.findOne({
+            where: { id, tenantId },
+            include: [{
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar', 'duration']
+            }]
+        });
+
+        if (!deal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Hot deal not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            deal: serializeHotDeal(deal)
+        });
+    } catch (error) {
+        console.error('Get tenant hot deal detail error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch hot deal details'
+        });
+    }
+};
+
+/**
  * Create a new hot deal
  * POST /api/v1/tenant/hot-deals
  */
 const createHotDeal = async (req, res) => {
     try {
-        const tenantId = req.user.tenantId;
+        const tenantId = req.tenantId;
         const {
             serviceId,
             title_en,
@@ -200,9 +257,17 @@ const createHotDeal = async (req, res) => {
             isActive: true
         });
 
+        const hydratedDeal = await db.HotDeal.findByPk(deal.id, {
+            include: [{
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar', 'duration']
+            }]
+        });
+
         res.status(201).json({
             success: true,
-            deal,
+            deal: serializeHotDeal(hydratedDeal || deal),
             autoApproved: canCreate.autoApprove
         });
     } catch (error) {
@@ -221,7 +286,7 @@ const createHotDeal = async (req, res) => {
 const updateHotDeal = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.user.tenantId;
+        const tenantId = req.tenantId;
         const updates = req.body;
 
         const deal = await db.HotDeal.findByPk(id);
@@ -249,9 +314,17 @@ const updateHotDeal = async (req, res) => {
 
         await deal.update(updates);
 
-        res.json({
+        const hydratedDeal = await db.HotDeal.findByPk(id, {
+            include: [{
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar', 'duration']
+            }]
+        });
+
+        return res.json({
             success: true,
-            deal
+            deal: serializeHotDeal(hydratedDeal || deal)
         });
     } catch (error) {
         console.error('Update hot deal error:', error);
@@ -269,7 +342,7 @@ const updateHotDeal = async (req, res) => {
 const deleteHotDeal = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.user.tenantId;
+        const tenantId = req.tenantId;
 
         const deal = await db.HotDeal.findByPk(id);
         if (!deal) {
@@ -478,6 +551,7 @@ module.exports = {
     // Tenant endpoints
     getHotDealsLimits,
     getTenantHotDeals,
+    getTenantHotDealById,
     createHotDeal,
     updateHotDeal,
     deleteHotDeal,
