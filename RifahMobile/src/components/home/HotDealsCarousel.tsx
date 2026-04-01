@@ -60,25 +60,9 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
     }
 
     if (deals.length === 0) {
-        // Placeholder cards when no data
         return (
-            <View style={styles.container}>
-                <FlatList
-                    horizontal
-                    data={[1, 2, 3]}
-                    renderItem={() => (
-                        <View style={styles.card}>
-                            <View style={styles.placeholderGradient}>
-                                <Text style={styles.placeholderBadge}>🔥 {t('hotDeals')}</Text>
-                                <Text style={styles.placeholderTitle}>{t('hotDeals')}</Text>
-                                <Text style={styles.placeholderSubtitle}>{t('browseSalons')}</Text>
-                            </View>
-                        </View>
-                    )}
-                    keyExtractor={(_, i) => `ph-${i}`}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.listContent}
-                />
+            <View style={styles.errorContainer}>
+                <Text style={styles.retryText}>{t('noHotDealsAvailable')}</Text>
             </View>
         );
     }
@@ -170,30 +154,6 @@ const styles = StyleSheet.create({
     },
     cardOverlay: {
         backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    placeholderGradient: {
-        flex: 1,
-        backgroundColor: '#6D28D9',
-        padding: spacing.lg,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: borderRadius.xl,
-    },
-    placeholderBadge: {
-        fontSize: fontSize.lg,
-        color: '#FFF',
-        fontWeight: '700',
-        marginBottom: spacing.sm,
-    },
-    placeholderTitle: {
-        fontSize: fontSize.xxl,
-        color: '#FFF',
-        fontWeight: '800',
-    },
-    placeholderSubtitle: {
-        fontSize: fontSize.sm,
-        color: 'rgba(255,255,255,0.7)',
-        marginTop: spacing.xs,
     },
     saveBadge: {
         position: 'absolute',

@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { Ionicons } from '@expo/vector-icons';
 import { api, getImageUrl, Tenant } from '../api/client';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 interface CartScreenProps {
     route: any;
@@ -14,6 +15,7 @@ interface CartScreenProps {
 
 export function CartScreen({ route, navigation }: CartScreenProps) {
     const { t, isRTL } = useLanguage();
+    const { showLogin } = useAppSession();
     const { cartItems, cartTotal, updateQuantity, removeFromCart, clearCart } = useCart();
 
     // We expect tenant to be passed from TenantScreen when navigating to Cart
@@ -45,6 +47,15 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             return;
         }
 
+        const user = await api.getUser();
+        if (!user) {
+            Alert.alert(t('guestTitle'), t('loginToOrderOrders'), [
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('loginNow'), onPress: showLogin },
+            ]);
+            return;
+        }
+
         if (!customerName || !customerEmail || !customerPhone || !city || !district || !street) {
             Alert.alert('Missing Details', 'Please fill in all required fields (Name, Email, Phone, City, District, Street).');
             return;
@@ -72,7 +83,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             // Process cash on delivery immediately
             try {
                 setLoading(true);
-                const res = await api.post<{ success: boolean; data: any; message?: string }>(`/tenant/${tenant.id}/orders`, payload);
+                const res = await api.post<{ success: boolean; data: any; message?: string }>(`/public/tenant/${tenant.id}/orders`, payload);
                 if (res.success) {
                     clearCart();
                     Alert.alert('Success', 'Order placed successfully!', [

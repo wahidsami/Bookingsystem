@@ -193,6 +193,7 @@ app.use('/api/v1', featuredRoutes);
 // Public tenant listing (for client app discovery)
 const publicTenantController = require('./controllers/publicTenantController');
 app.get('/api/v1/tenants', publicTenantController.getAllTenants);
+app.get('/api/v1/categories', publicTenantController.getPublicCategories);
 
 // Cleanup routes (temporary - for one-time operations)
 // Cleanup routes removed - one-time operations completed

@@ -8,6 +8,25 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 
+const BUSINESS_TYPE_META = {
+    beauty_salon: { name_en: 'Beauty Salon', name_ar: 'صالون تجميل', icon: '💄' },
+    hair_salon: { name_en: 'Hair Salon', name_ar: 'صالون شعر', icon: '💇' },
+    barber: { name_en: 'Barber', name_ar: 'حلاق', icon: '💈' },
+    barbershop: { name_en: 'Barbershop', name_ar: 'محل حلاقة', icon: '💈' },
+    spa: { name_en: 'Spa', name_ar: 'سبا', icon: '🧖' },
+    nails: { name_en: 'Nails', name_ar: 'أظافر', icon: '💅' },
+    massage: { name_en: 'Massage', name_ar: 'تدليك', icon: '💆' },
+    makeup: { name_en: 'Makeup', name_ar: 'مكياج', icon: '💄' },
+    skincare: { name_en: 'Skincare', name_ar: 'العناية بالبشرة', icon: '🧴' },
+    wellness: { name_en: 'Wellness', name_ar: 'العافية', icon: '✨' }
+};
+
+const prettifySlug = (value) => value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
 /**
  * Get all active tenants (public listing)
  */
@@ -102,6 +121,65 @@ exports.getAllTenants = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch tenants',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get public business categories derived from active tenants
+ */
+exports.getPublicCategories = async (req, res) => {
+    try {
+        const tenants = await db.Tenant.findAll({
+            where: { status: 'active' },
+            attributes: ['businessType']
+        });
+
+        const categorySet = new Set();
+
+        tenants.forEach((tenant) => {
+            const businessTypes = Array.isArray(tenant.businessType)
+                ? tenant.businessType
+                : tenant.businessType
+                    ? [tenant.businessType]
+                    : [];
+
+            businessTypes
+                .map((value) => `${value}`.trim().toLowerCase())
+                .filter(Boolean)
+                .forEach((value) => categorySet.add(value));
+        });
+
+        const categories = Array.from(categorySet)
+            .sort()
+            .map((slug, index) => {
+                const meta = BUSINESS_TYPE_META[slug] || {
+                    name_en: prettifySlug(slug),
+                    name_ar: prettifySlug(slug),
+                    icon: '📂'
+                };
+
+                return {
+                    id: slug,
+                    slug,
+                    name_en: meta.name_en,
+                    name_ar: meta.name_ar,
+                    icon: meta.icon,
+                    sortOrder: index + 1,
+                    isActive: true
+                };
+            });
+
+        res.json({
+            success: true,
+            categories
+        });
+    } catch (error) {
+        console.error('Get public categories error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch categories',
             error: error.message
         });
     }

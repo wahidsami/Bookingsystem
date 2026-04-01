@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { api, User } from '../api/client';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 interface MoreScreenProps {
     navigation?: any;
@@ -10,19 +12,27 @@ interface MoreScreenProps {
 
 export function MoreScreen({ navigation }: MoreScreenProps) {
     const { t } = useLanguage();
+    const { isAuthenticated, logout, showLogin } = useAppSession();
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        api.getUser().then(setUser).catch(() => setUser(null));
+    }, [isAuthenticated]);
 
     const menuItems = [
-        { id: 'profile', icon: '👤', label: t('profile'), route: 'Profile' },
-        { id: 'myAppointments', icon: '📅', label: t('myAppointments'), route: 'Bookings' },
-        { id: 'myPurchases', icon: '🛍️', label: t('myPurchases'), route: 'MyPurchases' },
-        { id: 'payments', icon: '💳', label: t('payments'), route: 'Payments' },
-        { id: 'settings', icon: '⚙️', label: t('settings'), route: 'Settings' },
-        { id: 'about', icon: '💜', label: t('aboutRefah'), route: 'About' },
+        { id: 'profile', icon: '👤', label: t('profile'), action: () => navigation?.navigate('Profile') },
+        { id: 'myAppointments', icon: '📅', label: t('myAppointments'), action: () => navigation?.navigate('Appointments') },
+        { id: 'browse', icon: '🔍', label: t('browseSalons'), action: () => navigation?.navigate('Browse') },
+        { id: 'myPurchases', icon: '🛍️', label: t('myPurchases'), action: () => navigation?.navigate('Purchases') },
     ];
 
-    const handleLogout = () => {
-        // TODO: Implement logout logic
-        console.log('Logout clicked');
+    const handleAuthAction = async () => {
+        if (isAuthenticated) {
+            await logout();
+            return;
+        }
+
+        showLogin();
     };
 
     return (
@@ -31,11 +41,11 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
             <View style={styles.header}>
                 <View style={styles.userInfo}>
                     <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>U</Text>
+                        <Text style={styles.avatarText}>{user?.firstName?.charAt(0).toUpperCase() || 'U'}</Text>
                     </View>
                     <View>
-                        <Text style={styles.userName}>Guest</Text>
-                        <Text style={styles.userEmail}>Welcome to Refah</Text>
+                        <Text style={styles.userName}>{user ? `${user.firstName} ${user.lastName}` : t('guestTitle')}</Text>
+                        <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
                     </View>
                 </View>
             </View>
@@ -48,10 +58,13 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             key={item.id}
                             style={styles.menuItem}
                             onPress={() => {
-                                if (['Profile', 'Bookings', 'MyPurchases'].includes(item.route)) {
-                                    navigation?.navigate(item.route);
-                                } else {
-                                    console.log(`Navigate to ${item.route}`);
+                                if (!isAuthenticated && item.id !== 'browse') {
+                                    showLogin();
+                                    return;
+                                }
+
+                                if (item.action) {
+                                    item.action();
                                 }
                             }}
                         >
@@ -65,9 +78,9 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                 </View>
 
                 {/* Logout Button */}
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                    <Text style={styles.logoutIcon}>🚪</Text>
-                    <Text style={styles.logoutText}>{t('logout')}</Text>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleAuthAction}>
+                    <Text style={styles.logoutIcon}>{isAuthenticated ? '🚪' : '🔐'}</Text>
+                    <Text style={styles.logoutText}>{isAuthenticated ? t('logout') : t('loginNow')}</Text>
                 </TouchableOpacity>
 
                 {/* App Info */}

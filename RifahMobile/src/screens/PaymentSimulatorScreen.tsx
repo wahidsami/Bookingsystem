@@ -39,7 +39,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
         setTimeout(async () => {
             try {
                 // Payment assumed successful, now create the formal order
-                const res = await api.post<{ success: boolean; data: any; message?: string }>(`/tenant/${tenantId}/orders`, payload);
+                const res = await api.post<{ success: boolean; data: any; message?: string }>(`/public/tenant/${tenantId}/orders`, payload);
                 if (res.success) {
                     setIsSuccess(true);
                     clearCart();

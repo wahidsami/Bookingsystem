@@ -15,17 +15,16 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { api, Booking, getImageUrl } from '../api/client';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
-import { ReviewPromptModal } from '../components/ReviewPromptModal';
 import { GuestView } from '../components/GuestView';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
+    const { showLogin } = useAppSession();
     const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [reviewModalVisible, setReviewModalVisible] = useState(false);
-    const [selectedBookingForReview, setSelectedBookingForReview] = useState<Booking | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
 
     useEffect(() => {
@@ -41,8 +40,7 @@ export function BookingsScreen({ navigation }: any) {
                 return;
             }
             setIsAuthenticated(true);
-            const status = activeTab === 'upcoming' ? 'upcoming' : 'completed';
-            const data = await api.getBookings(status);
+            const data = await api.getBookings(activeTab === 'upcoming' ? 'upcoming' : 'completed');
             setBookings(data);
         } catch (error: any) {
             if (error.status === 401 || error.message?.includes('unauthorized') || error.message?.includes('Invalid or expired token')) {
@@ -169,14 +167,6 @@ export function BookingsScreen({ navigation }: any) {
                                 <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
                             </TouchableOpacity>
                         )}
-                        {item.status === 'completed' && activeTab === 'history' && (
-                            <TouchableOpacity
-                                style={styles.reviewButton}
-                                onPress={() => { setSelectedBookingForReview(item); setReviewModalVisible(true); }}
-                            >
-                                <Text style={styles.reviewButtonText}>{t('leaveReview' as any) || 'Leave a Review'}</Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
             </View>
@@ -191,17 +181,7 @@ export function BookingsScreen({ navigation }: any) {
                 </View>
                 <GuestView
                     type="bookings"
-                    onLoginPress={() => {
-                        api.clearTokens().then(() => {
-                            // Navigate to welcome/login natively if possible, or trigger an app restart
-                            // In this architecture, clearing tokens and reloading the app is the safest way to reset the global navigation state
-                            import('react-native').then(RN => {
-                                if (RN.NativeModules.DevSettings) {
-                                    RN.NativeModules.DevSettings.reload();
-                                }
-                            });
-                        });
-                    }}
+                    onLoginPress={showLogin}
                 />
             </>
         );
@@ -260,13 +240,6 @@ export function BookingsScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
             )}
-
-            <ReviewPromptModal
-                visible={reviewModalVisible}
-                onClose={() => { setReviewModalVisible(false); setSelectedBookingForReview(null); }}
-                appointment={selectedBookingForReview}
-                onSuccess={() => { loadBookings(); setReviewModalVisible(false); setSelectedBookingForReview(null); }}
-            />
 
             {loading && (
                 <View style={styles.loadingOverlay}>
@@ -461,17 +434,6 @@ const styles = StyleSheet.create({
     },
     cancelButtonText: {
         color: '#EF4444',
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-    },
-    reviewButton: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-        backgroundColor: '#4F46E5', // Indigo
-        borderRadius: borderRadius.md,
-    },
-    reviewButtonText: {
-        color: 'white',
         fontSize: fontSize.sm,
         fontWeight: '600',
     },

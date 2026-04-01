@@ -7,6 +7,7 @@ import { api, Service, Staff, SlotItem } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 interface BookingProps {
     route: any;
@@ -18,6 +19,7 @@ type BookingStep = 'staff' | 'datetime' | 'review' | 'payment';
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
     const { t, isRTL, language } = useLanguage();
+    const { showLogin } = useAppSession();
     const [step, setStep] = useState<BookingStep>('staff');
     const [loading, setLoading] = useState(false);
 
@@ -42,7 +44,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
         try {
             setLoading(true);
             const response = await api.get<{ success: boolean; staff: Staff[] }>(
-                `/public/tenant/${tenant.id}/staff`
+                `/public/tenant/${tenant.id}/services/${service.id}/staff`
             );
             if (response.success) {
                 setStaffList(response.staff || []);
@@ -99,6 +101,16 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 
     const handleBooking = async () => {
         if (!selectedTime) return;
+
+        const user = await api.getUser();
+        if (!user) {
+            Alert.alert(t('guestTitle'), t('loginToOrderBookings'), [
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('loginNow'), onPress: showLogin },
+            ]);
+            return;
+        }
+
         try {
             setLoading(true);
             await api.post('/bookings/create', {
@@ -110,7 +122,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             Alert.alert(
                 'Booking Confirmed! 🎉',
                 'Your appointment has been scheduled successfully.',
-                [{ text: 'View My Bookings', onPress: () => navigation.navigate('Tabs', { screen: 'Bookings' }) }]
+                [{ text: 'View My Bookings', onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }) }]
             );
         } catch (error: any) {
             const msg = error.message || 'Failed to create booking';

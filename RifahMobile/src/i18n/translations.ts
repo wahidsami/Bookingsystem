@@ -154,6 +154,8 @@ export const translations = {
         myAppointments: 'My Appointments',
         addToCart: 'Add to Cart',
         noTopProviders: 'Top providers will appear here once staff profiles are available.',
+        noHotDealsAvailable: 'No hot deals are available right now.',
+        noCategoriesAvailable: 'No categories are available right now.',
 
         // Hot Deal Details
         saveDiscount: 'Save',
@@ -329,6 +331,8 @@ export const translations = {
         myAppointments: 'مواعيدي',
         addToCart: 'أضف إلى السلة',
         noTopProviders: 'سيظهر أفضل مقدمي الخدمات هنا عند توفر ملفات الموظفين.',
+        noHotDealsAvailable: 'لا توجد عروض ساخنة متاحة حالياً.',
+        noCategoriesAvailable: 'لا توجد فئات متاحة حالياً.',
 
         // Hot Deal Details
         saveDiscount: 'وفر',

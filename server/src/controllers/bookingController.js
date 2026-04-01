@@ -313,6 +313,12 @@ const listBookings = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service' },
                 { model: db.Staff, as: 'staff' },
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    required: false,
+                    attributes: ['id', 'name', 'slug', 'logo']
+                },
                 { 
                     model: db.PlatformUser,
                     as: 'user',

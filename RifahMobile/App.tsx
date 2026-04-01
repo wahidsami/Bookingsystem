@@ -18,6 +18,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
+import { AppSessionProvider } from './src/contexts/AppSessionContext';
 
 type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'home';
 
@@ -40,6 +41,7 @@ const loadFonts = async () => {
 function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('splash');
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { setLanguage } = useLanguage();
 
   useEffect(() => {
@@ -72,6 +74,7 @@ function AppContent() {
       setCurrentScreen('onboarding');
     } else {
       const authenticated = await api.isAuthenticated();
+      setIsAuthenticated(authenticated);
       setCurrentScreen(authenticated ? 'home' : 'welcome');
     }
   };
@@ -87,11 +90,19 @@ function AppContent() {
   };
 
   const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
     setCurrentScreen('home');
   };
 
   const handleRegisterSuccess = () => {
+    setIsAuthenticated(true);
     setCurrentScreen('home');
+  };
+
+  const handleLogout = async () => {
+    await api.clearTokens();
+    setIsAuthenticated(false);
+    setCurrentScreen('welcome');
   };
 
   // Show nothing while fonts are loading
@@ -99,74 +110,75 @@ function AppContent() {
     return null;
   }
 
-  if (currentScreen === 'splash') {
-    return <><SplashScreen onFinish={handleSplashFinish} /><StatusBar style="light" /></>;
-  }
+  return (
+    <AppSessionProvider
+      value={{
+        isAuthenticated,
+        login: handleLoginSuccess,
+        logout: handleLogout,
+        showLogin: () => setCurrentScreen('login'),
+        showRegister: () => setCurrentScreen('register'),
+        continueAsGuest: () => setCurrentScreen('home'),
+      }}
+    >
+      {currentScreen === 'splash' ? (
+        <><SplashScreen onFinish={handleSplashFinish} /><StatusBar style="light" /></>
+      ) : null}
 
-  if (currentScreen === 'language') {
-    return <><LanguageSelection onLanguageSelect={handleLanguageSelect} /><StatusBar style="dark" /></>;
-  }
+      {currentScreen === 'language' ? (
+        <><LanguageSelection onLanguageSelect={handleLanguageSelect} /><StatusBar style="dark" /></>
+      ) : null}
 
-  if (currentScreen === 'onboarding') {
-    return (
-      <>
-        <OnboardingScreens
-          onComplete={handleOnboardingComplete}
-          onBackToLanguage={() => setCurrentScreen('language')}
-        />
-        <StatusBar style="dark" />
-      </>
-    );
-  }
+      {currentScreen === 'onboarding' ? (
+        <>
+          <OnboardingScreens
+            onComplete={handleOnboardingComplete}
+            onBackToLanguage={() => setCurrentScreen('language')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
 
-  if (currentScreen === 'welcome') {
-    return (
-      <>
-        <WelcomeScreen
-          onLogin={() => setCurrentScreen('login')}
-          onRegister={() => setCurrentScreen('register')}
-          onGuest={() => setCurrentScreen('home')}
-        />
-        <StatusBar style="dark" />
-      </>
-    );
-  }
+      {currentScreen === 'welcome' ? (
+        <>
+          <WelcomeScreen
+            onLogin={() => setCurrentScreen('login')}
+            onRegister={() => setCurrentScreen('register')}
+            onGuest={() => setCurrentScreen('home')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
 
-  if (currentScreen === 'login') {
-    return (
-      <>
-        <LoginScreen
-          onLoginSuccess={handleLoginSuccess}
-          onBackToWelcome={() => setCurrentScreen('welcome')}
-          onGoToRegister={() => setCurrentScreen('register')}
-        />
-        <StatusBar style="dark" />
-      </>
-    );
-  }
+      {currentScreen === 'login' ? (
+        <>
+          <LoginScreen
+            onLoginSuccess={handleLoginSuccess}
+            onBackToWelcome={() => setCurrentScreen('welcome')}
+            onGoToRegister={() => setCurrentScreen('register')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
 
-  if (currentScreen === 'register') {
-    return (
-      <>
-        <RegisterScreen
-          onRegisterSuccess={handleRegisterSuccess}
-          onBackToWelcome={() => setCurrentScreen('welcome')}
-          onGoToLogin={() => setCurrentScreen('login')}
-        />
-        <StatusBar style="dark" />
-      </>
-    );
-  }
+      {currentScreen === 'register' ? (
+        <>
+          <RegisterScreen
+            onRegisterSuccess={handleRegisterSuccess}
+            onBackToWelcome={() => setCurrentScreen('welcome')}
+            onGoToLogin={() => setCurrentScreen('login')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
 
-  if (currentScreen === 'home') {
-    return (
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    );
-  }
-
-  return null;
+      {currentScreen === 'home' ? (
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      ) : null}
+    </AppSessionProvider>
+  );
 }
 
 export default function App() {

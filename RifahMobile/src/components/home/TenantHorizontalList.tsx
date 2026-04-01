@@ -57,11 +57,13 @@ export function TenantHorizontalList({ variant, navigation }: TenantHorizontalLi
         );
     }
 
-    const data = tenants.length > 0 ? tenants : [
-        { id: 'p1', name: 'Salon Name', slug: '', status: 'active', plan: '', city: 'Riyadh' },
-        { id: 'p2', name: 'Spa Center', slug: '', status: 'active', plan: '', city: 'Jeddah' },
-        { id: 'p3', name: 'Beauty Hub', slug: '', status: 'active', plan: '', city: 'Dammam' },
-    ] as Tenant[];
+    if (tenants.length === 0) {
+        return (
+            <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>{t('noSalonsFound')}</Text>
+            </View>
+        );
+    }
 
     const renderTenant = ({ item }: { item: Tenant }) => {
         const logoUrl = getImageUrl(item.logo);
@@ -100,9 +102,9 @@ export function TenantHorizontalList({ variant, navigation }: TenantHorizontalLi
     };
 
     return (
-        <FlatList
+            <FlatList
             horizontal
-            data={data}
+            data={tenants}
             renderItem={renderTenant}
             keyExtractor={item => item.id}
             showsHorizontalScrollIndicator={false}
@@ -159,6 +161,14 @@ const styles = StyleSheet.create({
     errorContainer: {
         alignItems: 'center',
         padding: spacing.md,
+    },
+    emptyContainer: {
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+    },
+    emptyText: {
+        color: colors.textSecondary,
+        fontSize: fontSize.sm,
     },
     retryButton: {
         backgroundColor: colors.backgroundGray,

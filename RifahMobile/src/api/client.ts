@@ -158,6 +158,8 @@ export interface Booking {
     tenantId?: string;
     Service?: Service;
     Staff?: Staff;
+    service?: Service;
+    staff?: Staff;
     tenant?: {
         id: string;
         name: string;
@@ -509,10 +511,26 @@ class ApiClient {
      * Get user bookings
      */
     async getBookings(status?: 'upcoming' | 'completed' | 'cancelled'): Promise<Booking[]> {
-        const response = await this.get<{ success: boolean; appointments: Booking[] }>(
-            status ? `/bookings?status=${status}` : '/bookings'
-        );
-        return response.appointments || [];
+        const response = await this.get<{ success: boolean; appointments: Booking[] }>('/bookings');
+        const normalized = (response.appointments || []).map((appointment) => ({
+            ...appointment,
+            Service: appointment.Service || appointment.service,
+            Staff: appointment.Staff || appointment.staff,
+        }));
+
+        if (!status) {
+            return normalized;
+        }
+
+        if (status === 'upcoming') {
+            return normalized.filter((appointment) => ['pending', 'confirmed'].includes(appointment.status));
+        }
+
+        if (status === 'completed') {
+            return normalized.filter((appointment) => ['completed', 'cancelled'].includes(appointment.status));
+        }
+
+        return normalized.filter((appointment) => appointment.status === status);
     }
 
     /**
@@ -532,7 +550,11 @@ class ApiClient {
         const response = await this.get<{ success: boolean; appointment: Booking }>(
             `/bookings/${id}`
         );
-        return response.appointment;
+        return {
+            ...response.appointment,
+            Service: response.appointment.Service || response.appointment.service,
+            Staff: response.appointment.Staff || response.appointment.staff,
+        };
     }
 
     /**
@@ -595,19 +617,27 @@ class ApiClient {
     }
 
     /**
+     * Get all public tenants for discovery
+     */
+    async getTenants(): Promise<Tenant[]> {
+        const response = await this.get<{ success: boolean; tenants: Tenant[] }>('/tenants');
+        return response.tenants || [];
+    }
+
+    /**
      * Get newest tenants (recently onboarded)
      */
     async getNewTenants(limit: number = 8): Promise<Tenant[]> {
-        const response = await this.get<{ success: boolean; tenants: Tenant[] }>(`/tenants?sort=newest&limit=${limit}`);
-        return response.tenants || [];
+        const tenants = await this.getTenants();
+        return tenants.slice(0, limit);
     }
 
     /**
      * Get trending tenants (most bookings / activity)
      */
     async getTrendingTenants(limit: number = 8): Promise<Tenant[]> {
-        const response = await this.get<{ success: boolean; tenants: Tenant[] }>(`/tenants?sort=trending&limit=${limit}`);
-        return response.tenants || [];
+        const response = await this.get<{ success: boolean; tenants: Tenant[] }>('/featured-tenants');
+        return (response.tenants || []).slice(0, limit);
     }
 
     /**

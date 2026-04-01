@@ -42,23 +42,23 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 }
             >
                 {/* Section 1: Hot Deals */}
-                <SectionHeader title={`🔥 ${t('hotDeals')}`} onSeeAll={() => console.log('See all deals')} />
+                <SectionHeader title={`🔥 ${t('hotDeals')}`} />
                 <HotDealsCarousel navigation={navigation} />
 
                 {/* Section 2: New to Refah */}
-                <SectionHeader title={t('newToRefah')} onSeeAll={() => console.log('See all new')} />
+                <SectionHeader title={t('newToRefah')} onSeeAll={() => navigation?.navigate('Browse', { title: t('newToRefah') })} />
                 <TenantHorizontalList variant="new" navigation={navigation} />
 
                 {/* Section 3: Categories */}
-                <SectionHeader title={t('categories')} onSeeAll={() => console.log('See all categories')} />
+                <SectionHeader title={t('categories')} onSeeAll={() => navigation?.navigate('Browse', { title: t('browseSalons') })} />
                 <CategoriesGrid navigation={navigation} />
 
                 {/* Section 4: Trending now */}
-                <SectionHeader title={t('trendingNow')} onSeeAll={() => console.log('See all trending')} />
+                <SectionHeader title={t('trendingNow')} onSeeAll={() => navigation?.navigate('Browse', { title: t('trendingNow') })} />
                 <TenantHorizontalList variant="trending" navigation={navigation} />
 
                 {/* Section 5: Top service providers */}
-                <SectionHeader title={t('topProviders')} onSeeAll={() => console.log('See all providers')} />
+                <SectionHeader title={t('topProviders')} />
                 <TopProvidersSection />
 
                 {/* Bottom padding */}

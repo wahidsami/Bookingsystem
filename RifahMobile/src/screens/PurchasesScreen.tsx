@@ -16,9 +16,11 @@ import { api, Order, getImageUrl } from '../api/client';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { GuestView } from '../components/GuestView';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 export function PurchasesScreen({ navigation }: any) {
     const { t, language } = useLanguage();
+    const { showLogin } = useAppSession();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -172,15 +174,7 @@ export function PurchasesScreen({ navigation }: any) {
                 </View>
                 <GuestView
                     type="orders"
-                    onLoginPress={() => {
-                        api.clearTokens().then(() => {
-                            import('react-native').then(RN => {
-                                if (RN.NativeModules.DevSettings) {
-                                    RN.NativeModules.DevSettings.reload();
-                                }
-                            });
-                        });
-                    }}
+                    onLoginPress={showLogin}
                 />
             </>
         );

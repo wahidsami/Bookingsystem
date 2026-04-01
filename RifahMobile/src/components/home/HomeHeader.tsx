@@ -4,6 +4,7 @@ import { ThemedText as Text } from '../ThemedText';
 import { colors, spacing, fontSize } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api, User, getImageUrl } from '../../api/client';
+import { useAppSession } from '../../contexts/AppSessionContext';
 
 interface HomeHeaderProps {
     navigation: any;
@@ -11,6 +12,7 @@ interface HomeHeaderProps {
 
 export function HomeHeader({ navigation }: HomeHeaderProps) {
     const { t } = useLanguage();
+    const { showLogin } = useAppSession();
     const [user, setUser] = useState<User | null>(null);
 
     useEffect(() => {
@@ -29,7 +31,10 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
     return (
         <View style={styles.container}>
             {/* Left: Avatar */}
-            <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarTouchable}>
+            <TouchableOpacity
+                onPress={() => (user ? navigation.navigate('Profile') : showLogin())}
+                style={styles.avatarTouchable}
+            >
                 {avatarUri ? (
                     <Image source={{ uri: avatarUri }} style={styles.avatar} />
                 ) : (
@@ -49,9 +54,6 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
             <View style={styles.iconsRow}>
                 <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Browse')}>
                     <Text style={styles.icon}>🔍</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={() => console.log('Notifications')}>
-                    <Text style={styles.icon}>🔔</Text>
                 </TouchableOpacity>
             </View>
         </View>

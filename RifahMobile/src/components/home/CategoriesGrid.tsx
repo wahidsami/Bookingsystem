@@ -54,23 +54,27 @@ export function CategoriesGrid({ navigation }: CategoriesGridProps) {
         );
     }
 
-    const data = categories.length > 0 ? categories : [
-        { id: 'p1', name_en: 'Hair', name_ar: 'شعر', slug: 'hair', icon: '💇', sortOrder: 1, isActive: true },
-        { id: 'p2', name_en: 'Nails', name_ar: 'أظافر', slug: 'nails', icon: '💅', sortOrder: 2, isActive: true },
-        { id: 'p3', name_en: 'Spa', name_ar: 'سبا', slug: 'spa', icon: '🧖', sortOrder: 3, isActive: true },
-        { id: 'p4', name_en: 'Massage', name_ar: 'تدليك', slug: 'massage', icon: '💆', sortOrder: 4, isActive: true },
-        { id: 'p5', name_en: 'Makeup', name_ar: 'مكياج', slug: 'makeup', icon: '💄', sortOrder: 5, isActive: true },
-        { id: 'p6', name_en: 'Barbering', name_ar: 'حلاقة', slug: 'barbering', icon: '💈', sortOrder: 6, isActive: true },
-    ];
+    if (categories.length === 0) {
+        return (
+            <View style={styles.errorContainer}>
+                <Text style={styles.retryText}>{t('noCategoriesAvailable')}</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.grid}>
-            {data.map(category => (
+            {categories.map(category => (
                 <TouchableOpacity
                     key={category.id}
                     style={styles.item}
                     activeOpacity={0.7}
-                    onPress={() => console.log('Category:', category.slug)}
+                    onPress={() =>
+                        navigation.navigate('Browse', {
+                            category: category.slug,
+                            title: isRTL ? category.name_ar : category.name_en,
+                        })
+                    }
                 >
                     <View style={styles.circle}>
                         <Text style={styles.icon}>{category.icon || '📂'}</Text>

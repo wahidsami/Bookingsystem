@@ -63,7 +63,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             }
 
             // 2. Fetch page-data for dynamic sections
-            const pageDataRes = await api.get<{ success: boolean; data: any }>(`/tenant/${idToFetch}/page-data`);
+            const pageDataRes = await api.get<{ success: boolean; data: any }>(`/public/tenant/${idToFetch}/page-data`);
             let isProductsEnabled = false;
             let isServicesEnabled = true;
             let isReviewsEnabled = true;
@@ -95,32 +95,29 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             // 3. Fetch Services
             if (isServicesEnabled) {
                 try {
-                    const servicesRes = await api.get<{ success: boolean; services: Service[] }>(`/tenant/${idToFetch}/services`);
+                    const servicesRes = await api.get<{ success: boolean; services: Service[] }>(`/public/tenant/${idToFetch}/services`);
                     if (servicesRes.success) setServices(servicesRes.services || []);
-                } catch (e) {
-                    console.log('Error fetching services fallback:', e);
-                    const servicesRes = await api.get<{ success: boolean; services: Service[] }>(`/services?tenantId=${tenantId}`);
-                    if (servicesRes.success) setServices(servicesRes.services || []);
+                } catch {
+                    setServices([]);
                 }
             }
 
             // 4. Fetch Products (if tab is enabled)
             if (isProductsEnabled) {
                 try {
-                    const productsRes = await api.get<{ success: boolean; products: Product[] }>(`/tenant/${idToFetch}/products`);
+                    const productsRes = await api.get<{ success: boolean; products: Product[] }>(`/public/tenant/${idToFetch}/products`);
                     if (productsRes.success) setProducts(productsRes.products || []);
-                } catch (e) {
-                    console.log('Error fetching products', e);
+                } catch {
+                    setProducts([]);
                 }
             }
 
             // 5. Fetch Staff
             try {
-                const staffRes = await api.get<{ success: boolean; staff: Staff[] }>(`/tenant/${idToFetch}/staff`);
+                const staffRes = await api.get<{ success: boolean; staff: Staff[] }>(`/public/tenant/${idToFetch}/staff`);
                 if (staffRes.success) setStaff(staffRes.staff || []);
-            } catch (e) {
-                const staffRes = await api.get<{ success: boolean; staff: Staff[] }>(`/staff?tenantId=${tenantId}`);
-                if (staffRes.success) setStaff(staffRes.staff || []);
+            } catch {
+                setStaff([]);
             }
 
         } catch (error) {

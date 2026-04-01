@@ -8,6 +8,8 @@ import { BookingFlow } from '../screens/BookingFlow';
 import { HotDealDetailScreen } from '../screens/HotDealDetailScreen';
 import { CartScreen } from '../screens/CartScreen';
 import { PaymentSimulatorScreen } from '../screens/PaymentSimulatorScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
+import { BrowseScreen } from '../screens/BrowseScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -27,6 +29,8 @@ export function RootNavigator() {
             <Stack.Screen name="HotDealDetail" component={HotDealDetailScreen} />
             <Stack.Screen name="Cart" component={CartScreen} />
             <Stack.Screen name="PaymentSimulator" component={PaymentSimulatorScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Browse" component={BrowseScreen} />
         </Stack.Navigator>
     );
 }
