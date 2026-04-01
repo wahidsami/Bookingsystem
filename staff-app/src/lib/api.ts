@@ -261,6 +261,20 @@ export async function updateStaffAppointmentStatus(
   return data.appointment;
 }
 
+export async function changeStaffPassword(
+  session: StaffSession,
+  payload: { currentPassword: string; newPassword: string }
+): Promise<{ success: boolean; message: string }> {
+  return authorizedRequest<{ success: boolean; message: string }>(
+    '/staff/me/password',
+    session,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
 export async function logoutStaff(session: StaffSession | null): Promise<void> {
   if (session) {
     try {

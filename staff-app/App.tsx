@@ -12,6 +12,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { getApiUrl } from './src/config/env';
 import {
+  changeStaffPassword,
   fetchApiHealth,
   fetchStaffAppointments,
   fetchStaffMe,
@@ -80,6 +81,9 @@ export default function App() {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const loadDashboard = async (activeSession: StaffSession, showSpinner = true) => {
     if (showSpinner) {
@@ -185,6 +189,8 @@ export default function App() {
     setLoginPassword('');
     setDataError(null);
     setActionMessage(null);
+    setCurrentPassword('');
+    setNewPassword('');
   };
 
   const handleAppointmentAction = async (
@@ -237,6 +243,39 @@ export default function App() {
         ];
       default:
         return [];
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (!session) return;
+
+    if (!currentPassword.trim() || !newPassword.trim()) {
+      setDataError('Current password and new password are required.');
+      return;
+    }
+
+    if (newPassword.trim().length < 8) {
+      setDataError('New password must be at least 8 characters long.');
+      return;
+    }
+
+    setPasswordLoading(true);
+    setDataError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await changeStaffPassword(session, {
+        currentPassword: currentPassword.trim(),
+        newPassword: newPassword.trim(),
+      });
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setActionMessage(result.message || 'Password updated successfully.');
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Failed to update password');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -536,6 +575,33 @@ export default function App() {
             <Text style={styles.profileLine}>City: {session.staff.tenant?.city || 'Not set'}</Text>
             <Text style={styles.profileLine}>Commission: {session.staff.commissionRate ?? 0}%</Text>
             <Text style={styles.profileLine}>Rating: {session.staff.rating ?? 'N/A'}</Text>
+
+            <View style={styles.passwordPanel}>
+              <Text style={styles.passwordTitle}>Change password</Text>
+              <TextInput
+                secureTextEntry
+                placeholder="Current password"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+              />
+              <TextInput
+                secureTextEntry
+                placeholder="New password"
+                placeholderTextColor="#94a3b8"
+                style={[styles.input, styles.passwordInputSpacing]}
+                value={newPassword}
+                onChangeText={setNewPassword}
+              />
+              <Pressable style={styles.actionButton} onPress={handlePasswordChange} disabled={passwordLoading}>
+                {passwordLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Update Password</Text>
+                )}
+              </Pressable>
+            </View>
 
             <Pressable style={[styles.secondaryButton, styles.logoutButton]} onPress={handleLogout}>
               <Text style={styles.secondaryButtonText}>Logout</Text>
@@ -837,6 +903,20 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 20,
+  },
+  passwordPanel: {
+    marginTop: 12,
+    paddingTop: 8,
+    gap: 0,
+  },
+  passwordTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  passwordInputSpacing: {
+    marginTop: 12,
   },
   actionRow: {
     flexDirection: 'row',
