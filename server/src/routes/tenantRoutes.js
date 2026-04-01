@@ -19,6 +19,7 @@ const tenantReportsController = require('../controllers/tenantReportsController'
 const tenantPublicPageController = require('../controllers/tenantPublicPageController');
 const tenantScheduleController = require('../controllers/tenantScheduleController');
 const tenantRegistrationController = require('../controllers/tenantRegistrationController');
+const tenantBillsController = require('../controllers/tenantBillsController');
 const { authenticateTenant } = require('../middleware/authTenant');
 const multer = require('multer');
 const path = require('path');
@@ -100,6 +101,9 @@ router.get('/orders', tenantOrderController.getOrders);
 router.get('/orders/:id', tenantOrderController.getOrder);
 router.patch('/orders/:id/status', tenantOrderController.updateOrderStatus);
 router.patch('/orders/:id/payment', tenantOrderController.updatePaymentStatus);
+
+// Billing
+router.get('/bills', tenantBillsController.getBills);
 
 // Settings management
 router.get('/settings', tenantSettingsController.getSettings);

@@ -231,6 +231,26 @@ class AdminApi {
     return this.request<{ success: boolean; data: any[] }>(`/admin/financial/commission-breakdown?${params.toString()}`);
   }
 
+  async getCommissionByPackage(startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    return this.request<{ success: boolean; data: any[] }>(`/admin/financial/commission-by-package?${params.toString()}`);
+  }
+
+  async getRevenueByType(startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/revenue-by-type?${params.toString()}`);
+  }
+
+  async getBillsSummary(status?: string) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/bills-summary?${params.toString()}`);
+  }
+
   async getTopEmployees(limit: number = 20, startDate?: string, endDate?: string) {
     const params = new URLSearchParams();
     params.append('limit', limit.toString());

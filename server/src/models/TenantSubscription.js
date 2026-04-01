@@ -12,6 +12,10 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'packageId',
                 as: 'package'
             });
+            TenantSubscription.hasMany(models.Bill, {
+                foreignKey: 'tenantSubscriptionId',
+                as: 'bills'
+            });
         }
 
         // Instance method: Check if subscription is active

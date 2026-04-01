@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const subscriptionController = require('../controllers/subscriptionController');
 const { authenticateTenant } = require('../middleware/authTenant');
-const { requireActiveSubscription } = require('../middleware/checkSubscription');
 
 // Public routes (no authentication required)
 // Get available packages for registration/browsing
@@ -25,6 +24,7 @@ router.patch('/alerts/:alertId/acknowledge', subscriptionController.acknowledgeA
 
 // Request subscription change (upgrade/downgrade)
 router.post('/change-request', subscriptionController.requestSubscriptionChange);
+router.post('/request-upgrade', subscriptionController.requestUpgrade);
 
 module.exports = router;
 

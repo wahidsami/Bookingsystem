@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const publicTenantController = require('../controllers/publicTenantController');
+const publicBillPaymentController = require('../controllers/publicBillPaymentController');
 const { optionalAuth } = require('../middleware/authUser');
 
 // Get all active tenants (for browse/discovery)
@@ -39,6 +40,10 @@ router.post('/tenant/:tenantId/orders', optionalAuth, publicTenantController.cre
 
 // Contact form
 router.post('/tenant/:tenantId/contact', publicTenantController.submitContactForm);
+
+// Bill payment links
+router.get('/bills/by-token/:token', publicBillPaymentController.getBillByToken);
+router.post('/bills/by-token/:token/pay', publicBillPaymentController.payBillByToken);
 
 module.exports = router;
 

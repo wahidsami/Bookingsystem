@@ -12,6 +12,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'subscription'
             });
+
+            Tenant.hasMany(models.Bill, {
+                foreignKey: 'tenantId',
+                as: 'bills'
+            });
             
             // Hot deals relationship
             Tenant.hasMany(models.HotDeal, {

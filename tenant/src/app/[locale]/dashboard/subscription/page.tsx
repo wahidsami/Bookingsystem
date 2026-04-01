@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { TenantLayout } from "@/components/TenantLayout";
 import { Currency } from "@/components/Currency";
@@ -58,6 +59,7 @@ const BILLING_CYCLES: BillingCycle[] = ["monthly", "sixMonth", "annual"];
 
 export default function SubscriptionPage() {
   const params = useParams();
+  const router = useRouter();
   const locale = (params?.locale as string) || "ar";
   const isRTL = locale === "ar";
   const t = useTranslations("Subscription");
@@ -179,6 +181,10 @@ export default function SubscriptionPage() {
       setFeedback("");
 
       const response = await tenantApi.requestSubscriptionChange(pkg.id, billingCycle);
+      if (response?.paymentToken) {
+        router.push(`/${locale}/payment?token=${encodeURIComponent(response.paymentToken)}`);
+        return;
+      }
       setFeedback(response.message || t("requestSuccess"));
     } catch (err: any) {
       console.error("Failed to request subscription change:", err);
@@ -313,6 +319,20 @@ export default function SubscriptionPage() {
           <div className="space-y-3 text-sm text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
             <p>{t("billingNoticeBody")}</p>
             <p>{t("billingNoticeHint")}</p>
+          </div>
+          <div className="mt-6 space-y-3">
+            <Link
+              href={`/${locale}/dashboard/bills`}
+              className="block rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-center text-sm font-semibold text-primary hover:bg-primary/10"
+            >
+              {locale === "ar" ? "عرض الفواتير" : "View bills"}
+            </Link>
+            <Link
+              href={`/${locale}/dashboard/subscription/upgrade`}
+              className="block rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-white hover:bg-primary/90"
+            >
+              {locale === "ar" ? "ترقية أو تجديد الباقة" : "Upgrade or renew"}
+            </Link>
           </div>
         </div>
       </div>

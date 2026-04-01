@@ -1,48 +1,82 @@
 const { sequelize } = require('../models');
 
-/**
- * Financial Service - Handles all financial calculations and queries
- */
+const toNumber = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildDateClause = (column, startDate, endDate) => `
+  ${startDate ? `AND ${column} >= :startDate` : ''}
+  ${endDate ? `AND ${column} <= :endDate` : ''}
+`;
 
 class FinancialService {
-  /**
-   * Get summary of platform earnings
-   */
   static async getPlatformSummary(startDate, endDate) {
     try {
-      const query = `
-        SELECT 
+      const transactionQuery = `
+        SELECT
           ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
           ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as your_earnings,
           ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_earnings,
           COUNT(*) as total_transactions,
-          COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_transactions,
-          ROUND(AVG(CAST("platformFee" as NUMERIC)), 2) as avg_commission
+          COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_transactions
         FROM transactions
         WHERE status = 'completed'
-          ${startDate ? 'AND "createdAt" >= :startDate' : ''}
-          ${endDate ? 'AND "createdAt" <= :endDate' : ''}
+          AND type IN ('booking', 'product_purchase')
+          ${buildDateClause('"createdAt"', startDate, endDate)}
       `;
 
-      const result = await sequelize.query(query, {
-        replacements: { startDate, endDate },
-        type: sequelize.QueryTypes.SELECT,
-      });
+      const billQuery = `
+        SELECT
+          ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
+          COUNT(*) as total_transactions
+        FROM bills
+        WHERE status = 'PAID'
+          ${buildDateClause('"paidAt"', startDate, endDate)}
+      `;
 
-      return result[0] || {};
+      const [txRows, billRows] = await Promise.all([
+        sequelize.query(transactionQuery, {
+          replacements: { startDate, endDate },
+          type: sequelize.QueryTypes.SELECT,
+        }),
+        sequelize.query(billQuery, {
+          replacements: { startDate, endDate },
+          type: sequelize.QueryTypes.SELECT,
+        }),
+      ]);
+
+      const tx = txRows[0] || {};
+      const bills = billRows[0] || {};
+      const totalRevenue = toNumber(tx.total_revenue) + toNumber(bills.total_revenue);
+      const yourEarnings = toNumber(tx.your_earnings) + toNumber(bills.total_revenue);
+      const totalTransactions = toNumber(tx.total_transactions) + toNumber(bills.total_transactions);
+
+      return {
+        total_revenue: Number(totalRevenue.toFixed(2)),
+        your_earnings: Number(yourEarnings.toFixed(2)),
+        tenant_earnings: Number(toNumber(tx.tenant_earnings).toFixed(2)),
+        total_transactions: totalTransactions,
+        failed_transactions: toNumber(tx.failed_transactions),
+        avg_commission: totalTransactions > 0 ? Number((yourEarnings / totalTransactions).toFixed(2)) : 0,
+      };
     } catch (error) {
       console.error('Error in getPlatformSummary:', error);
-      return {};
+      return {
+        total_revenue: 0,
+        your_earnings: 0,
+        tenant_earnings: 0,
+        total_transactions: 0,
+        failed_transactions: 0,
+        avg_commission: 0,
+      };
     }
   }
 
-  /**
-   * Get tenant financial details with earnings
-   */
   static async getTenantFinancials(tenantId, startDate, endDate) {
     try {
       const query = `
-        SELECT 
+        SELECT
           t.id,
           t.name,
           t.plan,
@@ -57,9 +91,9 @@ class FinancialService {
         FROM transactions tr
         JOIN tenants t ON tr."tenantId" = t.id
         WHERE tr.status = 'completed'
+          AND tr.type IN ('booking', 'product_purchase')
           ${tenantId ? 'AND t.id = :tenantId' : ''}
-          ${startDate ? 'AND tr."createdAt" >= :startDate' : ''}
-          ${endDate ? 'AND tr."createdAt" <= :endDate' : ''}
+          ${buildDateClause('tr."createdAt"', startDate, endDate)}
         GROUP BY t.id, t.name, t.plan, t.status
         ORDER BY net_revenue DESC
       `;
@@ -76,14 +110,11 @@ class FinancialService {
     }
   }
 
-  /**
-   * Get all tenants leaderboard
-   */
   static async getTenantLeaderboard(limit = 10, startDate, endDate) {
     try {
       const query = `
-        SELECT 
-          ROW_NUMBER() OVER (ORDER BY net_revenue DESC) as rank,
+        SELECT
+          ROW_NUMBER() OVER (ORDER BY tenant_earned DESC) as rank,
           t.id,
           t.name,
           t.plan,
@@ -96,8 +127,8 @@ class FinancialService {
         FROM transactions tr
         JOIN tenants t ON tr."tenantId" = t.id
         WHERE tr.status = 'completed'
-          ${startDate ? 'AND tr."createdAt" >= :startDate' : ''}
-          ${endDate ? 'AND tr."createdAt" <= :endDate' : ''}
+          AND tr.type IN ('booking', 'product_purchase')
+          ${buildDateClause('tr."createdAt"', startDate, endDate)}
         GROUP BY t.id, t.name, t.plan
         ORDER BY tenant_earned DESC
         LIMIT :limit
@@ -115,13 +146,10 @@ class FinancialService {
     }
   }
 
-  /**
-   * Get employee hours and earnings for a tenant
-   */
   static async getTenantEmployeeMetrics(tenantId, startDate, endDate) {
     try {
       const query = `
-        SELECT 
+        SELECT
           s.id,
           s.name,
           s."commissionRate",
@@ -135,8 +163,7 @@ class FinancialService {
         JOIN staff s ON a."staffId" = s.id
         WHERE a."tenantId" = :tenantId
           AND a.status = 'completed'
-          ${startDate ? 'AND a."startTime" >= :startDate' : ''}
-          ${endDate ? 'AND a."startTime" <= :endDate' : ''}
+          ${buildDateClause('a."startTime"', startDate, endDate)}
         GROUP BY s.id, s.name, s."commissionRate"
         ORDER BY hours_worked DESC
       `;
@@ -153,64 +180,214 @@ class FinancialService {
     }
   }
 
-  /**
-   * Get monthly revenue comparison
-   */
   static async getMonthlyComparison(limit = 12) {
     try {
-      const query = `
-        WITH monthly_data AS (
-          SELECT 
-            DATE_TRUNC('month', "createdAt")::date as month,
-            ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
-            ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as your_earnings,
-            ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_earnings,
-            COUNT(*) as transaction_count,
-            COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count
-          FROM transactions
-          WHERE status = 'completed'
-          GROUP BY DATE_TRUNC('month', "createdAt")
-          ORDER BY month DESC
-          LIMIT :limit
-        )
-        SELECT 
-          month,
-          total_revenue,
-          your_earnings,
-          tenant_earnings,
-          transaction_count,
-          failed_count,
-          ROUND((your_earnings / total_revenue * 100)::numeric, 1) as your_percentage
-        FROM monthly_data
-        ORDER BY month DESC
+      const transactionQuery = `
+        SELECT
+          DATE_TRUNC('month', "createdAt")::date as month,
+          ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
+          ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as your_earnings,
+          ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_earnings,
+          COUNT(*) as transaction_count,
+          COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count
+        FROM transactions
+        WHERE status = 'completed'
+          AND type IN ('booking', 'product_purchase')
+        GROUP BY DATE_TRUNC('month', "createdAt")
       `;
 
-      const result = await sequelize.query(query, {
-        replacements: { limit },
-        type: sequelize.QueryTypes.SELECT,
-      });
+      const billsQuery = `
+        SELECT
+          DATE_TRUNC('month', "paidAt")::date as month,
+          ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
+          COUNT(*) as transaction_count
+        FROM bills
+        WHERE status = 'PAID'
+          AND "paidAt" IS NOT NULL
+        GROUP BY DATE_TRUNC('month', "paidAt")
+      `;
 
-      return result && Array.isArray(result) ? result : [];
+      const [txRows, billRows] = await Promise.all([
+        sequelize.query(transactionQuery, {
+          type: sequelize.QueryTypes.SELECT,
+        }),
+        sequelize.query(billsQuery, {
+          type: sequelize.QueryTypes.SELECT,
+        }),
+      ]);
+
+      const monthly = new Map();
+
+      for (const row of txRows || []) {
+        monthly.set(row.month, {
+          month: row.month,
+          total_revenue: toNumber(row.total_revenue),
+          your_earnings: toNumber(row.your_earnings),
+          tenant_earnings: toNumber(row.tenant_earnings),
+          transaction_count: toNumber(row.transaction_count),
+          failed_count: toNumber(row.failed_count),
+        });
+      }
+
+      for (const row of billRows || []) {
+        const current = monthly.get(row.month) || {
+          month: row.month,
+          total_revenue: 0,
+          your_earnings: 0,
+          tenant_earnings: 0,
+          transaction_count: 0,
+          failed_count: 0,
+        };
+
+        current.total_revenue += toNumber(row.total_revenue);
+        current.your_earnings += toNumber(row.total_revenue);
+        current.transaction_count += toNumber(row.transaction_count);
+        monthly.set(row.month, current);
+      }
+
+      return Array.from(monthly.values())
+        .sort((a, b) => new Date(b.month) - new Date(a.month))
+        .slice(0, limit)
+        .map((row) => ({
+          ...row,
+          total_revenue: Number(row.total_revenue.toFixed(2)),
+          your_earnings: Number(row.your_earnings.toFixed(2)),
+          tenant_earnings: Number(row.tenant_earnings.toFixed(2)),
+          your_percentage: row.total_revenue > 0
+            ? Number(((row.your_earnings / row.total_revenue) * 100).toFixed(1))
+            : 0,
+        }));
     } catch (error) {
       console.error('Error in getMonthlyComparison:', error);
       return [];
     }
   }
 
-  /**
-   * Get commission breakdown by subscription plan
-   */
+  static async getRevenueByType(startDate, endDate) {
+    try {
+      const transactionQuery = `
+        SELECT
+          type,
+          COUNT(*) as count,
+          ROUND(SUM(CAST(amount as NUMERIC)), 2) as amount,
+          ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as platform_fee,
+          ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_revenue
+        FROM transactions
+        WHERE status = 'completed'
+          AND type IN ('booking', 'product_purchase')
+          ${buildDateClause('"createdAt"', startDate, endDate)}
+        GROUP BY type
+      `;
+
+      const billQuery = `
+        SELECT
+          COUNT(*) as count,
+          ROUND(SUM(CAST(amount as NUMERIC)), 2) as amount
+        FROM bills
+        WHERE status = 'PAID'
+          ${buildDateClause('"paidAt"', startDate, endDate)}
+      `;
+
+      const [txRows, billRows] = await Promise.all([
+        sequelize.query(transactionQuery, {
+          replacements: { startDate, endDate },
+          type: sequelize.QueryTypes.SELECT,
+        }),
+        sequelize.query(billQuery, {
+          replacements: { startDate, endDate },
+          type: sequelize.QueryTypes.SELECT,
+        }),
+      ]);
+
+      const result = {
+        booking: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+        product_purchase: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+        subscription: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+      };
+
+      for (const row of txRows || []) {
+        if (!result[row.type]) continue;
+        result[row.type] = {
+          count: toNumber(row.count),
+          amount: toNumber(row.amount),
+          platformFee: toNumber(row.platform_fee),
+          tenantRevenue: toNumber(row.tenant_revenue),
+        };
+      }
+
+      const paidBills = billRows[0] || {};
+      result.subscription = {
+        count: toNumber(paidBills.count),
+        amount: toNumber(paidBills.amount),
+        platformFee: toNumber(paidBills.amount),
+        tenantRevenue: 0,
+      };
+
+      return result;
+    } catch (error) {
+      console.error('Error in getRevenueByType:', error);
+      return {
+        booking: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+        product_purchase: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+        subscription: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+      };
+    }
+  }
+
+  static async getBillsSummary(status = null) {
+    try {
+      const whereClause = status ? 'WHERE b.status = :status' : '';
+      const query = `
+        SELECT
+          b.status,
+          COUNT(*) as count,
+          ROUND(SUM(CAST(b.amount as NUMERIC)), 2) as total_amount
+        FROM bills b
+        ${whereClause}
+        GROUP BY b.status
+      `;
+
+      const rows = await sequelize.query(query, {
+        replacements: status ? { status } : {},
+        type: sequelize.QueryTypes.SELECT,
+      });
+
+      const result = {
+        UNPAID: { count: 0, totalAmount: 0 },
+        PAID: { count: 0, totalAmount: 0 },
+        EXPIRED: { count: 0, totalAmount: 0 },
+      };
+
+      for (const row of rows || []) {
+        if (!result[row.status]) continue;
+        result[row.status] = {
+          count: toNumber(row.count),
+          totalAmount: toNumber(row.total_amount),
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error in getBillsSummary:', error);
+      return {
+        UNPAID: { count: 0, totalAmount: 0 },
+        PAID: { count: 0, totalAmount: 0 },
+        EXPIRED: { count: 0, totalAmount: 0 },
+      };
+    }
+  }
+
   static async getCommissionByPlan(startDate, endDate) {
     try {
       const query = `
-        SELECT 
+        SELECT
           t.plan as plan,
           COUNT(DISTINCT t.id) as tenant_count,
           COUNT(*) as total_transactions,
           ROUND(SUM(CAST(tr.amount as NUMERIC)), 2) as total_revenue,
           ROUND(SUM(CAST(tr."platformFee" as NUMERIC)), 2) as your_earnings,
           ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)), 2) as tenant_earnings,
-          CASE 
+          CASE
             WHEN t.plan = 'Starter' THEN 7.0
             WHEN t.plan = 'Professional' THEN 8.0
             WHEN t.plan = 'Enterprise' THEN 3.5
@@ -219,8 +396,8 @@ class FinancialService {
         FROM transactions tr
         JOIN tenants t ON tr."tenantId" = t.id
         WHERE tr.status = 'completed'
-          ${startDate ? 'AND tr."createdAt" >= :startDate' : ''}
-          ${endDate ? 'AND tr."createdAt" <= :endDate' : ''}
+          AND tr.type IN ('booking', 'product_purchase')
+          ${buildDateClause('tr."createdAt"', startDate, endDate)}
         GROUP BY t.plan
         ORDER BY your_earnings DESC
       `;
@@ -237,33 +414,69 @@ class FinancialService {
     }
   }
 
-  /**
-   * Get transaction details for detailed view
-   */
+  static async getCommissionByPackage(startDate, endDate) {
+    try {
+      const query = `
+        SELECT
+          COALESCE(sp.name, 'Unknown') as plan,
+          COUNT(DISTINCT t.id) as tenant_count,
+          COUNT(tr.id) as total_transactions,
+          ROUND(SUM(CAST(tr.amount as NUMERIC)), 2) as total_revenue,
+          ROUND(SUM(CAST(tr."platformFee" as NUMERIC)), 2) as your_earnings,
+          ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)), 2) as tenant_earnings
+        FROM transactions tr
+        JOIN tenants t ON tr."tenantId" = t.id
+        LEFT JOIN LATERAL (
+          SELECT "packageId" FROM tenant_subscriptions
+          WHERE "tenantId" = t.id
+          ORDER BY "createdAt" DESC
+          LIMIT 1
+        ) ts ON true
+        LEFT JOIN subscription_packages sp ON sp.id = ts."packageId"
+        WHERE tr.status = 'completed'
+          AND tr.type IN ('booking', 'product_purchase')
+          ${buildDateClause('tr."createdAt"', startDate, endDate)}
+        GROUP BY sp.id, sp.name
+        ORDER BY your_earnings DESC
+      `;
+
+      const result = await sequelize.query(query, {
+        replacements: { startDate, endDate },
+        type: sequelize.QueryTypes.SELECT,
+      });
+
+      return result && Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error('Error in getCommissionByPackage:', error);
+      return [];
+    }
+  }
+
   static async getTransactionDetails(tenantId, limit = 50, offset = 0) {
     const query = `
-      SELECT 
+      SELECT
         tr.id,
         tr."createdAt",
         t.name as tenant_name,
-        CASE 
+        CASE
           WHEN a.id IS NOT NULL THEN 'appointment'
-          WHEN p.id IS NOT NULL THEN 'product'
+          WHEN o.id IS NOT NULL THEN 'product'
           ELSE 'other'
         END as transaction_type,
-        COALESCE(s.name, p.name, 'N/A') as item_name,
+        COALESCE(s.name_en, o."orderNumber", 'N/A') as item_name,
         ROUND(CAST(tr.amount as NUMERIC), 2) as amount,
         ROUND(CAST(tr."platformFee" as NUMERIC), 2) as your_fee,
         ROUND(CAST(tr."tenantRevenue" as NUMERIC), 2) as tenant_revenue,
         tr.status as payment_status,
-        tr."paymentMethod"
+        COALESCE(tr.metadata->>'paymentMethod', 'N/A') as "paymentMethod"
       FROM transactions tr
       JOIN tenants t ON tr."tenantId" = t.id
       LEFT JOIN appointments a ON tr."appointmentId" = a.id
       LEFT JOIN services s ON a."serviceId" = s.id
-      LEFT JOIN products p ON tr."productId" = p.id
+      LEFT JOIN orders o ON tr.order_id = o.id
       WHERE tr."tenantId" = :tenantId
         AND tr.status = 'completed'
+        AND tr.type IN ('booking', 'product_purchase')
       ORDER BY tr."createdAt" DESC
       LIMIT :limit
       OFFSET :offset
@@ -281,13 +494,10 @@ class FinancialService {
     }
   }
 
-  /**
-   * Get top performing employees across all tenants
-   */
   static async getTopEmployees(limit = 20, startDate, endDate) {
     try {
       const query = `
-        SELECT 
+        SELECT
           ROW_NUMBER() OVER (ORDER BY commission_earned DESC) as rank,
           t.name as tenant,
           s.name as employee,
@@ -300,8 +510,7 @@ class FinancialService {
         JOIN staff s ON a."staffId" = s.id
         JOIN tenants t ON a."tenantId" = t.id
         WHERE a.status = 'completed'
-          ${startDate ? 'AND a."startTime" >= :startDate' : ''}
-          ${endDate ? 'AND a."startTime" <= :endDate' : ''}
+          ${buildDateClause('a."startTime"', startDate, endDate)}
         GROUP BY t.id, t.name, s.id, s.name
         ORDER BY commission_earned DESC
         LIMIT :limit

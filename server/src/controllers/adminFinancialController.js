@@ -45,7 +45,8 @@ exports.getTenantLeaderboard = async (req, res) => {
 
 exports.getTenantEmployeeMetrics = async (req, res) => {
   try {
-    const { tenantId, startDate, endDate } = req.query;
+    const tenantId = req.params.tenantId || req.query.tenantId;
+    const { startDate, endDate } = req.query;
 
     if (!tenantId) {
       return res.status(400).json(errorResponse('tenantId is required'));
@@ -85,9 +86,43 @@ exports.getCommissionByPlan = async (req, res) => {
   }
 };
 
+exports.getRevenueByType = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const data = await FinancialService.getRevenueByType(startDate, endDate);
+    res.json(successResponse('Revenue by type retrieved', data));
+  } catch (error) {
+    console.error('Error fetching revenue by type:', error);
+    res.status(500).json(errorResponse('Failed to fetch revenue by type', error.message));
+  }
+};
+
+exports.getBillsSummary = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const data = await FinancialService.getBillsSummary(status || null);
+    res.json(successResponse('Bills summary retrieved', data));
+  } catch (error) {
+    console.error('Error fetching bills summary:', error);
+    res.status(500).json(errorResponse('Failed to fetch bills summary', error.message));
+  }
+};
+
+exports.getCommissionByPackage = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const data = await FinancialService.getCommissionByPackage(startDate, endDate);
+    res.json(successResponse('Commission by package retrieved', data));
+  } catch (error) {
+    console.error('Error fetching commission by package:', error);
+    res.status(500).json(errorResponse('Failed to fetch commission by package', error.message));
+  }
+};
+
 exports.getTransactionDetails = async (req, res) => {
   try {
-    const { tenantId, limit = 50, offset = 0 } = req.query;
+    const tenantId = req.params.tenantId || req.query.tenantId;
+    const { limit = 50, offset = 0 } = req.query;
 
     if (!tenantId) {
       return res.status(400).json(errorResponse('tenantId is required'));
@@ -121,13 +156,15 @@ exports.getDashboardOverview = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    const [summary, leaderboard, monthlyComparison, commissionBreakdown, topEmployees] =
+    const [summary, leaderboard, monthlyComparison, commissionBreakdown, topEmployees, revenueByType, billsSummary] =
       await Promise.all([
         FinancialService.getPlatformSummary(startDate, endDate),
         FinancialService.getTenantLeaderboard(5, startDate, endDate),
         FinancialService.getMonthlyComparison(6),
-        FinancialService.getCommissionByPlan(startDate, endDate),
+        FinancialService.getCommissionByPackage(startDate, endDate),
         FinancialService.getTopEmployees(5, startDate, endDate),
+        FinancialService.getRevenueByType(startDate, endDate),
+        FinancialService.getBillsSummary(),
       ]);
 
     res.json(
@@ -137,6 +174,8 @@ exports.getDashboardOverview = async (req, res) => {
         monthlyComparison,
         commissionBreakdown,
         topEmployees,
+        revenueByType,
+        billsSummary,
       })
     );
   } catch (error) {

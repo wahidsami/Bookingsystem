@@ -25,18 +25,20 @@ type MonthlyData = {
 
 type CommissionData = {
   plan: string;
-  commission_rate: number;
   tenant_count: number;
   total_transactions: number;
-  total_revenue: number;
   your_earnings: number;
-  tenant_earnings: number;
 };
+
+type RevenueByType = Record<string, { count: number; amount: number; platformFee: number; tenantRevenue: number }>;
+type BillsSummary = Record<string, { count: number; totalAmount: number }>;
 
 export default function FinancialOverviewPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [monthly, setMonthly] = useState<MonthlyData[]>([]);
   const [commissionBreakdown, setCommissionBreakdown] = useState<CommissionData[]>([]);
+  const [revenueByType, setRevenueByType] = useState<RevenueByType | null>(null);
+  const [billsSummary, setBillsSummary] = useState<BillsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('30');
@@ -53,15 +55,19 @@ export default function FinancialOverviewPage() {
       const startDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
       const endDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
 
-      const [summaryRes, monthlyRes, commissionRes] = await Promise.all([
+      const [summaryRes, monthlyRes, commissionRes, revenueByTypeRes, billsRes] = await Promise.all([
         adminApi.getPlatformFinancialSummary(startDate, endDate),
         adminApi.getMonthlyComparison(12),
-        adminApi.getCommissionBreakdown(startDate, endDate),
+        adminApi.getCommissionByPackage(startDate, endDate),
+        adminApi.getRevenueByType(startDate, endDate),
+        adminApi.getBillsSummary(),
       ]);
 
       if (summaryRes.success) setSummary(summaryRes.data);
       if (monthlyRes.success) setMonthly(monthlyRes.data || []);
       if (commissionRes.success) setCommissionBreakdown(commissionRes.data || []);
+      if (revenueByTypeRes.success) setRevenueByType(revenueByTypeRes.data || null);
+      if (billsRes.success) setBillsSummary(billsRes.data || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
       console.error('Error:', err);
@@ -91,6 +97,12 @@ export default function FinancialOverviewPage() {
     ...(monthly?.map((m) => m.total_revenue || 0) || [0]),
     summary?.total_revenue || 0
   );
+
+  const typeLabels: Record<string, string> = {
+    booking: 'Bookings',
+    product_purchase: 'Products',
+    subscription: 'Subscriptions',
+  };
 
   return (
     <AdminLayout>
@@ -163,6 +175,74 @@ export default function FinancialOverviewPage() {
                   })
                   : '0'}
               </p>
+            </div>
+          </div>
+        )}
+
+        {billsSummary && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-amber-600/50 bg-amber-900/20 p-6">
+              <p className="text-sm font-medium text-amber-200">Unpaid Bills</p>
+              <p className="mt-2 text-2xl font-bold text-amber-400">{billsSummary.UNPAID?.count || 0}</p>
+              <p className="text-xs text-amber-300">
+                SAR {(billsSummary.UNPAID?.totalAmount || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-6">
+              <p className="text-sm font-medium text-green-200">Paid Bills</p>
+              <p className="mt-2 text-2xl font-bold text-green-400">{billsSummary.PAID?.count || 0}</p>
+              <p className="text-xs text-green-300">
+                SAR {(billsSummary.PAID?.totalAmount || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-gray-600 bg-gray-800 p-6">
+              <p className="text-sm font-medium text-gray-300">Expired Bills</p>
+              <p className="mt-2 text-2xl font-bold text-gray-200">{billsSummary.EXPIRED?.count || 0}</p>
+              <p className="text-xs text-gray-400">
+                SAR {(billsSummary.EXPIRED?.totalAmount || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {revenueByType && (
+          <div className="card p-6">
+            <h2 className="mb-6 text-lg font-semibold text-white">Revenue by Type</h2>
+            <div className="overflow-x-auto">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th className="text-right">Count</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-right">Platform Fee</th>
+                    <th className="text-right">Tenant Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(['booking', 'product_purchase', 'subscription'] as const).map((key) => {
+                    const row = revenueByType[key];
+                    if (!row) return null;
+                    return (
+                      <tr key={key}>
+                        <td>{typeLabels[key] || key}</td>
+                        <td className="text-right">{row.count}</td>
+                        <td className="text-right">
+                          SAR {(row.amount || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="text-right text-green-400">
+                          SAR {(row.platformFee || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="text-right">
+                          SAR {(row.tenantRevenue || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -255,17 +335,17 @@ export default function FinancialOverviewPage() {
         {/* Commission Breakdown by Plan */}
         {commissionBreakdown.length > 0 && (
           <div className="card p-6">
-            <h2 className="mb-6 text-lg font-semibold text-white">Commission by Subscription Plan</h2>
+            <h2 className="mb-6 text-lg font-semibold text-white">Commission by Subscription Package</h2>
             <div className="grid gap-6 md:grid-cols-2">
               {/* Pie Chart */}
               <div className="flex flex-col items-center justify-center">
                 <div style={{ width: '200px', height: '200px' }} className="relative flex items-center justify-center">
                   <svg width="200" height="200" className="transform -rotate-90">
                     {commissionBreakdown.map((item, idx) => {
-                      const total = commissionBreakdown.reduce((sum, p) => sum + (p.your_earnings || 0), 0);
-                      const percentage = total > 0 ? ((item.your_earnings || 0) / total) * 100 : 0;
+                      const total = commissionBreakdown.reduce((sum, p) => sum + Number(p.your_earnings || 0), 0);
+                      const itemEarnings = Number(item.your_earnings || 0);
+                      const percentage = total > 0 ? (itemEarnings / total) * 100 : 0;
                       const circumference = 2 * Math.PI * 60;
-                      const offset = circumference * ((100 - percentage) / 100);
 
                       const colors = [
                         '#3B82F6',
@@ -280,7 +360,7 @@ export default function FinancialOverviewPage() {
                       let cumulativeOffset = 0;
                       for (let i = 0; i < idx; i++) {
                         cumulativeOffset +=
-                          ((commissionBreakdown[i].your_earnings || 0) / (total || 1)) * circumference;
+                          (Number(commissionBreakdown[i].your_earnings || 0) / (total || 1)) * circumference;
                       }
 
                       return (
@@ -303,7 +383,7 @@ export default function FinancialOverviewPage() {
                     <p className="text-xl font-bold text-white">
                       SAR{' '}
                       {commissionBreakdown
-                        .reduce((sum, p) => sum + (p.your_earnings || 0), 0)
+                        .reduce((sum, p) => sum + Number(p.your_earnings || 0), 0)
                         .toLocaleString('en-SA', { maximumFractionDigits: 0 })}
                     </p>
                   </div>
@@ -321,8 +401,8 @@ export default function FinancialOverviewPage() {
                       '#EC4899',
                     ];
                     const color = colors[idx % colors.length];
-                    const total = commissionBreakdown.reduce((sum, p) => sum + (p.your_earnings || 0), 0);
-                    const percentage = total > 0 ? (((item.your_earnings || 0) / total) * 100).toFixed(1) : '0.0';
+                    const total = commissionBreakdown.reduce((sum, p) => sum + Number(p.your_earnings || 0), 0);
+                    const percentage = total > 0 ? ((Number(item.your_earnings || 0) / total) * 100).toFixed(1) : '0.0';
 
                     return (
                       <div key={idx} className="flex items-center gap-2 text-sm">
@@ -341,7 +421,6 @@ export default function FinancialOverviewPage() {
                   <thead>
                     <tr>
                       <th>Plan</th>
-                      <th className="text-right">Rate</th>
                       <th className="text-right">Tenants</th>
                       <th className="text-right">Your Commission</th>
                     </tr>
@@ -350,10 +429,9 @@ export default function FinancialOverviewPage() {
                     {commissionBreakdown.map((item, idx) => (
                       <tr key={idx}>
                         <td className="capitalize">{item.plan}</td>
-                        <td className="text-right">{item.commission_rate}%</td>
-                        <td className="text-right">{item.tenant_count}</td>
+                        <td className="text-right">{Number(item.tenant_count || 0)}</td>
                         <td className="text-right font-semibold text-green-400">
-                          SAR {(item.your_earnings || 0).toLocaleString('en-SA', { maximumFractionDigits: 0 })}
+                          SAR {Number(item.your_earnings || 0).toLocaleString('en-SA', { maximumFractionDigits: 0 })}
                         </td>
                       </tr>
                     ))}

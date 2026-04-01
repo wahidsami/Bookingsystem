@@ -1321,6 +1321,30 @@ class TenantApiClient {
     return this.post('/subscriptions/change-request', { packageId, billingCycle });
   }
 
+  async getBills(): Promise<any> {
+    return this.get('/tenant/bills');
+  }
+
+  async getBillPaymentDetails(token: string): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/public/bills/by-token/${encodeURIComponent(token)}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to load bill');
+    return data;
+  }
+
+  async payBillByToken(token: string): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/public/bills/by-token/${encodeURIComponent(token)}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Payment failed');
+    return data;
+  }
+
   /**
    * Subscription payment (fake gateway) – get session. Use token from email link or Bearer.
    */
