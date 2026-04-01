@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
@@ -35,6 +35,30 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
 
     const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
     const [paymentMethod, setPaymentMethod] = useState<'cash-on-delivery' | 'online'>('online');
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const hydrateCustomerDefaults = async () => {
+            const user = await api.getUser();
+            if (!user || !isMounted) {
+                return;
+            }
+
+            setCustomerName((value) => value || `${user.firstName} ${user.lastName}`.trim());
+            setCustomerEmail((value) => value || user.email || '');
+            setCustomerPhone((value) => value || user.addressPhone || user.phone || '');
+            setCity((value) => value || user.addressCity || '');
+            setStreet((value) => value || user.addressStreet || '');
+            setBuilding((value) => value || user.addressBuilding || '');
+        };
+
+        hydrateCustomerDefaults().catch(() => undefined);
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     // Calculations
     const deliveryFee = deliveryMethod === 'express' ? 50 : (cartTotal >= 200 ? 0 : 25);

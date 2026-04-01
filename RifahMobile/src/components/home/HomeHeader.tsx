@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../ThemedText';
 import { colors, spacing, fontSize } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -15,12 +16,14 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
     const { showLogin } = useAppSession();
     const [user, setUser] = useState<User | null>(null);
 
-    useEffect(() => {
-        loadUser();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadUser();
+        }, [])
+    );
 
     const loadUser = async () => {
-        const userData = await api.getUser();
+        const userData = await api.getProfile().catch(() => api.getUser());
         setUser(userData);
     };
 

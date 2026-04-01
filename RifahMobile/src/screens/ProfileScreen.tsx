@@ -1,26 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, User, getImageUrl } from '../api/client';
 
-export function ProfileScreen() {
+interface ProfileScreenProps {
+    navigation: any;
+}
+
+export function ProfileScreen({ navigation }: ProfileScreenProps) {
     const { t } = useLanguage();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
-    useEffect(() => {
-        loadUserData();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadUserData();
+        }, [])
+    );
 
     const loadUserData = async () => {
         try {
-            const userData = await api.getUser();
+            const userData = await api.getProfile().catch(() => api.getUser());
             setUser(userData);
+            if (userData) {
+                await api.setUser(userData);
+            }
         } catch (error) {
             console.error('Failed to load user data:', error);
         } finally {
@@ -34,7 +44,7 @@ export function ProfileScreen() {
         try {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permissionResult.granted) {
-                setUploadError('Permission to access camera roll is required');
+                setUploadError(t('photoLibraryPermissionRequired'));
                 return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -56,7 +66,7 @@ export function ProfileScreen() {
             await api.setUser(updatedUser);
         } catch (err: any) {
             console.error('Profile photo upload error:', err);
-            setUploadError(err.message || 'Failed to upload photo');
+            setUploadError(err.message || t('profileSaveFailed'));
         } finally {
             setUploadLoading(false);
         }
@@ -139,7 +149,10 @@ export function ProfileScreen() {
                     )}
                 </View>
 
-                <TouchableOpacity style={styles.editProfileButton}>
+                <TouchableOpacity
+                    style={styles.editProfileButton}
+                    onPress={() => navigation.navigate('EditProfile')}
+                >
                     <Text style={styles.editProfileText}>{t('editProfile')}</Text>
                 </TouchableOpacity>
             </ScrollView>

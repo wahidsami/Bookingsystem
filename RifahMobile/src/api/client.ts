@@ -52,6 +52,8 @@ export interface User {
     lastName: string;
     profileImage?: string;
     createdAt?: string;
+    dateOfBirth?: string;
+    gender?: 'male' | 'female' | 'other' | '';
     emailVerified: boolean;
     phoneVerified: boolean;
     walletBalance: number;
@@ -59,6 +61,13 @@ export interface User {
     totalBookings: number;
     totalSpent: number;
     preferredLanguage?: string;
+    addressStreet?: string;
+    addressCity?: string;
+    addressBuilding?: string;
+    addressFloor?: string;
+    addressApartment?: string;
+    addressPhone?: string;
+    addressNotes?: string;
     notificationPreferences?: {
         email: boolean;
         sms: boolean;
@@ -482,6 +491,31 @@ class ApiClient {
         } catch (error) {
             console.error('Error storing user:', error);
         }
+    }
+
+    /**
+     * Request a password reset email.
+     */
+    async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+        return this.post<{ success: boolean; message: string }>('/auth/user/forgot-password', {
+            email,
+        });
+    }
+
+    /**
+     * Get authenticated user profile from backend.
+     */
+    async getProfile(): Promise<User> {
+        const response = await this.get<{ success: boolean; user: User }>('/users/profile');
+        return response.user;
+    }
+
+    /**
+     * Update authenticated user profile.
+     */
+    async updateProfile(data: Partial<User>): Promise<User> {
+        const response = await this.put<{ success: boolean; user: User }>('/users/profile', data);
+        return response.user;
     }
 
     /**

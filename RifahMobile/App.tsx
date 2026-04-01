@@ -9,6 +9,7 @@ import { OnboardingScreens } from './src/screens/OnboardingScreens';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
+import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LanguageProvider, useLanguage } from './src/contexts/LanguageContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { getLanguage } from './src/utils/language';
@@ -20,7 +21,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 
-type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'home';
+type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'forgotPassword' | 'home';
 
 // Load Cairo fonts
 const loadFonts = async () => {
@@ -118,6 +119,7 @@ function AppContent() {
         logout: handleLogout,
         showLogin: () => setCurrentScreen('login'),
         showRegister: () => setCurrentScreen('register'),
+        showForgotPassword: () => setCurrentScreen('forgotPassword'),
         continueAsGuest: () => setCurrentScreen('home'),
       }}
     >
@@ -156,6 +158,7 @@ function AppContent() {
             onLoginSuccess={handleLoginSuccess}
             onBackToWelcome={() => setCurrentScreen('welcome')}
             onGoToRegister={() => setCurrentScreen('register')}
+            onForgotPassword={() => setCurrentScreen('forgotPassword')}
           />
           <StatusBar style="dark" />
         </>
@@ -167,6 +170,16 @@ function AppContent() {
             onRegisterSuccess={handleRegisterSuccess}
             onBackToWelcome={() => setCurrentScreen('welcome')}
             onGoToLogin={() => setCurrentScreen('login')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
+
+      {currentScreen === 'forgotPassword' ? (
+        <>
+          <ForgotPasswordScreen
+            onBackToLogin={() => setCurrentScreen('login')}
+            onBackToWelcome={() => setCurrentScreen('welcome')}
           />
           <StatusBar style="dark" />
         </>

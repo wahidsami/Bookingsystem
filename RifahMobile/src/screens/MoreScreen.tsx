@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -18,6 +19,19 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     useEffect(() => {
         api.getUser().then(setUser).catch(() => setUser(null));
     }, [isAuthenticated]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            api.getProfile()
+                .then(async (profile) => {
+                    setUser(profile);
+                    await api.setUser(profile);
+                })
+                .catch(() => {
+                    api.getUser().then(setUser).catch(() => setUser(null));
+                });
+        }, [])
+    );
 
     const menuItems = [
         { id: 'profile', icon: '👤', label: t('profile'), action: () => navigation?.navigate('Profile') },

@@ -26,9 +26,6 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
 
-        // Mock Analytics Event
-        console.log(`[Analytics] language_selected(${lang})`);
-
         onLanguageSelect(lang);
     };
 

@@ -9,6 +9,7 @@ import {
     Platform,
     ActivityIndicator,
     Image,
+    Alert,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import * as ImagePicker from 'expo-image-picker';
@@ -48,7 +49,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
             if (!permissionResult.granted) {
-                alert('Permission to access camera roll is required!');
+                Alert.alert(t('permissionRequiredTitle'), t('photoLibraryPermissionRequired'));
                 return;
             }
 
@@ -63,7 +64,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
             }
         } catch (error) {
             console.error('Error picking image:', error);
-            alert('Failed to pick image');
+            Alert.alert(t('error'), t('failedToPickImage'));
         }
     };
 
@@ -132,55 +133,60 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
         setLoading(true);
 
         try {
-            // Create FormData for file upload
-            const registrationData = new FormData();
-            registrationData.append('email', formData.email.trim());
-            registrationData.append('phone', formatPhone(formData.phone));
-            registrationData.append('password', formData.password);
-            registrationData.append('firstName', formData.firstName.trim());
-            registrationData.append('lastName', formData.lastName.trim());
-
-            if (formData.dateOfBirth) {
-                registrationData.append('dateOfBirth', formData.dateOfBirth);
-            }
-            if (formData.gender) {
-                registrationData.append('gender', formData.gender);
-            }
-
-            // Add avatar if selected
-            if (avatar) {
-                const uriParts = avatar.split('.');
-                const fileType = uriParts[uriParts.length - 1];
-
-                registrationData.append('avatar', {
-                    uri: avatar,
-                    name: `avatar.${fileType}`,
-                    type: `image/${fileType}`,
-                } as any);
-            }
-
             const response = await api.post<{
                 success: boolean;
                 accessToken: string;
                 refreshToken: string;
                 user: any;
-            }>('/auth/user/register', registrationData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
+            }>('/auth/user/register', {
+                email: formData.email.trim(),
+                phone: formatPhone(formData.phone),
+                password: formData.password,
+                firstName: formData.firstName.trim(),
+                lastName: formData.lastName.trim(),
             });
 
             if (response.success && response.accessToken) {
                 // Store tokens and user data
                 await api.setTokens(response.accessToken, response.refreshToken);
-                await api.setUser(response.user);
+
+                let user = response.user;
+
+                if (formData.dateOfBirth || formData.gender) {
+                    try {
+                        user = await api.updateProfile({
+                            dateOfBirth: formData.dateOfBirth || undefined,
+                            gender: formData.gender || undefined,
+                        });
+                    } catch (profileError) {
+                        console.error('Registration profile update error:', profileError);
+                    }
+                }
+
+                if (avatar) {
+                    try {
+                        const uriParts = avatar.split('.');
+                        const fileType = uriParts.length > 1 ? uriParts[uriParts.length - 1] : 'jpg';
+                        const fileName = `avatar.${fileType}`;
+                        const contentType = fileType === 'jpg' ? 'image/jpeg' : `image/${fileType}`;
+                        const uploadResponse = await api.uploadProfilePhoto(avatar, fileName, contentType);
+                        user = {
+                            ...user,
+                            profileImage: uploadResponse.profileImage,
+                        };
+                    } catch (uploadError) {
+                        console.error('Registration avatar upload error:', uploadError);
+                    }
+                }
+
+                await api.setUser(user);
                 onRegisterSuccess();
             } else {
-                setError('Registration failed. Please try again.');
+                setError(t('registrationFailed'));
             }
         } catch (err: any) {
             console.error('Registration error:', err);
-            setError(err.message || 'Registration failed. Please try again.');
+            setError(err.message || t('registrationFailed'));
         } finally {
             setLoading(false);
         }

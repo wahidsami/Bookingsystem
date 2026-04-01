@@ -20,9 +20,10 @@ interface LoginScreenProps {
     onLoginSuccess: () => void;
     onBackToWelcome: () => void;
     onGoToRegister: () => void;
+    onForgotPassword: () => void;
 }
 
-export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, onForgotPassword }: LoginScreenProps) {
     const { t, isRTL } = useLanguage();
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
@@ -170,7 +171,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister }:
                     </View>
 
                     {/* Forgot Password */}
-                    <TouchableOpacity style={styles.forgotPasswordButton}>
+                    <TouchableOpacity style={styles.forgotPasswordButton} onPress={onForgotPassword}>
                         <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
                     </TouchableOpacity>
 

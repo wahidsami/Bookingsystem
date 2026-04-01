@@ -6,6 +6,7 @@ interface AppSessionContextValue {
     logout: () => Promise<void>;
     showLogin: () => void;
     showRegister: () => void;
+    showForgotPassword: () => void;
     continueAsGuest: () => void;
 }
 
