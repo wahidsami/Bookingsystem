@@ -60,6 +60,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'staffId',
                 as: 'pushTokens'
             });
+
+            Staff.hasOne(models.StaffPermission, {
+                foreignKey: 'staffId',
+                as: 'permissionProfile'
+            });
         }
     }
 

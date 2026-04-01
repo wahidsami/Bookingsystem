@@ -8,6 +8,7 @@ const { Op } = require('sequelize');
 const { Sequelize } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('../services/pushNotificationService');
+const bookingService = require('../services/bookingService');
 
 /**
  * Get all appointments for the authenticated tenant
@@ -448,6 +449,162 @@ exports.updatePaymentStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to update payment status',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Reschedule an appointment from the tenant dashboard.
+ * PATCH /api/v1/tenant/appointments/:id/reschedule
+ */
+exports.rescheduleAppointment = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+        const { startTime, staffId } = req.body;
+
+        if (!startTime) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'startTime is required'
+            });
+        }
+
+        const requestedStart = new Date(startTime);
+        if (Number.isNaN(requestedStart.getTime())) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid startTime'
+            });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: { id },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    where: { tenantId },
+                    required: true
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    where: { tenantId },
+                    required: true
+                }
+            ],
+            transaction
+        });
+
+        if (!appointment) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Appointment not found'
+            });
+        }
+
+        if (!['pending', 'confirmed'].includes(appointment.status)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Only pending or confirmed appointments can be rescheduled'
+            });
+        }
+
+        const hoursUntilCurrentStart = (new Date(appointment.startTime).getTime() - Date.now()) / (60 * 60 * 1000);
+        if (hoursUntilCurrentStart <= 24) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Appointments can only be rescheduled more than 24 hours before the original start time'
+            });
+        }
+
+        if (requestedStart.getTime() <= Date.now()) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'New appointment time must be in the future'
+            });
+        }
+
+        const requestedStaffId = staffId || appointment.staffId;
+        const assignedStaff = await db.Staff.findOne({
+            where: {
+                id: requestedStaffId,
+                tenantId,
+                isActive: true
+            },
+            transaction
+        });
+
+        if (!assignedStaff) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Staff member not found'
+            });
+        }
+
+        const durationMinutes =
+            parseInt(appointment.service?.duration, 10) ||
+            Math.max(15, Math.round((new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime()) / 60000));
+        const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
+
+        const hasConflict = await bookingService.hasConflict(
+            requestedStaffId,
+            requestedStart,
+            requestedEnd,
+            appointment.id,
+            transaction
+        );
+
+        if (hasConflict) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected time slot is no longer available'
+            });
+        }
+
+        appointment.staffId = requestedStaffId;
+        appointment.startTime = requestedStart;
+        appointment.endTime = requestedEnd;
+        await appointment.save({ transaction });
+        await transaction.commit();
+
+        try {
+            await pushNotificationService.sendToUser(appointment.platformUserId, {
+                title: 'Booking rescheduled',
+                body: 'Your appointment time has been updated.',
+                data: {
+                    type: 'booking_rescheduled',
+                    appointmentId: appointment.id,
+                    startTime: requestedStart.toISOString(),
+                    staffId: requestedStaffId
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Tenant booking reschedule notification warning:', notificationError.message);
+        }
+
+        res.json({
+            success: true,
+            message: 'Appointment rescheduled successfully',
+            appointment
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Reschedule appointment error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reschedule appointment',
             error: error.message
         });
     }

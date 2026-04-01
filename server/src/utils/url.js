@@ -58,6 +58,25 @@ const getServerPublicUrl = () => {
     return '';
 };
 
+const getStaffAppLoginUrl = () => {
+    const explicitLoginUrl = normalizeBaseUrl(process.env.STAFF_APP_LOGIN_URL);
+
+    if (explicitLoginUrl) {
+        return explicitLoginUrl;
+    }
+
+    const baseUrl = normalizeBaseUrl(process.env.STAFF_APP_URL);
+    if (baseUrl) {
+        return baseUrl;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        return 'exp://localhost:8081';
+    }
+
+    return '';
+};
+
 const buildPublicAssetUrl = (assetPath) => {
     if (!assetPath || typeof assetPath !== 'string') {
         return assetPath;
@@ -87,6 +106,7 @@ module.exports = {
     normalizeBaseUrl,
     getTenantDashboardBaseUrl,
     getTenantDashboardLoginUrl,
+    getStaffAppLoginUrl,
     getServerPublicUrl,
     buildPublicAssetUrl
 };

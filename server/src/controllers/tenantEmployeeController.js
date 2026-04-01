@@ -11,6 +11,12 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
+const DEFAULT_STAFF_PERMISSIONS = {
+    view_earnings: false,
+    view_reviews: true,
+    reply_reviews: false,
+    view_clients: false
+};
 
 const generateTemporaryStaffPassword = () => {
     const suffix = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -24,6 +30,19 @@ const buildStaffAppAccessPayload = ({ email, hasAccount, temporaryPassword = nul
     passwordUpdated,
     accountRemoved
 });
+
+const getOrCreateStaffPermissionRecord = async (staffId, transaction = null) => {
+    const [record] = await db.StaffPermission.findOrCreate({
+        where: { staffId },
+        defaults: {
+            staffId,
+            permissions: DEFAULT_STAFF_PERMISSIONS
+        },
+        transaction
+    });
+
+    return record;
+};
 
 const syncStaffAuthAccount = async ({
     tenantId,
@@ -293,7 +312,10 @@ exports.getEmployee = async (req, res) => {
 
         res.json({
             success: true,
-            employee,
+            employee: {
+                ...employee.toJSON(),
+                app_enabled: staffAppAccess.hasAccount
+            },
             staffAppAccess
         });
     } catch (error) {
@@ -306,6 +328,334 @@ exports.getEmployee = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch employee',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get staff permissions and app-access state
+ * GET /api/v1/tenant/employees/:id/permissions
+ */
+exports.getEmployeePermissions = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+
+        const employee = await db.Staff.findOne({
+            where: { id, tenantId },
+            attributes: ['id', 'email']
+        });
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: 'Employee not found'
+            });
+        }
+
+        const permissionRecord = await getOrCreateStaffPermissionRecord(employee.id);
+        const staffUser = employee.email
+            ? await db.User.findOne({
+                where: {
+                    email: normalizeEmail(employee.email),
+                    tenantId,
+                    role: 'staff'
+                },
+                attributes: ['id']
+            })
+            : null;
+
+        res.json({
+            success: true,
+            permissions: {
+                ...DEFAULT_STAFF_PERMISSIONS,
+                ...(permissionRecord.permissions || {})
+            },
+            appEnabled: Boolean(staffUser)
+        });
+    } catch (error) {
+        console.error('Get employee permissions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch employee permissions',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Update staff permissions
+ * PUT /api/v1/tenant/employees/:id/permissions
+ */
+exports.updateEmployeePermissions = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+        const allowedKeys = Object.keys(DEFAULT_STAFF_PERMISSIONS);
+
+        const employee = await db.Staff.findOne({
+            where: { id, tenantId },
+            attributes: ['id']
+        });
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: 'Employee not found'
+            });
+        }
+
+        const updates = {};
+        for (const key of allowedKeys) {
+            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+                updates[key] = req.body[key] === true || req.body[key] === 'true';
+            }
+        }
+
+        const permissionRecord = await getOrCreateStaffPermissionRecord(employee.id);
+        const nextPermissions = {
+            ...DEFAULT_STAFF_PERMISSIONS,
+            ...(permissionRecord.permissions || {}),
+            ...updates
+        };
+
+        await permissionRecord.update({ permissions: nextPermissions });
+
+        res.json({
+            success: true,
+            message: 'Employee permissions updated successfully',
+            permissions: nextPermissions
+        });
+    } catch (error) {
+        console.error('Update employee permissions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update employee permissions',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Enable or disable staff app access
+ * PUT /api/v1/tenant/employees/:id/app-access
+ */
+exports.updateEmployeeAppAccess = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+        const hasAppAccess = req.body.hasAppAccess === true || req.body.hasAppAccess === 'true';
+
+        const employee = await db.Staff.findOne({
+            where: { id, tenantId },
+            transaction
+        });
+
+        if (!employee) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Employee not found'
+            });
+        }
+
+        if (hasAppAccess && !employee.email) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Employee email is required before enabling app access'
+            });
+        }
+
+        const staffAppAccess = hasAppAccess
+            ? await syncStaffAuthAccount({
+                tenantId,
+                previousEmail: employee.email,
+                nextEmail: employee.email,
+                transaction
+            })
+            : await syncStaffAuthAccount({
+                tenantId,
+                previousEmail: employee.email,
+                nextEmail: null,
+                transaction
+            });
+
+        await transaction.commit();
+
+        res.json({
+            success: true,
+            message: hasAppAccess ? 'Staff app access enabled' : 'Staff app access disabled',
+            staffAppAccess
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Update employee app access error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update employee app access',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Send staff app invite email
+ * POST /api/v1/tenant/employees/:id/send-invite
+ */
+exports.sendEmployeeInvite = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+
+        const employee = await db.Staff.findOne({
+            where: { id, tenantId },
+            attributes: ['id', 'name', 'email'],
+            transaction
+        });
+
+        if (!employee) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Employee not found'
+            });
+        }
+
+        if (!employee.email) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Employee email is required to send an invite'
+            });
+        }
+
+        const staffAppAccess = await syncStaffAuthAccount({
+            tenantId,
+            previousEmail: employee.email,
+            nextEmail: employee.email,
+            transaction
+        });
+
+        const tenant = await db.Tenant.findByPk(tenantId, {
+            attributes: ['name', 'name_en', 'name_ar'],
+            transaction
+        });
+
+        await transaction.commit();
+
+        const { sendStaffInviteEmail } = require('../utils/emailService');
+        const emailResult = await sendStaffInviteEmail({
+            email: employee.email,
+            staffName: employee.name,
+            tenantName: tenant?.name_ar || tenant?.name_en || tenant?.name || 'Rifah',
+            temporaryPassword: staffAppAccess.temporaryPassword || 'Use your existing password'
+        });
+
+        res.json({
+            success: true,
+            message: emailResult.success
+                ? 'Staff invite sent successfully'
+                : 'Staff access was enabled, but invite email could not be sent',
+            staffAppAccess,
+            emailSent: emailResult.success,
+            emailError: emailResult.success ? null : emailResult.error
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Send employee invite error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send employee invite',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Reset staff app password and email a temporary password
+ * POST /api/v1/tenant/employees/:id/reset-password
+ */
+exports.resetEmployeePassword = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+
+        const employee = await db.Staff.findOne({
+            where: { id, tenantId },
+            attributes: ['id', 'name', 'email'],
+            transaction
+        });
+
+        if (!employee) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Employee not found'
+            });
+        }
+
+        if (!employee.email) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Employee email is required to reset password'
+            });
+        }
+
+        const staffUser = await db.User.findOne({
+            where: {
+                email: normalizeEmail(employee.email),
+                tenantId,
+                role: 'staff'
+            },
+            transaction
+        });
+
+        if (!staffUser) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Staff app access is not enabled for this employee'
+            });
+        }
+
+        const temporaryPassword = generateTemporaryStaffPassword();
+        await staffUser.update({ password: temporaryPassword }, { transaction });
+
+        const tenant = await db.Tenant.findByPk(tenantId, {
+            attributes: ['name', 'name_en', 'name_ar'],
+            transaction
+        });
+
+        await transaction.commit();
+
+        const { sendStaffPasswordResetEmail } = require('../utils/emailService');
+        const emailResult = await sendStaffPasswordResetEmail({
+            email: employee.email,
+            staffName: employee.name,
+            tenantName: tenant?.name_ar || tenant?.name_en || tenant?.name || 'Rifah',
+            temporaryPassword
+        });
+
+        res.json({
+            success: true,
+            message: emailResult.success
+                ? 'Password reset email sent successfully'
+                : 'Password was reset, but reset email could not be sent',
+            emailSent: emailResult.success,
+            emailError: emailResult.success ? null : emailResult.error
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Reset employee password error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reset employee password',
             error: error.message
         });
     }

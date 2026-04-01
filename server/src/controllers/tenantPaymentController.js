@@ -13,7 +13,7 @@ const splitPaymentService = require('../services/splitPaymentService');
 const getPaymentSummary = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.user.tenantId;
+        const tenantId = req.tenantId;
 
         // Verify appointment belongs to tenant
         const appointment = await db.Appointment.findByPk(id, {
@@ -53,8 +53,7 @@ const getPaymentSummary = async (req, res) => {
 const recordPayment = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.user.tenantId;
-        const staffId = req.user.id; // Staff member processing payment
+        const tenantId = req.tenantId;
         const { amount, paymentMethod, notes } = req.body;
 
         // Verify appointment belongs to tenant
@@ -86,7 +85,7 @@ const recordPayment = async (req, res) => {
         const updatedAppointment = await splitPaymentService.recordRemainderPayment(id, {
             amount: parseFloat(amount),
             paymentMethod,
-            processedBy: staffId,
+            processedBy: null,
             notes
         });
 
@@ -115,8 +114,7 @@ const recordPayment = async (req, res) => {
 const refundPayment = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.user.tenantId;
-        const staffId = req.user.id;
+        const tenantId = req.tenantId;
         const { amount, reason } = req.body;
 
         // Verify appointment belongs to tenant
@@ -139,7 +137,7 @@ const refundPayment = async (req, res) => {
         const refundTransaction = await splitPaymentService.refundPayment(id, {
             amount: parseFloat(amount),
             reason,
-            processedBy: staffId
+            processedBy: null
         });
 
         // Get updated payment summary

@@ -58,8 +58,13 @@ router.get('/dashboard/revenue-chart', tenantDashboardController.getRevenueChart
 // Employee management
 router.get('/employees', tenantEmployeeController.getEmployees);
 router.get('/employees/:id', tenantEmployeeController.getEmployee);
+router.get('/employees/:id/permissions', tenantEmployeeController.getEmployeePermissions);
 router.post('/employees', tenantEmployeeController.uploadPhoto, tenantEmployeeController.createEmployee);
 router.put('/employees/:id', tenantEmployeeController.uploadPhoto, tenantEmployeeController.updateEmployee);
+router.put('/employees/:id/permissions', tenantEmployeeController.updateEmployeePermissions);
+router.put('/employees/:id/app-access', tenantEmployeeController.updateEmployeeAppAccess);
+router.post('/employees/:id/send-invite', tenantEmployeeController.sendEmployeeInvite);
+router.post('/employees/:id/reset-password', tenantEmployeeController.resetEmployeePassword);
 router.delete('/employees/:id', tenantEmployeeController.deleteEmployee);
 
 // Product management
@@ -84,6 +89,7 @@ router.get('/appointments/stats', tenantAppointmentController.getAppointmentStat
 router.get('/appointments/:id', tenantAppointmentController.getAppointment);
 router.patch('/appointments/:id/status', tenantAppointmentController.updateAppointmentStatus);
 router.patch('/appointments/:id/payment', tenantAppointmentController.updatePaymentStatus);
+router.patch('/appointments/:id/reschedule', tenantAppointmentController.rescheduleAppointment);
 
 // Financial management
 router.get('/financial/overview', tenantFinancialController.getFinancialOverview);

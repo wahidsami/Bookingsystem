@@ -1,7 +1,7 @@
 const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
-const { getTenantDashboardLoginUrl } = require('./url');
+const { getTenantDashboardLoginUrl, getStaffAppLoginUrl } = require('./url');
 
 /**
  * Email Service Utility - Resend
@@ -220,6 +220,38 @@ const sendPaymentFailedEmail = async (tenantData) => {
     });
 };
 
+const sendStaffInviteEmail = async ({ email, staffName, tenantName, temporaryPassword }) => {
+    const loginUrl = getStaffAppLoginUrl();
+    return sendEmail({
+        to: email,
+        subject: 'Rifah staff app invitation',
+        template: 'staff_invite',
+        data: {
+            staffName,
+            tenantName,
+            email,
+            temporaryPassword,
+            loginUrl
+        }
+    });
+};
+
+const sendStaffPasswordResetEmail = async ({ email, staffName, tenantName, temporaryPassword }) => {
+    const loginUrl = getStaffAppLoginUrl();
+    return sendEmail({
+        to: email,
+        subject: 'Rifah staff app password reset',
+        template: 'staff_password_reset',
+        data: {
+            staffName,
+            tenantName,
+            email,
+            temporaryPassword,
+            loginUrl
+        }
+    });
+};
+
 module.exports = {
     sendEmail,
     sendWelcomeEmail,
@@ -227,5 +259,7 @@ module.exports = {
     sendRejectionEmail,
     sendPaymentExpiredEmail,
     sendPaymentSuccessEmail,
-    sendPaymentFailedEmail
+    sendPaymentFailedEmail,
+    sendStaffInviteEmail,
+    sendStaffPasswordResetEmail
 };

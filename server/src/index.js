@@ -168,6 +168,7 @@ app.use('/api/v1/admin', adminRoutes); // Admin APIs
 // Tenant subscription payment (link token or Bearer; must be before /api/v1/tenant)
 app.use('/api/v1/tenant/subscription', require('./routes/tenantSubscriptionPaymentRoutes'));
 app.use('/api/v1/tenant', tenantRoutes); // Tenant dashboard APIs (protected)
+app.use('/api/v1', require('./routes/tenantPaymentRoutes'));
 app.get('/api/v1/settings/global', adminSettingsController.getGlobalSettings); // Public global settings endpoint
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/staff', staffRoutes);
@@ -318,6 +319,7 @@ const startServer = async () => {
         await db.Product.sync({ force: false }); // New: Product catalog
         await db.Customer.sync({ force: false });
         await db.Staff.sync({ force: false });
+        await db.StaffPermission.sync({ force: false });
         await db.MobilePushToken.sync({ force: false });
         await db.ServiceEmployee.sync({ force: false }); // New: Service-Employee junction
         await db.StaffSchedule.sync({ force: false }); // Legacy schedule (kept for backward compatibility)
