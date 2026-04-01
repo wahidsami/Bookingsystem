@@ -6,6 +6,34 @@ import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { API_BASE_URL } from '@/lib/api';
+
+const SAUDI_CITIES = [
+    { en: 'Abha', ar: 'أبها' },
+    { en: 'Al Hofuf', ar: 'الهفوف' },
+    { en: 'Al Jubail', ar: 'الجبيل' },
+    { en: 'Al Kharj', ar: 'الخرج' },
+    { en: 'Al Khobar', ar: 'الخبر' },
+    { en: 'Al Majma\'ah', ar: 'المجمعة' },
+    { en: 'Al Mubarraz', ar: 'المبرز' },
+    { en: 'Al Qatif', ar: 'القطيف' },
+    { en: 'Buraydah', ar: 'بريدة' },
+    { en: 'Dammam', ar: 'الدمام' },
+    { en: 'Dhahran', ar: 'الظهران' },
+    { en: 'Hafr Al Batin', ar: 'حفر الباطن' },
+    { en: 'Hail', ar: 'حائل' },
+    { en: 'Jeddah', ar: 'جدة' },
+    { en: 'Jizan', ar: 'جازان' },
+    { en: 'Khamis Mushait', ar: 'خميس مشيط' },
+    { en: 'Mecca', ar: 'مكة المكرمة' },
+    { en: 'Medina', ar: 'المدينة المنورة' },
+    { en: 'Najran', ar: 'نجران' },
+    { en: 'Qurayyat', ar: 'القريات' },
+    { en: 'Riyadh', ar: 'الرياض' },
+    { en: 'Tabuk', ar: 'تبوك' },
+    { en: 'Taif', ar: 'الطائف' },
+    { en: 'Yanbu', ar: 'ينبع' }
+].sort((a: any, b: any) => a.en.localeCompare(b.en));
 
 // Step 1: Entity Details Component
 const Step1EntityDetails = ({ formData, handleChange, handleFileChange, errors }: any) => {
@@ -53,25 +81,48 @@ const Step1EntityDetails = ({ formData, handleChange, handleFileChange, errors }
                 </div>
             </div>
 
-            {/* Business Type */}
+            {/* Business Type - Multi-select */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     {t('step1.businessType')} <span className="text-red-500">*</span>
                 </label>
-                <select
-                    name="businessType"
-                    value={formData.businessType}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    required
-                >
-                    <option value="">{t('step1.selectBusinessType')}</option>
-                    <option value="spa">{t('step1.types.spa')}</option>
-                    <option value="salon">{t('step1.types.salon')}</option>
-                    <option value="beauty_center">{t('step1.types.beautyCenter')}</option>
-                    <option value="barbershop">{t('step1.types.barbershop')}</option>
-                    <option value="clinic">{t('step1.types.clinic')}</option>
-                </select>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                        { value: 'salon', label: t('step1.types.salon'), emoji: '💇' },
+                        { value: 'spa', label: t('step1.types.spa'), emoji: '🧖' },
+                        { value: 'beauty_center', label: t('step1.types.beautyCenter'), emoji: '💅' },
+                        { value: 'barbershop', label: t('step1.types.barbershop'), emoji: '💈' },
+                        { value: 'clinic', label: t('step1.types.clinic'), emoji: '🏥' },
+                    ].map((type) => {
+                        const isSelected = (formData.businessType || []).includes(type.value);
+                        return (
+                            <label
+                                key={type.value}
+                                className={`flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${isSelected
+                                    ? 'border-purple-500 bg-purple-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                                    }`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                        const current = formData.businessType || [];
+                                        const updated = isSelected
+                                            ? current.filter((t: string) => t !== type.value)
+                                            : [...current, type.value];
+                                        handleChange({
+                                            target: { name: 'businessType', value: updated }
+                                        } as any);
+                                    }}
+                                    className="w-4 h-4 text-purple-600 rounded"
+                                />
+                                <span className="text-lg">{type.emoji}</span>
+                                <span className="text-sm font-medium text-gray-700">{type.label}</span>
+                            </label>
+                        );
+                    })}
+                </div>
                 {errors.businessType && <p className="text-red-500 text-sm mt-1">{errors.businessType}</p>}
             </div>
 
@@ -237,13 +288,19 @@ const Step1EntityDetails = ({ formData, handleChange, handleFileChange, errors }
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('step1.city')}
                     </label>
-                    <input
-                        type="text"
+                    <select
                         name="city"
                         value={formData.city}
                         onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    >
+                        <option value="">{t('step1.selectCity') || 'Select City'}</option>
+                        {SAUDI_CITIES.map(city => (
+                            <option key={city.en} value={city.en}>
+                                {locale === 'ar' ? city.ar : city.en}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <div>
@@ -606,7 +663,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="providesHomeServices"
                                 value="true"
                                 checked={formData.providesHomeServices === true}
-                                onChange={() => setFormData(prev => ({ ...prev, providesHomeServices: true }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, providesHomeServices: true }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.yes')}</span>
@@ -617,7 +674,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="providesHomeServices"
                                 value="false"
                                 checked={formData.providesHomeServices === false}
-                                onChange={() => setFormData(prev => ({ ...prev, providesHomeServices: false }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, providesHomeServices: false }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.no')}</span>
@@ -636,7 +693,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="sellsProducts"
                                 value="true"
                                 checked={formData.sellsProducts === true}
-                                onChange={() => setFormData(prev => ({ ...prev, sellsProducts: true }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, sellsProducts: true }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.yes')}</span>
@@ -647,7 +704,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="sellsProducts"
                                 value="false"
                                 checked={formData.sellsProducts === false}
-                                onChange={() => setFormData(prev => ({ ...prev, sellsProducts: false }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, sellsProducts: false }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.no')}</span>
@@ -666,7 +723,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="hasOwnPaymentGateway"
                                 value="true"
                                 checked={formData.hasOwnPaymentGateway === true}
-                                onChange={() => setFormData(prev => ({ ...prev, hasOwnPaymentGateway: true }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, hasOwnPaymentGateway: true }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.yes')}</span>
@@ -677,7 +734,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="hasOwnPaymentGateway"
                                 value="false"
                                 checked={formData.hasOwnPaymentGateway === false}
-                                onChange={() => setFormData(prev => ({ ...prev, hasOwnPaymentGateway: false }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, hasOwnPaymentGateway: false }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.no')}</span>
@@ -696,7 +753,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="advertiseOnSocialMedia"
                                 value="true"
                                 checked={formData.advertiseOnSocialMedia === true}
-                                onChange={() => setFormData(prev => ({ ...prev, advertiseOnSocialMedia: true }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, advertiseOnSocialMedia: true }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.yes')}</span>
@@ -707,7 +764,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="advertiseOnSocialMedia"
                                 value="false"
                                 checked={formData.advertiseOnSocialMedia === false}
-                                onChange={() => setFormData(prev => ({ ...prev, advertiseOnSocialMedia: false }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, advertiseOnSocialMedia: false }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.no')}</span>
@@ -726,7 +783,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="wantsRifahPromotion"
                                 value="true"
                                 checked={formData.wantsRifahPromotion === true}
-                                onChange={() => setFormData(prev => ({ ...prev, wantsRifahPromotion: true }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, wantsRifahPromotion: true }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.yes')}</span>
@@ -737,7 +794,7 @@ const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: a
                                 name="wantsRifahPromotion"
                                 value="false"
                                 checked={formData.wantsRifahPromotion === false}
-                                onChange={() => setFormData(prev => ({ ...prev, wantsRifahPromotion: false }))}
+                                onChange={() => setFormData((prev: any) => ({ ...prev, wantsRifahPromotion: false }))}
                                 className="w-4 h-4 text-purple-600"
                             />
                             <span className="ml-2 text-sm">{t('step5.no')}</span>
@@ -817,7 +874,7 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
 
     const fetchPackages = async () => {
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/subscriptions/packages`);
+            const response = await fetch(`${API_BASE_URL}/subscriptions/packages`);
             const data = await response.json();
             if (data.success) {
                 setPackages(data.packages.filter((pkg: any) => pkg.isActive));
@@ -842,7 +899,7 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
         if (selectedTab === 'monthly') price = pkg.monthlyPrice;
         else if (selectedTab === 'sixMonth') price = pkg.sixMonthPrice;
         else price = pkg.annualPrice;
-        return parseFloat(price) || 0;
+        return parseFloat(String(price)) || 0;
     };
 
     const getSavings = (pkg: any) => {
@@ -1047,13 +1104,13 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<any>({});
-    const [registrationSuccess, setRegistrationSuccess] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
 
     const [formData, setFormData] = useState({
         // Step 1: Entity Details
         name_en: '',
         name_ar: '',
-        businessType: '',
+        businessType: [] as string[],
         phone: '',
         mobile: '',
         email: '',
@@ -1146,7 +1203,7 @@ export default function RegisterPage() {
         if (step === 1) {
             if (!formData.name_en) newErrors.name_en = t('step1.errors.nameEnRequired');
             if (!formData.name_ar) newErrors.name_ar = t('step1.errors.nameArRequired');
-            if (!formData.businessType) newErrors.businessType = t('step1.errors.businessTypeRequired');
+            if (!formData.businessType || formData.businessType.length === 0) newErrors.businessType = t('step1.errors.businessTypeRequired');
             if (!formData.email) newErrors.email = t('step1.errors.emailRequired');
             if (!formData.phone) newErrors.phone = t('step1.errors.phoneRequired');
             if (!formData.mobile) newErrors.mobile = t('step1.errors.mobileRequired');
@@ -1231,13 +1288,13 @@ export default function RegisterPage() {
             // Append files
             Object.entries(files).forEach(([key, file]) => {
                 if (file) {
-                    submitData.append(key, file);
+                    if (file instanceof File) submitData.append(key, file);
                 }
             });
 
             submitData.append('preferredLanguage', locale);
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/auth/tenant/register`, {
+            const response = await fetch(`${API_BASE_URL}/auth/tenant/register`, {
                 method: 'POST',
                 body: submitData
             });
@@ -1253,9 +1310,8 @@ export default function RegisterPage() {
                 localStorage.setItem('tenant_token', data.accessToken);
             }
 
-            // Show thank-you screen instead of redirecting
-            setRegistrationSuccess(true);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Show success screen instead of immediate redirect
+            setIsSuccess(true);
 
         } catch (err: any) {
             console.error('Registration error:', err);
@@ -1264,77 +1320,6 @@ export default function RegisterPage() {
             setLoading(false);
         }
     };
-
-    // Thank-you / pending approval screen
-    if (registrationSuccess) {
-        return (
-            <div className="min-h-screen relative flex items-center justify-center py-12 px-4">
-                <div
-                    className="fixed inset-0 z-0"
-                    style={{
-                        backgroundImage: 'url(/regbg.jpg)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat'
-                    }}
-                >
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 via-purple-800/75 to-pink-900/80"></div>
-                </div>
-                <div className="relative z-10 max-w-2xl mx-auto text-center">
-                    <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-white/50">
-                        {/* Success Icon */}
-                        <div className="flex justify-center mb-6">
-                            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-xl">
-                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                            </div>
-                        </div>
-
-                        <h1 className="text-3xl md:text-4xl font-bold text-purple-900 mb-4 font-cairo">
-                            {locale === 'ar' ? '🎉 شكراً لتسجيلك معنا!' : '🎉 Thank You for Registering!'}
-                        </h1>
-
-                        <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                            {locale === 'ar'
-                                ? 'تم استلام طلبك بنجاح. طلبك قيد المراجعة الآن من قبل فريقنا وسنتواصل معك خلال 1-3 أيام عمل.'
-                                : 'Your registration request has been received successfully. Our team is reviewing your application and will get back to you within 1–3 business days.'}
-                        </p>
-
-                        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6 mb-8 text-right space-y-3">
-                            <div className="flex items-center gap-3 justify-center">
-                                <span className="text-2xl">📋</span>
-                                <span className="text-purple-800 font-semibold">
-                                    {locale === 'ar' ? 'حالة الطلب: قيد المراجعة' : 'Status: Under Review'}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-3 justify-center">
-                                <span className="text-2xl">📧</span>
-                                <span className="text-gray-700 text-sm">
-                                    {locale === 'ar'
-                                        ? 'ستصلك رسالة بريد إلكتروني عند الموافقة على طلبك'
-                                        : 'You will receive an email once your application is approved'}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-3 justify-center">
-                                <span className="text-2xl">⏱️</span>
-                                <span className="text-gray-700 text-sm">
-                                    {locale === 'ar' ? 'وقت المراجعة: 1-3 أيام عمل' : 'Review time: 1–3 business days'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <Link
-                            href={`/${locale}`}
-                            className="inline-block px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg"
-                        >
-                            {locale === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
-                        </Link>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen relative py-12 px-4">
@@ -1412,103 +1397,125 @@ export default function RegisterPage() {
 
                 {/* Form */}
                 <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl p-8 border border-white/20">
-                    {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                            {error}
+                    {isSuccess ? (
+                        <div className="text-center py-12 animate-in fade-in zoom-in duration-500">
+                            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border-4 border-white">
+                                <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <h2 className="text-3xl font-bold text-gray-900 mb-4">{t('success.title')}</h2>
+                            <p className="text-lg text-gray-600 mb-10 max-w-lg mx-auto leading-relaxed">
+                                {t('success.message')}
+                            </p>
+                            <Link
+                                href={`/${locale}/dashboard`}
+                                className="inline-block px-8 py-4 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition shadow-lg hover:shadow-xl w-full sm:w-auto"
+                            >
+                                {t('success.goToDashboard')}
+                            </Link>
                         </div>
+                    ) : (
+                        <>
+                            {error && (
+                                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                                    {error}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSubmit}>
+                                {currentStep === 1 && (
+                                    <Step1EntityDetails
+                                        formData={formData}
+                                        handleChange={handleChange}
+                                        handleFileChange={handleFileChange}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {currentStep === 2 && (
+                                    <Step2Documentation
+                                        formData={formData}
+                                        handleChange={handleChange}
+                                        handleFileChange={handleFileChange}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {currentStep === 3 && (
+                                    <Step3ContactPerson
+                                        formData={formData}
+                                        handleChange={handleChange}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {currentStep === 4 && (
+                                    <Step4OwnerDetails
+                                        formData={formData}
+                                        handleChange={handleChange}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {currentStep === 5 && (
+                                    <Step5BusinessDetails
+                                        formData={formData}
+                                        setFormData={setFormData}
+                                        handleChange={handleChange}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {currentStep === 6 && (
+                                    <Step6SubscriptionPackage
+                                        formData={formData}
+                                        setFormData={setFormData}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {currentStep === 7 && (
+                                    <Step7ServiceAgreement
+                                        formData={formData}
+                                        handleChange={handleChange}
+                                        errors={errors}
+                                    />
+                                )}
+
+                                {/* Navigation Buttons */}
+                                <div className="flex justify-between mt-8 pt-6 border-t">
+                                    {currentStep > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={prevStep}
+                                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                                        >
+                                            {t('buttons.previous')}
+                                        </button>
+                                    )}
+
+                                    {currentStep < 7 ? (
+                                        <button
+                                            type="button"
+                                            onClick={nextStep}
+                                            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition ml-auto"
+                                        >
+                                            {t('buttons.next')}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="submit"
+                                            disabled={loading || !formData.acceptedServiceAgreement}
+                                            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                                        >
+                                            {loading ? t('buttons.submitting') : t('buttons.submit')}
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+                        </>
                     )}
-
-                    <form onSubmit={handleSubmit}>
-                        {currentStep === 1 && (
-                            <Step1EntityDetails
-                                formData={formData}
-                                handleChange={handleChange}
-                                handleFileChange={handleFileChange}
-                                errors={errors}
-                            />
-                        )}
-
-                        {currentStep === 2 && (
-                            <Step2Documentation
-                                formData={formData}
-                                handleChange={handleChange}
-                                handleFileChange={handleFileChange}
-                                errors={errors}
-                            />
-                        )}
-
-                        {currentStep === 3 && (
-                            <Step3ContactPerson
-                                formData={formData}
-                                handleChange={handleChange}
-                                errors={errors}
-                            />
-                        )}
-
-                        {currentStep === 4 && (
-                            <Step4OwnerDetails
-                                formData={formData}
-                                handleChange={handleChange}
-                                errors={errors}
-                            />
-                        )}
-
-                        {currentStep === 5 && (
-                            <Step5BusinessDetails
-                                formData={formData}
-                                setFormData={setFormData}
-                                handleChange={handleChange}
-                                errors={errors}
-                            />
-                        )}
-
-                        {currentStep === 6 && (
-                            <Step6SubscriptionPackage
-                                formData={formData}
-                                setFormData={setFormData}
-                                errors={errors}
-                            />
-                        )}
-
-                        {currentStep === 7 && (
-                            <Step7ServiceAgreement
-                                formData={formData}
-                                handleChange={handleChange}
-                                errors={errors}
-                            />
-                        )}
-
-                        {/* Navigation Buttons */}
-                        <div className="flex justify-between mt-8 pt-6 border-t">
-                            {currentStep > 1 && (
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-                                >
-                                    {t('buttons.previous')}
-                                </button>
-                            )}
-
-                            {currentStep < 7 ? (
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition ml-auto"
-                                >
-                                    {t('buttons.next')}
-                                </button>
-                            ) : (
-                                <button
-                                    type="submit"
-                                    disabled={loading || !formData.acceptedServiceAgreement}
-                                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
-                                >
-                                    {loading ? t('buttons.submitting') : t('buttons.submit')}
-                                </button>
-                            )}
-                        </div>
-                    </form>
                 </div>
 
                 {/* Login Link */}

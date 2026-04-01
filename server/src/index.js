@@ -297,6 +297,8 @@ const startServer = async () => {
 
         // Subscription System (must be before Tenant sync for foreign keys)
         await db.SubscriptionPackage.sync({ force: false }); // Base packages
+        await db.FeaturePricing.sync({ force: false }); // Package builder pricing master list
+        await db.ServiceCategory.sync({ force: false }); // Global service categories
 
         await db.Tenant.sync({ force: false });
 
@@ -305,6 +307,7 @@ const startServer = async () => {
         await db.Bill.sync({ force: false }); // Subscription invoices
         await db.TenantUsage.sync({ force: false }); // Usage tracking
         await db.UsageAlert.sync({ force: false }); // Usage alerts
+        await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
 
         await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
         await db.PaymentMethod.sync({ force: false });
@@ -338,8 +341,10 @@ const startServer = async () => {
             console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
         }
         await db.Appointment.sync({ force: false });
+        await db.Review.sync({ force: false }); // Customer reviews
         await db.CustomerInsight.sync({ force: false });
         await db.Transaction.sync({ force: false });
+        await db.StaffPayroll.sync({ force: false }); // Payroll records
         await db.Order.sync({ force: false }); // Order system
         await db.OrderItem.sync({ force: false }); // Order items
         await db.PublicPageData.sync({ force: false }); // Public page data
@@ -352,6 +357,10 @@ const startServer = async () => {
         // Seed default subscription packages
         const { seedDefaultPackages } = require('./utils/seedPackages');
         await seedDefaultPackages();
+        const { seedFeaturePricing } = require('./utils/seedFeaturePricing');
+        await seedFeaturePricing();
+        const { seedServiceCategories } = require('./utils/seedServiceCategories');
+        await seedServiceCategories();
 
         if (isProduction && !getTenantDashboardBaseUrl()) {
             console.warn('⚠️  Tenant dashboard base URL is not configured. Email-generated links may be incomplete.');

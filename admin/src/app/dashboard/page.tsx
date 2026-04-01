@@ -139,23 +139,29 @@ export default function DashboardPage() {
             <div className="card-body text-center py-12">
               <div className="text-6xl mb-4">⚠️</div>
               <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
-              <p className="text-dark-300 mb-2">Failed to fetch statistics from the server.</p>
-              <p className="text-dark-400 text-sm mb-6">
-                The backend API may be temporarily unavailable. Please try again in a moment.
-              </p>
-              <button
-                onClick={loadData}
-                className="btn btn-primary"
-              >
-                Retry Connection
-              </button>
+              <p className="text-dark-300 mb-6">{error}</p>
+              <div className="space-y-4">
+                <div className="text-sm text-dark-400 space-y-2">
+                  <p>Please ensure:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Docker Desktop is running</li>
+                    <li>PostgreSQL container is started: <code className="bg-dark-800 px-2 py-1 rounded">docker-compose up -d</code></li>
+                    <li>Backend server is running: <code className="bg-dark-800 px-2 py-1 rounded">cd server && npm run dev</code></li>
+                  </ul>
+                </div>
+                <button
+                  onClick={loadData}
+                  className="btn btn-primary"
+                >
+                  Retry Connection
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </AdminLayout>
     );
   }
-
 
   return (
     <AdminLayout>
@@ -317,7 +323,7 @@ export default function DashboardPage() {
                           {activity.performedByName || "System"}
                         </span>{" "}
                         <span className={getActionColor(activity.action)}>{activity.action}</span>{" "}
-                        a {String(activity.entityType || "").replace("_", " ")}
+                        a {activity.entityType.replace("_", " ")}
                       </p>
                       <p className="text-xs text-dark-500 mt-1">
                         {formatTimeAgo(activity.createdAt)}
@@ -342,7 +348,7 @@ export default function DashboardPage() {
                   <div key={item.type}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-dark-300 capitalize">
-                        {String(item.type || "").replace("_", " ") || "Unknown"}
+                        {item.type?.replace("_", " ") || "Unknown"}
                       </span>
                       <span className="text-white font-medium">{item.count}</span>
                     </div>
@@ -362,7 +368,7 @@ export default function DashboardPage() {
                 <h4 className="font-semibold text-white mb-4">By Plan</h4>
                 {stats?.breakdowns.tenantsByPlan.map((item) => (
                   <div key={item.plan} className="flex items-center justify-between py-2">
-                    <span className="text-dark-300 capitalize">{String(item.plan || "").replace("_", " ")}</span>
+                    <span className="text-dark-300 capitalize">{item.plan?.replace("_", " ")}</span>
                     <span className="badge badge-primary">{item.count}</span>
                   </div>
                 ))}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { adminApi } from "@/lib/api";
+import { adminApi, getImageUrl } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,7 +12,7 @@ interface Tenant {
   name: string;
   nameAr?: string;
   slug: string;
-  businessType: string;
+  businessType: string[] | string;
   email: string;
   phone: string;
   whatsapp: string;
@@ -68,8 +68,6 @@ export default function ClientDetailsPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "documents" | "activity" | "settings">("overview");
   const [suspendModal, setSuspendModal] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
-  const [moreInfoModal, setMoreInfoModal] = useState(false);
-  const [moreInfoMessage, setMoreInfoMessage] = useState("");
 
   useEffect(() => {
     if (params.id) {
@@ -92,13 +90,13 @@ export default function ClientDetailsPage() {
   };
 
   const handleApprove = async () => {
-    if (!confirm("Are you sure you want to approve this client? A payment link will be sent (48h window).")) return;
+    if (!confirm("Are you sure you want to approve this client?")) return;
 
     setActionLoading(true);
     try {
       const response = await adminApi.approveTenant(tenant!.id);
       if (response.success) {
-        setTenant({ ...tenant!, status: "payment_pending", approvedAt: new Date().toISOString() });
+        setTenant({ ...tenant!, status: "approved", approvedAt: new Date().toISOString() });
         loadTenantDetails();
       }
     } catch (error) {
@@ -136,7 +134,7 @@ export default function ClientDetailsPage() {
     try {
       const response = await adminApi.activateTenant(tenant!.id);
       if (response.success) {
-        setTenant({ ...tenant!, status: "active", suspensionReason: "" });
+        setTenant({ ...tenant!, status: "approved", suspensionReason: "" });
         loadTenantDetails();
       }
     } catch (error) {
@@ -147,44 +145,14 @@ export default function ClientDetailsPage() {
     }
   };
 
-  const handleRequestMoreInfo = async () => {
-    if (!moreInfoMessage.trim()) return;
-
-    setActionLoading(true);
-    try {
-      const response = await adminApi.requestMoreInfo(tenant!.id, moreInfoMessage);
-      if (response.success) {
-        setTenant({ ...tenant!, status: "more_info_required" });
-        setMoreInfoModal(false);
-        setMoreInfoMessage("");
-        loadTenantDetails();
-      }
-    } catch (error) {
-      console.error("Failed to request more info:", error);
-      alert("Failed to send request");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { class: string; text: string }> = {
-      registered: { class: "badge-info", text: "Registered" },
-      plan_selected: { class: "badge-info", text: "Plan Selected" },
-      pending_approval: { class: "badge-warning", text: "Pending Approval" },
-      more_info_required: { class: "badge-warning", text: "More Info Required" },
-      payment_pending: { class: "badge-warning", text: "Payment Pending" },
-      payment_success: { class: "badge-success", text: "Payment Success" },
-      payment_failed: { class: "badge-danger", text: "Payment Failed" },
-      payment_expired: { class: "badge-danger", text: "Payment Expired" },
-      active: { class: "badge-success", text: "Active" },
       pending: { class: "badge-warning", text: "Pending" },
       approved: { class: "badge-success", text: "Approved" },
       rejected: { class: "badge-danger", text: "Rejected" },
       suspended: { class: "badge-danger", text: "Suspended" },
-      inactive: { class: "badge-info", text: "Inactive" },
     };
-    return badges[status] || { class: "badge-info", text: (status || "").replace(/_/g, " ") };
+    return badges[status] || { class: "badge-info", text: status };
   };
 
   const formatDate = (dateString: string) => {
@@ -231,11 +199,11 @@ export default function ClientDetailsPage() {
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-primary-500/20 rounded-xl flex items-center justify-center text-3xl">
-              {tenant.businessType === "salon" && "💇"}
-              {tenant.businessType === "spa" && "🧖"}
-              {tenant.businessType === "barbershop" && "💈"}
-              {tenant.businessType === "beauty_center" && "💅"}
-              {!tenant.businessType && "🏢"}
+              {(Array.isArray(tenant.businessType) ? tenant.businessType[0] : tenant.businessType) === "salon" && "💇"}
+              {(Array.isArray(tenant.businessType) ? tenant.businessType[0] : tenant.businessType) === "spa" && "🧖"}
+              {(Array.isArray(tenant.businessType) ? tenant.businessType[0] : tenant.businessType) === "barbershop" && "💈"}
+              {(Array.isArray(tenant.businessType) ? tenant.businessType[0] : tenant.businessType) === "beauty_center" && "💅"}
+              {!tenant.businessType || (Array.isArray(tenant.businessType) && tenant.businessType.length === 0) ? "🏢" : null}
             </div>
             <div>
               <div className="flex items-center gap-3">
@@ -243,7 +211,9 @@ export default function ClientDetailsPage() {
                 <span className={`badge ${statusBadge.class}`}>{statusBadge.text}</span>
               </div>
               <p className="text-dark-400 mt-1 capitalize">
-                {String(tenant.businessType || "").replace("_", " ")} • {tenant.city || "Location not set"}
+                {Array.isArray(tenant.businessType)
+                  ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
+                  : tenant.businessType?.replace("_", " ")} • {tenant.city || "Location not set"}
               </p>
               <p className="text-dark-500 text-sm mt-1">ID: {tenant.id}</p>
             </div>
@@ -252,21 +222,12 @@ export default function ClientDetailsPage() {
             <Link href="/dashboard/clients" className="btn btn-secondary">
               ← Back
             </Link>
-            {(tenant.status === "pending" || tenant.status === "pending_approval") && (
-              <>
-                <button
-                  onClick={() => setMoreInfoModal(true)}
-                  disabled={actionLoading}
-                  className="btn btn-secondary"
-                >
-                  Request More Info
-                </button>
-                <button onClick={handleApprove} disabled={actionLoading} className="btn btn-success">
-                  ✓ Approve
-                </button>
-              </>
+            {tenant.status === "pending" && (
+              <button onClick={handleApprove} disabled={actionLoading} className="btn btn-success">
+                ✓ Approve
+              </button>
             )}
-            {(tenant.status === "active" || tenant.status === "approved") && (
+            {tenant.status === "approved" && (
               <button
                 onClick={() => setSuspendModal(true)}
                 disabled={actionLoading}
@@ -295,13 +256,6 @@ export default function ClientDetailsPage() {
           <div className="bg-danger/10 border border-danger/20 rounded-xl p-4">
             <p className="text-danger font-medium">Rejected</p>
             <p className="text-dark-300 text-sm mt-1">Reason: {tenant.rejectionReason}</p>
-          </div>
-        )}
-
-        {(tenant as any).moreInfoMessage && (
-          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">
-            <p className="text-warning font-medium">More info requested</p>
-            <p className="text-dark-300 text-sm mt-1">{(tenant as any).moreInfoMessage}</p>
           </div>
         )}
 
@@ -342,8 +296,8 @@ export default function ClientDetailsPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`py-3 px-1 border-b-2 transition-colors ${activeTab === tab.id
-                    ? "border-primary-500 text-primary-400"
-                    : "border-transparent text-dark-400 hover:text-dark-200"
+                  ? "border-primary-500 text-primary-400"
+                  : "border-transparent text-dark-400 hover:text-dark-200"
                   }`}
               >
                 {tab.label}
@@ -373,7 +327,9 @@ export default function ClientDetailsPage() {
                   <div>
                     <p className="text-dark-400 text-xs">Type</p>
                     <p className="text-white mt-1 capitalize">
-                      {String(tenant.businessType || "").replace("_", " ")}
+                      {Array.isArray(tenant.businessType)
+                        ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
+                        : tenant.businessType?.replace("_", " ") || "-"}
                     </p>
                   </div>
                   <div>
@@ -385,7 +341,7 @@ export default function ClientDetailsPage() {
                   <div>
                     <p className="text-dark-400 text-xs mb-2">Business Logo</p>
                     <img
-                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${tenant.logo}`}
+                      src={getImageUrl(tenant.logo)}
                       alt="Business Logo"
                       className="h-16 w-16 object-cover rounded-lg border border-dark-600"
                       onError={(e) => {
@@ -520,19 +476,43 @@ export default function ClientDetailsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-dark-400 text-xs">Plan</p>
-                    <p className="text-white mt-1 capitalize">{String(tenant.plan || "").replace("_", " ")}</p>
+                    <p className="text-white mt-1 capitalize">
+                      {(tenant as any).subscription?.package?.name
+                        || tenant.plan?.replace("_", " ")
+                        || "No plan"}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-dark-400 text-xs">Status</p>
-                    <p className="text-white mt-1">{statusBadge.text}</p>
+                    <p className="text-dark-400 text-xs">Subscription Status</p>
+                    <p className="text-white mt-1 capitalize">
+                      {(tenant as any).subscription?.status || "—"}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-dark-400 text-xs">Start Date</p>
-                    <p className="text-white mt-1">{formatDate(tenant.planStartDate)}</p>
+                    <p className="text-dark-400 text-xs">Billing Cycle</p>
+                    <p className="text-white mt-1 capitalize">
+                      {(tenant as any).subscription?.billingCycle?.replace("sixMonth", "6 Months") || "—"}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-dark-400 text-xs">End Date</p>
-                    <p className="text-white mt-1">{formatDate(tenant.planEndDate)}</p>
+                    <p className="text-dark-400 text-xs">Amount</p>
+                    <p className="text-white mt-1">
+                      {(tenant as any).subscription?.amount
+                        ? <><Currency amount={parseFloat((tenant as any).subscription.amount)} /></>
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-dark-400 text-xs">Period Start</p>
+                    <p className="text-white mt-1">
+                      {formatDate((tenant as any).subscription?.currentPeriodStart || tenant.planStartDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-dark-400 text-xs">Period End</p>
+                    <p className="text-white mt-1">
+                      {formatDate((tenant as any).subscription?.currentPeriodEnd || tenant.planEndDate)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-dark-400 text-xs">Registered</p>
@@ -591,7 +571,7 @@ export default function ClientDetailsPage() {
                       )}
                       {hasDocument ? (
                         <a
-                          href={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${documentPath}`}
+                          href={getImageUrl(documentPath)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-secondary btn-sm w-full"
@@ -693,47 +673,6 @@ export default function ClientDetailsPage() {
                     className="btn btn-danger"
                   >
                     {actionLoading ? "Processing..." : "Suspend Client"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Request More Info Modal */}
-        {moreInfoModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="card w-full max-w-md">
-              <div className="card-header">
-                <h3 className="font-semibold text-white">Request More Information</h3>
-              </div>
-              <div className="card-body space-y-4">
-                <p className="text-dark-300 text-sm">
-                  Send a message to the applicant describing what additional documents or information you need. They will be able to resubmit.
-                </p>
-                <textarea
-                  value={moreInfoMessage}
-                  onChange={(e) => setMoreInfoMessage(e.target.value)}
-                  placeholder="Enter your message..."
-                  rows={4}
-                  className="input"
-                />
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => {
-                      setMoreInfoModal(false);
-                      setMoreInfoMessage("");
-                    }}
-                    className="btn btn-secondary"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleRequestMoreInfo}
-                    disabled={!moreInfoMessage.trim() || actionLoading}
-                    className="btn btn-primary"
-                  >
-                    {actionLoading ? "Sending..." : "Send Request"}
                   </button>
                 </div>
               </div>

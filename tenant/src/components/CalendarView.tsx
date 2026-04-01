@@ -3,13 +3,20 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
+import { getImageUrl } from "@/lib/api";
 
 interface Appointment {
   id: string;
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'refunded' | 'partially_refunded';
+  paymentStatus:
+    | 'pending'
+    | 'deposit_paid'
+    | 'fully_paid'
+    | 'paid'
+    | 'refunded'
+    | 'partially_refunded';
   price: number;
   notes?: string;
   service: {
@@ -355,7 +362,7 @@ export function CalendarView({
                         {staff.photo ? (
                           <>
                             <img
-                              src={staff.photo.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${staff.photo}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${staff.photo}`}
+                              src={getImageUrl(staff.photo)}
                               alt={staff.name}
                               className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
                               onError={(e) => {
@@ -437,23 +444,6 @@ export function CalendarView({
                           ? `${appointment.user.firstName?.[0] || ''}${appointment.user.lastName?.[0] || ''}`.toUpperCase() || '?'
                           : '?';
                         
-                        // Debug: Log user photo data (remove in production)
-                        if (appointment.user && process.env.NODE_ENV === 'development') {
-                          const photoValue = appointment.user.photo;
-                          console.log(`[DEBUG] User: ${userName}`);
-                          console.log(`[DEBUG] Photo value:`, photoValue);
-                          console.log(`[DEBUG] Photo type:`, typeof photoValue);
-                          console.log(`[DEBUG] Has photo:`, !!photoValue);
-                          if (photoValue) {
-                            const photoPath = photoValue.startsWith('/') 
-                              ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${photoValue}` 
-                              : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${photoValue}`;
-                            console.log(`[DEBUG] Photo URL:`, photoPath);
-                          } else {
-                            console.log(`[DEBUG] No photo value for ${userName}`);
-                          }
-                        }
-                        
                         return (
                           <div
                             key={appointment.id}
@@ -469,15 +459,11 @@ export function CalendarView({
                                   {(() => {
                                     const userPhoto = appointment.user?.photo;
                                     const hasValidPhoto = userPhoto && typeof userPhoto === 'string' && userPhoto.trim() !== '';
-                                    
-                                    if (!hasValidPhoto && process.env.NODE_ENV === 'development') {
-                                      console.log(`[AVATAR] No valid photo for ${userName}, using initials. Photo value:`, userPhoto);
-                                    }
-                                    
+
                                     if (hasValidPhoto) {
                                       const photoUrl = userPhoto.startsWith('/') 
-                                        ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${userPhoto}` 
-                                        : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${userPhoto}`;
+? getImageUrl(userPhoto)
+                                        : getImageUrl(userPhoto);
                                       
                                       return (
                                         <>
@@ -486,16 +472,12 @@ export function CalendarView({
                                             alt={userName}
                                             className="w-6 h-6 rounded-full object-cover border border-white/30 relative z-10"
                                             onError={(e) => {
-                                              console.error(`[AVATAR ERROR] Failed to load avatar for ${userName} from:`, photoUrl);
                                               const img = e.currentTarget;
                                               img.style.display = 'none';
                                               const fallback = img.parentElement?.querySelector('.avatar-fallback') as HTMLElement;
                                               if (fallback) {
                                                 fallback.style.display = 'flex';
                                               }
-                                            }}
-                                            onLoad={() => {
-                                              console.log(`[AVATAR SUCCESS] Avatar loaded for ${userName}`);
                                             }}
                                           />
                                           <div 

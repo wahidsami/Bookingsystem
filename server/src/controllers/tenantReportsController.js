@@ -478,3 +478,125 @@ exports.getCustomerAnalytics = async (req, res) => {
     }
 };
 
+const tenantFinancialController = require('./tenantFinancialController');
+
+function runHandler(handler, req) {
+    return new Promise((resolve, reject) => {
+        const res = {
+            json(body) { resolve(body); },
+            status() { return this; },
+            send() { resolve(null); }
+        };
+        Promise.resolve(handler(req, res)).catch(reject);
+    });
+}
+
+exports.getFullReport = async (req, res) => {
+    try {
+        const { startDate, endDate, sections: sectionsParam } = req.query;
+        const sections = typeof sectionsParam === 'string'
+            ? sectionsParam.split(',').map(section => section.trim()).filter(Boolean)
+            : Array.isArray(sectionsParam)
+                ? sectionsParam.filter(Boolean)
+                : [];
+
+        if (sections.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'At least one section required'
+            });
+        }
+
+        const result = {};
+        const queryWithRange = { ...req.query, startDate, endDate };
+
+        if (sections.includes('overview')) {
+            const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
+            if (response?.success && response?.overview) {
+                result.overview = response.overview;
+            }
+        }
+
+        if (sections.includes('employees')) {
+            const response = await runHandler(tenantFinancialController.getEmployeeRevenue, req);
+            if (response?.success) {
+                result.employees = response.employees;
+                result.employeeTotals = response.totals;
+            }
+        }
+
+        if (sections.includes('services')) {
+            const response = await runHandler(tenantFinancialController.getServiceRevenue, req);
+            if (response?.success) {
+                result.services = response.services;
+                result.serviceTotals = response.totals;
+            }
+        }
+
+        if (sections.includes('products')) {
+            const response = await runHandler(tenantFinancialController.getProductRevenue, req);
+            if (response?.success) {
+                result.products = response.products;
+                result.productTotals = response.totals;
+            }
+        }
+
+        if (sections.includes('daily')) {
+            const response = await runHandler(tenantFinancialController.getDailyRevenue, req);
+            if (response?.success && response?.dailyRevenue) {
+                result.dailyRevenue = response.dailyRevenue;
+            }
+        }
+
+        if (sections.includes('bookingTrends')) {
+            const response = await runHandler(exports.getBookingTrends, {
+                ...req,
+                query: { ...queryWithRange, groupBy: 'day' }
+            });
+            if (response?.success && response?.data) {
+                result.bookingTrends = response.data;
+            }
+        }
+
+        if (sections.includes('servicePerformance')) {
+            const response = await runHandler(exports.getServicePerformance, req);
+            if (response?.success && response?.data) {
+                result.servicePerformance = response.data;
+            }
+        }
+
+        if (sections.includes('employeePerformance')) {
+            const response = await runHandler(exports.getEmployeePerformance, req);
+            if (response?.success && response?.data) {
+                result.employeePerformance = response.data;
+            }
+        }
+
+        if (sections.includes('peakHours')) {
+            const response = await runHandler(exports.getPeakHoursAnalysis, req);
+            if (response?.success && response?.data) {
+                result.peakHours = response.data;
+            }
+        }
+
+        if (sections.includes('customerAnalytics')) {
+            const response = await runHandler(exports.getCustomerAnalytics, req);
+            if (response?.success && response?.data) {
+                result.customerAnalytics = response.data;
+            }
+        }
+
+        res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        console.error('Get full report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate full report',
+            error: error.message
+        });
+    }
+};
+

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { adminApi } from "@/lib/api";
+import { adminApi, getImageUrl } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -167,7 +167,7 @@ export default function UserDetailsPage() {
             <div className="w-16 h-16 rounded-full bg-primary-500/20 flex items-center justify-center text-3xl">
               {user.profileImage ? (
                 <img
-                  src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${user.profileImage}`}
+                  src={getImageUrl(user.profileImage)}
                   alt=""
                   className="w-16 h-16 rounded-full object-cover"
                 />
@@ -200,8 +200,8 @@ export default function UserDetailsPage() {
             <p className="text-dark-400 text-xs font-medium">Completed</p>
             <p className="text-2xl font-bold text-success mt-1">{stats?.completedBookings || 0}</p>
           </div>
-          <div className="card p-4 cursor-pointer hover:border-primary-500/50"
-            onClick={() => setAdjustModal({ open: true, type: "wallet" })}>
+          <div className="card p-4 cursor-pointer hover:border-primary-500/50" 
+               onClick={() => setAdjustModal({ open: true, type: "wallet" })}>
             <p className="text-dark-400 text-xs font-medium">Wallet Balance</p>
             <p className="text-2xl font-bold text-white mt-1">
               <Currency amount={user.walletBalance} />
@@ -209,7 +209,7 @@ export default function UserDetailsPage() {
             <p className="text-xs text-primary-400 mt-1">Click to adjust</p>
           </div>
           <div className="card p-4 cursor-pointer hover:border-primary-500/50"
-            onClick={() => setAdjustModal({ open: true, type: "loyalty" })}>
+               onClick={() => setAdjustModal({ open: true, type: "loyalty" })}>
             <p className="text-dark-400 text-xs font-medium">Loyalty Points</p>
             <p className="text-2xl font-bold text-white mt-1">{user.loyaltyPoints || 0}</p>
             <p className="text-xs text-primary-400 mt-1">Click to adjust</p>
@@ -345,7 +345,7 @@ export default function UserDetailsPage() {
                 <tbody>
                   {transactions.slice(0, 10).map((tx) => (
                     <tr key={tx.id}>
-                      <td className="text-white capitalize">{String(tx.type || "").replace("_", " ")}</td>
+                      <td className="text-white capitalize">{tx.type?.replace("_", " ")}</td>
                       <td className={tx.type === "refund" ? "text-success" : "text-white"}>
                         {tx.type === "refund" ? "+" : "-"}
                         <Currency amount={parseFloat(tx.amount.toString())} />

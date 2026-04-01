@@ -8,6 +8,8 @@ const adminStatsController = require('../controllers/adminStatsController');
 const adminPackagesController = require('../controllers/adminPackagesController');
 const adminSettingsController = require('../controllers/adminSettingsController');
 const adminFinancialController = require('../controllers/adminFinancialController');
+const adminCategoryController = require('../controllers/adminCategoryController');
+const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
 
 // All routes require super admin authentication
 router.use(authenticateSuperAdmin);
@@ -61,6 +63,17 @@ router.delete('/packages/:id', requirePermission('settings', 'edit'), adminPacka
 // ===== GLOBAL SETTINGS =====
 router.get('/settings', requirePermission('settings', 'view'), adminSettingsController.getSettings);
 router.put('/settings', requirePermission('settings', 'edit'), adminSettingsController.updateSettings);
+
+// ===== SERVICE CATEGORIES =====
+router.get('/categories', requirePermission('settings', 'view'), adminCategoryController.listCategories);
+router.post('/categories', requirePermission('settings', 'edit'), adminCategoryController.createCategory);
+router.put('/categories/reorder', requirePermission('settings', 'edit'), adminCategoryController.reorderCategories);
+router.put('/categories/:id', requirePermission('settings', 'edit'), adminCategoryController.updateCategory);
+router.delete('/categories/:id', requirePermission('settings', 'edit'), adminCategoryController.deleteCategory);
+
+// ===== FEATURE PRICING =====
+router.get('/feature-pricing', requirePermission('settings', 'view'), adminFeaturePricingController.getFeaturePricings);
+router.put('/feature-pricing/:key', requirePermission('settings', 'edit'), adminFeaturePricingController.updateFeaturePricing);
 
 module.exports = router;
 

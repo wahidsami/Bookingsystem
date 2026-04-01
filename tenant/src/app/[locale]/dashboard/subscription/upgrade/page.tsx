@@ -1,196 +1,139 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { TenantLayout } from "@/components/TenantLayout";
-import { Currency } from "@/components/Currency";
-import { tenantApi } from "@/lib/api";
+import { useState, useEffect } from 'react';
+import { TenantLayout } from '@/components/TenantLayout';
+import { tenantApi } from '@/lib/api';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 
-type BillingCycle = "monthly" | "sixMonth" | "annual";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
-interface SubscriptionPackage {
+interface Pkg {
   id: string;
   name: string;
-  name_ar?: string;
+  name_ar: string;
   description?: string;
-  monthlyPrice: number | string;
-  sixMonthPrice: number | string;
-  annualPrice: number | string;
-  platformCommission: number | string;
+  monthlyPrice: number;
+  sixMonthPrice: number;
+  annualPrice: number;
+  slug: string;
+  isActive: boolean;
+  displayOrder: number;
 }
 
-interface CurrentSubscription {
-  packageId: string;
-}
-
-const BILLING_CYCLES: BillingCycle[] = ["monthly", "sixMonth", "annual"];
-
-export default function UpgradeSubscriptionPage() {
+export default function UpgradePlanPage() {
   const params = useParams();
-  const router = useRouter();
-  const locale = (params?.locale as string) || "ar";
-  const isRTL = locale === "ar";
-
+  const locale = (params?.locale as string) || 'ar';
+  const [packages, setPackages] = useState<Pkg[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState<string | null>(null);
-  const [packages, setPackages] = useState<SubscriptionPackage[]>([]);
-  const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
-  const [selectedBillingCycle, setSelectedBillingCycle] = useState<Record<string, BillingCycle>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    fetch(`${API_BASE}/subscriptions/packages`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.packages) {
+          setPackages(data.packages.filter((p: Pkg) => p.isActive));
+        }
+      })
+      .catch(() => setError('Failed to load packages'))
+      .finally(() => setLoading(false));
+  }, []);
 
-    (async () => {
-      try {
-        const [packagesRes, currentRes] = await Promise.all([
-          tenantApi.getAvailableSubscriptionPackages(),
-          tenantApi.getCurrentSubscription(),
-        ]);
-
-        if (!mounted) return;
-
-        const nextPackages = (packagesRes?.packages || []) as SubscriptionPackage[];
-        setPackages(nextPackages);
-        setCurrentSubscription((currentRes?.subscription || null) as CurrentSubscription | null);
-
-        const defaults: Record<string, BillingCycle> = {};
-        nextPackages.forEach((pkg) => {
-          defaults[pkg.id] = "monthly";
-        });
-        setSelectedBillingCycle(defaults);
-      } catch (err: any) {
-        if (!mounted) return;
-        setError(err.message || (locale === "ar" ? "تعذر تحميل الباقات" : "Failed to load packages"));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [locale]);
-
-  const getPrice = (pkg: SubscriptionPackage, cycle: BillingCycle) => {
-    if (cycle === "annual") return Number(pkg.annualPrice || 0);
-    if (cycle === "sixMonth") return Number(pkg.sixMonthPrice || 0);
-    return Number(pkg.monthlyPrice || 0);
+  const handleUpgrade = (pkg: Pkg, billingCycle: 'monthly' | 'sixMonth' | 'annual') => {
+    setSubmitting(pkg.id);
+    setError(null);
+    tenantApi
+      .requestUpgrade(pkg.id, billingCycle)
+      .then((res: any) => {
+        if (res.success && res.paymentUrl) {
+          window.location.href = res.paymentUrl;
+        } else {
+          setError(res.message || (locale === 'ar' ? 'فشل طلب الترقية' : 'Upgrade request failed'));
+        }
+      })
+      .catch(() => setError(locale === 'ar' ? 'فشل الاتصال' : 'Request failed'))
+      .finally(() => setSubmitting(null));
   };
 
-  const submitChange = async (pkg: SubscriptionPackage) => {
-    const billingCycle = selectedBillingCycle[pkg.id] || "monthly";
-    const requestKey = `${pkg.id}:${billingCycle}`;
-
-    try {
-      setSubmitting(requestKey);
-      const response = await tenantApi.requestSubscriptionChange(pkg.id, billingCycle);
-      if (response?.paymentToken) {
-        router.push(`/${locale}/payment?token=${encodeURIComponent(response.paymentToken)}`);
-        return;
-      }
-      setError(response?.message || "");
-    } catch (err: any) {
-      setError(err.message || (locale === "ar" ? "تعذر إنشاء الفاتورة" : "Failed to create invoice"));
-    } finally {
-      setSubmitting(null);
-    }
+  const priceFor = (pkg: Pkg, cycle: string) => {
+    const n =
+      cycle === 'monthly'
+        ? pkg.monthlyPrice
+        : cycle === 'sixMonth'
+          ? pkg.sixMonthPrice
+          : pkg.annualPrice;
+    return isNaN(n) ? 0 : n;
   };
 
   return (
     <TenantLayout>
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900" style={{ textAlign: isRTL ? "right" : "left" }}>
-          {locale === "ar" ? "ترقية أو تجديد الاشتراك" : "Upgrade or Renew Subscription"}
-        </h2>
-        <p className="mt-2 text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
-          {locale === "ar"
-            ? "اختر الباقة المناسبة وسيتم إنشاء فاتورة دفع مباشرة."
-            : "Choose the package you want and we will create a direct payment invoice."}
+      <div className="p-6">
+        <div className="mb-6">
+          <Link
+            href={`/${locale}/dashboard/subscription`}
+            className="text-purple-600 hover:underline text-sm font-medium"
+          >
+            ← {locale === 'ar' ? 'اشتراكي' : 'My Subscription'}
+          </Link>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {locale === 'ar' ? 'ترقية الخطة' : 'Upgrade plan'}
+        </h1>
+        <p className="text-gray-600 mb-6">
+          {locale === 'ar' ? 'اختر خطة جديدة وادفع خلال 48 ساعة لتفعيلها.' : 'Choose a new plan and pay within 48 hours to activate it.'}
         </p>
-      </div>
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
 
-      {loading ? (
-        <div className="card flex min-h-[260px] items-center justify-center">
-          <div className="spinner" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {packages.map((pkg) => {
-            const billingCycle = selectedBillingCycle[pkg.id] || "monthly";
-            const requestKey = `${pkg.id}:${billingCycle}`;
-            const isCurrent = currentSubscription?.packageId === pkg.id;
-            const packageName = locale === "ar" ? pkg.name_ar || pkg.name : pkg.name || pkg.name_ar;
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
+          </div>
+        )}
 
-            return (
-              <div key={pkg.id} className={`rounded-3xl border p-6 ${isCurrent ? "border-primary bg-primary/5" : "border-gray-200 bg-white"}`}>
-                <div className={`mb-4 flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <div style={{ textAlign: isRTL ? "right" : "left" }}>
-                    <h3 className="text-xl font-bold text-gray-900">{packageName}</h3>
-                    <p className="mt-2 text-sm text-gray-500">{pkg.description || ""}</p>
-                  </div>
-                  {isCurrent && (
-                    <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white">
-                      {locale === "ar" ? "الباقة الحالية" : "Current"}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mb-5">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    {locale === "ar" ? "دورة الفوترة" : "Billing cycle"}
-                  </label>
-                  <select
-                    value={billingCycle}
-                    onChange={(e) =>
-                      setSelectedBillingCycle((prev) => ({
-                        ...prev,
-                        [pkg.id]: e.target.value as BillingCycle,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-primary"
-                  >
-                    {BILLING_CYCLES.map((cycle) => (
-                      <option key={cycle} value={cycle}>
-                        {cycle}
-                      </option>
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {packages.map((pkg) => (
+              <div
+                key={pkg.id}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col"
+              >
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {locale === 'ar' ? pkg.name_ar : pkg.name}
+                </h2>
+                <p className="text-gray-500 text-sm mt-1 line-clamp-2">
+                  {pkg.description || ''}
+                </p>
+                <div className="mt-4 space-y-2">
+                    {(['monthly', 'sixMonth', 'annual'] as const).map((cycle) => (
+                      <button
+                        key={cycle}
+                        type="button"
+                        disabled={!!submitting}
+                        onClick={() => handleUpgrade(pkg, cycle)}
+                        className="w-full py-2 px-3 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium text-sm disabled:opacity-50"
+                      >
+                        {submitting === pkg.id
+                          ? (locale === 'ar' ? 'جاري التحميل...' : 'Loading...')
+                          : cycle === 'monthly'
+                          ? `${locale === 'ar' ? 'شهري' : 'Monthly'} — ${priceFor(pkg, cycle)} SAR`
+                          : cycle === 'sixMonth'
+                          ? `${locale === 'ar' ? '6 أشهر' : '6 months'} — ${priceFor(pkg, cycle)} SAR`
+                          : `${locale === 'ar' ? 'سنوي' : 'Annual'} — ${priceFor(pkg, cycle)} SAR`}
+                      </button>
                     ))}
-                  </select>
                 </div>
-
-                <div className="mb-6 rounded-2xl bg-gray-50 p-4">
-                  <p className="text-sm text-gray-500">{locale === "ar" ? "السعر" : "Price"}</p>
-                  <div className="mt-2 text-2xl font-bold text-gray-900">
-                    <Currency amount={getPrice(pkg, billingCycle)} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {locale === "ar" ? "عمولة المنصة" : "Platform commission"}: {Number(pkg.platformCommission || 0)}%
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => submitChange(pkg)}
-                  disabled={submitting === requestKey}
-                  className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
-                >
-                  {submitting === requestKey
-                    ? (locale === "ar" ? "جاري إنشاء الفاتورة..." : "Creating invoice...")
-                    : isCurrent
-                      ? (locale === "ar" ? "تجديد هذه الباقة" : "Renew this package")
-                      : (locale === "ar" ? "الترقية إلى هذه الباقة" : "Upgrade to this package")}
-                </button>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </TenantLayout>
   );
 }

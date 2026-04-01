@@ -8,7 +8,7 @@ interface TenantUser {
   id: string;
   email: string;
   businessName: string;
-  businessType: string;
+  businessType: string[];
   status: string;
   profileImage?: string;
   [key: string]: any;
@@ -39,7 +39,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
 
   const loadUser = async () => {
     try {
-      const accessToken = typeof window !== 'undefined' 
+      const accessToken = typeof window !== 'undefined'
         ? sessionStorage.getItem('rifah_tenant_access_token')
         : null;
 
@@ -50,7 +50,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
 
       // Fetch current tenant user
       const response = await tenantApi.get('/tenant/profile');
-      
+
       if (response.success && response.tenant) {
         setUser(response.tenant);
       }
@@ -69,18 +69,10 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await tenantApi.login(email, password);
-      
+
       if (response.success && response.tenant) {
         setUser(response.tenant);
-        const locale = typeof window !== 'undefined' && window.location.pathname.startsWith('/en') ? 'en' : 'ar';
-        const status = response.tenant?.status;
-        if (status === 'payment_pending') {
-          router.push(`/${locale}/subscription/pay`);
-        } else if (status === 'more_info_required') {
-          router.push(`/${locale}/onboarding/more-info`);
-        } else {
-          router.push(`/${locale}/dashboard`);
-        }
+        router.push('/ar/dashboard');
       } else {
         throw new Error(response.message || 'Login failed');
       }

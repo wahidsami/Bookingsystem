@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { TenantLayout } from '@/components/TenantLayout';
 import {
   Cog6ToothIcon,
@@ -15,22 +16,37 @@ import { AboutUsTab } from '@/components/AboutUsTab';
 import { HeroSliderTab } from '@/components/HeroSliderTab';
 import { GeneralSettingsTab } from '@/components/GeneralSettingsTab';
 import { PagesBannersTab } from '@/components/PagesBannersTab';
-import { tenantApi } from '@/lib/api';
+import { PUBLIC_PAGE_URL, tenantApi } from '@/lib/api';
 
-const PUBLIC_PAGE_URL = (process.env.NEXT_PUBLIC_PUBLIC_PAGE_URL || 'http://localhost:3004').replace(/\/+$/, '');
+interface ReviewItem {
+  id: string;
+  customerName: string | null;
+  rating: number;
+  comment: string | null;
+  isVisible: boolean;
+  createdAt: string;
+  staff?: { id: string; name: string } | null;
+}
 
 export default function MyPagePage() {
   const t = useTranslations('MyPage');
   const locale = useLocale();
+  const router = useRouter();
   const isRTL = locale === 'ar';
 
   const [activeTab, setActiveTab] = useState('general');
   const [tenantSlug, setTenantSlug] = useState<string | null>(null);
   const [loadingSlug, setLoadingSlug] = useState(true);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   useEffect(() => {
     loadTenantSlug();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'reviews') loadReviews();
+  }, [activeTab]);
 
   const loadTenantSlug = async () => {
     try {
@@ -46,9 +62,26 @@ export default function MyPagePage() {
     }
   };
 
+  const loadReviews = async () => {
+    setReviewsLoading(true);
+    try {
+      const res = await tenantApi.getReviews();
+      if (res.success && res.data?.reviews) {
+        setReviews(res.data.reviews);
+      } else {
+        setReviews([]);
+      }
+    } catch {
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
   const handleViewPage = () => {
     if (tenantSlug) {
       // Open public page in new tab
+      // PublicPage runs on port 3004
       const publicPageUrl = `${PUBLIC_PAGE_URL}/t/${tenantSlug}`;
       window.open(publicPageUrl, '_blank');
     }
@@ -126,15 +159,51 @@ export default function MyPagePage() {
             {/* Reviews Tab */}
             {activeTab === 'reviews' && (
               <div className="space-y-6">
-                <h2 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t('reviews')}
-                </h2>
-                <div className="flex items-center justify-center py-20">
-                  <div className="text-center">
-                    <div className="text-6xl mb-4">🚧</div>
-                    <p className="text-gray-500 text-lg">{t('comingSoon')}</p>
-                  </div>
+                <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {t('reviews')}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/${locale}/dashboard/reviews`)}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
+                    {locale === 'ar' ? 'عرض الكل ←' : 'View all →'}
+                  </button>
                 </div>
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent" />
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-5xl mb-4">⭐</div>
+                    <p className="text-gray-500">{locale === 'ar' ? 'لا توجد تقييمات بعد' : 'No reviews yet'}</p>
+                    <p className="text-gray-400 text-sm mt-1">{locale === 'ar' ? 'ستظهر تقييمات العملاء هنا' : 'Customer reviews will appear here.'}</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-4">
+                    {reviews.slice(0, 10).map((r) => (
+                      <li key={r.id} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                        <div className="flex items-start gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                          <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                            {(r.customerName || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900">{r.customerName || (locale === 'ar' ? 'عميل' : 'Customer')}</p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <span key={i} className={i <= r.rating ? 'text-yellow-400' : 'text-gray-300'}>★</span>
+                              ))}
+                              <span className="text-xs text-gray-500 ml-1">{new Date(r.createdAt).toLocaleDateString(locale)}</span>
+                            </div>
+                            {r.comment && <p className="text-sm text-gray-600 mt-1 line-clamp-2">{r.comment}</p>}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </div>

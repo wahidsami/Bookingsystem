@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
-import { tenantApi } from '@/lib/api';
+import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
 import {
   ArrowLeftIcon,
@@ -227,11 +227,7 @@ export default function CustomerDetailPage() {
                   {customer.profileImage ? (
                     <>
                       <img
-                        src={customer.profileImage.startsWith('http')
-                          ? customer.profileImage
-                          : customer.profileImage.startsWith('/')
-                            ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${customer.profileImage}`
-                            : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${customer.profileImage}`}
+                        src={customer.profileImage.startsWith('http') ? customer.profileImage : getImageUrl(customer.profileImage)}
                         alt={`${customer.firstName} ${customer.lastName}`}
                         className="w-24 h-24 rounded-full object-cover"
                         onError={(e) => {

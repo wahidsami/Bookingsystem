@@ -4,6 +4,62 @@
  */
 
 const db = require('../models');
+const { Op } = require('sequelize');
+const { checkResourceLimit } = require('../utils/tenantLimitsUtil');
+const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+
+/**
+ * Get subscription limits and current usage for the tenant.
+ */
+exports.getSubscriptionLimits = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const settings = await db.TenantSettings.findOne({ where: { tenantId } });
+        const tenantFeatures = settings?.features || {};
+
+        const subResult = await getActiveSubscriptionForTenant(tenantId, {
+            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+        });
+        const packageLimits = subResult?.package?.limits || {};
+        const mergedFeatures = { ...packageLimits, ...tenantFeatures };
+
+        const [staff, services, products, bookings] = await Promise.all([
+            checkResourceLimit(tenantId, 'maxStaff', async () => db.Staff.count({ where: { tenantId } })),
+            checkResourceLimit(tenantId, 'maxServices', async () => db.Service.count({ where: { tenantId } })),
+            checkResourceLimit(tenantId, 'maxProducts', async () => db.Product.count({ where: { tenantId } })),
+            checkResourceLimit(tenantId, 'maxBookingsPerMonth', async () => db.Appointment.count({
+                where: {
+                    tenantId,
+                    createdAt: { [Op.gte]: startOfMonth }
+                }
+            }))
+        ]);
+
+        const packageName = subResult?.package?.name || staff.packageName;
+
+        res.json({
+            success: true,
+            limits: mergedFeatures,
+            data: {
+                packageName,
+                staff: { current: staff.current, limit: staff.limit, allowed: staff.allowed },
+                services: { current: services.current, limit: services.limit, allowed: services.allowed },
+                products: { current: products.current, limit: products.limit, allowed: products.allowed },
+                bookings: { current: bookings.current, limit: bookings.limit, allowed: bookings.allowed }
+            }
+        });
+    } catch (error) {
+        console.error('Get subscription limits error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch subscription limits'
+        });
+    }
+};
 
 /**
  * Get all settings for the tenant

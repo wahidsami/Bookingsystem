@@ -1,17 +1,24 @@
 import createMiddleware from 'next-intl/middleware';
+import { NextRequest, NextResponse } from 'next/server';
 
-export default createMiddleware({
-  // A list of all locales that are supported
+const intlMiddleware = createMiddleware({
   locales: ['ar', 'en'],
-
-  // Used when no locale matches
-  defaultLocale: 'ar', // Arabic is default!
-  
+  defaultLocale: 'ar',
   localePrefix: 'always'
 });
 
+export default function middleware(request: NextRequest) {
+  // Payment link from email may open without locale (e.g. /payment?token=xxx) — redirect to default locale
+  const pathname = request.nextUrl.pathname;
+  if (pathname === '/payment' || pathname.startsWith('/payment/')) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/payment/, '/ar/payment');
+    return NextResponse.redirect(url);
+  }
+  return intlMiddleware(request);
+}
+
 export const config = {
-  // Match only internationalized pathnames
-  matcher: ['/', '/(ar|en)/:path*']
+  matcher: ['/', '/(ar|en)/:path*', '/payment', '/payment/:path*']
 };
 

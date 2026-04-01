@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { PhotoIcon, XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { tenantApi } from '@/lib/api';
+import { PhotoIcon, XMarkIcon, PlusIcon, TrashIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { getImageUrl, tenantApi } from '@/lib/api';
 
 interface MissionVisionValue {
   id: string;
@@ -26,6 +26,10 @@ export function AboutUsTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // AI State
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
 
   // Our Story
   const [storyTitle, setStoryTitle] = useState('ourStory');
@@ -74,7 +78,7 @@ export function AboutUsTab() {
       const response = await tenantApi.getPublicPageData();
       if (response.success && response.data) {
         const data = response.data.aboutUs || {};
-        
+
         setStoryTitle(data.storyTitle || 'ourStory');
         setStoryEn(data.storyEn || '');
         setStoryAr(data.storyAr || '');
@@ -82,7 +86,7 @@ export function AboutUsTab() {
         const fixImagePaths = (items: any[]) => {
           return items.map((item: any) => {
             if (item.imageUrl && !item.imageUrl.startsWith('http') && !item.imageUrl.startsWith('data:')) {
-              item.imageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${item.imageUrl}`;
+              item.imageUrl = getImageUrl(item.imageUrl);
             }
             return item;
           });
@@ -93,8 +97,8 @@ export function AboutUsTab() {
         setFacilitiesDescriptionEn(data.facilitiesDescriptionEn || '');
         setFacilitiesDescriptionAr(data.facilitiesDescriptionAr || '');
         // Fix facilities images paths
-        const facilitiesImgs = (data.facilitiesImages || []).map((img: string) => 
-          img.startsWith('http') ? img : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${img}`
+        const facilitiesImgs = (data.facilitiesImages || []).map((img: string) =>
+          img.startsWith('http') ? img : getImageUrl(img)
         );
         setFacilitiesImages(facilitiesImgs);
         setFinalWordTitleEn(data.finalWordTitleEn || '');
@@ -103,7 +107,7 @@ export function AboutUsTab() {
         setFinalWordTextAr(data.finalWordTextAr || '');
         setFinalWordType(data.finalWordType || 'image');
         // Fix final word image path
-        setFinalWordImageUrl(data.finalWordImageUrl ? (data.finalWordImageUrl.startsWith('http') ? data.finalWordImageUrl : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${data.finalWordImageUrl}`) : null);
+        setFinalWordImageUrl(data.finalWordImageUrl ? (data.finalWordImageUrl.startsWith('http') ? data.finalWordImageUrl : getImageUrl(data.finalWordImageUrl)) : null);
         setFinalWordIconName(data.finalWordIconName || '');
       }
     } catch (err: any) {
@@ -111,6 +115,82 @@ export function AboutUsTab() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAIEnhance = async (confirmReplace = false) => {
+    // Basic validation
+    if (!storyEn && !storyAr) {
+      setError(locale === 'ar' ? 'يرجى كتابة قصتنا (بالعربية أو الإنجليزية) أولاً لاستخدام الذكاء الاصطناعي.' : 'Please write Our Story (in English or Arabic) first to use AI.');
+      return;
+    }
+
+    if ((storyEn.length < 20 && storyAr.length < 20)) {
+      setError(locale === 'ar' ? 'يرجى كتابة قصة أطول قليلاً (20 حرفاً على الأقل) لتحسين أفضل.' : 'Please write a slightly longer story (at least 20 chars) for better enhancement.');
+      return;
+    }
+
+    // Check if we already have missions/visions/values
+    const hasExistingItems = missions.length > 0 || visions.length > 0 || values.length > 0;
+    if (hasExistingItems && !confirmReplace) {
+      setShowReplaceConfirm(true);
+      return;
+    }
+
+    setShowReplaceConfirm(false);
+    setIsGeneratingAI(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const inputLanguage = storyAr && !storyEn ? 'Arabic' : 'English';
+      const storyText = storyEn || storyAr || '';
+      const facilitiesText = facilitiesDescriptionEn || facilitiesDescriptionAr || '';
+
+      const response = await tenantApi.generateAboutUsAI({
+        storyText,
+        facilitiesText,
+        inputLanguage,
+      });
+
+      if (response.success && response.data) {
+        const d = response.data;
+
+        // Update story
+        if (d.storyEn) setStoryEn(d.storyEn);
+        if (d.storyAr) setStoryAr(d.storyAr);
+
+        // Map AI items to our state format
+        const mapItems = (items: any[]) => {
+          if (!Array.isArray(items)) return [];
+          return items.map((item: any, idx: number) => ({
+            id: Date.now().toString() + '_' + idx,
+            titleEn: item.titleEn || '',
+            titleAr: item.titleAr || '',
+            detailsEn: item.detailsEn || '',
+            detailsAr: item.detailsAr || '',
+            type: 'icon' as const,
+            iconName: item.iconName || 'StarIcon'
+          }));
+        };
+
+        if (d.missions) setMissions(mapItems(d.missions));
+        if (d.visions) setVisions(mapItems(d.visions));
+        if (d.values) setValues(mapItems(d.values));
+
+        // Update facilities if provided
+        if (d.facilitiesEn) setFacilitiesDescriptionEn(d.facilitiesEn);
+        if (d.facilitiesAr) setFacilitiesDescriptionAr(d.facilitiesAr);
+
+        setSuccess(locale === 'ar' ? '✨ تم تحسين وإنشاء المحتوى بنجاح بواسطة الذكاء الاصطناعي' : '✨ Content successfully enhanced and generated by AI');
+      } else {
+        throw new Error(response.message || 'Failed to generate AI content');
+      }
+    } catch (err: any) {
+      console.error('AI Enhancement Error:', err);
+      setError(locale === 'ar' ? 'فشل تحسين المحتوى بالذكاء الاصطناعي.' : 'Failed to enhance content with AI.');
+    } finally {
+      setIsGeneratingAI(false);
     }
   };
 
@@ -454,9 +534,56 @@ export function AboutUsTab() {
 
       {/* Our Story */}
       <div className="space-y-4 pt-6 border-t border-gray-200">
-        <h3 className="text-md font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-          {t('ourStory.title')}
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-md font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            {t('ourStory.title')}
+          </h3>
+          <button
+            onClick={() => handleAIEnhance(false)}
+            disabled={isGeneratingAI || saving}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${isGeneratingAI
+                ? 'bg-purple-100 text-purple-400 cursor-not-allowed'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 shadow-sm'
+              }`}
+            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+          >
+            <SparklesIcon className={`w-4 h-4 ${isGeneratingAI ? 'animate-pulse' : ''}`} />
+            <span>
+              {isGeneratingAI
+                ? (locale === 'ar' ? 'جاري التحسين...' : 'Enhancing...')
+                : (locale === 'ar' ? '✨ تحسين وبناء بالذكاء الاصطناعي' : '✨ AI Enhance & Generate')}
+            </span>
+          </button>
+        </div>
+
+        {/* AI Replace Confirmation */}
+        {showReplaceConfirm && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h4 className="text-sm font-semibold text-yellow-800 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              {locale === 'ar' ? 'تأكيد الاستبدال' : 'Confirm Replacement'}
+            </h4>
+            <p className="text-sm text-yellow-700 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              {locale === 'ar'
+                ? 'لديك بالفعل عناصر في المهمة/الرؤية/القيم. سيقوم الذكاء الاصطناعي باستبدالها بعناصر جديدة. هل تريد المتابعة؟'
+                : 'You already have items in Mission/Vision/Values. The AI will replace them with newly generated ones. Continue?'}
+            </p>
+            <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <button
+                onClick={() => handleAIEnhance(true)}
+                className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700"
+              >
+                {locale === 'ar' ? 'نعم، استبدل المحتوى' : 'Yes, Replace Content'}
+              </button>
+              <button
+                onClick={() => setShowReplaceConfirm(false)}
+                className="px-4 py-2 bg-white text-gray-700 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
             {t('ourStory.titleLabel')}

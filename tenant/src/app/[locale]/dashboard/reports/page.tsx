@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { tenantApi } from '@/lib/api';
+import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
 import {
   ChartBarIcon,
@@ -133,9 +133,13 @@ export default function ReportsPage() {
             {t('subtitle')}
           </p>
         </div>
-        
-        {/* Date Range Selector */}
-        <div className="flex gap-2 flex-wrap" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+        <div className="flex items-center gap-2 flex-wrap" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <a
+            href={`/${locale}/dashboard/reports/generate`}
+            className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 no-print"
+          >
+            {locale === 'ar' ? 'إنشاء تقرير' : 'Generate report'}
+          </a>
           {['week', 'month', 'quarter', 'year'].map((preset) => (
             <button
               key={preset}
@@ -357,7 +361,7 @@ export default function ReportsPage() {
                       <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
                           {employee.photo ? (
-                            <img src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${employee.photo}`} alt={employee.name} className="w-10 h-10 rounded-full object-cover" />
+                            <img src={getImageUrl(employee.photo)} alt={employee.name} className="w-10 h-10 rounded-full object-cover" />
                           ) : (
                             <span className="text-primary-600 font-medium">{employee.name?.charAt(0)}</span>
                           )}

@@ -1,0 +1,70 @@
+/**
+ * Print styles for tenant report and financial views.
+ * Applied when user prints (e.g. from report preview) or uses "Save as PDF".
+ */
+@media print {
+  /* Hide navigation, sidebar, and non-report UI */
+  header,
+  aside,
+  nav,
+  .no-print,
+  [data-no-print],
+  button:not(.print-show) {
+    visibility: hidden !important;
+    display: none !important;
+  }
+
+  /* Report container: take full page, no margins from layout */
+  .report-print-area,
+  body.report-preview-printing {
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Ensure report content is visible */
+  .report-print-area,
+  .report-print-area * {
+    visibility: visible !important;
+  }
+
+  .report-print-area {
+    display: block !important;
+  }
+
+  /* Clean typography and page setup */
+  body {
+    background: #fff;
+    color: #111;
+    font-size: 12pt;
+  }
+
+  /* Avoid breaking tables and cards across pages */
+  .report-print-area table,
+  .report-print-area thead,
+  .report-print-area tr {
+    break-inside: avoid;
+  }
+
+  .report-print-area .card,
+  .report-print-area section {
+    break-inside: avoid;
+  }
+
+  /* Show table headers on each printed page (if table spans pages) */
+  .report-print-area thead {
+    display: table-header-group;
+  }
+
+  /* Remove shadows and heavy backgrounds for faster, cleaner print */
+  .report-print-area .card,
+  .report-print-area .shadow-sm,
+  .report-print-area .shadow {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb;
+  }
+
+  /* Links: show URL for reference (optional) */
+  a[href]::after {
+    content: none;
+  }
+}

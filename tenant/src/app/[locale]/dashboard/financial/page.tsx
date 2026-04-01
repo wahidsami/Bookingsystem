@@ -191,6 +191,12 @@ export default function FinancialPage() {
               {t("subtitle")}
             </p>
           </div>
+          <Link
+            href={`/${locale}/dashboard/reports/generate`}
+            className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:opacity-90 no-print"
+          >
+            {locale === 'ar' ? 'إنشاء تقرير' : 'Generate report'}
+          </Link>
         </div>
       </div>
 
@@ -301,7 +307,7 @@ export default function FinancialPage() {
                 <div className="card bg-gradient-to-br from-green-50 to-green-100 border border-green-200">
                   <div className="text-sm font-medium text-green-600 mb-1">{t("totalRevenue")}</div>
                   <div className="text-2xl font-bold text-green-800">
-                    <Currency amount={overview.totalRevenue} />
+                    <Currency amount={overview?.totalRevenue ?? 0} />
                   </div>
                   <div className="text-xs text-green-600 mt-1">
                     {overview.totalBookings || 0} {t("bookings")}
@@ -311,21 +317,21 @@ export default function FinancialPage() {
                 <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
                   <div className="text-sm font-medium text-blue-600 mb-1">{t("tenantRevenue")}</div>
                   <div className="text-2xl font-bold text-blue-800">
-                    <Currency amount={overview.totalTenantRevenue} />
+                    <Currency amount={overview?.totalTenantRevenue ?? 0} />
                   </div>
                   <div className="text-xs text-blue-600 mt-1">{t("afterPlatformFees")}</div>
                 </div>
                 <div className="card bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200">
                   <div className="text-sm font-medium text-purple-600 mb-1">{t("netRevenue")}</div>
                   <div className="text-2xl font-bold text-purple-800">
-                    <Currency amount={overview.netRevenue} />
+                    <Currency amount={overview?.netRevenue ?? 0} />
                   </div>
                   <div className="text-xs text-purple-600 mt-1">{t("afterCommissions")}</div>
                 </div>
                 <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200">
                   <div className="text-sm font-medium text-yellow-600 mb-1">{t("pendingPayments")}</div>
                   <div className="text-2xl font-bold text-yellow-800">
-                    <Currency amount={overview.pendingPayments} />
+                    <Currency amount={overview?.pendingPayments ?? 0} />
                   </div>
                   <div className="text-xs text-yellow-600 mt-1">
                     {(overview.totalBookings || 0) - (overview.paidBookings || 0)} {t("unpaidBookings")}
@@ -343,39 +349,39 @@ export default function FinancialPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <span className="text-gray-600">{t("rawPrice")}</span>
-                      <span className="font-semibold"><Currency amount={overview.totalRawPrice} /></span>
+                      <span className="font-semibold"><Currency amount={overview?.totalRawPrice ?? 0} /></span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <span className="text-gray-600">{t("tax")} (15% VAT)</span>
-                      <span className="font-semibold"><Currency amount={overview.totalTax} /></span>
+                      <span className="font-semibold"><Currency amount={overview?.totalTax ?? 0} /></span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                       <span className="text-red-600">{t("platformFees")}</span>
-                      <span className="font-semibold text-red-600">- <Currency amount={overview.totalPlatformFees} /></span>
+                      <span className="font-semibold text-red-600">- <Currency amount={overview?.totalPlatformFees ?? 0} /></span>
                     </div>
                     {overview.appointmentRevenue !== undefined && overview.orderRevenue !== undefined && (
                       <>
                         <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                           <span className="text-blue-600">📅 {t("appointmentRevenue")}</span>
-                          <span className="font-semibold text-blue-600"><Currency amount={overview.appointmentRevenue} /></span>
+                          <span className="font-semibold text-blue-600"><Currency amount={overview?.appointmentRevenue ?? 0} /></span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                           <span className="text-green-600">🛍️ {t("productRevenue")}</span>
-                          <span className="font-semibold text-green-600"><Currency amount={overview.orderRevenue} /></span>
+                          <span className="font-semibold text-green-600"><Currency amount={overview?.orderRevenue ?? 0} /></span>
                         </div>
                       </>
                     )}
                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
                       <span className="font-semibold text-blue-800">{t("tenantRevenue")}</span>
-                      <span className="font-bold text-blue-800"><Currency amount={overview.totalTenantRevenue} /></span>
+                      <span className="font-bold text-blue-800"><Currency amount={overview?.totalTenantRevenue ?? 0} /></span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                       <span className="text-orange-600">{t("employeeCommissions")}</span>
-                      <span className="font-semibold text-orange-600">- <Currency amount={overview.totalEmployeeCommissions} /></span>
+                      <span className="font-semibold text-orange-600">- <Currency amount={overview?.totalEmployeeCommissions ?? 0} /></span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-green-100 rounded-lg border-2 border-green-300">
                       <span className="font-bold text-green-800">{t("netRevenue")}</span>
-                      <span className="font-bold text-green-800 text-xl"><Currency amount={overview.netRevenue} /></span>
+                      <span className="font-bold text-green-800 text-xl"><Currency amount={overview?.netRevenue ?? 0} /></span>
                     </div>
                   </div>
                 </div>
@@ -387,29 +393,58 @@ export default function FinancialPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <span className="text-gray-600">{t("totalBookings")}</span>
-                      <span className="font-semibold text-2xl">{overview.totalBookings}</span>
+                      <span className="font-semibold text-2xl">{overview?.totalBookings ?? 0}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                       <span className="text-green-600">{t("completedBookings")}</span>
-                      <span className="font-semibold text-green-600">{overview.completedBookings}</span>
+                      <span className="font-semibold text-green-600">{overview?.completedBookings ?? 0}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                       <span className="text-green-600">{t("paidBookings")}</span>
-                      <span className="font-semibold text-green-600">{overview.paidBookings}</span>
+                      <span className="font-semibold text-green-600">{overview?.paidBookings ?? 0}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                       <span className="text-yellow-600">{t("unpaidBookings")}</span>
-                      <span className="font-semibold text-yellow-600">{overview.totalBookings - overview.paidBookings}</span>
+                      <span className="font-semibold text-yellow-600">{(overview?.totalBookings ?? 0) - (overview?.paidBookings ?? 0)}</span>
                     </div>
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <div className="text-sm text-gray-600 mb-1">{t("averageBookingValue")}</div>
                       <div className="font-bold text-xl text-blue-800">
-                        <Currency amount={overview.totalBookings > 0 ? overview.totalRevenue / overview.totalBookings : 0} />
+                        <Currency amount={(overview?.totalBookings ?? 0) > 0 ? (overview?.totalRevenue ?? 0) / (overview?.totalBookings ?? 1) : 0} />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Daily Revenue Chart */}
+              {dailyRevenue.length > 0 && (
+                <div className="card">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("dailyRevenue") || "Daily revenue"}
+                  </h3>
+                  <div className="h-64 flex items-end gap-0.5">
+                    {dailyRevenue.map((day, index) => {
+                      const maxRev = Math.max(...dailyRevenue.map((d) => d.revenue || 0), 1);
+                      const pct = maxRev > 0 ? ((day.revenue || 0) / maxRev) * 100 : 0;
+                      return (
+                        <div
+                          key={day.date}
+                          className="flex-1 bg-green-200 hover:bg-green-400 transition-colors rounded-t min-w-0"
+                          style={{
+                            height: `${pct}%`,
+                            minHeight: (day.revenue || 0) > 0 ? "6px" : "2px",
+                          }}
+                          title={`${day.date}: ${(day.revenue ?? 0).toLocaleString()} • ${day.bookings ?? 0} bookings`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-center text-sm text-gray-500 mt-2">
+                    {startDate} – {endDate}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -421,19 +456,19 @@ export default function FinancialPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="card bg-gray-50">
                     <div className="text-sm text-gray-600">{t("totalEmployees")}</div>
-                    <div className="text-2xl font-bold">{employeeTotals.totalEmployees}</div>
+                    <div className="text-2xl font-bold">{employeeTotals.totalEmployees ?? 0}</div>
                   </div>
                   <div className="card bg-blue-50">
                     <div className="text-sm text-blue-600">{t("totalRevenueGenerated")}</div>
-                    <div className="text-2xl font-bold text-blue-800"><Currency amount={employeeTotals.totalRevenueGenerated} /></div>
+                    <div className="text-2xl font-bold text-blue-800"><Currency amount={employeeTotals.totalRevenueGenerated ?? 0} /></div>
                   </div>
                   <div className="card bg-orange-50">
                     <div className="text-sm text-orange-600">{t("totalCommissions")}</div>
-                    <div className="text-2xl font-bold text-orange-800"><Currency amount={employeeTotals.totalCommissions} /></div>
+                    <div className="text-2xl font-bold text-orange-800"><Currency amount={employeeTotals.totalCommissions ?? 0} /></div>
                   </div>
                   <div className="card bg-green-50">
                     <div className="text-sm text-green-600">{t("totalPayroll")}</div>
-                    <div className="text-2xl font-bold text-green-800"><Currency amount={employeeTotals.totalPayroll} /></div>
+                    <div className="text-2xl font-bold text-green-800"><Currency amount={employeeTotals.totalPayroll ?? 0} /></div>
                   </div>
                 </div>
               )}
@@ -470,16 +505,16 @@ export default function FinancialPage() {
                             <span className="text-xs text-green-600 ml-1">({emp.paidBookings} {t("paid")})</span>
                           </td>
                           <td className="px-4 py-4 text-right font-semibold">
-                            <Currency amount={emp.totalRevenueGenerated} />
+                            <Currency amount={emp.totalRevenueGenerated ?? 0} />
                           </td>
                           <td className="px-4 py-4 text-right text-gray-600">
-                            <Currency amount={emp.baseSalary} />
+                            <Currency amount={emp.baseSalary ?? 0} />
                           </td>
                           <td className="px-4 py-4 text-right text-orange-600 font-semibold">
-                            <Currency amount={emp.totalCommission} />
+                            <Currency amount={emp.totalCommission ?? 0} />
                           </td>
                           <td className="px-4 py-4 text-right text-green-600 font-bold">
-                            <Currency amount={emp.totalEarnings} />
+                            <Currency amount={emp.totalEarnings ?? 0} />
                           </td>
                         </tr>
                       ))}
@@ -498,19 +533,19 @@ export default function FinancialPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="card bg-gray-50">
                     <div className="text-sm text-gray-600">{t("totalServices")}</div>
-                    <div className="text-2xl font-bold">{serviceTotals.totalServices}</div>
+                    <div className="text-2xl font-bold">{serviceTotals.totalServices ?? 0}</div>
                   </div>
                   <div className="card bg-green-50">
                     <div className="text-sm text-green-600">{t("totalRevenue")}</div>
-                    <div className="text-2xl font-bold text-green-800"><Currency amount={serviceTotals.totalRevenue} /></div>
+                    <div className="text-2xl font-bold text-green-800"><Currency amount={serviceTotals.totalRevenue ?? 0} /></div>
                   </div>
                   <div className="card bg-blue-50">
                     <div className="text-sm text-blue-600">{t("totalBookings")}</div>
-                    <div className="text-2xl font-bold text-blue-800">{serviceTotals.totalBookings}</div>
+                    <div className="text-2xl font-bold text-blue-800">{serviceTotals.totalBookings ?? 0}</div>
                   </div>
                   <div className="card bg-purple-50">
                     <div className="text-sm text-purple-600">{t("tenantRevenue")}</div>
-                    <div className="text-2xl font-bold text-purple-800"><Currency amount={serviceTotals.totalTenantRevenue} /></div>
+                    <div className="text-2xl font-bold text-purple-800"><Currency amount={serviceTotals.totalTenantRevenue ?? 0} /></div>
                   </div>
                 </div>
               )}
@@ -549,13 +584,13 @@ export default function FinancialPage() {
                             <span className="px-2 py-1 bg-gray-100 rounded text-sm">{service.category}</span>
                           </td>
                           <td className="px-4 py-4 text-center font-semibold">
-                            {service.totalBookings}
+                            {service.totalBookings ?? 0}
                           </td>
                           <td className="px-4 py-4 text-right font-semibold text-green-600">
-                            <Currency amount={service.totalRevenue} />
+                            <Currency amount={service.totalRevenue ?? 0} />
                           </td>
                           <td className="px-4 py-4 text-right font-semibold text-blue-600">
-                            <Currency amount={service.totalTenantRevenue} />
+                            <Currency amount={service.totalTenantRevenue ?? 0} />
                           </td>
                         </tr>
                       ))}
@@ -574,19 +609,19 @@ export default function FinancialPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="card bg-gray-50">
                     <div className="text-sm text-gray-600">{t("totalProducts")}</div>
-                    <div className="text-2xl font-bold">{productTotals.totalProducts}</div>
+                    <div className="text-2xl font-bold">{productTotals.totalProducts ?? 0}</div>
                   </div>
                   <div className="card bg-green-50">
                     <div className="text-sm text-green-600">{t("totalRevenue")}</div>
-                    <div className="text-2xl font-bold text-green-800"><Currency amount={productTotals.totalRevenue} /></div>
+                    <div className="text-2xl font-bold text-green-800"><Currency amount={productTotals.totalRevenue ?? 0} /></div>
                   </div>
                   <div className="card bg-blue-50">
                     <div className="text-sm text-blue-600">{t("totalOrders")}</div>
-                    <div className="text-2xl font-bold text-blue-800">{productTotals.totalOrders}</div>
+                    <div className="text-2xl font-bold text-blue-800">{productTotals.totalOrders ?? 0}</div>
                   </div>
                   <div className="card bg-purple-50">
                     <div className="text-sm text-purple-600">{t("tenantRevenue")}</div>
-                    <div className="text-2xl font-bold text-purple-800"><Currency amount={productTotals.totalTenantRevenue} /></div>
+                    <div className="text-2xl font-bold text-purple-800"><Currency amount={productTotals.totalTenantRevenue ?? 0} /></div>
                   </div>
                 </div>
               )}
@@ -626,16 +661,16 @@ export default function FinancialPage() {
                             <span className="px-2 py-1 bg-gray-100 rounded text-sm">{product.category}</span>
                           </td>
                           <td className="px-4 py-4 text-center font-semibold">
-                            {product.totalOrders}
+                            {product.totalOrders ?? 0}
                           </td>
                           <td className="px-4 py-4 text-center font-semibold">
-                            {product.totalQuantity}
+                            {product.totalQuantity ?? 0}
                           </td>
                           <td className="px-4 py-4 text-right font-semibold text-green-600">
-                            <Currency amount={product.totalRevenue} />
+                            <Currency amount={product.totalRevenue ?? 0} />
                           </td>
                           <td className="px-4 py-4 text-right font-semibold text-blue-600">
-                            <Currency amount={product.totalTenantRevenue} />
+                            <Currency amount={product.totalTenantRevenue ?? 0} />
                           </td>
                         </tr>
                       ))}

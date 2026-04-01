@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/lib/api";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,8 @@ const navigation = [
   { name: "Users", href: "/dashboard/users", icon: "👥" },
   { name: "Financial", href: "/dashboard/financial", icon: "💰" },
   { name: "Packages", href: "/dashboard/packages", icon: "📦" },
+  { name: "Marketing", href: "/dashboard/marketing", icon: "🔥" },
+  { name: "Clients Control", href: "/dashboard/clients-control", icon: "🎛️" },
   { name: "Activities", href: "/dashboard/activities", icon: "📋" },
   { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
 ];
@@ -40,8 +43,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       try {
         const token = sessionStorage.getItem("rifah_admin_token");
         if (!token) return;
-        
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/admin/tenants/pending`, {
+
+        const response = await fetch(`${API_BASE_URL}/admin/tenants/pending`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await response.json();

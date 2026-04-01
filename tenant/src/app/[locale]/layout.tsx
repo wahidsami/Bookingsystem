@@ -4,6 +4,7 @@ import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { TenantAuthProvider } from '@/contexts/TenantAuthContext';
 import "../globals.css";
+import "@/styles/print.css";
 
 export const metadata: Metadata = {
   title: "رفاه - لوحة تحكم الصالون | Rifah - Salon Dashboard",

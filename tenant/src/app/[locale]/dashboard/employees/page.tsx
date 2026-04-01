@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -39,6 +39,7 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState("");
+  const [limits, setLimits] = useState<any>(null);
 
   useEffect(() => {
     loadEmployees();
@@ -48,7 +49,7 @@ export default function EmployeesPage() {
     try {
       setLoading(true);
       setError("");
-      
+
       const params: any = {};
       if (filterActive !== undefined) {
         params.isActive = filterActive;
@@ -57,16 +58,23 @@ export default function EmployeesPage() {
         params.search = searchTerm;
       }
 
-      const response = await tenantApi.getEmployees(params);
-      
+      const [response, limitsData] = await Promise.all([
+        tenantApi.getEmployees(params),
+        tenantApi.getSubscriptionLimits().catch(() => null)
+      ]);
+
+      if (limitsData?.staff) {
+        setLimits(limitsData.staff);
+      }
+
       // Handle different response structures
       const data = response.data || response;
-      
+
       if (data.success !== false) {
         // Response is successful (either success: true or success is undefined but no error)
         const employeesList = data.employees || data.data?.employees || [];
         setEmployees(employeesList);
-        
+
         if (employeesList.length === 0 && !filterActive && !searchTerm) {
           console.log("No employees found. Response:", response);
         }
@@ -89,8 +97,8 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(locale === 'ar' 
-      ? `هل أنت متأكد من حذف الموظف "${name}"؟` 
+    if (!confirm(locale === 'ar'
+      ? `هل أنت متأكد من حذف الموظف "${name}"؟`
       : `Are you sure you want to delete employee "${name}"?`)) {
       return;
     }
@@ -121,15 +129,31 @@ export default function EmployeesPage() {
               {t("subtitle")}
             </p>
           </div>
-          <Link
-            href={`/${locale}/dashboard/employees/new`}
-            className="btn btn-primary"
-            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-          >
-            <span className="mr-2">{isRTL ? '➕' : ''}</span>
-            {t("addEmployee")}
-            <span className="ml-2">{!isRTL ? '➕' : ''}</span>
-          </Link>
+          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            {limits && (
+              <div className="text-sm px-3 py-1 bg-gray-100 rounded-lg whitespace-nowrap">
+                <span className="text-gray-500">{isRTL ? 'الحد المسموح:' : 'Limit:'} </span>
+                <span className={`font-medium ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
+                  {limits.current} / {limits.limit}
+                </span>
+              </div>
+            )}
+            <Link
+              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/employees/new`}
+              className={`btn btn-primary ${limits && !limits.allowed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+              onClick={(e) => {
+                if (limits && !limits.allowed) {
+                  e.preventDefault();
+                  alert(isRTL ? 'تم الوصول للحد الأقصى לבاقتك' : 'You have reached your subscription limit');
+                }
+              }}
+            >
+              <span className="mr-2">{isRTL ? '➕' : ''}</span>
+              {t("addEmployee")}
+              <span className="ml-2">{!isRTL ? '➕' : ''}</span>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -152,31 +176,28 @@ export default function EmployeesPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setFilterActive(undefined)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterActive === undefined
+              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === undefined
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("all")}
             </button>
             <button
               onClick={() => setFilterActive(true)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterActive === true
+              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === true
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("active")}
             </button>
             <button
               onClick={() => setFilterActive(false)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterActive === false
+              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === false
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("inactive")}
             </button>
@@ -216,7 +237,7 @@ export default function EmployeesPage() {
                 <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
                   {employee.photo ? (
                     <img
-                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${employee.photo}`}
+                      src={getImageUrl(employee.photo)}
                       alt={employee.name}
                       className="w-full h-full object-cover"
                     />
@@ -225,9 +246,8 @@ export default function EmployeesPage() {
                   )}
                 </div>
                 <div
-                  className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} w-6 h-6 rounded-full border-2 border-white ${
-                    employee.isActive ? 'bg-green-500' : 'bg-gray-400'
-                  }`}
+                  className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} w-6 h-6 rounded-full border-2 border-white ${employee.isActive ? 'bg-green-500' : 'bg-gray-400'
+                    }`}
                 ></div>
               </div>
 

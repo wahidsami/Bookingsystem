@@ -88,6 +88,32 @@ async function getTenantSettings(tenantId) {
 }
 
 /**
+ * Get all active service categories for tenant service forms.
+ * GET /api/v1/tenant/services/categories
+ */
+exports.getServiceCategories = async (req, res) => {
+    try {
+        const categories = await db.ServiceCategory.findAll({
+            where: { isActive: true },
+            order: [['sortOrder', 'ASC'], ['name_en', 'ASC']],
+            attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
+        });
+
+        res.json({
+            success: true,
+            categories
+        });
+    } catch (error) {
+        console.error('Get service categories error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch service categories',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Get all services for the authenticated tenant
  * GET /api/v1/tenant/services
  */

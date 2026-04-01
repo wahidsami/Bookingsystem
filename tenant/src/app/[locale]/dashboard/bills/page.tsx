@@ -1,161 +1,151 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { TenantLayout } from "@/components/TenantLayout";
-import { Currency } from "@/components/Currency";
-import { tenantApi } from "@/lib/api";
+import { useState, useEffect } from 'react';
+import { TenantLayout } from '@/components/TenantLayout';
+import { tenantApi } from '@/lib/api';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 
-interface BillItem {
+interface Bill {
   id: string;
   billNumber: string;
   amount: number;
   currency: string;
   dueDate: string;
-  status: "UNPAID" | "PAID" | "EXPIRED";
-  paidAt?: string | null;
-  createdAt: string;
-  type: "initial" | "renewal" | "upgrade";
-  planSnapshot?: {
-    packageName?: string;
-    packageNameAr?: string;
-    billingCycle?: string;
-  };
+  status: string;
+  paidAt?: string;
+  planSnapshot?: { packageName?: string; billingCycle?: string };
+  type: string;
   paymentToken?: string;
 }
 
-const statusStyles: Record<string, string> = {
-  UNPAID: "bg-amber-100 text-amber-800",
-  PAID: "bg-green-100 text-green-800",
-  EXPIRED: "bg-gray-200 text-gray-700",
-};
-
 export default function BillsPage() {
   const params = useParams();
-  const locale = (params?.locale as string) || "ar";
-  const isRTL = locale === "ar";
-
+  const locale = (params?.locale as string) || 'ar';
+  const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [bills, setBills] = useState<BillItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    tenantApi
+      .getBills()
+      .then((res) => {
+        if (res.success && res.bills) setBills(res.bills);
+        else setError('Failed to load bills');
+      })
+      .catch(() => setError('Failed to load bills'))
+      .finally(() => setLoading(false));
+  }, []);
 
-    (async () => {
-      try {
-        const response = await tenantApi.getBills();
-        if (!mounted) return;
-        setBills((response?.bills || []) as BillItem[]);
-      } catch (err: any) {
-        if (!mounted) return;
-        setError(err.message || (locale === "ar" ? "تعذر تحميل الفواتير" : "Failed to load bills"));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
+  const statusLabel = (status: string) => {
+    if (locale === 'ar') {
+      if (status === 'UNPAID') return 'غير مدفوعة';
+      if (status === 'PAID') return 'مدفوعة';
+      if (status === 'EXPIRED') return 'منتهية';
+    }
+    return status;
+  };
 
-    return () => {
-      mounted = false;
-    };
-  }, [locale]);
+  const statusColor = (status: string) => {
+    if (status === 'PAID') return 'bg-green-100 text-green-800';
+    if (status === 'EXPIRED') return 'bg-red-100 text-red-800';
+    return 'bg-amber-100 text-amber-800';
+  };
 
   return (
     <TenantLayout>
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900" style={{ textAlign: isRTL ? "right" : "left" }}>
-          {locale === "ar" ? "فواتيري" : "My Bills"}
-        </h2>
-        <p className="mt-2 text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
-          {locale === "ar"
-            ? "راجع فواتير الاشتراك وادفع الفواتير المستحقة عند التجديد أو الترقية."
-            : "Review subscription invoices and pay any renewal or upgrade bill from here."}
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {locale === 'ar' ? 'فواتيري' : 'My Bills'}
+        </h1>
+        <p className="text-gray-600 mb-6">
+          {locale === 'ar'
+            ? 'عرض الفواتير ودفعها من هنا.'
+            : 'View and pay your bills here.'}
         </p>
-      </div>
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
+          </div>
+        )}
 
-      {loading ? (
-        <div className="card flex min-h-[260px] items-center justify-center">
-          <div className="spinner" />
-        </div>
-      ) : bills.length === 0 ? (
-        <div className="card py-16 text-center">
-          <h3 className="text-xl font-semibold text-gray-900">
-            {locale === "ar" ? "لا توجد فواتير حالياً" : "No bills yet"}
-          </h3>
-          <p className="mt-2 text-gray-600">
-            {locale === "ar"
-              ? "عند طلب ترقية أو تجديد ستظهر الفاتورة هنا."
-              : "When you request an upgrade or renewal, the invoice will appear here."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {bills.map((bill) => {
-            const packageName =
-              locale === "ar"
-                ? bill.planSnapshot?.packageNameAr || bill.planSnapshot?.packageName || "-"
-                : bill.planSnapshot?.packageName || bill.planSnapshot?.packageNameAr || "-";
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
 
-            return (
-              <div key={bill.id} className="card">
-                <div className={`flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between ${isRTL ? "lg:flex-row-reverse" : ""}`}>
-                  <div style={{ textAlign: isRTL ? "right" : "left" }}>
-                    <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                      <h3 className="text-xl font-bold text-gray-900">{bill.billNumber}</h3>
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[bill.status] || statusStyles.EXPIRED}`}>
-                        {bill.status}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {locale === "ar" ? "الباقة" : "Package"}: {packageName}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {locale === "ar" ? "نوع الفاتورة" : "Bill type"}: {bill.type}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {locale === "ar" ? "تاريخ الاستحقاق" : "Due date"}:{" "}
-                      {new Date(bill.dueDate).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
-                    </p>
-                    {bill.paidAt && (
-                      <p className="mt-1 text-sm text-gray-500">
-                        {locale === "ar" ? "تاريخ السداد" : "Paid at"}:{" "}
-                        {new Date(bill.paidAt).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className={`flex flex-col gap-3 ${isRTL ? "items-end" : "items-start lg:items-end"}`}>
-                    <div className="text-2xl font-bold text-gray-900">
-                      <Currency amount={bill.amount} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
-                    </div>
-                    {bill.status === "UNPAID" && bill.paymentToken ? (
-                      <Link
-                        href={`/${locale}/payment?token=${encodeURIComponent(bill.paymentToken)}`}
-                        className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white hover:bg-primary/90"
-                      >
-                        {locale === "ar" ? "ادفع الآن" : "Pay now"}
-                      </Link>
-                    ) : (
-                      <span className="text-sm text-gray-500">
-                        {bill.status === "PAID"
-                          ? (locale === "ar" ? "تم السداد" : "Paid")
-                          : (locale === "ar" ? "منتهية" : "Expired")}
-                      </span>
-                    )}
-                  </div>
-                </div>
+        {!loading && !error && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            {bills.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                {locale === 'ar' ? 'لا توجد فواتير.' : 'No bills yet.'}
               </div>
-            );
-          })}
-        </div>
-      )}
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">
+                        {locale === 'ar' ? 'رقم الفاتورة' : 'Bill number'}
+                      </th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">
+                        {locale === 'ar' ? 'الخطة' : 'Plan'}
+                      </th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">
+                        {locale === 'ar' ? 'المبلغ' : 'Amount'}
+                      </th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">
+                        {locale === 'ar' ? 'الموعد النهائي' : 'Due date'}
+                      </th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">
+                        {locale === 'ar' ? 'الحالة' : 'Status'}
+                      </th>
+                      <th className="text-right px-4 py-3 text-sm font-semibold text-gray-700">
+                        {locale === 'ar' ? 'إجراء' : 'Action'}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bills.map((bill) => (
+                      <tr key={bill.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">{bill.billNumber}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {bill.planSnapshot?.packageName || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900">
+                          {bill.amount} {bill.currency}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{bill.dueDate}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${statusColor(
+                              bill.status
+                            )}`}
+                          >
+                            {statusLabel(bill.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {bill.status === 'UNPAID' && bill.paymentToken && (
+                            <Link
+                              href={`/${locale}/payment?token=${bill.paymentToken}`}
+                              className="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+                            >
+                              {locale === 'ar' ? 'ادفع الآن' : 'Pay now'}
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </TenantLayout>
   );
 }

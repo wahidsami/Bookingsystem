@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { PhotoIcon, XMarkIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { tenantApi } from '@/lib/api';
+import { API_ORIGIN, getImageUrl, tenantApi } from '@/lib/api';
 
 interface HeroSlider {
   id: string;
@@ -84,13 +84,7 @@ export function HeroSliderTab() {
         // Fix image paths to include /uploads/ prefix
         const fixedSliders = heroSliders.map((slider: HeroSlider) => ({
           ...slider,
-          backgroundImage: slider.backgroundImage 
-            ? (slider.backgroundImage.startsWith('http') 
-                ? slider.backgroundImage 
-                : slider.backgroundImage.startsWith('/uploads/')
-                  ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${slider.backgroundImage}`
-                  : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`)
-            : null
+          backgroundImage: slider.backgroundImage ? getImageUrl(slider.backgroundImage) : null
         }));
         console.log('Fixed sliders:', fixedSliders);
         setSliders(fixedSliders);
@@ -166,7 +160,7 @@ export function HeroSliderTab() {
       setEditingSlider(slider);
       setFormData({ ...slider });
       if (slider.backgroundImage) {
-        setBackgroundImagePreview(slider.backgroundImage.startsWith('http') ? slider.backgroundImage : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`);
+        setBackgroundImagePreview(slider.backgroundImage.startsWith('http') ? slider.backgroundImage : getImageUrl(slider.backgroundImage));
       } else {
         setBackgroundImagePreview(null);
       }
@@ -218,12 +212,12 @@ export function HeroSliderTab() {
         formDataToSend.append('sliderId', formData.id);
         // Keep existing image if no new file
         if (!backgroundImageFile && formData.backgroundImage) {
-          // Extract just the path part (remove http://localhost:5000/uploads/ if present)
+          // Extract just the path part (remove API origin prefix if present)
           let imagePath = formData.backgroundImage;
           if (imagePath.includes('/uploads/')) {
-            imagePath = imagePath.split('/uploads/')[1];
-          } else if (imagePath.startsWith('http://localhost:5000')) {
-            imagePath = imagePath.replace('http://localhost:5000', '');
+            imagePath = imagePath.split('/uploads/')[1] ? `uploads/${imagePath.split('/uploads/')[1]}` : imagePath;
+          } else if (imagePath.startsWith(API_ORIGIN)) {
+            imagePath = imagePath.replace(API_ORIGIN, '').replace(/^\//, '');
           }
           formDataToSend.append('existingBackgroundImage', imagePath);
         }
@@ -265,13 +259,7 @@ export function HeroSliderTab() {
             // Fix image paths to include /uploads/ prefix
             const fixedSliders = heroSliders.map((slider: HeroSlider) => ({
               ...slider,
-              backgroundImage: slider.backgroundImage 
-                ? (slider.backgroundImage.startsWith('http') 
-                    ? slider.backgroundImage 
-                    : slider.backgroundImage.startsWith('/uploads/')
-                      ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${slider.backgroundImage}`
-                      : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`)
-                : null
+              backgroundImage: slider.backgroundImage ? getImageUrl(slider.backgroundImage) : null
             }));
             console.log('Fixed sliders to set:', fixedSliders);
             setSliders(fixedSliders);
@@ -401,7 +389,7 @@ export function HeroSliderTab() {
                 <div className="relative h-48 bg-gray-100">
                   {slider.backgroundImage ? (
                     <img
-                      src={slider.backgroundImage.startsWith('http') ? slider.backgroundImage : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${slider.backgroundImage}`}
+                      src={slider.backgroundImage.startsWith('http') ? slider.backgroundImage : getImageUrl(slider.backgroundImage)}
                       alt="Hero Slider"
                       className="w-full h-full object-cover"
                     />

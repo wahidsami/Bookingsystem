@@ -33,7 +33,6 @@ export default function NewEmployeePage() {
     skills: [] as string[],
     salary: "",
     commissionRate: "",
-    staffAppPassword: "",
     isActive: true
   });
   const [newSkill, setNewSkill] = useState("");
@@ -98,7 +97,6 @@ export default function NewEmployeePage() {
       submitData.append("skills", JSON.stringify(formData.skills));
       submitData.append("salary", formData.salary);
       submitData.append("commissionRate", formData.commissionRate || "0");
-      if (formData.staffAppPassword) submitData.append("staffAppPassword", formData.staffAppPassword);
       submitData.append("isActive", formData.isActive.toString());
       // Note: workingHours removed - use Schedules section to manage employee schedules
       
@@ -110,13 +108,6 @@ export default function NewEmployeePage() {
       const response = await tenantApi.createEmployee(submitData);
       
       if (response.success) {
-        if (response.staffAppAccess?.temporaryPassword && response.staffAppAccess?.email) {
-          window.alert(
-            locale === 'ar'
-              ? `تم إنشاء حساب تطبيق الموظفين.\nالبريد الإلكتروني: ${response.staffAppAccess.email}\nكلمة المرور المؤقتة: ${response.staffAppAccess.temporaryPassword}\nيرجى مشاركتها مع الموظف بشكل آمن.`
-              : `Staff app account created.\nEmail: ${response.staffAppAccess.email}\nTemporary password: ${response.staffAppAccess.temporaryPassword}\nPlease share it with the staff member securely.`
-          );
-        }
         router.push(`/${locale}/dashboard/employees`);
       } else {
         setError(response.message || t("createError"));
@@ -404,35 +395,6 @@ export default function NewEmployeePage() {
                     max="100"
                     step="0.01"
                     placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'دخول تطبيق الموظفين' : 'Staff App Access'}
-              </h3>
-
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {locale === 'ar'
-                    ? 'إذا أدخلت بريداً إلكترونياً للموظف، يمكنه تسجيل الدخول إلى تطبيق الموظفين. اترك كلمة المرور فارغة لإنشاء كلمة مرور مؤقتة تلقائياً.'
-                    : 'If the employee has an email, they can sign in to the staff app. Leave the password blank to generate a temporary one automatically.'}
-                </p>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'كلمة مرور تطبيق الموظفين' : 'Staff App Password'} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
-                  <input
-                    type="password"
-                    name="staffAppPassword"
-                    value={formData.staffAppPassword}
-                    onChange={handleChange}
-                    minLength={8}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />

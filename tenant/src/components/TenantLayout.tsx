@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useParams, useRouter } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import Link from "next/link";
 import { useTenantAuth } from "@/contexts/TenantAuthContext";
 import { useTranslations } from "next-intl";
 import { Currency } from "./Currency";
+import { getImageUrl } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 interface TenantLayoutProps {
   children: React.ReactNode;
@@ -38,10 +40,14 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: "📅" },
     { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦" },
     { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥" },
+    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: "📬" },
+    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: "🔔" },
     { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: "🤝" },
-    { name: t("subscription"), href: `/${locale}/dashboard/subscription`, icon: "💳" },
-    { name: locale === 'ar' ? 'الفواتير' : 'Bills', href: `/${locale}/dashboard/bills`, icon: "🧾" },
+    { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: "🧾" },
+    { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: "📋" },
     { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: "💰" },
+    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: "💳" },
+    { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: "⭐" },
     { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈" },
     { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐" },
     { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: "⚙️" },
@@ -108,7 +114,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
             >
               {(user?.logo || user?.profileImage) ? (
                 <img
-                  src={user.logo ? (user.logo.startsWith('http') ? user.logo : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${user.logo}`) : user.profileImage}
+                  src={user.logo ? (user.logo.startsWith('http') ? user.logo : getImageUrl(user.logo)) : getImageUrl(user.profileImage)}
                   alt="Business Logo"
                   className="w-12 h-12 rounded-lg object-cover border-2 border-primary/20"
                 />
@@ -123,7 +129,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                 <p className="text-sm font-bold text-gray-900 truncate">
                   {user?.businessName || "صالون رفاه"}
                 </p>
-                <p className="text-xs text-gray-600">{user?.businessType || "Salon"}</p>
+                <p className="text-xs text-gray-600">{Array.isArray(user?.businessType) ? user.businessType.map((t: string) => t.replace('_', ' ')).join(', ') : user?.businessType || "Salon"}</p>
               </div>
             </div>
           </div>
@@ -137,8 +143,8 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                   key={item.name}
                   href={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${active
-                      ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
-                      : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100"
                     }`}
                   style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                 >
@@ -210,4 +216,3 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     </div>
   );
 }
-

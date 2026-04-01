@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { tenantApi } from '@/lib/api';
+import { getImageUrl, tenantApi } from '@/lib/api';
 import { SwatchIcon, PaintBrushIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 interface GeneralSettings {
@@ -85,7 +85,7 @@ export function GeneralSettingsTab() {
         if (generalSettings.logo) {
           setLogoPreview(generalSettings.logo.startsWith('http') 
             ? generalSettings.logo 
-            : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${generalSettings.logo}`);
+            : getImageUrl(generalSettings.logo));
         }
       }
     } catch (err: any) {

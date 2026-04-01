@@ -48,8 +48,6 @@ interface Break {
   label: string | null;
   isRecurring: boolean;
   isActive: boolean;
-  startDate?: string | null;
-  endDate?: string | null;
 }
 
 interface TimeOff {
@@ -281,8 +279,8 @@ export default function SchedulesPage() {
                 <button
                   onClick={() => setActiveTab('shifts')}
                   className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'shifts'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
                   <ClockIcon className="w-4 h-4 inline mr-2" />
@@ -291,8 +289,8 @@ export default function SchedulesPage() {
                 <button
                   onClick={() => setActiveTab('breaks')}
                   className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'breaks'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
                   <PauseIcon className="w-4 h-4 inline mr-2" />
@@ -301,8 +299,8 @@ export default function SchedulesPage() {
                 <button
                   onClick={() => setActiveTab('timeoff')}
                   className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'timeoff'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
                   <NoSymbolIcon className="w-4 h-4 inline mr-2" />
@@ -311,8 +309,8 @@ export default function SchedulesPage() {
                 <button
                   onClick={() => setActiveTab('overrides')}
                   className={`px-6 py-3 border-b-2 font-medium text-sm ${activeTab === 'overrides'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
                   <ExclamationCircleIcon className="w-4 h-4 inline mr-2" />
@@ -432,25 +430,7 @@ export default function SchedulesPage() {
 }
 
 // Shifts Tab Component
-function ShiftsTab({
-  shifts,
-  employeeName,
-  onAdd,
-  onEdit,
-  onDelete,
-  onRefresh,
-  locale,
-  isRTL
-}: {
-  shifts: Shift[],
-  employeeName: string,
-  onAdd: () => void,
-  onEdit: (item: Shift) => void,
-  onDelete: (id: string) => void,
-  onRefresh: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function ShiftsTab({ shifts, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
   const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -550,25 +530,7 @@ function ShiftsTab({
 }
 
 // Breaks Tab Component
-function BreaksTab({
-  breaks,
-  employeeName,
-  onAdd,
-  onEdit,
-  onDelete,
-  onRefresh,
-  locale,
-  isRTL
-}: {
-  breaks: Break[],
-  employeeName: string,
-  onAdd: () => void,
-  onEdit: (item: Break) => void,
-  onDelete: (id: string) => void,
-  onRefresh: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function BreaksTab({ breaks, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
   const dayNames = locale === 'ar'
     ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
     : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -626,25 +588,7 @@ function BreaksTab({
 }
 
 // Time Off Tab Component
-function TimeOffTab({
-  timeOff,
-  employeeName,
-  onAdd,
-  onEdit,
-  onDelete,
-  onRefresh,
-  locale,
-  isRTL
-}: {
-  timeOff: TimeOff[],
-  employeeName: string,
-  onAdd: () => void,
-  onEdit: (item: TimeOff) => void,
-  onDelete: (id: string) => void,
-  onRefresh: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function TimeOffTab({ timeOff, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -700,25 +644,7 @@ function TimeOffTab({
 }
 
 // Overrides Tab Component
-function OverridesTab({
-  overrides,
-  employeeName,
-  onAdd,
-  onEdit,
-  onDelete,
-  onRefresh,
-  locale,
-  isRTL
-}: {
-  overrides: Override[],
-  employeeName: string,
-  onAdd: () => void,
-  onEdit: (item: Override) => void,
-  onDelete: (id: string) => void,
-  onRefresh: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function OverridesTab({ overrides, employeeName, onAdd, onEdit, onDelete, locale, isRTL }: any) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -778,22 +704,7 @@ function OverridesTab({
 }
 
 // Shift Modal Component
-function ShiftModal({
-  employeeId,
-  employeeName,
-  shift,
-  onClose,
-  onSave,
-  locale
-}: {
-  employeeId: string,
-  employeeName: string,
-  shift: Shift | null,
-  onClose: () => void,
-  onSave: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function ShiftModal({ employeeId, employeeName, shift, onClose, onSave, locale, isRTL }: any) {
   const [formData, setFormData] = useState({
     isRecurring: shift?.isRecurring !== false,
     dayOfWeek: shift?.dayOfWeek ?? null,
@@ -971,22 +882,7 @@ function ShiftModal({
 }
 
 // Break Modal Component
-function BreakModal({
-  employeeId,
-  employeeName,
-  breakItem,
-  onClose,
-  onSave,
-  locale
-}: {
-  employeeId: string,
-  employeeName: string,
-  breakItem: Break | null,
-  onClose: () => void,
-  onSave: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function BreakModal({ employeeId, employeeName, breakItem, onClose, onSave, locale, isRTL }: any) {
   const [formData, setFormData] = useState({
     isRecurring: breakItem?.isRecurring !== false,
     dayOfWeek: breakItem?.dayOfWeek ?? null,
@@ -1175,22 +1071,7 @@ function BreakModal({
 }
 
 // Time Off Modal Component
-function TimeOffModal({
-  employeeId,
-  employeeName,
-  timeOff,
-  onClose,
-  onSave,
-  locale
-}: {
-  employeeId: string,
-  employeeName: string,
-  timeOff: TimeOff | null,
-  onClose: () => void,
-  onSave: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function TimeOffModal({ employeeId, employeeName, timeOff, onClose, onSave, locale, isRTL }: any) {
   const [formData, setFormData] = useState({
     startDate: timeOff?.startDate || '',
     endDate: timeOff?.endDate || '',
@@ -1208,7 +1089,7 @@ function TimeOffModal({
         startDate: formData.startDate,
         endDate: formData.endDate,
         type: formData.type,
-        reason: formData.reason || undefined
+        reason: formData.reason || null
       };
 
       if (timeOff) {
@@ -1295,22 +1176,7 @@ function TimeOffModal({
 }
 
 // Override Modal Component
-function OverrideModal({
-  employeeId,
-  employeeName,
-  override,
-  onClose,
-  onSave,
-  locale
-}: {
-  employeeId: string,
-  employeeName: string,
-  override: Override | null,
-  onClose: () => void,
-  onSave: () => void,
-  locale: string,
-  isRTL: boolean
-}) {
+function OverrideModal({ employeeId, employeeName, override, onClose, onSave, locale, isRTL }: any) {
   const [formData, setFormData] = useState({
     date: override?.date || '',
     type: override?.type || 'override',

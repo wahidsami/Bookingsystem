@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { tenantApi } from '@/lib/api';
+import { getImageUrl, tenantApi } from '@/lib/api';
 
 interface PageBanners {
   services?: string | null;
@@ -49,7 +49,7 @@ export function PagesBannersTab() {
       if (response.success && response.data) {
         // Get page banners from dedicated field (not from generalSettings)
         const pageBanners = response.data.pageBanners || {};
-        
+
         setBanners({
           services: pageBanners.services || null,
           products: pageBanners.products || null,
@@ -59,22 +59,22 @@ export function PagesBannersTab() {
 
         // Set previews for existing banners
         if (pageBanners.services) {
-          setServicesBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.services}`);
+          setServicesBannerPreview(getImageUrl(pageBanners.services));
         } else {
           setServicesBannerPreview(null);
         }
         if (pageBanners.products) {
-          setProductsBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.products}`);
+          setProductsBannerPreview(getImageUrl(pageBanners.products ?? ''));
         } else {
           setProductsBannerPreview(null);
         }
         if (pageBanners.about) {
-          setAboutBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.about}`);
+          setAboutBannerPreview(getImageUrl(pageBanners.about ?? ''));
         } else {
           setAboutBannerPreview(null);
         }
         if (pageBanners.contact) {
-          setContactBannerPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${pageBanners.contact}`);
+          setContactBannerPreview(getImageUrl(pageBanners.contact));
         } else {
           setContactBannerPreview(null);
         }
@@ -160,7 +160,7 @@ export function PagesBannersTab() {
       if (!contactBannerFile && banners.contact) {
         pageBannersData.contact = banners.contact;
       }
-      
+
       // Only append pageBanners if there's data to send
       // This prevents sending empty object or null values that could overwrite existing banners
       if (Object.keys(pageBannersData).length > 0) {
@@ -170,10 +170,10 @@ export function PagesBannersTab() {
       await tenantApi.updatePublicPageData(formData);
       setSuccess(t('saved'));
       setTimeout(() => setSuccess(null), 3000);
-      
+
       // Reload to get updated paths
       await loadBanners();
-      
+
       // Clear file states
       setServicesBannerFile(null);
       setProductsBannerFile(null);
@@ -214,7 +214,7 @@ export function PagesBannersTab() {
           {hasBanner ? (
             <div className="relative">
               <img
-                src={preview || (existingBanner ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${existingBanner}` : '')}
+                src={preview || (existingBanner ? getImageUrl(existingBanner) : '')}
                 alt={`${title} banner`}
                 className="w-full h-48 object-cover rounded-lg"
               />
@@ -316,7 +316,7 @@ export function PagesBannersTab() {
           setServicesBannerFile,
           servicesBannerPreview,
           setServicesBannerPreview,
-          banners.services
+          banners.services || null
         )}
 
         {renderBannerUpload(
@@ -327,7 +327,7 @@ export function PagesBannersTab() {
           setProductsBannerFile,
           productsBannerPreview,
           setProductsBannerPreview,
-          banners.products
+          banners.products || null
         )}
 
         {renderBannerUpload(
@@ -338,7 +338,7 @@ export function PagesBannersTab() {
           setAboutBannerFile,
           aboutBannerPreview,
           setAboutBannerPreview,
-          banners.about
+          banners.about || null
         )}
 
         {renderBannerUpload(
@@ -349,7 +349,7 @@ export function PagesBannersTab() {
           setContactBannerFile,
           contactBannerPreview,
           setContactBannerPreview,
-          banners.contact
+          banners.contact || null
         )}
       </div>
 

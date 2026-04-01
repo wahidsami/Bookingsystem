@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -62,6 +62,7 @@ export default function ServicesPage() {
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [error, setError] = useState("");
+  const [limits, setLimits] = useState<any>(null);
 
   useEffect(() => {
     loadServices();
@@ -71,7 +72,7 @@ export default function ServicesPage() {
     try {
       setLoading(true);
       setError("");
-      
+
       const params: any = {};
       if (filterActive !== undefined) {
         params.isActive = filterActive;
@@ -83,16 +84,23 @@ export default function ServicesPage() {
         params.search = searchTerm;
       }
 
-      const response = await tenantApi.getServices(params);
-      
+      const [response, limitsData] = await Promise.all([
+        tenantApi.getServices(params),
+        tenantApi.getSubscriptionLimits().catch(() => null)
+      ]);
+
+      if (limitsData?.services) {
+        setLimits(limitsData.services);
+      }
+
       // Handle different response structures
       const data = response.data || response;
-      
+
       if (data.success !== false) {
         // Response is successful (either success: true or success is undefined but no error)
         const servicesList = data.services || data.data?.services || [];
         setServices(servicesList);
-        
+
         if (servicesList.length === 0 && !filterActive && !filterCategory && !searchTerm) {
           console.log("No services found. Response:", response);
         }
@@ -116,8 +124,8 @@ export default function ServicesPage() {
 
   const handleDelete = async (id: string, name: string) => {
     const serviceName = locale === 'ar' ? name : name;
-    if (!confirm(locale === 'ar' 
-      ? `هل أنت متأكد من حذف الخدمة "${serviceName}"؟` 
+    if (!confirm(locale === 'ar'
+      ? `هل أنت متأكد من حذف الخدمة "${serviceName}"؟`
       : `Are you sure you want to delete service "${serviceName}"?`)) {
       return;
     }
@@ -157,15 +165,31 @@ export default function ServicesPage() {
               {t("subtitle")}
             </p>
           </div>
-          <Link
-            href={`/${locale}/dashboard/services/new`}
-            className="btn btn-primary"
-            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-          >
-            <span className="mr-2">{isRTL ? '➕' : ''}</span>
-            {t("addService")}
-            <span className="ml-2">{!isRTL ? '➕' : ''}</span>
-          </Link>
+          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            {limits && (
+              <div className="text-sm px-3 py-1 bg-gray-100 rounded-lg whitespace-nowrap">
+                <span className="text-gray-500">{isRTL ? 'الحد المسموح:' : 'Limit:'} </span>
+                <span className={`font-medium ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
+                  {limits.current} / {limits.limit}
+                </span>
+              </div>
+            )}
+            <Link
+              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/services/new`}
+              className={`btn btn-primary ${limits && !limits.allowed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+              onClick={(e) => {
+                if (limits && !limits.allowed) {
+                  e.preventDefault();
+                  alert(isRTL ? 'تم الوصول للحد الأقصى לבاقتك' : 'You have reached your subscription limit');
+                }
+              }}
+            >
+              <span className="mr-2">{isRTL ? '➕' : ''}</span>
+              {t("addService")}
+              <span className="ml-2">{!isRTL ? '➕' : ''}</span>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -203,31 +227,28 @@ export default function ServicesPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setFilterActive(undefined)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterActive === undefined
+              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === undefined
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("all")}
             </button>
             <button
               onClick={() => setFilterActive(true)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterActive === true
+              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === true
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("active")}
             </button>
             <button
               onClick={() => setFilterActive(false)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterActive === false
+              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === false
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("inactive")}
             </button>
@@ -267,7 +288,7 @@ export default function ServicesPage() {
                 <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
                   {service.image ? (
                     <img
-                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${service.image}`}
+                      src={getImageUrl(service.image)}
                       alt={locale === 'ar' ? service.name_ar : service.name_en}
                       className="w-full h-full object-cover"
                     />
@@ -286,9 +307,8 @@ export default function ServicesPage() {
                   </div>
                 )}
                 <div
-                  className={`absolute bottom-2 ${isRTL ? 'right-2' : 'left-2'} w-6 h-6 rounded-full border-2 border-white ${
-                    service.isActive ? 'bg-green-500' : 'bg-gray-400'
-                  }`}
+                  className={`absolute bottom-2 ${isRTL ? 'right-2' : 'left-2'} w-6 h-6 rounded-full border-2 border-white ${service.isActive ? 'bg-green-500' : 'bg-gray-400'
+                    }`}
                   title={service.isActive ? t("active") : t("inactive")}
                 ></div>
               </div>
@@ -311,33 +331,37 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              {/* Pricing Breakdown */}
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">{t("rawPrice")}</span>
-                  <span className="font-semibold text-gray-900">
-                    <Currency amount={service.rawPrice} />
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">{t("tax")} ({service.taxRate}%)</span>
-                  <span className="text-gray-700">
-                    <Currency amount={service.rawPrice * (service.taxRate / 100)} />
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">{t("commission")} ({service.commissionRate}%)</span>
-                  <span className="text-gray-700">
-                    <Currency amount={service.rawPrice * (service.commissionRate / 100)} />
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <span className="font-semibold text-gray-900">{t("finalPrice")}</span>
-                  <span className="font-bold text-primary text-lg">
-                    <Currency amount={service.finalPrice} />
-                  </span>
-                </div>
-              </div>
+              {/* Pricing: (raw + platform fee), then tax = 15% of that sum */}
+              {(() => {
+                const raw = Number(service.rawPrice) || 0;
+                const platformFee = raw * ((Number(service.commissionRate) || 10) / 100);
+                const subtotalBeforeTax = raw + platformFee;
+                const taxAmount = subtotalBeforeTax * ((Number(service.taxRate) || 15) / 100);
+                return (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{t("rawPrice")}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={raw} /></span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{t("commission")} ({service.commissionRate}%)</span>
+                      <span className="text-gray-700"><Currency amount={platformFee} /></span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>{t("subtotalBeforeTax") || "Subtotal"}</span>
+                      <span><Currency amount={subtotalBeforeTax} /></span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{t("tax")} ({service.taxRate}% of subtotal)</span>
+                      <span className="text-gray-700"><Currency amount={taxAmount} /></span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                      <span className="font-semibold text-gray-900">{t("finalPrice")}</span>
+                      <span className="font-bold text-primary text-lg"><Currency amount={service.finalPrice} /></span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Includes */}
               {service.includes && service.includes.length > 0 && (
@@ -369,7 +393,7 @@ export default function ServicesPage() {
                       <div key={emp.id} className="flex items-center gap-1">
                         {emp.photo ? (
                           <img
-                            src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${emp.photo}`}
+                            src={getImageUrl(emp.photo)}
                             alt={emp.name}
                             className="w-6 h-6 rounded-full object-cover"
                           />

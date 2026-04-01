@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -287,7 +287,7 @@ export default function OrderDetailsPage() {
                 {order.user.photo ? (
                   <>
                     <img
-                      src={order.user.photo.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${order.user.photo}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${order.user.photo}`}
+                      src={getImageUrl(order.user.photo)}
                       alt={userName}
                       className="w-16 h-16 rounded-full object-cover"
                       onError={(e) => {
@@ -330,7 +330,7 @@ export default function OrderDetailsPage() {
                 <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   {item.product?.image && (
                     <img
-                      src={item.product.image.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${item.product.image}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${item.product.image}`}
+                      src={getImageUrl(item.product.image)}
                       alt={locale === 'ar' && item.productNameAr ? item.productNameAr : item.productName}
                       className="w-16 h-16 rounded-lg object-cover"
                     />

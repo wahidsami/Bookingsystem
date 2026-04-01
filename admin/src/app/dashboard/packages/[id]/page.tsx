@@ -5,6 +5,60 @@ import { useRouter, useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 
+// Mapping from formData field keys to FeaturePricing featureKeys (same as create)
+const RESOURCE_PRICE_MAP: Record<string, { featureKey: string; multiplier?: number }> = {
+    maxBookingsPerMonth: { featureKey: 'bookingsPerMonth' },
+    maxStaff: { featureKey: 'maxStaff' },
+    maxServices: { featureKey: 'maxServices' },
+    maxProducts: { featureKey: 'maxProducts' },
+    storageGB: { featureKey: 'storage', multiplier: 1024 },
+};
+
+const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boolean }> = {
+    hasSubscriptionFee: { featureKey: 'subscriptionFee', isBoolean: true },
+    hasProductsAndOrders: { featureKey: 'productsAndOrders', isBoolean: true },
+    hasInternalMessaging: { featureKey: 'internalMessaging', isBoolean: true },
+    whatsappNotifications: { featureKey: 'whatsappNotifications' },
+    inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
+    aiContentAssistant: { featureKey: 'aiContentAssistant' },
+    promotionalEmails: { featureKey: 'promotionalEmails' },
+    searchRankingBoost: { featureKey: 'searchRankingBoost' },
+    newToRefahDays: { featureKey: 'newToRefah' },
+    maxHotDeals: { featureKey: 'hotDeals' },
+};
+
+const defaultFormData = {
+    name: '',
+    name_ar: '',
+    slug: '',
+    description: '',
+    description_ar: '',
+    platformCommission: '5.00',
+    displayOrder: '0',
+    isActive: true,
+    isFeatured: false,
+    maxBookingsPerMonth: '100',
+    maxStaff: '5',
+    maxServices: '20',
+    maxProducts: '10',
+    storageGB: '2',
+    hasSubscriptionFee: true,
+    hasProductsAndOrders: false,
+    hasInternalMessaging: false,
+    whatsappNotifications: '0',
+    inAppMarketingNotifications: '0',
+    aiContentAssistant: '0',
+    promotionalEmails: '0',
+    searchRankingBoost: '0',
+    hasNewToRefah: false,
+    newToRefahDays: '0',
+    featuredCarousel: false,
+    carouselPriority: 'low',
+    maxHotDeals: '0',
+    hotDealsAutoApprove: false,
+    featuredProducts: '0'
+};
+
 export default function EditPackagePage() {
     const router = useRouter();
     const params = useParams();
@@ -12,55 +66,21 @@ export default function EditPackagePage() {
 
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
-    const [formData, setFormData] = useState({
-        name: '',
-        name_ar: '',
-        slug: '',
-        description: '',
-        description_ar: '',
-        monthlyPrice: '',
-        sixMonthPrice: '',
-        annualPrice: '',
-        platformCommission: '5.00',
-        displayOrder: '0',
-        isActive: true,
-        isFeatured: false,
-        // Limits
-        maxBookingsPerMonth: '100',
-        maxStaff: '5',
-        maxServices: '20',
-        maxProducts: '10',
-        storageGB: '2',
-        // Features
-        hasAdvancedReports: false,
-        hasWhatsAppNotifications: false,
-        hasSMSNotifications: false,
-        hasEmailNotifications: true,
-        hasVoiceNotifications: false,
-        hasMultiLocation: false,
-        hasInventoryManagement: false,
-        hasLoyaltyProgram: false,
-        hasGiftCards: false,
-        hasOnlinePayments: true,
-        hasCustomBranding: false,
-        hasAPIAccess: false,
-        hasPrioritySupport: false,
-        hasDedicatedAccountManager: false,
-        // Promotional Features
-        featuredCarousel: false,
-        carouselPriority: 'low',
-        maxHotDeals: '0',
-        hotDealsAutoApprove: false,
-        searchRankingBoost: 'standard',
-        homepageBanner: false,
-        featuredProducts: '0',
-        pushNotifications: false,
-        emailMarketing: false,
-        advancedAnalytics: false,
-        prioritySupport: false
-    });
+    const [featurePrices, setFeaturePrices] = useState<Record<string, number>>({});
+    const [formData, setFormData] = useState(defaultFormData);
 
     useEffect(() => {
+        adminApi.getFeaturePricing().then((res) => {
+            if (res.success) {
+                const priceMap: Record<string, number> = {};
+                res.features.forEach((f: any) => { priceMap[f.featureKey] = parseFloat(f.unitPrice); });
+                setFeaturePrices(priceMap);
+            }
+        }).catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        if (!packageId) return;
         fetchPackage();
     }, [packageId]);
 
@@ -68,53 +88,41 @@ export default function EditPackagePage() {
         try {
             const response = await adminApi.getPackage(packageId);
             const pkg = response.package;
+            const limits = pkg.limits || {};
+
+            const toStr = (v: any, def: string) => (v === undefined || v === null ? def : String(v));
+            const toBool = (v: any, def: boolean) => (typeof v === 'boolean' ? v : def);
 
             setFormData({
-                name: pkg.name,
-                name_ar: pkg.name_ar,
-                slug: pkg.slug,
+                name: pkg.name || '',
+                name_ar: pkg.name_ar || '',
+                slug: pkg.slug || '',
                 description: pkg.description || '',
                 description_ar: pkg.description_ar || '',
-                monthlyPrice: pkg.monthlyPrice,
-                sixMonthPrice: pkg.sixMonthPrice,
-                annualPrice: pkg.annualPrice,
-                platformCommission: pkg.platformCommission,
-                displayOrder: pkg.displayOrder.toString(),
-                isActive: pkg.isActive,
-                isFeatured: pkg.isFeatured,
-                // Limits
-                maxBookingsPerMonth: pkg.limits.maxBookingsPerMonth.toString(),
-                maxStaff: pkg.limits.maxStaff.toString(),
-                maxServices: pkg.limits.maxServices.toString(),
-                maxProducts: pkg.limits.maxProducts.toString(),
-                storageGB: pkg.limits.storageGB.toString(),
-                // Features
-                hasAdvancedReports: pkg.limits.hasAdvancedReports || false,
-                hasWhatsAppNotifications: pkg.limits.hasWhatsAppNotifications || false,
-                hasSMSNotifications: pkg.limits.hasSMSNotifications || false,
-                hasEmailNotifications: pkg.limits.hasEmailNotifications || false,
-                hasVoiceNotifications: pkg.limits.hasVoiceNotifications || false,
-                hasMultiLocation: pkg.limits.hasMultiLocation || false,
-                hasInventoryManagement: pkg.limits.hasInventoryManagement || false,
-                hasLoyaltyProgram: pkg.limits.hasLoyaltyProgram || false,
-                hasGiftCards: pkg.limits.hasGiftCards || false,
-                hasOnlinePayments: pkg.limits.hasOnlinePayments || false,
-                hasCustomBranding: pkg.limits.hasCustomBranding || false,
-                hasAPIAccess: pkg.limits.hasAPIAccess || false,
-                hasPrioritySupport: pkg.limits.hasPrioritySupport || false,
-                hasDedicatedAccountManager: pkg.limits.hasDedicatedAccountManager || false,
-                // Promotional Features
-                featuredCarousel: pkg.limits.featuredCarousel || false,
-                carouselPriority: pkg.limits.carouselPriority || 'low',
-                maxHotDeals: (pkg.limits.maxHotDeals || 0).toString(),
-                hotDealsAutoApprove: pkg.limits.hotDealsAutoApprove || false,
-                searchRankingBoost: pkg.limits.searchRankingBoost || 'standard',
-                homepageBanner: pkg.limits.homepageBanner || false,
-                featuredProducts: (pkg.limits.featuredProducts || 0).toString(),
-                pushNotifications: pkg.limits.pushNotifications || false,
-                emailMarketing: pkg.limits.emailMarketing || false,
-                advancedAnalytics: pkg.limits.advancedAnalytics || false,
-                prioritySupport: pkg.limits.prioritySupport || false
+                platformCommission: toStr(pkg.platformCommission, '5.00'),
+                displayOrder: toStr(pkg.displayOrder, '0'),
+                isActive: pkg.isActive !== false,
+                isFeatured: pkg.isFeatured === true,
+                maxBookingsPerMonth: toStr(limits.maxBookingsPerMonth, '100'),
+                maxStaff: toStr(limits.maxStaff, '5'),
+                maxServices: toStr(limits.maxServices, '20'),
+                maxProducts: toStr(limits.maxProducts, '10'),
+                storageGB: toStr(limits.storageGB, '2'),
+                hasSubscriptionFee: toBool(limits.hasSubscriptionFee, true),
+                hasProductsAndOrders: toBool(limits.hasProductsAndOrders, false),
+                hasInternalMessaging: toBool(limits.hasInternalMessaging, false),
+                whatsappNotifications: toStr(limits.whatsappNotifications, '0'),
+                inAppMarketingNotifications: toStr(limits.inAppMarketingNotifications, '0'),
+                aiContentAssistant: toStr(limits.aiContentAssistant, '0'),
+                promotionalEmails: toStr(limits.promotionalEmails, '0'),
+                searchRankingBoost: toStr(limits.searchRankingBoost, '0'),
+                hasNewToRefah: toBool(limits.hasNewToRefah, false),
+                newToRefahDays: toStr(limits.newToRefahDays, '0'),
+                featuredCarousel: toBool(limits.featuredCarousel, false),
+                carouselPriority: limits.carouselPriority || 'low',
+                maxHotDeals: toStr(limits.maxHotDeals, '0'),
+                hotDealsAutoApprove: toBool(limits.hotDealsAutoApprove, false),
+                featuredProducts: toStr(limits.featuredProducts, '0')
             });
         } catch (error: any) {
             alert(error.message || 'Failed to fetch package');
@@ -123,44 +131,68 @@ export default function EditPackagePage() {
         }
     };
 
+    const getFieldCost = (fieldKey: string): number => {
+        const mapping = RESOURCE_PRICE_MAP[fieldKey];
+        if (!mapping) return 0;
+        const qty = parseInt((formData as any)[fieldKey] || '0');
+        if (isNaN(qty) || qty <= 0) return 0;
+        const unitPrice = featurePrices[mapping.featureKey] || 0;
+        const multiplier = mapping.multiplier || 1;
+        return qty * multiplier * unitPrice;
+    };
+
+    const resourceLimitsTotal = Object.keys(RESOURCE_PRICE_MAP).reduce((sum, key) => sum + getFieldCost(key), 0);
+
+    const getFeatureItemCost = (fieldKey: string): number => {
+        const mapping = FEATURES_PRICE_MAP[fieldKey];
+        if (!mapping) return 0;
+        const unitPrice = featurePrices[mapping.featureKey] || 0;
+        if (mapping.isBoolean) {
+            return (formData as any)[fieldKey] === true ? unitPrice : 0;
+        } else if (fieldKey === 'newToRefahDays') {
+            if (!formData.hasNewToRefah) return 0;
+            const days = parseInt(formData.newToRefahDays || '0');
+            return isNaN(days) || days <= 0 ? 0 : days * unitPrice;
+        } else {
+            const qty = parseInt((formData as any)[fieldKey] || '0');
+            return isNaN(qty) || qty <= 0 ? 0 : qty * unitPrice;
+        }
+    };
+
+    const featuresTotal = Object.keys(FEATURES_PRICE_MAP).reduce((sum, key) => sum + getFeatureItemCost(key), 0);
+
+    const commissionPct = parseFloat(formData.platformCommission) || 0;
+    const rawCostAmountA = resourceLimitsTotal + featuresTotal;
+    const costWithCommissionAmountB = rawCostAmountA + (rawCostAmountA * (commissionPct / 100));
+    const finalMonthlyPrice = costWithCommissionAmountB + (costWithCommissionAmountB * 0.15);
+    const finalSixMonthPrice = (costWithCommissionAmountB * 6) + ((costWithCommissionAmountB * 6) * 0.15);
+    const finalAnnualPrice = (costWithCommissionAmountB * 12) + ((costWithCommissionAmountB * 12) * 0.15);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-
         try {
-            // Build limits object
             const limits = {
                 maxBookingsPerMonth: formData.maxBookingsPerMonth === '-1' ? -1 : parseInt(formData.maxBookingsPerMonth),
                 maxStaff: formData.maxStaff === '-1' ? -1 : parseInt(formData.maxStaff),
                 maxServices: formData.maxServices === '-1' ? -1 : parseInt(formData.maxServices),
                 maxProducts: formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts),
                 storageGB: parseInt(formData.storageGB),
-                hasAdvancedReports: formData.hasAdvancedReports,
-                hasWhatsAppNotifications: formData.hasWhatsAppNotifications,
-                hasSMSNotifications: formData.hasSMSNotifications,
-                hasEmailNotifications: formData.hasEmailNotifications,
-                hasVoiceNotifications: formData.hasVoiceNotifications,
-                hasMultiLocation: formData.hasMultiLocation,
-                hasInventoryManagement: formData.hasInventoryManagement,
-                hasLoyaltyProgram: formData.hasLoyaltyProgram,
-                hasGiftCards: formData.hasGiftCards,
-                hasOnlinePayments: formData.hasOnlinePayments,
-                hasCustomBranding: formData.hasCustomBranding,
-                hasAPIAccess: formData.hasAPIAccess,
-                hasPrioritySupport: formData.hasPrioritySupport,
-                hasDedicatedAccountManager: formData.hasDedicatedAccountManager,
-                // Promotional Features
+                hasSubscriptionFee: formData.hasSubscriptionFee,
+                hasProductsAndOrders: formData.hasProductsAndOrders,
+                hasInternalMessaging: formData.hasInternalMessaging,
+                whatsappNotifications: parseInt(formData.whatsappNotifications) || 0,
+                inAppMarketingNotifications: parseInt(formData.inAppMarketingNotifications) || 0,
+                aiContentAssistant: parseInt(formData.aiContentAssistant) || 0,
+                promotionalEmails: parseInt(formData.promotionalEmails) || 0,
+                searchRankingBoost: parseInt(formData.searchRankingBoost) || 0,
+                newToRefahDays: parseInt(formData.newToRefahDays) || 0,
+                hasNewToRefah: formData.hasNewToRefah,
                 featuredCarousel: formData.featuredCarousel,
                 carouselPriority: formData.carouselPriority,
                 maxHotDeals: formData.maxHotDeals === '-1' ? -1 : parseInt(formData.maxHotDeals),
                 hotDealsAutoApprove: formData.hotDealsAutoApprove,
-                searchRankingBoost: formData.searchRankingBoost,
-                homepageBanner: formData.homepageBanner,
-                featuredProducts: formData.featuredProducts === '-1' ? -1 : parseInt(formData.featuredProducts),
-                pushNotifications: formData.pushNotifications,
-                emailMarketing: formData.emailMarketing,
-                advancedAnalytics: formData.advancedAnalytics,
-                prioritySupport: formData.prioritySupport
+                featuredProducts: formData.featuredProducts === '-1' ? -1 : parseInt(formData.featuredProducts)
             };
 
             const payload = {
@@ -169,9 +201,9 @@ export default function EditPackagePage() {
                 slug: formData.slug,
                 description: formData.description,
                 description_ar: formData.description_ar,
-                monthlyPrice: parseFloat(formData.monthlyPrice),
-                sixMonthPrice: parseFloat(formData.sixMonthPrice),
-                annualPrice: parseFloat(formData.annualPrice),
+                monthlyPrice: finalMonthlyPrice,
+                sixMonthPrice: finalSixMonthPrice,
+                annualPrice: finalAnnualPrice,
                 platformCommission: parseFloat(formData.platformCommission),
                 displayOrder: parseInt(formData.displayOrder),
                 isActive: formData.isActive,
@@ -213,20 +245,16 @@ export default function EditPackagePage() {
                         ← Back to Packages
                     </button>
                     <h1 className="text-2xl font-bold text-white">Edit Package</h1>
-                    <p className="text-dark-300 mt-1">Update subscription package details</p>
+                    <p className="text-dark-300 mt-1">Update subscription package — same form as create</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left Column */}
                     <div className="space-y-6">
-                        {/* Basic Information - Same as create page */}
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
                             <h2 className="text-lg font-semibold text-white mb-4">Basic Information</h2>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Name (English) *
-                                    </label>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">Name (English) *</label>
                                     <input
                                         type="text"
                                         required
@@ -236,9 +264,7 @@ export default function EditPackagePage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Name (Arabic) *
-                                    </label>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">Name (Arabic) *</label>
                                     <input
                                         type="text"
                                         required
@@ -250,21 +276,18 @@ export default function EditPackagePage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-dark-300 mb-1">
-                                            Slug (URL-friendly) *
-                                        </label>
+                                        <label className="block text-sm font-medium text-dark-300 mb-1">Slug (URL-friendly) *</label>
                                         <input
                                             type="text"
                                             required
                                             value={formData.slug}
                                             onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
                                             className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            placeholder="e.g., premium-plus"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-dark-300 mb-1">
-                                            Display Order
-                                        </label>
+                                        <label className="block text-sm font-medium text-dark-300 mb-1">Display Order</label>
                                         <input
                                             type="number"
                                             value={formData.displayOrder}
@@ -274,9 +297,7 @@ export default function EditPackagePage() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Description (English)
-                                    </label>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">Description (English)</label>
                                     <textarea
                                         value={formData.description}
                                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -285,9 +306,7 @@ export default function EditPackagePage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Description (Arabic)
-                                    </label>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">Description (Arabic)</label>
                                     <textarea
                                         value={formData.description_ar}
                                         onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
@@ -299,55 +318,12 @@ export default function EditPackagePage() {
                             </div>
                         </div>
 
-                        {/* Pricing - Same structure */}
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
-                            <h2 className="text-lg font-semibold text-white mb-4">Pricing (SAR)</h2>
-                            <div className="space-y-4">
+                            <h2 className="text-lg font-semibold text-white mb-4">Pricing Calculation (SAR)</h2>
+                            <p className="text-sm text-dark-400 mb-6">Prices are automatically calculated from limits & features, plus the platform commission, and 15% VAT (ضريبة القيمة المضافة).</p>
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Monthly Price *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={formData.monthlyPrice}
-                                        onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        6-Month Price *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={formData.sixMonthPrice}
-                                        onChange={(e) => setFormData({ ...formData, sixMonthPrice: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                    <p className="text-xs text-dark-400 mt-1">Recommended: Monthly × 6 × 0.9 (10% off)</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Annual Price *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={formData.annualPrice}
-                                        onChange={(e) => setFormData({ ...formData, annualPrice: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                    <p className="text-xs text-dark-400 mt-1">Recommended: Monthly × 12 × 0.83 (17% off)</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">
-                                        Platform Commission (%)
-                                    </label>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">Platform Commission (%)</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -355,11 +331,34 @@ export default function EditPackagePage() {
                                         onChange={(e) => setFormData({ ...formData, platformCommission: e.target.value })}
                                         className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                     />
+                                    <p className="text-xs text-dark-400 mt-1">This markup is added to the base cost before VAT.</p>
+                                </div>
+                                <div className="p-4 bg-dark-900 rounded-lg border border-dark-700 space-y-4">
+                                    <div className="flex justify-between items-center pb-3 border-b border-dark-700">
+                                        <div>
+                                            <span className="text-sm font-medium text-white block">Monthly Price</span>
+                                            <span className="text-xs text-dark-400">Includes 15% VAT</span>
+                                        </div>
+                                        <div className="text-xl font-bold text-green-400">SAR {finalMonthlyPrice.toFixed(2)}</div>
+                                    </div>
+                                    <div className="flex justify-between items-center pb-3 border-b border-dark-700">
+                                        <div>
+                                            <span className="text-sm font-medium text-white block">6-Month Price</span>
+                                            <span className="text-xs text-dark-400">Includes 15% VAT</span>
+                                        </div>
+                                        <div className="text-lg font-bold text-purple-400">SAR {finalSixMonthPrice.toFixed(2)}</div>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <span className="text-sm font-medium text-white block">Annual Price</span>
+                                            <span className="text-xs text-dark-400">Includes 15% VAT</span>
+                                        </div>
+                                        <div className="text-lg font-bold text-purple-400">SAR {finalAnnualPrice.toFixed(2)}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Status */}
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
                             <h2 className="text-lg font-semibold text-white mb-4">Status</h2>
                             <div className="space-y-3">
@@ -385,95 +384,139 @@ export default function EditPackagePage() {
                         </div>
                     </div>
 
-                    {/* Right Column - Limits & Features (same structure as create) */}
                     <div className="space-y-6">
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
-                            <h2 className="text-lg font-semibold text-white mb-4">Resource Limits</h2>
+                            <div className="flex items-center justify-between mb-1">
+                                <h2 className="text-lg font-semibold text-white">Resource Limits</h2>
+                                <span className="text-sm font-semibold px-3 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                                    Total: SAR {resourceLimitsTotal.toFixed(2)}
+                                </span>
+                            </div>
                             <p className="text-sm text-dark-400 mb-4">Use -1 for unlimited</p>
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">Bookings/Month</label>
-                                    <input
-                                        type="number"
-                                        value={formData.maxBookingsPerMonth}
-                                        onChange={(e) => setFormData({ ...formData, maxBookingsPerMonth: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">Max Staff</label>
-                                    <input
-                                        type="number"
-                                        value={formData.maxStaff}
-                                        onChange={(e) => setFormData({ ...formData, maxStaff: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">Max Services</label>
-                                    <input
-                                        type="number"
-                                        value={formData.maxServices}
-                                        onChange={(e) => setFormData({ ...formData, maxServices: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">Max Products</label>
-                                    <input
-                                        type="number"
-                                        value={formData.maxProducts}
-                                        onChange={(e) => setFormData({ ...formData, maxProducts: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">Storage (GB)</label>
-                                    <input
-                                        type="number"
-                                        value={formData.storageGB}
-                                        onChange={(e) => setFormData({ ...formData, storageGB: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
+                                {[
+                                    { key: 'maxBookingsPerMonth', label: 'Bookings/Month' },
+                                    { key: 'maxStaff', label: 'Max Staff' },
+                                    { key: 'maxServices', label: 'Max Services' },
+                                    { key: 'maxProducts', label: 'Max Products' },
+                                    { key: 'storageGB', label: 'Storage (GB)' },
+                                ].map((field) => {
+                                    const qty = parseInt((formData as any)[field.key] || '0');
+                                    const cost = getFieldCost(field.key);
+                                    const isUnlimited = qty === -1;
+                                    return (
+                                        <div key={field.key}>
+                                            <label className="block text-sm font-medium text-dark-300 mb-1">{field.label}</label>
+                                            <input
+                                                type="number"
+                                                value={(formData as any)[field.key]}
+                                                onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            />
+                                            <div className="mt-1 text-xs">
+                                                {isUnlimited ? <span className="text-yellow-400">∞ Unlimited</span> : cost > 0 ? <span className="text-green-400">SAR {cost.toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
-                            <h2 className="text-lg font-semibold text-white mb-4">Features</h2>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold text-white">Features</h2>
+                                <span className="text-sm font-semibold px-3 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                                    Total: SAR {featuresTotal.toFixed(2)} / month
+                                </span>
+                            </div>
+                            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-2 border-b border-dark-700 pb-6">
                                 {[
-                                    { key: 'hasAdvancedReports', label: 'Advanced Reports' },
-                                    { key: 'hasWhatsAppNotifications', label: 'WhatsApp Notifications' },
-                                    { key: 'hasSMSNotifications', label: 'SMS Notifications' },
-                                    { key: 'hasEmailNotifications', label: 'Email Notifications' },
-                                    { key: 'hasVoiceNotifications', label: 'Voice Notifications' },
-                                    { key: 'hasMultiLocation', label: 'Multi-Location' },
-                                    { key: 'hasInventoryManagement', label: 'Inventory Management' },
-                                    { key: 'hasLoyaltyProgram', label: 'Loyalty Program' },
-                                    { key: 'hasGiftCards', label: 'Gift Cards' },
-                                    { key: 'hasOnlinePayments', label: 'Online Payments' },
-                                    { key: 'hasCustomBranding', label: 'Custom Branding' },
-                                    { key: 'hasAPIAccess', label: 'API Access' },
-                                    { key: 'hasPrioritySupport', label: 'Priority Support' },
-                                    { key: 'hasDedicatedAccountManager', label: 'Account Manager' },
-                                ].map((feature) => (
-                                    <label key={feature.key} className="flex items-center gap-2 cursor-pointer">
+                                    { key: 'hasSubscriptionFee', label: 'Subscription Fee' },
+                                    { key: 'hasProductsAndOrders', label: 'Products & Orders (E-commerce)' },
+                                    { key: 'hasInternalMessaging', label: 'Internal Messaging' },
+                                ].map((feature) => {
+                                    const cost = getFeatureItemCost(feature.key);
+                                    return (
+                                        <div key={feature.key} className="flex flex-col">
+                                            <label className="flex items-center gap-2 cursor-pointer mb-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(formData as any)[feature.key] as boolean}
+                                                    onChange={(e) => setFormData({ ...formData, [feature.key]: e.target.checked })}
+                                                    className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                                                />
+                                                <span className="text-sm font-medium text-white">{feature.label}</span>
+                                            </label>
+                                            <div className="text-xs ml-6">
+                                                {cost > 0 ? <span className="text-green-400">SAR {cost.toFixed(2)} / mo</span> : <span className="text-dark-500">SAR 0.00</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {[
+                                    { key: 'whatsappNotifications', label: 'WhatsApp Notifications', desc: 'Max messages/mo' },
+                                    { key: 'inAppMarketingNotifications', label: 'In-App Marketing Notifs', desc: 'Max messages/mo' },
+                                    { key: 'aiContentAssistant', label: '✨ AI Content Assistant', desc: 'Tokens/mo (in thousands)' },
+                                    { key: 'promotionalEmails', label: 'Promotional Emails', desc: 'Max emails/mo' },
+                                    { key: 'searchRankingBoost', label: 'Search Ranking Boost', desc: 'Times boosted/mo' },
+                                ].map((field) => {
+                                    const cost = getFeatureItemCost(field.key);
+                                    return (
+                                        <div key={field.key} className="bg-dark-900/50 p-3 rounded-lg border border-dark-600/50">
+                                            <label className="block text-sm font-medium text-white mb-2">
+                                                {field.label}
+                                                <span className="block text-xs text-dark-400 font-normal">{field.desc}</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={(formData as any)[field.key]}
+                                                onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                                            />
+                                            <div className="mt-2 text-xs text-right">
+                                                {cost > 0 ? <span className="text-green-400 font-medium">SAR {cost.toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <div className="bg-dark-900/50 p-3 rounded-lg border border-dark-600/50">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-2">
                                         <input
                                             type="checkbox"
-                                            checked={formData[feature.key as keyof typeof formData] as boolean}
-                                            onChange={(e) => setFormData({ ...formData, [feature.key]: e.target.checked })}
+                                            checked={formData.hasNewToRefah}
+                                            onChange={(e) => setFormData({ ...formData, hasNewToRefah: e.target.checked })}
                                             className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                                         />
-                                        <span className="text-sm text-dark-300">{feature.label}</span>
+                                        <span className="text-sm font-medium text-white">New to Refah Tag</span>
                                     </label>
-                                ))}
+                                    <div className={`transition-opacity ${formData.hasNewToRefah ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                                        <label className="block text-xs text-dark-400 mb-1">Duration (Days)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={formData.newToRefahDays}
+                                            onChange={(e) => setFormData({ ...formData, newToRefahDays: e.target.value })}
+                                            className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
+                                            disabled={!formData.hasNewToRefah}
+                                        />
+                                        <div className="mt-2 text-xs text-right">
+                                            {getFeatureItemCost('newToRefahDays') > 0 ? <span className="text-green-400 font-medium">SAR {getFeatureItemCost('newToRefahDays').toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Promotional Features */}
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
-                            <h2 className="text-lg font-semibold text-white mb-2">Promotional Features</h2>
+                            <div className="flex items-center justify-between mb-2">
+                                <h2 className="text-lg font-semibold text-white">Promotional Features</h2>
+                                <span className="text-sm font-semibold px-3 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                                    Total: SAR {getFeatureItemCost('maxHotDeals').toFixed(2)} / mo
+                                </span>
+                            </div>
                             <p className="text-sm text-dark-400 mb-4">Features for mobile app visibility and marketing</p>
                             <div className="space-y-4">
                                 <div className="pb-4 border-b border-dark-700">
@@ -494,21 +537,25 @@ export default function EditPackagePage() {
                                                 onChange={(e) => setFormData({ ...formData, carouselPriority: e.target.value })}
                                                 className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
                                             >
-                                                <option value="low">Low</option>
-                                                <option value="medium">Medium</option>
-                                                <option value="high">High</option>
+                                                <option value="low">Low (appears less often)</option>
+                                                <option value="medium">Medium (balanced rotation)</option>
+                                                <option value="high">High (appears more often)</option>
                                             </select>
                                         </div>
                                     )}
                                 </div>
-                                <div className="pb-4 border-b border-dark-700">
+                                <div>
                                     <label className="block text-sm font-medium text-dark-300 mb-1">Max Hot Deals</label>
                                     <input
                                         type="number"
                                         value={formData.maxHotDeals}
                                         onChange={(e) => setFormData({ ...formData, maxHotDeals: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500"
+                                        placeholder="0 = none, -1 = unlimited"
                                     />
+                                    <div className="mt-1 text-xs mb-3">
+                                        {parseInt(formData.maxHotDeals) === -1 ? <span className="text-yellow-400">∞ Unlimited</span> : getFeatureItemCost('maxHotDeals') > 0 ? <span className="text-green-400">SAR {getFeatureItemCost('maxHotDeals').toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
+                                    </div>
                                     {parseInt(formData.maxHotDeals) > 0 && (
                                         <label className="flex items-center gap-2 cursor-pointer mt-2">
                                             <input
@@ -521,41 +568,10 @@ export default function EditPackagePage() {
                                         </label>
                                     )}
                                 </div>
-                                <div className="pb-4 border-b border-dark-700">
-                                    <label className="block text-sm font-medium text-dark-300 mb-1">Search Ranking Boost</label>
-                                    <select
-                                        value={formData.searchRankingBoost}
-                                        onChange={(e) => setFormData({ ...formData, searchRankingBoost: e.target.value })}
-                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                                    >
-                                        <option value="standard">Standard</option>
-                                        <option value="boosted">Boosted</option>
-                                        <option value="top">Top Priority</option>
-                                    </select>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={formData.homepageBanner} onChange={(e) => setFormData({ ...formData, homepageBanner: e.target.checked })} className="w-4 h-4 text-purple-600 rounded" />
-                                        <span className="text-sm text-dark-300">Homepage Banner</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={formData.pushNotifications} onChange={(e) => setFormData({ ...formData, pushNotifications: e.target.checked })} className="w-4 h-4 text-purple-600 rounded" />
-                                        <span className="text-sm text-dark-300">Push Notifications</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={formData.emailMarketing} onChange={(e) => setFormData({ ...formData, emailMarketing: e.target.checked })} className="w-4 h-4 text-purple-600 rounded" />
-                                        <span className="text-sm text-dark-300">Email Marketing</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={formData.advancedAnalytics} onChange={(e) => setFormData({ ...formData, advancedAnalytics: e.target.checked })} className="w-4 h-4 text-purple-600 rounded" />
-                                        <span className="text-sm text-dark-300">Advanced Analytics</span>
-                                    </label>
-                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Submit Buttons */}
                     <div className="lg:col-span-2">
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
                             <div className="flex gap-3">
@@ -581,4 +597,3 @@ export default function EditPackagePage() {
         </AdminLayout>
     );
 }
-

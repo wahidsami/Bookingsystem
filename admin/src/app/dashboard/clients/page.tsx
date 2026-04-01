@@ -9,7 +9,7 @@ interface Tenant {
   id: string;
   name: string;
   nameAr?: string;
-  businessType: string;
+  businessType: string[] | string;
   email: string;
   phone: string;
   city: string;
@@ -34,6 +34,8 @@ export default function ClientsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; tenant: Tenant | null }>({ open: false, tenant: null });
+  const [deleting, setDeleting] = useState(false);
   const [filters, setFilters] = useState({
     status: "",
     businessType: "",
@@ -94,6 +96,23 @@ export default function ClientsPage() {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleDeleteTenant = async () => {
+    const tenant = deleteModal.tenant;
+    if (!tenant) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteTenant(tenant.id);
+      setTenants((prev) => prev.filter((t) => t.id !== tenant.id));
+      setDeleteModal({ open: false, tenant: null });
+    } catch (error) {
+      console.error("Failed to delete tenant:", error);
+      setDeleteModal({ open: false, tenant: null });
+      alert("Failed to delete tenant. You may need the 'delete' permission on tenants.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -214,9 +233,35 @@ export default function ClientsPage() {
               <div className="spinner w-8 h-8"></div>
             </div>
           ) : tenants.length === 0 ? (
-            <div className="p-8 text-center text-dark-400">
-              <span className="text-4xl block mb-2">🏢</span>
-              No clients found
+            <div className="p-10 text-center">
+              <span className="text-5xl block mb-4" aria-hidden>🏢</span>
+              <h3 className="text-lg font-semibold text-white mb-1">No clients yet</h3>
+              <p className="text-dark-400 text-sm max-w-sm mx-auto mb-4">
+                {filters.status || filters.businessType || filters.plan || filters.search
+                  ? "No clients match your filters. Try clearing filters to see all clients."
+                  : "When businesses register, they will appear here. You can review pending sign-ups in Pending Approvals."}
+              </p>
+              {filters.status || filters.businessType || filters.plan || filters.search ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilters({
+                      status: "",
+                      businessType: "",
+                      plan: "",
+                      search: "",
+                      page: 1,
+                    })
+                  }
+                  className="btn btn-primary btn-sm"
+                >
+                  Clear filters
+                </button>
+              ) : (
+                <Link href="/dashboard/clients/pending" className="btn btn-primary btn-sm">
+                  View pending approvals
+                </Link>
+              )}
             </div>
           ) : (
             <>
@@ -245,7 +290,9 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className="capitalize text-dark-300">
-                            {String(tenant.businessType || "").replace("_", " ")}
+                            {Array.isArray(tenant.businessType)
+                              ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
+                              : tenant.businessType?.replace("_", " ") || "-"}
                           </span>
                         </td>
                         <td>
@@ -262,19 +309,29 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className={`badge ${getPlanBadge(tenant.plan)}`}>
-                            {String(tenant.plan || "").replace("_", " ")}
+                            {tenant.plan?.replace("_", " ")}
                           </span>
                         </td>
                         <td className="text-dark-400 text-sm">
                           {formatDate(tenant.createdAt)}
                         </td>
                         <td>
-                          <Link
-                            href={`/dashboard/clients/${tenant.id}`}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            View
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/dashboard/clients/${tenant.id}`}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              View
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteModal({ open: true, tenant })}
+                              className="btn btn-danger btn-sm"
+                              title="Delete tenant and all related data"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -315,6 +372,40 @@ export default function ClientsPage() {
             </>
           )}
         </div>
+
+        {/* Delete confirmation modal */}
+        {deleteModal.open && deleteModal.tenant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="card max-w-md w-full mx-4">
+              <div className="card-body">
+                <h3 className="text-lg font-semibold text-white">Delete client</h3>
+                <p className="text-dark-300 mt-2">
+                  Are you sure you want to delete <strong className="text-white">{(deleteModal.tenant as any).name_en || deleteModal.tenant.name}</strong>?
+                  This will permanently remove the tenant and all related data (subscriptions, bills, appointments, orders, staff, services, products, etc.).
+                </p>
+                <p className="text-danger text-sm mt-2">This action cannot be undone.</p>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModal({ open: false, tenant: null })}
+                    className="btn btn-secondary"
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteTenant}
+                    className="btn btn-danger"
+                    disabled={deleting}
+                  >
+                    {deleting ? "Deleting…" : "Delete permanently"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

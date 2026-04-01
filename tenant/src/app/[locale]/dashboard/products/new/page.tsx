@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { API_BASE_URL, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 
 const CATEGORIES = [
   "Hair Care",
@@ -25,6 +26,10 @@ export default function NewProductPage() {
   const isRTL = locale === 'ar';
 
   const [loading, setLoading] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [translatingField, setTranslatingField] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState<'search' | 'enhance'>('search');
+  const [showNotFoundPopup, setShowNotFoundPopup] = useState(false);
   const [error, setError] = useState("");
   const [globalSettings, setGlobalSettings] = useState({
     taxRate: 15.00,
@@ -49,7 +54,9 @@ export default function NewProductPage() {
     features_en: "",
     features_ar: "",
     isAvailable: true,
-    isFeatured: false
+    isFeatured: false,
+    allowsDelivery: true,
+    allowsPickup: true
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -60,7 +67,7 @@ export default function NewProductPage() {
 
   const loadGlobalSettings = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/settings/global`);
+      const response = await fetch(`${API_BASE_URL}/settings/global`);
       const data = await response.json();
       if (data.success) {
         setGlobalSettings(data.settings);
@@ -72,16 +79,24 @@ export default function NewProductPage() {
 
   const calculateFinalPrice = () => {
     const raw = parseFloat(formData.rawPrice || "0");
-    const tax = raw * (globalSettings.taxRate / 100);
-    const commission = raw * (globalSettings.productCommissionRate / 100);
-    return raw + tax + commission;
+    const platformFee = raw * (globalSettings.productCommissionRate / 100);
+    const subtotalBeforeTax = raw + platformFee;
+    const tax = subtotalBeforeTax * (globalSettings.taxRate / 100);
+    return subtotalBeforeTax + tax;
+  };
+  const getPricingBreakdown = () => {
+    const raw = parseFloat(formData.rawPrice || "0");
+    const platformFee = raw * (globalSettings.productCommissionRate / 100);
+    const subtotalBeforeTax = raw + platformFee;
+    const tax = subtotalBeforeTax * (globalSettings.taxRate / 100);
+    return { raw, platformFee, subtotalBeforeTax, tax, final: subtotalBeforeTax + tax };
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
-    if (name === "isAvailable" || name === "isFeatured") {
+    if (name === "isAvailable" || name === "isFeatured" || name === "allowsDelivery" || name === "allowsPickup") {
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -90,20 +105,20 @@ export default function NewProductPage() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     if (files.length === 0) return;
-    
+
     // Validate: Maximum 5 images total
     const totalImages = imageFiles.length + files.length;
     if (totalImages > 5) {
       setError(`Maximum 5 images allowed. You already have ${imageFiles.length} image(s).`);
       return;
     }
-    
+
     // Add new files
     const newFiles = [...imageFiles, ...files];
     setImageFiles(newFiles);
-    
+
     // Create previews for new files
     files.forEach(file => {
       const reader = new FileReader();
@@ -126,7 +141,7 @@ export default function NewProductPage() {
 
     try {
       const submitData = new FormData();
-      
+
       // Append all form fields
       submitData.append("name_en", formData.name_en);
       submitData.append("name_ar", formData.name_ar);
@@ -147,21 +162,23 @@ export default function NewProductPage() {
       if (formData.features_ar) submitData.append("features_ar", formData.features_ar);
       submitData.append("isAvailable", formData.isAvailable.toString());
       submitData.append("isFeatured", formData.isFeatured.toString());
-      
+      submitData.append("allowsDelivery", formData.allowsDelivery.toString());
+      submitData.append("allowsPickup", formData.allowsPickup.toString());
+
       // Validation: At least 1 image is required
       if (imageFiles.length === 0) {
         setError("At least one product image is required");
         setLoading(false);
         return;
       }
-      
+
       // Append images (up to 5)
       imageFiles.forEach((file) => {
         submitData.append("images", file);
       });
 
       const response = await tenantApi.createProduct(submitData);
-      
+
       if (response.success) {
         router.push(`/${locale}/dashboard/products`);
       } else {
@@ -172,6 +189,110 @@ export default function NewProductPage() {
       setError(err.message || t("createError"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAIFill = async () => {
+    const hasEnglish = formData.name_en.trim().length > 0;
+    const hasArabic = formData.name_ar.trim().length > 0;
+
+    if (!hasEnglish && !hasArabic) {
+      setError(locale === 'ar'
+        ? 'يرجى إدخال اسم المنتج بالعربية أو الإنجليزية أولاً'
+        : 'Please enter the product name in English or Arabic first');
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    setError('');
+    setShowNotFoundPopup(false);
+
+    try {
+      const inputLang = hasEnglish ? 'English' : 'Arabic';
+      const productName = hasEnglish ? formData.name_en : formData.name_ar;
+
+      const response = await tenantApi.generateProductAI({
+        name_en: hasEnglish ? formData.name_en : undefined,
+        name_ar: hasArabic ? formData.name_ar : undefined,
+        brand: formData.brand,
+        category: formData.category,
+        inputLanguage: inputLang,
+        mode: aiMode,
+        existingData: aiMode === 'enhance' ? {
+          description_en: formData.description_en,
+          description_ar: formData.description_ar,
+          ingredients_en: formData.ingredients_en,
+          ingredients_ar: formData.ingredients_ar,
+          howToUse_en: formData.howToUse_en,
+          howToUse_ar: formData.howToUse_ar,
+          features_en: formData.features_en,
+          features_ar: formData.features_ar,
+        } : undefined
+      });
+
+      if (response.success && response.data) {
+        const aiData = response.data;
+
+        if (aiData.found === false) {
+          // Product not found — show popup and switch to enhance mode
+          setShowNotFoundPopup(true);
+          setAiMode('enhance');
+        } else {
+          // Product found (or enhance mode) — fill all fields
+          setFormData(prev => ({
+            ...prev,
+            name_en: hasEnglish ? prev.name_en : (aiData.name_en || prev.name_en),
+            name_ar: hasArabic ? prev.name_ar : (aiData.name_ar || prev.name_ar),
+            brand: prev.brand || aiData.brand || prev.brand,
+            description_en: aiData.description_en || prev.description_en,
+            description_ar: aiData.description_ar || prev.description_ar,
+            ingredients_en: aiData.ingredients_en || prev.ingredients_en,
+            ingredients_ar: aiData.ingredients_ar || prev.ingredients_ar,
+            howToUse_en: aiData.howToUse_en || prev.howToUse_en,
+            howToUse_ar: aiData.howToUse_ar || prev.howToUse_ar,
+            features_en: aiData.features_en || prev.features_en,
+            features_ar: aiData.features_ar || prev.features_ar,
+          }));
+          // Reset to search mode after successful fill
+          setAiMode('search');
+        }
+      } else {
+        setError(response.message || 'Failed to generate AI content');
+      }
+    } catch (err: any) {
+      console.error('AI Generation Error:', err);
+      setError(err.message || 'Failed to generate AI content');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const handleTranslate = async (sourceField: string, targetField: string, targetLang: 'English' | 'Arabic') => {
+    const sourceText = formData[sourceField as keyof typeof formData] as string;
+    if (!sourceText) return;
+
+    setTranslatingField(targetField);
+    setError("");
+
+    try {
+      const response = await tenantApi.translateTextAI({
+        text: sourceText,
+        targetLanguage: targetLang
+      });
+
+      if (response.success && response.translatedText) {
+        setFormData(prev => ({
+          ...prev,
+          [targetField]: response.translatedText
+        }));
+      } else {
+        setError(response.message || "Failed to translate text");
+      }
+    } catch (err: any) {
+      console.error("Translation Error:", err);
+      setError(err.message || "Failed to translate text");
+    } finally {
+      setTranslatingField(null);
     }
   };
 
@@ -188,11 +309,52 @@ export default function NewProductPage() {
               {locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج' : 'Add a new product to your catalog'}
             </p>
           </div>
-          <Link href={`/${locale}/dashboard/products`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
+          <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <Link href={`/${locale}/dashboard/products`} className="btn btn-secondary">
+              {t("cancel")}
+            </Link>
+          </div>
         </div>
       </div>
+
+      {/* Not Found Popup */}
+      {showNotFoundPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-fade-in">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <SparklesIcon className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {locale === 'ar' ? 'لم أجد تطابقاً لهذا المنتج' : 'No Product Match Found'}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {locale === 'ar'
+                    ? 'لم أجد تطابقاً لاسم المنتج الذي أدخلته. ادخل البيانات يدوياً في الحقول ثم اضغط عليّ مرة أخرى لتحسين محتواك.'
+                    : "I didn't find a match to the product name you entered. Enter the data manually in the fields, then click me again to enhance your content."
+                  }
+                </p>
+                <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-200">
+                  <SparklesIcon className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="text-xs font-medium text-purple-700">
+                    {locale === 'ar' ? 'الزر سيتحول إلى: ✨ تحسين المحتوى' : 'Button now: ✨ Enhance Content'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowNotFoundPopup(false)}
+                className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+              >
+                {locale === 'ar' ? 'حسناً، سأدخل البيانات يدوياً' : 'Got it, I\'ll enter data manually'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -208,10 +370,30 @@ export default function NewProductPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
             <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
-              </h3>
-              
+              <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAIFill}
+                  disabled={isGeneratingAI || (!formData.name_en && !formData.name_ar)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${aiMode === 'enhance'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                    : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
+                    }`}
+                  title={!formData.name_en && !formData.name_ar ? (locale === 'ar' ? 'أدخل اسم المنتج أولاً' : 'Enter product name first') : ''}
+                >
+                  <SparklesIcon className="w-4 h-4" />
+                  {isGeneratingAI
+                    ? (locale === 'ar' ? 'جاري البحث...' : 'Searching...')
+                    : aiMode === 'enhance'
+                      ? (locale === 'ar' ? '✨ تحسين المحتوى' : '✨ Enhance Content')
+                      : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
+                  }
+                </button>
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -244,9 +426,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("descriptionEn")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("descriptionEn")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.description_ar && !formData.description_en && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('description_ar', 'description_en', 'English')}
+                        disabled={translatingField === 'description_en'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'description_en' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للإنجليزية' : 'Translate to EN')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="description_en"
                     value={formData.description_en}
@@ -258,9 +453,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("descriptionAr")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("descriptionAr")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.description_en && !formData.description_ar && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('description_en', 'description_ar', 'Arabic')}
+                        disabled={translatingField === 'description_ar'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'description_ar' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للعربية' : 'Translate to AR')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="description_ar"
                     value={formData.description_ar}
@@ -278,7 +486,7 @@ export default function NewProductPage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -359,9 +567,22 @@ export default function NewProductPage() {
 
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("ingredientsEn")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("ingredientsEn")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.ingredients_ar && !formData.ingredients_en && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('ingredients_ar', 'ingredients_en', 'English')}
+                        disabled={translatingField === 'ingredients_en'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'ingredients_en' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للإنجليزية' : 'Translate to EN')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="ingredients_en"
                     value={formData.ingredients_en}
@@ -374,9 +595,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("ingredientsAr")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("ingredientsAr")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.ingredients_en && !formData.ingredients_ar && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('ingredients_en', 'ingredients_ar', 'Arabic')}
+                        disabled={translatingField === 'ingredients_ar'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'ingredients_ar' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للعربية' : 'Translate to AR')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="ingredients_ar"
                     value={formData.ingredients_ar}
@@ -389,9 +623,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("howToUseEn")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("howToUseEn")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.howToUse_ar && !formData.howToUse_en && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('howToUse_ar', 'howToUse_en', 'English')}
+                        disabled={translatingField === 'howToUse_en'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'howToUse_en' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للإنجليزية' : 'Translate to EN')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="howToUse_en"
                     value={formData.howToUse_en}
@@ -404,9 +651,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("howToUseAr")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("howToUseAr")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.howToUse_en && !formData.howToUse_ar && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('howToUse_en', 'howToUse_ar', 'Arabic')}
+                        disabled={translatingField === 'howToUse_ar'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'howToUse_ar' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للعربية' : 'Translate to AR')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="howToUse_ar"
                     value={formData.howToUse_ar}
@@ -419,9 +679,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("featuresEn")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("featuresEn")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.features_ar && !formData.features_en && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('features_ar', 'features_en', 'English')}
+                        disabled={translatingField === 'features_en'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'features_en' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للإنجليزية' : 'Translate to EN')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="features_en"
                     value={formData.features_en}
@@ -434,9 +707,22 @@ export default function NewProductPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("featuresAr")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
+                  <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("featuresAr")} <span className="text-gray-400">({t("optional")})</span>
+                    </label>
+                    {formData.features_en && !formData.features_ar && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslate('features_en', 'features_ar', 'Arabic')}
+                        disabled={translatingField === 'features_ar'}
+                        className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50"
+                      >
+                        <LanguageIcon className="w-3 h-3" />
+                        {translatingField === 'features_ar' ? (locale === 'ar' ? 'جاري الترجمة...' : 'Translating...') : (locale === 'ar' ? 'ترجم للعربية' : 'Translate to AR')}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     name="features_ar"
                     value={formData.features_ar}
@@ -461,7 +747,7 @@ export default function NewProductPage() {
               <p className="text-sm text-gray-500 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'حد أدنى: صورة واحدة، حد أقصى: 5 صور' : 'Minimum: 1 image, Maximum: 5 images'}
               </p>
-              
+
               <div className="space-y-4">
                 {/* Image Previews Grid */}
                 {imagePreviews.length > 0 && (
@@ -484,7 +770,7 @@ export default function NewProductPage() {
                     ))}
                   </div>
                 )}
-                
+
                 {/* Upload Button */}
                 {imagePreviews.length < 5 && (
                   <label className="block">
@@ -497,14 +783,14 @@ export default function NewProductPage() {
                       disabled={imagePreviews.length >= 5}
                     />
                     <span className="btn btn-secondary w-full text-center cursor-pointer">
-                      {imagePreviews.length === 0 
-                        ? `${t("uploadImage")} (${t("required")})` 
+                      {imagePreviews.length === 0
+                        ? `${t("uploadImage")} (${t("required")})`
                         : `${t("addMoreImages")} (${imagePreviews.length}/5)`
                       }
                     </span>
                   </label>
                 )}
-                
+
                 {imagePreviews.length === 0 && (
                   <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
                     <span className="text-4xl">📦</span>
@@ -518,7 +804,7 @@ export default function NewProductPage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -571,27 +857,34 @@ export default function NewProductPage() {
                   </div>
                 </div>
 
-                {/* Final Price Display */}
-                {formData.rawPrice && (
-                  <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">{t("rawPrice")}</span>
-                      <span className="font-semibold"><Currency amount={parseFloat(formData.rawPrice)} /></span>
+                {/* Final Price Display: (raw + platform fee), then tax = 15% of that sum */}
+                {formData.rawPrice && (() => {
+                  const b = getPricingBreakdown();
+                  return (
+                    <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">{t("rawPrice")}</span>
+                        <span className="font-semibold"><Currency amount={b.raw} /></span>
+                      </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">{t("commission")} ({globalSettings.productCommissionRate}%)</span>
+                        <span className="text-sm"><Currency amount={b.platformFee} /></span>
+                      </div>
+                      <div className="flex items-center justify-between mb-2 text-gray-500 text-sm">
+                        <span>{t("subtotalBeforeTax") || "Subtotal (raw + platform fee)"}</span>
+                        <span><Currency amount={b.subtotalBeforeTax} /></span>
+                      </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">{t("tax")} ({globalSettings.taxRate}% of subtotal)</span>
+                        <span className="text-sm"><Currency amount={b.tax} /></span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-primary/20">
+                        <span className="font-bold text-gray-900">{t("finalPrice")}</span>
+                        <span className="font-bold text-primary text-xl"><Currency amount={b.final} /></span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">{t("tax")} ({globalSettings.taxRate}%)</span>
-                      <span className="text-sm"><Currency amount={parseFloat(formData.rawPrice) * (globalSettings.taxRate / 100)} /></span>
-                    </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">{t("commission")} ({globalSettings.productCommissionRate}%)</span>
-                      <span className="text-sm"><Currency amount={parseFloat(formData.rawPrice) * (globalSettings.productCommissionRate / 100)} /></span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-primary/20">
-                      <span className="font-bold text-gray-900">{t("finalPrice")}</span>
-                      <span className="font-bold text-primary text-xl"><Currency amount={calculateFinalPrice()} /></span>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -633,6 +926,44 @@ export default function NewProductPage() {
                   className="w-4 h-4 text-primary focus:ring-primary"
                 />
                 <label className="font-medium text-gray-700">{t("isFeatured")}</label>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'خيارات التوصيل والاستلام' : 'Fulfillment options'}
+              </p>
+              <p className="text-xs text-gray-500 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'اختر واحدًا أو كليهما. يجب تفعيل خيار واحد على الأقل.' : 'Select one or both. At least one must be enabled.'}
+              </p>
+              <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <input
+                    type="checkbox"
+                    name="allowsDelivery"
+                    checked={formData.allowsDelivery}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData(prev => ({ ...prev, allowsDelivery: checked }));
+                      if (!checked && !formData.allowsPickup) setFormData(prev => ({ ...prev, allowsPickup: true }));
+                    }}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <label className="font-medium text-gray-700">{locale === 'ar' ? 'التوصيل' : 'Delivery'}</label>
+                </div>
+                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <input
+                    type="checkbox"
+                    name="allowsPickup"
+                    checked={formData.allowsPickup}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData(prev => ({ ...prev, allowsPickup: checked }));
+                      if (!checked && !formData.allowsDelivery) setFormData(prev => ({ ...prev, allowsDelivery: true }));
+                    }}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <label className="font-medium text-gray-700">{locale === 'ar' ? 'الاستلام من المركز' : 'Pick on visit'}</label>
+                </div>
               </div>
             </div>
           </div>

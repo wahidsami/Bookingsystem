@@ -2,11 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { tenantApi, getImageUrl, API_BASE_URL } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+
+function avatarUrl(path: string | undefined): string {
+  if (!path) return "";
+  return path.startsWith("http") ? path : getImageUrl(path.startsWith("/") ? path.slice(1) : path);
+}
 
 interface Service {
   id: string;
@@ -39,14 +44,18 @@ interface User {
   email: string;
   phone: string;
   photo?: string;
+  profileImage?: string; // API returns customer avatar as profileImage
 }
 
 interface Appointment {
   id: string;
+  tenantId?: string;
+  serviceId?: string;
+  staffId?: string;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'refunded' | 'partially_refunded';
+  status: 'pending' | 'confirmed' | 'started' | 'completed' | 'cancelled' | 'no_show';
+  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'paid' | 'refunded' | 'partially_refunded';
   paymentMethod?: string;
   paidAt?: string;
   price: number;
@@ -57,11 +66,24 @@ interface Appointment {
   employeeRevenue?: number;
   employeeCommissionRate?: number;
   employeeCommission?: number;
+  depositAmount?: number;
+  remainderAmount?: number;
+  totalPaid?: number;
+  depositPaid?: boolean;
+  remainderPaid?: boolean;
   notes?: string;
   service: Service;
   staff: Employee;
   user?: User;
   createdAt: string;
+}
+
+interface SlotItem {
+  startTime: string;
+  endTime: string;
+  available: boolean;
+  staffId?: string;
+  staffName?: string;
 }
 
 export default function AppointmentDetailsPage() {
@@ -76,6 +98,13 @@ export default function AppointmentDetailsPage() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [recordRemainderMethod, setRecordRemainderMethod] = useState<string>("cash");
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<SlotItem[]>([]);
+  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState<SlotItem | null>(null);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -141,6 +170,91 @@ export default function AppointmentDetailsPage() {
     }
   };
 
+  const handleRecordRemainder = async () => {
+    if (!appointment) return;
+    const remainder = Number(appointment.remainderAmount ?? 0);
+    if (remainder <= 0) return;
+    setUpdating(true);
+    try {
+      const response = await tenantApi.recordRemainderPayment(appointment.id, {
+        amount: remainder,
+        paymentMethod: recordRemainderMethod,
+      });
+      if (response.success) {
+        loadAppointment();
+      } else {
+        alert(response.message || t("updateError"));
+      }
+    } catch (err: any) {
+      console.error("Failed to record remainder:", err);
+      alert(err.message || t("updateError"));
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const tenantId = appointment?.tenantId ?? (appointment?.service as any)?.tenantId;
+  const hoursUntilStart = appointment
+    ? (new Date(appointment.startTime).getTime() - Date.now()) / (60 * 60 * 1000)
+    : 0;
+  const canReschedule =
+    appointment &&
+    (appointment.status === "confirmed" || appointment.status === "pending") &&
+    hoursUntilStart > 24;
+
+  useEffect(() => {
+    if (!rescheduleModalOpen || !rescheduleDate || !appointment || !tenantId) return;
+    const serviceId = appointment.serviceId ?? appointment.service?.id;
+    if (!serviceId) return;
+    setRescheduleLoading(true);
+    setRescheduleSlots([]);
+    setRescheduleSelectedSlot(null);
+    fetch(`${API_BASE_URL}/bookings/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenantId,
+        serviceId,
+        date: rescheduleDate,
+        staffId: appointment.staffId ?? appointment.staff?.id,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const list = (data.slots || []).filter((s: SlotItem) => s.available);
+        setRescheduleSlots(list);
+      })
+      .catch((err) => {
+        console.error("Failed to load slots", err);
+        setRescheduleSlots([]);
+      })
+      .finally(() => setRescheduleLoading(false));
+  }, [rescheduleModalOpen, rescheduleDate, appointment?.id, tenantId]);
+
+  const handleRescheduleConfirm = async () => {
+    if (!appointment || !rescheduleSelectedSlot) return;
+    setRescheduleSubmitting(true);
+    try {
+      const response = await tenantApi.rescheduleAppointment(appointment.id, {
+        startTime: rescheduleSelectedSlot.startTime,
+        staffId: rescheduleSelectedSlot.staffId,
+      });
+      if (response.success) {
+        setRescheduleModalOpen(false);
+        setRescheduleDate("");
+        setRescheduleSelectedSlot(null);
+        loadAppointment();
+      } else {
+        alert(response.message || t("updateError"));
+      }
+    } catch (err: any) {
+      console.error("Failed to reschedule", err);
+      alert(err.message || t("updateError"));
+    } finally {
+      setRescheduleSubmitting(false);
+    }
+  };
+
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return {
@@ -161,6 +275,7 @@ export default function AppointmentDetailsPage() {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800 border-green-300';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'started': return 'bg-purple-100 text-purple-800 border-purple-300';
       case 'completed': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'cancelled': return 'bg-red-100 text-red-800 border-red-300';
       case 'no_show': return 'bg-gray-100 text-gray-800 border-gray-300';
@@ -170,8 +285,9 @@ export default function AppointmentDetailsPage() {
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
+      case 'paid':
       case 'fully_paid': return 'bg-green-100 text-green-800 border-green-300';
-      case 'deposit_paid': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'deposit_paid': return 'bg-amber-100 text-amber-800 border-amber-300';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'refunded': return 'bg-red-100 text-red-800 border-red-300';
       case 'partially_refunded': return 'bg-orange-100 text-orange-800 border-orange-300';
@@ -183,6 +299,7 @@ export default function AppointmentDetailsPage() {
     switch (status) {
       case 'pending': return t("pending");
       case 'confirmed': return t("confirmed");
+      case 'started': return t("inProgress");
       case 'completed': return t("completed");
       case 'cancelled': return t("cancelled");
       case 'no_show': return t("noShow");
@@ -193,8 +310,9 @@ export default function AppointmentDetailsPage() {
   const getPaymentStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return t("paymentPending");
+      case 'deposit_paid': return t("depositPaid") || "Deposit paid";
+      case 'paid':
       case 'fully_paid': return t("paid");
-      case 'deposit_paid': return locale === 'ar' ? 'تم دفع العربون' : 'Deposit Paid';
       case 'refunded': return t("refunded");
       case 'partially_refunded': return t("partiallyRefunded");
       default: return status;
@@ -313,95 +431,115 @@ export default function AppointmentDetailsPage() {
           </div>
 
           {/* Customer Details */}
-          {appointment.user && (
-            <div className="card">
+          {appointment.user && (() => {
+            const customerAvatar = appointment.user.photo || appointment.user.profileImage;
+            return (
+            <div className="card overflow-hidden">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("customerDetails")}
               </h3>
-              <div className="space-y-4">
-                {/* Customer Avatar and Name */}
-                <div className={`flex items-center gap-4 mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  {appointment.user.photo ? (
+              <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <div className="flex-shrink-0 relative">
+                  {customerAvatar ? (
                     <img
-                      src={appointment.user.photo.startsWith('/') 
-                        ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${appointment.user.photo}` 
-                        : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${appointment.user.photo}`}
+                      src={avatarUrl(customerAvatar)}
                       alt={userName}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                      className="w-20 h-20 rounded-full object-cover ring-2 ring-gray-200 shadow-sm"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
                         if (fallback) fallback.style.display = 'flex';
                       }}
                     />
                   ) : null}
-                  <div 
-                    className={`w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center border-2 border-gray-200 ${appointment.user.photo ? 'hidden' : ''}`}
-                    style={{ display: appointment.user.photo ? 'none' : 'flex' }}
+                  <div
+                    className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center ring-2 ring-gray-200 shadow-sm text-primary-700 font-semibold text-2xl"
+                    style={{ display: customerAvatar ? 'none' : 'flex' }}
                   >
-                    <span className="text-primary-600 font-semibold text-xl">
-                      {appointment.user.firstName?.[0] || ''}{appointment.user.lastName?.[0] || ''}
-                    </span>
-                  </div>
-                  <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    <label className="text-sm font-medium text-gray-600 block">
-                      {t("name")}
-                    </label>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {userName}
-                    </p>
+                    {appointment.user.firstName?.[0] || ''}{appointment.user.lastName?.[0] || '?'}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {appointment.user.email && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        {t("email")}
-                      </label>
-                      <p className="text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        {appointment.user.email}
-                      </p>
-                    </div>
-                  )}
-                  {appointment.user.phone && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        {t("phone")}
-                      </label>
-                      <p className="text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        {appointment.user.phone}
-                      </p>
+                <div className="flex-1 min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <p className="text-lg font-semibold text-gray-900 truncate">{userName}</p>
+                  <p className="text-sm text-gray-500 mt-0.5">{t("name")}</p>
+                  {(appointment.user.email || appointment.user.phone) && (
+                    <div className="mt-3 space-y-2">
+                      {appointment.user.email && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">{t("email")}</p>
+                          <a href={`mailto:${appointment.user.email}`} className="text-sm text-primary-600 hover:underline break-all">
+                            {appointment.user.email}
+                          </a>
+                        </div>
+                      )}
+                      {appointment.user.phone && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">{t("phone")}</p>
+                          <a href={`tel:${appointment.user.phone}`} className="text-sm text-gray-900 hover:underline">
+                            {appointment.user.phone}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Employee Details */}
-          <div className="card">
+          <div className="card overflow-hidden">
             <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {t("employeeDetails")}
             </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("employee")}
-                </label>
-                <p className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {appointment.staff.name}
-                </p>
-              </div>
-              {appointment.staff.phone && (
-                <div>
-                  <label className="text-sm font-medium text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("phone")}
-                  </label>
-                  <p className="text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {appointment.staff.phone}
-                  </p>
+            <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className="flex-shrink-0 relative">
+                {appointment.staff.photo ? (
+                  <img
+                    src={avatarUrl(appointment.staff.photo)}
+                    alt={appointment.staff.name}
+                    className="w-20 h-20 rounded-full object-cover ring-2 ring-gray-200 shadow-sm"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center ring-2 ring-gray-200 shadow-sm text-primary-700 font-semibold text-2xl"
+                  style={{ display: appointment.staff.photo ? 'none' : 'flex' }}
+                >
+                  {appointment.staff.name?.split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase() || '?'}
                 </div>
-              )}
+              </div>
+              <div className="flex-1 min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <p className="text-lg font-semibold text-gray-900 truncate">{appointment.staff.name}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{t("employee")}</p>
+                {(appointment.staff.phone || appointment.staff.email) && (
+                  <div className="mt-3 space-y-2">
+                    {appointment.staff.phone && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">{t("phone")}</p>
+                        <a href={`tel:${appointment.staff.phone}`} className="text-sm text-gray-900 hover:underline">
+                          {appointment.staff.phone}
+                        </a>
+                      </div>
+                    )}
+                    {appointment.staff.email && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">{t("email")}</p>
+                        <a href={`mailto:${appointment.staff.email}`} className="text-sm text-primary-600 hover:underline break-all">
+                          {appointment.staff.email}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -420,28 +558,34 @@ export default function AppointmentDetailsPage() {
 
         {/* Right Column - Pricing & Actions */}
         <div className="space-y-6">
-          {/* Price Breakdown */}
+          {/* Price Breakdown: (raw + platform fee) → tax 15% of that → total */}
           <div className="card">
             <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {t("priceBreakdown")}
             </h3>
             <div className="space-y-3">
-              {appointment.rawPrice && (
+              {appointment.rawPrice != null && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">{t("rawPrice")}</span>
                   <span className="font-semibold"><Currency amount={appointment.rawPrice} /></span>
                 </div>
               )}
-              {appointment.taxAmount && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{t("tax")}</span>
-                  <span className="font-semibold"><Currency amount={appointment.taxAmount} /></span>
-                </div>
-              )}
-              {appointment.platformFee && (
+              {appointment.platformFee != null && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">{t("platformFee")}</span>
                   <span className="font-semibold"><Currency amount={appointment.platformFee} /></span>
+                </div>
+              )}
+              {(appointment.rawPrice != null || appointment.platformFee != null) && (
+                <div className="flex items-center justify-between text-sm text-gray-500">
+                  <span>{t("subtotalBeforeTax") || "Subtotal (raw + platform fee)"}</span>
+                  <span><Currency amount={(Number(appointment.rawPrice) || 0) + (Number(appointment.platformFee) || 0)} /></span>
+                </div>
+              )}
+              {appointment.taxAmount != null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{t("tax")} (15% of subtotal)</span>
+                  <span className="font-semibold"><Currency amount={appointment.taxAmount} /></span>
                 </div>
               )}
               <div className="flex items-center justify-between pt-3 border-t border-gray-200">
@@ -463,6 +607,70 @@ export default function AppointmentDetailsPage() {
             </div>
           </div>
 
+          {/* Payment summary: total, paid online, remaining — simple and clear */}
+          <div className="card">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              {t("paymentSummary")}
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">{t("totalPrice")}</span>
+                <span className="font-bold text-gray-900"><Currency amount={appointment.price} /></span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">{t("paidOnline")}</span>
+                <span className="font-semibold text-green-700">
+                  {appointment.paymentStatus === 'pending' ? (
+                    <Currency amount={0} />
+                  ) : appointment.paymentStatus === 'deposit_paid' || appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid' ? (
+                    <Currency amount={Number(appointment.depositAmount ?? appointment.totalPaid ?? 0)} />
+                  ) : (
+                    <Currency amount={Number(appointment.totalPaid ?? appointment.price ?? 0)} />
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                <span className="text-sm font-medium text-gray-700">{t("remaining")}</span>
+                <span className={`font-bold ${(appointment.paymentStatus === 'deposit_paid' && Number(appointment.remainderAmount ?? 0) > 0) ? 'text-amber-700' : 'text-gray-700'}`}>
+                  {appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid' ? (
+                    t("paidInFull")
+                  ) : (
+                    <Currency amount={appointment.paymentStatus === 'deposit_paid' ? Number(appointment.remainderAmount ?? 0) : Number(appointment.price ?? 0)} />
+                  )}
+                </span>
+              </div>
+            </div>
+            {/* Collect remaining at salon — only when deposit_paid */}
+            {appointment.paymentStatus === 'deposit_paid' && Number(appointment.remainderAmount ?? 0) > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                <p className="text-sm font-medium text-amber-800" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("collectRemainingAtSalon")}
+                </p>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("paymentMethod")}
+                  </label>
+                  <select
+                    value={recordRemainderMethod}
+                    onChange={(e) => setRecordRemainderMethod(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  >
+                    <option value="cash">{t("cash")}</option>
+                    <option value="card_pos">{t("cardPos")}</option>
+                    <option value="wallet">{t("wallet")}</option>
+                  </select>
+                  <button
+                    onClick={handleRecordRemainder}
+                    disabled={updating}
+                    className="w-full btn btn-success"
+                  >
+                    {t("recordRemainderPayment")}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="card">
             <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -478,7 +686,7 @@ export default function AppointmentDetailsPage() {
                   {t("confirm")}
                 </button>
               )}
-              {appointment.status === 'confirmed' && (
+              {(appointment.status === 'confirmed' || appointment.status === 'started') && (
                 <button
                   onClick={() => handleStatusUpdate('completed')}
                   disabled={updating}
@@ -496,7 +704,19 @@ export default function AppointmentDetailsPage() {
                   {t("markAsPaid")}
                 </button>
               )}
-              {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+              {canReschedule && (
+                <button
+                  onClick={() => {
+                    setRescheduleDate(new Date().toISOString().slice(0, 10));
+                    setRescheduleModalOpen(true);
+                  }}
+                  disabled={updating}
+                  className="w-full btn btn-secondary"
+                >
+                  {t("reschedule") || "Reschedule"}
+                </button>
+              )}
+              {(appointment.status === 'pending' || appointment.status === 'confirmed' || appointment.status === 'started') && (
                 <button
                   onClick={() => handleStatusUpdate('cancelled')}
                   disabled={updating}
@@ -509,7 +729,7 @@ export default function AppointmentDetailsPage() {
           </div>
 
           {/* Payment Info */}
-          {(appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'deposit_paid') && appointment.paidAt && (
+          {(appointment.paymentStatus === 'paid' || appointment.paymentStatus === 'fully_paid') && appointment.paidAt && (
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("paymentInfo")}
@@ -532,6 +752,83 @@ export default function AppointmentDetailsPage() {
           )}
         </div>
       </div>
+
+      {/* Reschedule modal */}
+      {rescheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? "right" : "left" }}>
+                {t("reschedule") || "Reschedule"}
+              </h3>
+              <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? "right" : "left" }}>
+                {t("date") || "Date"}
+              </label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 mb-4"
+              />
+              <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? "right" : "left" }}>
+                {t("time") || "Time"}
+              </label>
+              {rescheduleLoading ? (
+                <p className="text-gray-500 py-4">{t("loading")}</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {rescheduleSlots.map((slot) => {
+                    const time = new Date(slot.startTime).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                    const selected = rescheduleSelectedSlot?.startTime === slot.startTime;
+                    return (
+                      <button
+                        key={slot.startTime}
+                        type="button"
+                        onClick={() => setRescheduleSelectedSlot(slot)}
+                        className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                          selected
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-primary"
+                        }`}
+                      >
+                        {time}
+                      </button>
+                    );
+                  })}
+                  {rescheduleSlots.length === 0 && !rescheduleLoading && (
+                    <p className="text-gray-500 text-sm">{locale === "ar" ? "لا توجد أوقات متاحة" : "No available times"}</p>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRescheduleModalOpen(false);
+                    setRescheduleDate("");
+                    setRescheduleSelectedSlot(null);
+                  }}
+                  className="btn btn-secondary"
+                >
+                  {t("cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRescheduleConfirm}
+                  disabled={!rescheduleSelectedSlot || rescheduleSubmitting}
+                  className="btn btn-primary"
+                >
+                  {rescheduleSubmitting ? t("loading") : t("confirm") || "Confirm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </TenantLayout>
   );
 }

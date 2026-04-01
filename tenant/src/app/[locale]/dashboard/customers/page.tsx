@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { tenantApi } from '@/lib/api';
+import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
 import {
   MagnifyingGlassIcon,
@@ -39,7 +39,7 @@ interface Customer {
   cancellationCount: number;
   tags: string[];
   notes: string;
-  customerType: 'service_only' | 'product_only' | 'both';
+  customerType?: 'service_only' | 'product_only' | 'both';
   totalOrders?: number;
   totalProductsPurchased?: number;
 }
@@ -351,11 +351,7 @@ export default function CustomersPage() {
                               {customer.photo ? (
                                 <>
                                   <img
-                                    src={customer.photo.startsWith('http')
-                                      ? customer.photo
-                                      : customer.photo.startsWith('/')
-                                        ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${customer.photo}`
-                                        : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${customer.photo}`}
+                                    src={customer.photo.startsWith('http') ? customer.photo : getImageUrl(customer.photo)}
                                     alt={`${customer.firstName} ${customer.lastName}`}
                                     className="w-10 h-10 rounded-full object-cover"
                                     onError={(e) => {

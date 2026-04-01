@@ -20,6 +20,8 @@ const tenantPublicPageController = require('../controllers/tenantPublicPageContr
 const tenantScheduleController = require('../controllers/tenantScheduleController');
 const tenantRegistrationController = require('../controllers/tenantRegistrationController');
 const tenantBillsController = require('../controllers/tenantBillsController');
+const tenantMessagesController = require('../controllers/tenantMessagesController');
+const tenantPayrollController = require('../controllers/tenantPayrollController');
 const { authenticateTenant } = require('../middleware/authTenant');
 const multer = require('multer');
 const path = require('path');
@@ -67,6 +69,7 @@ router.delete('/products/:id', tenantProductController.deleteProduct);
 
 // Service management
 router.get('/services', tenantServiceController.getServices);
+router.get('/services/categories', tenantServiceController.getServiceCategories);
 router.get('/services/:id', tenantServiceController.getService);
 router.post('/services', tenantServiceController.uploadImage, tenantServiceController.createService);
 router.put('/services/:id', tenantServiceController.uploadImage, tenantServiceController.updateService);
@@ -105,7 +108,22 @@ router.patch('/orders/:id/payment', tenantOrderController.updatePaymentStatus);
 // Billing
 router.get('/bills', tenantBillsController.getBills);
 
+// Messaging
+router.get('/messages', tenantMessagesController.getMessages);
+router.post('/messages', tenantMessagesController.sendMessage);
+router.delete('/messages/:id', tenantMessagesController.deleteMessage);
+
+// Payroll
+router.get('/payroll', tenantPayrollController.getPayrollRecords);
+router.post('/payroll/generate', tenantPayrollController.generatePayroll);
+router.put('/payroll/:id/status', tenantPayrollController.updatePayrollStatus);
+
+// Reviews
+router.get('/reviews', tenantPayrollController.getAllReviews);
+router.patch('/reviews/:id', tenantPayrollController.updateReview);
+
 // Settings management
+router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);
 router.get('/settings', tenantSettingsController.getSettings);
 router.put('/settings/business', tenantSettingsController.updateBusinessInfo);
 router.put('/settings/working-hours', tenantSettingsController.updateWorkingHours);
@@ -119,6 +137,7 @@ router.post('/settings/cover', settingsUpload.single('coverImage'), tenantSettin
 
 // Reports and analytics
 router.get('/reports/summary', tenantReportsController.getDashboardSummary);
+router.get('/reports/full', tenantReportsController.getFullReport);
 router.get('/reports/booking-trends', tenantReportsController.getBookingTrends);
 router.get('/reports/service-performance', tenantReportsController.getServicePerformance);
 router.get('/reports/employee-performance', tenantReportsController.getEmployeePerformance);

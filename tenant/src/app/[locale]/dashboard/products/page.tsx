@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -51,6 +51,7 @@ export default function ProductsPage() {
   const [filterAvailable, setFilterAvailable] = useState<boolean | undefined>(undefined);
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [error, setError] = useState("");
+  const [limits, setLimits] = useState<any>(null);
 
   useEffect(() => {
     loadProducts();
@@ -60,7 +61,7 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       setError("");
-      
+
       const params: any = {};
       if (filterAvailable !== undefined) {
         params.isAvailable = filterAvailable;
@@ -72,16 +73,23 @@ export default function ProductsPage() {
         params.search = searchTerm;
       }
 
-      const response = await tenantApi.getProducts(params);
-      
+      const [response, limitsData] = await Promise.all([
+        tenantApi.getProducts(params),
+        tenantApi.getSubscriptionLimits().catch(() => null)
+      ]);
+
+      if (limitsData?.products) {
+        setLimits(limitsData.products);
+      }
+
       // Handle different response structures
       const data = response.data || response;
-      
+
       if (data.success !== false) {
         // Response is successful (either success: true or success is undefined but no error)
         const productsList = data.products || data.data?.products || [];
         setProducts(productsList);
-        
+
         if (productsList.length === 0 && !filterAvailable && !filterCategory && !searchTerm) {
           console.log("No products found. Response:", response);
         }
@@ -105,8 +113,8 @@ export default function ProductsPage() {
 
   const handleDelete = async (id: string, name: string) => {
     const productName = locale === 'ar' ? name : name;
-    if (!confirm(locale === 'ar' 
-      ? `هل أنت متأكد من حذف المنتج "${productName}"؟` 
+    if (!confirm(locale === 'ar'
+      ? `هل أنت متأكد من حذف المنتج "${productName}"؟`
       : `Are you sure you want to delete product "${productName}"?`)) {
       return;
     }
@@ -137,15 +145,31 @@ export default function ProductsPage() {
               {t("subtitle")}
             </p>
           </div>
-          <Link
-            href={`/${locale}/dashboard/products/new`}
-            className="btn btn-primary"
-            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-          >
-            <span className="mr-2">{isRTL ? '➕' : ''}</span>
-            {t("addProduct")}
-            <span className="ml-2">{!isRTL ? '➕' : ''}</span>
-          </Link>
+          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            {limits && (
+              <div className="text-sm px-3 py-1 bg-gray-100 rounded-lg whitespace-nowrap">
+                <span className="text-gray-500">{isRTL ? 'الحد المسموح:' : 'Limit:'} </span>
+                <span className={`font-medium ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
+                  {limits.current} / {limits.limit}
+                </span>
+              </div>
+            )}
+            <Link
+              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/products/new`}
+              className={`btn btn-primary ${limits && !limits.allowed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+              onClick={(e) => {
+                if (limits && !limits.allowed) {
+                  e.preventDefault();
+                  alert(isRTL ? 'تم الوصول للحد الأقصى לבاقتك' : 'You have reached your subscription limit');
+                }
+              }}
+            >
+              <span className="mr-2">{isRTL ? '➕' : ''}</span>
+              {t("addProduct")}
+              <span className="ml-2">{!isRTL ? '➕' : ''}</span>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -183,31 +207,28 @@ export default function ProductsPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setFilterAvailable(undefined)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterAvailable === undefined
+              className={`px-4 py-2 rounded-lg transition-colors ${filterAvailable === undefined
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("all")}
             </button>
             <button
               onClick={() => setFilterAvailable(true)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterAvailable === true
+              className={`px-4 py-2 rounded-lg transition-colors ${filterAvailable === true
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("available")}
             </button>
             <button
               onClick={() => setFilterAvailable(false)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filterAvailable === false
+              className={`px-4 py-2 rounded-lg transition-colors ${filterAvailable === false
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {t("unavailable")}
             </button>
@@ -247,7 +268,7 @@ export default function ProductsPage() {
                 <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
                   {product.image ? (
                     <img
-                      src={`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${product.image}`}
+                      src={getImageUrl(product.image)}
                       alt={locale === 'ar' ? product.name_ar : product.name_en}
                       className="w-full h-full object-cover"
                     />
@@ -261,9 +282,8 @@ export default function ProductsPage() {
                   </div>
                 )}
                 <div
-                  className={`absolute top-2 ${isRTL ? 'right-2' : 'left-2'} w-6 h-6 rounded-full border-2 border-white ${
-                    product.isAvailable ? 'bg-green-500' : 'bg-gray-400'
-                  }`}
+                  className={`absolute top-2 ${isRTL ? 'right-2' : 'left-2'} w-6 h-6 rounded-full border-2 border-white ${product.isAvailable ? 'bg-green-500' : 'bg-gray-400'
+                    }`}
                   title={product.isAvailable ? t("available") : t("unavailable")}
                 ></div>
               </div>

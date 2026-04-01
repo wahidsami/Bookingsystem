@@ -1,7 +1,16 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
-// Base server URL for media/uploads (without /api/v1)
-export const SERVER_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
+export const API_ORIGIN = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
+  : 'http://localhost:5000';
+
+export function getImageUrl(path: string | null | undefined): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const normalized = path.startsWith('/') ? path.slice(1) : path;
+  const prefix = normalized.startsWith('uploads/') ? '' : 'uploads/';
+  return `${API_ORIGIN}/${prefix}${normalized}`;
+}
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -112,10 +121,6 @@ class AdminApi {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/reject`, 'POST', { body: { reason } });
   }
 
-  async requestMoreInfo(id: string, message: string) {
-    return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/request-more-info`, 'POST', { body: { message } });
-  }
-
   async suspendTenant(id: string, reason: string) {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/suspend`, 'POST', { body: { reason } });
   }
@@ -126,6 +131,10 @@ class AdminApi {
 
   async updateTenant(id: string, data: any) {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}`, 'PUT', { body: data });
+  }
+
+  async deleteTenant(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/admin/tenants/${id}`, 'DELETE');
   }
 
   // Users
@@ -231,26 +240,6 @@ class AdminApi {
     return this.request<{ success: boolean; data: any[] }>(`/admin/financial/commission-breakdown?${params.toString()}`);
   }
 
-  async getCommissionByPackage(startDate?: string, endDate?: string) {
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    return this.request<{ success: boolean; data: any[] }>(`/admin/financial/commission-by-package?${params.toString()}`);
-  }
-
-  async getRevenueByType(startDate?: string, endDate?: string) {
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    return this.request<{ success: boolean; data: any }>(`/admin/financial/revenue-by-type?${params.toString()}`);
-  }
-
-  async getBillsSummary(status?: string) {
-    const params = new URLSearchParams();
-    if (status) params.append('status', status);
-    return this.request<{ success: boolean; data: any }>(`/admin/financial/bills-summary?${params.toString()}`);
-  }
-
   async getTopEmployees(limit: number = 20, startDate?: string, endDate?: string) {
     const params = new URLSearchParams();
     params.append('limit', limit.toString());
@@ -273,6 +262,57 @@ class AdminApi {
     return this.request<{ success: boolean; data: any[] }>(`/admin/financial/employee-metrics/${tenantId}?${params.toString()}`);
   }
 
+  async getRevenueByType(startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    return this.request<{ success: boolean; data: Record<string, { count: number; amount: number; platformFee: number; tenantRevenue: number }> }>(`/admin/financial/revenue-by-type?${params.toString()}`);
+  }
+
+  async getBillsSummary(status?: string) {
+    const params = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request<{ success: boolean; data: Record<string, { count: number; totalAmount: number }> }>(`/admin/financial/bills-summary${params}`);
+  }
+
+  async getPlatformTransactions(params: { startDate?: string; endDate?: string; tenantId?: string; type?: string; limit?: number; offset?: number } = {}) {
+    const search = new URLSearchParams();
+    if (params.startDate) search.append('startDate', params.startDate);
+    if (params.endDate) search.append('endDate', params.endDate);
+    if (params.tenantId) search.append('tenantId', params.tenantId);
+    if (params.type) search.append('type', params.type);
+    if (params.limit != null) search.append('limit', params.limit.toString());
+    if (params.offset != null) search.append('offset', params.offset.toString());
+    return this.request<{ success: boolean; data: { transactions: any[]; total: number } }>(`/admin/financial/transactions?${search.toString()}`);
+  }
+
+  async getCommissionByPackage(startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    return this.request<{ success: boolean; data: any[] }>(`/admin/financial/commission-by-package?${params.toString()}`);
+  }
+
+  async getGeneralReport(startDate?: string, endDate?: string, options?: { leaderboardLimit?: number; monthlyLimit?: number; employeesLimit?: number }) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (options?.leaderboardLimit != null) params.append('leaderboardLimit', options.leaderboardLimit.toString());
+    if (options?.monthlyLimit != null) params.append('monthlyLimit', options.monthlyLimit.toString());
+    if (options?.employeesLimit != null) params.append('employeesLimit', options.employeesLimit.toString());
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/general?${params.toString()}`);
+  }
+
+  async getDetailedReport(params: { startDate?: string; endDate?: string; tenantId?: string; type?: string; limit?: number; offset?: number } = {}) {
+    const search = new URLSearchParams();
+    if (params.startDate) search.append('startDate', params.startDate);
+    if (params.endDate) search.append('endDate', params.endDate);
+    if (params.tenantId) search.append('tenantId', params.tenantId);
+    if (params.type) search.append('type', params.type);
+    if (params.limit != null) search.append('limit', params.limit.toString());
+    if (params.offset != null) search.append('offset', params.offset.toString());
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/detailed?${search.toString()}`);
+  }
+
   // Hot Deals Management
   async getPendingHotDeals() {
     return this.request<{ success: boolean; deals: any[] }>('/admin/hot-deals/pending');
@@ -284,6 +324,36 @@ class AdminApi {
 
   async rejectHotDeal(id: string, reason: string) {
     return this.request<{ success: boolean; deal: any }>(`/admin/hot-deals/${id}/reject`, 'POST', { body: { reason } });
+  }
+
+  // Service Categories Management
+  async getCategories(includeHidden: boolean = false) {
+    return this.request<{ success: boolean; categories: any[] }>(`/admin/categories${includeHidden ? '?includeHidden=true' : ''}`);
+  }
+
+  async createCategory(data: { name_en: string; name_ar: string; icon?: string; sortOrder?: number }) {
+    return this.request<{ success: boolean; category: any }>('/admin/categories', 'POST', { body: data });
+  }
+
+  async updateCategory(id: string, data: { name_en?: string; name_ar?: string; icon?: string; sortOrder?: number; isActive?: boolean }) {
+    return this.request<{ success: boolean; category: any }>(`/admin/categories/${id}`, 'PUT', { body: data });
+  }
+
+  async deleteCategory(id: string, hard: boolean = false) {
+    return this.request<{ success: boolean; message: string }>(`/admin/categories/${id}${hard ? '?hard=true' : ''}`, 'DELETE');
+  }
+
+  async reorderCategories(orderMap: { id: string; sortOrder: number }[]) {
+    return this.request<{ success: boolean; categories: any[] }>('/admin/categories/reorder', 'PUT', { body: { orderMap } });
+  }
+
+  // Feature Pricing Management
+  async getFeaturePricing() {
+    return this.request<{ success: boolean; features: any[] }>('/admin/feature-pricing');
+  }
+
+  async updateFeaturePricing(key: string, unitPrice: number) {
+    return this.request<{ success: boolean; feature: any }>(`/admin/feature-pricing/${key}`, 'PUT', { body: { unitPrice } });
   }
 }
 

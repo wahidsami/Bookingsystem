@@ -36,13 +36,14 @@ interface Appointment {
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'refunded' | 'partially_refunded';
+  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'paid' | 'refunded' | 'partially_refunded';
   price: number;
   rawPrice?: number;
   taxAmount?: number;
   platformFee?: number;
   tenantRevenue?: number;
   employeeCommission?: number;
+  remainderAmount?: number;
   notes?: string;
   service: Service;
   staff: Employee;
@@ -77,6 +78,7 @@ export default function AppointmentsPage() {
   const [filterStaffId, setFilterStaffId] = useState<string>("");
   const [filterServiceId, setFilterServiceId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -87,7 +89,7 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     loadAppointments();
-  }, [startDate, endDate, filterStaffId, filterServiceId, filterStatus]);
+  }, [startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
 
   // When calendar view is selected, adjust date range to selected date
   // Use local date to avoid timezone issues
@@ -99,8 +101,8 @@ export default function AppointmentsPage() {
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       setStartDate(dateStr);
-      // Set endDate to end of day (23:59:59) to include all appointments for that day
-      setEndDate(`${dateStr}T23:59:59.999`);
+      // Use date-only for endDate so HTML date inputs get valid yyyy-MM-dd (same day range)
+      setEndDate(dateStr);
     }
   }, [viewMode, selectedDate]);
 
@@ -139,6 +141,7 @@ export default function AppointmentsPage() {
       if (filterStaffId) params.staffId = filterStaffId;
       if (filterServiceId) params.serviceId = filterServiceId;
       if (filterStatus) params.status = filterStatus;
+      if (filterPaymentStatus) params.paymentStatus = filterPaymentStatus;
 
       const response = await tenantApi.getAppointments(params);
 
@@ -183,8 +186,9 @@ export default function AppointmentsPage() {
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
+      case 'paid':
       case 'fully_paid': return 'bg-green-100 text-green-800';
-      case 'deposit_paid': return 'bg-blue-100 text-blue-800';
+      case 'deposit_paid': return 'bg-amber-100 text-amber-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'refunded': return 'bg-red-100 text-red-800';
       case 'partially_refunded': return 'bg-orange-100 text-orange-800';
@@ -206,8 +210,9 @@ export default function AppointmentsPage() {
   const getPaymentStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return t("paymentPending");
+      case 'deposit_paid': return t("depositPaid") || "Deposit paid";
+      case 'paid':
       case 'fully_paid': return t("paid");
-      case 'deposit_paid': return locale === 'ar' ? 'تم دفع العربون' : 'Deposit Paid';
       case 'refunded': return t("refunded");
       case 'partially_refunded': return t("partiallyRefunded");
       default: return status;
@@ -269,7 +274,7 @@ export default function AppointmentsPage() {
         <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
           {t("filters")}
         </h3>
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 ${isRTL ? 'md:grid-cols-2 lg:grid-cols-5' : ''}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 ${isRTL ? 'md:grid-cols-2 lg:grid-cols-6' : ''}`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {t("startDate")}
@@ -344,6 +349,23 @@ export default function AppointmentsPage() {
               <option value="no_show">{t("noShow")}</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              {t("paymentStatus") || "Payment"}
+            </label>
+            <select
+              value={filterPaymentStatus}
+              onChange={(e) => setFilterPaymentStatus(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              style={{ textAlign: isRTL ? 'right' : 'left' }}
+            >
+              <option value="">{t("allPayments") || "All"}
+              </option>
+              <option value="pending">{t("paymentPending")}</option>
+              <option value="deposit_paid">{t("remainderDue") || "Remainder due"}</option>
+              <option value="fully_paid">{t("paid")}</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -364,7 +386,10 @@ export default function AppointmentsPage() {
         <div className="card text-center py-12">
           <div className="text-6xl mb-4">📅</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noAppointments")}</h3>
-          <p className="text-gray-600">{t("noAppointmentsDesc")}</p>
+          <p className="text-gray-600 mb-2">{t("noAppointmentsDesc")}</p>
+          <p className="text-sm text-gray-500">
+            {locale === 'ar' ? 'القائمة معروضة حسب تاريخ البداية والنهاية أعلاه. غيّر النطاق لرؤية حجوزات أخرى.' : 'List is filtered by the start/end dates above. Try a wider date range to see more appointments.'}
+          </p>
         </div>
       ) : viewMode === 'list' ? (
         /* List View */
@@ -406,6 +431,11 @@ export default function AppointmentsPage() {
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${getPaymentStatusColor(appointment.paymentStatus)}`}>
                         {getPaymentStatusLabel(appointment.paymentStatus)}
                       </span>
+                      {appointment.paymentStatus === 'deposit_paid' && (
+                        <span className="px-2 py-1 rounded text-xs font-semibold bg-amber-200 text-amber-900">
+                          {t("remainderDue") || "Remainder due"}
+                        </span>
+                      )}
                     </div>
 
                     <div className="text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
-import { tenantApi } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -333,7 +333,7 @@ export default function OrdersPage() {
                           <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                             {order.user.photo ? (
                               <img
-                                src={order.user.photo.startsWith('/') ? `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}${order.user.photo}` : `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${order.user.photo}`}
+                                src={getImageUrl(order.user.photo)}
                                 alt={`${order.user.firstName} ${order.user.lastName}`}
                                 className="w-10 h-10 rounded-full object-cover"
                                 onError={(e) => {

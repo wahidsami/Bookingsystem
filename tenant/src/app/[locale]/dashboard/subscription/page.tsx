@@ -1,433 +1,158 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { TenantLayout } from "@/components/TenantLayout";
-import { Currency } from "@/components/Currency";
-import { tenantApi } from "@/lib/api";
-
-type BillingCycle = "monthly" | "sixMonth" | "annual";
-
-interface PackageLimits {
-  maxBookingsPerMonth?: number;
-  maxStaff?: number;
-  maxServices?: number;
-  maxProducts?: number;
-  storageGB?: number;
-}
-
-interface SubscriptionPackage {
-  id: string;
-  name: string;
-  description?: string;
-  monthlyPrice: number | string;
-  sixMonthPrice: number | string;
-  annualPrice: number | string;
-  platformCommission: number | string;
-  isFeatured?: boolean;
-  limits: PackageLimits;
-}
-
-interface CurrentSubscription {
-  id: string;
-  packageId: string;
-  billingCycle: BillingCycle;
-  amount: number | string;
-  currency: string;
-  status: string;
-  currentPeriodEnd: string;
-  nextBillingDate?: string;
-  autoRenew: boolean;
-  package: SubscriptionPackage;
-}
-
-interface UsageStatsResponse {
-  usage?: {
-    bookings?: { current: number; limit: number; unlimited: boolean; percentage: number };
-    staff?: { current: number; limit: number; unlimited: boolean; percentage: number };
-    services?: { current: number; limit: number; unlimited: boolean; percentage: number };
-    products?: { current: number; limit: number; unlimited: boolean; percentage: number };
-  };
-  subscription?: {
-    daysRemaining?: number | null;
-  };
-}
-
-const BILLING_CYCLES: BillingCycle[] = ["monthly", "sixMonth", "annual"];
+import { useState, useEffect } from 'react';
+import { TenantLayout } from '@/components/TenantLayout';
+import { tenantApi } from '@/lib/api';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 
 export default function SubscriptionPage() {
   const params = useParams();
-  const router = useRouter();
-  const locale = (params?.locale as string) || "ar";
-  const isRTL = locale === "ar";
-  const t = useTranslations("Subscription");
-
+  const locale = (params?.locale as string) || 'ar';
+  const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("");
-  const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
-  const [packages, setPackages] = useState<SubscriptionPackage[]>([]);
-  const [usage, setUsage] = useState<UsageStatsResponse["usage"] | null>(null);
-  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
-  const [selectedBillingCycle, setSelectedBillingCycle] = useState<Record<string, BillingCycle>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadData();
+    tenantApi
+      .getCurrentSubscription()
+      .then((res) => {
+        if (res.success && res.subscription) setSubscription(res.subscription);
+        else setError('No subscription found');
+      })
+      .catch(() => setError('Failed to load subscription'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const [currentRes, packagesRes, usageRes] = await Promise.allSettled([
-        tenantApi.getCurrentSubscription(),
-        tenantApi.getAvailableSubscriptionPackages(),
-        tenantApi.getSubscriptionUsageStats()
-      ]);
-
-      if (currentRes.status === "fulfilled" && currentRes.value?.success) {
-        const subscription = currentRes.value.subscription as CurrentSubscription;
-        setCurrentSubscription(subscription);
-        setSelectedBillingCycle((prev) => ({
-          ...prev,
-          [subscription.packageId]: subscription.billingCycle || "monthly"
-        }));
-      }
-
-      if (packagesRes.status === "fulfilled" && packagesRes.value?.success) {
-        const nextPackages = (packagesRes.value.packages || []) as SubscriptionPackage[];
-        setPackages(nextPackages);
-        setSelectedBillingCycle((prev) => {
-          const updated = { ...prev };
-          nextPackages.forEach((pkg) => {
-            if (!updated[pkg.id]) updated[pkg.id] = "monthly";
-          });
-          return updated;
-        });
-      }
-
-      if (usageRes.status === "fulfilled" && usageRes.value?.success) {
-        setUsage(usageRes.value.usage || null);
-        setDaysRemaining(usageRes.value.subscription?.daysRemaining ?? null);
-      }
-
-      if (
-        currentRes.status === "rejected" &&
-        packagesRes.status === "rejected" &&
-        usageRes.status === "rejected"
-      ) {
-        throw new Error(t("loadError"));
-      }
-    } catch (err: any) {
-      console.error("Failed to load subscription data:", err);
-      setError(err.message || t("loadError"));
-    } finally {
-      setLoading(false);
-    }
+  const statusLabel = (s: string) => {
+    const map: Record<string, string> = locale === 'ar'
+      ? { active: 'نشط', trial: 'تجريبي', past_due: 'متأخر', APPROVED_PENDING_PAYMENT: 'بانتظار الدفع', APPROVED_FREE_ACTIVE: 'نشط' }
+      : { active: 'Active', trial: 'Trial', past_due: 'Past due', APPROVED_PENDING_PAYMENT: 'Pending payment', APPROVED_FREE_ACTIVE: 'Active' };
+    return map[s] || s;
   };
 
-  const getPriceForCycle = (pkg: SubscriptionPackage, cycle: BillingCycle) => {
-    const raw =
-      cycle === "monthly"
-        ? pkg.monthlyPrice
-        : cycle === "sixMonth"
-          ? pkg.sixMonthPrice
-          : pkg.annualPrice;
+  const daysUntilRenewal = subscription?.currentPeriodEnd
+    ? Math.max(0, Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
 
-    return Number(raw || 0);
-  };
-
-  const formatBillingCycle = (cycle: BillingCycle) => {
-    switch (cycle) {
-      case "monthly":
-        return t("monthly");
-      case "sixMonth":
-        return t("sixMonth");
-      case "annual":
-        return t("annual");
-      default:
-        return cycle;
-    }
-  };
-
-  const formatStatus = (status: string) => {
-    const normalized = String(status || "").toLowerCase();
-    const lookup: Record<string, string> = {
-      trial: t("statusTrial"),
-      active: t("statusActive"),
-      past_due: t("statusPastDue"),
-      expired: t("statusExpired"),
-      cancelled: t("statusCancelled"),
-      suspended: t("statusSuspended")
-    };
-    return lookup[normalized] || status;
-  };
-
-  const formatLimit = (value?: number) => {
-    if (value === undefined || value === null) return t("notAvailable");
-    return value === -1 ? t("unlimited") : value.toString();
-  };
-
-  const requestChange = async (pkg: SubscriptionPackage) => {
-    const billingCycle = selectedBillingCycle[pkg.id] || "monthly";
-    const requestKey = `${pkg.id}:${billingCycle}`;
-
-    try {
-      setSubmitting(requestKey);
-      setFeedback("");
-
-      const response = await tenantApi.requestSubscriptionChange(pkg.id, billingCycle);
-      if (response?.paymentToken) {
-        router.push(`/${locale}/payment?token=${encodeURIComponent(response.paymentToken)}`);
-        return;
-      }
-      setFeedback(response.message || t("requestSuccess"));
-    } catch (err: any) {
-      console.error("Failed to request subscription change:", err);
-      setFeedback(err.message || t("requestError"));
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  if (loading) {
-    return (
-      <TenantLayout>
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <div className="spinner"></div>
-        </div>
-      </TenantLayout>
-    );
-  }
+  const formatDate = (d: string) => (d ? new Date(d).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-GB') : '—');
 
   return (
     <TenantLayout>
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-start justify-between gap-4 ${isRTL ? "flex-row-reverse" : ""}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? "right" : "left" }}>
-              {t("title")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
-              {t("subtitle")}
-            </p>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {locale === 'ar' ? 'اشتراكي' : 'My Subscription'}
+        </h1>
+        <p className="text-gray-600 mb-6">
+          {locale === 'ar' ? 'تفاصيل خطتك وتجديدها.' : 'Your plan details and renewal.'}
+        </p>
+
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
           </div>
-        </div>
-      </div>
+        )}
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {feedback && (
-        <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-          {feedback}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="card xl:col-span-2">
-          <div className={`mb-6 flex items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-            <div style={{ textAlign: isRTL ? "right" : "left" }}>
-              <p className="text-sm font-medium text-gray-500">{t("currentPlan")}</p>
-              <h3 className="text-2xl font-bold text-gray-900">
-                {currentSubscription?.package?.name || t("noSubscription")}
-              </h3>
+        {error && !subscription && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-6">
+            {error}
+            <div className="mt-2">
+              <Link href={`/${locale}/dashboard/bills`} className="text-purple-600 hover:underline font-medium">
+                {locale === 'ar' ? 'الفواتير' : 'My Bills'}
+              </Link>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
-              {currentSubscription ? formatStatus(currentSubscription.status) : t("notAvailable")}
-            </span>
           </div>
+        )}
 
-          {currentSubscription ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">{t("billingCycle")}</p>
-                <p className="mt-2 text-lg font-semibold text-gray-900">
-                  {formatBillingCycle(currentSubscription.billingCycle)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">{t("currentAmount")}</p>
-                <p className="mt-2 text-lg font-semibold text-gray-900">
-                  <Currency amount={Number(currentSubscription.amount || 0)} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
-                </p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">{t("renewalDate")}</p>
-                <p className="mt-2 text-lg font-semibold text-gray-900">
-                  {currentSubscription.currentPeriodEnd
-                    ? new Date(currentSubscription.currentPeriodEnd).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")
-                    : t("notAvailable")}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">{t("daysRemaining")}</p>
-                <p className="mt-2 text-lg font-semibold text-gray-900">
-                  {daysRemaining ?? t("notAvailable")}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-gray-600">
-              {t("noSubscriptionDescription")}
-            </div>
-          )}
-
-          {usage && (
-            <div className="mt-8">
-              <h4 className="mb-4 text-lg font-bold text-gray-900" style={{ textAlign: isRTL ? "right" : "left" }}>
-                {t("usageOverview")}
-              </h4>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {[
-                  { key: "bookings", label: t("bookings"), value: usage.bookings },
-                  { key: "staff", label: t("staff"), value: usage.staff },
-                  { key: "services", label: t("services"), value: usage.services },
-                  { key: "products", label: t("products"), value: usage.products }
-                ].map((item) => (
-                  <div key={item.key} className="rounded-2xl border border-gray-200 p-4">
-                    <div className={`mb-3 flex items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-                      <span className="font-semibold text-gray-900">{item.label}</span>
-                      <span className="text-sm text-gray-500">
-                        {item.value?.current || 0} / {item.value?.unlimited ? t("unlimited") : item.value?.limit ?? t("notAvailable")}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-gray-100">
-                      <div
-                        className="h-2 rounded-full bg-primary"
-                        style={{ width: `${Math.min(item.value?.percentage || 0, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <h3 className="mb-4 text-xl font-bold text-gray-900" style={{ textAlign: isRTL ? "right" : "left" }}>
-            {t("billingNoticeTitle")}
-          </h3>
-          <div className="space-y-3 text-sm text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
-            <p>{t("billingNoticeBody")}</p>
-            <p>{t("billingNoticeHint")}</p>
-          </div>
-          <div className="mt-6 space-y-3">
-            <Link
-              href={`/${locale}/dashboard/bills`}
-              className="block rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-center text-sm font-semibold text-primary hover:bg-primary/10"
-            >
-              {locale === "ar" ? "عرض الفواتير" : "View bills"}
-            </Link>
-            <Link
-              href={`/${locale}/dashboard/subscription/upgrade`}
-              className="block rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-white hover:bg-primary/90"
-            >
-              {locale === "ar" ? "ترقية أو تجديد الباقة" : "Upgrade or renew"}
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 card">
-        <div className={`mb-6 flex items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-          <div style={{ textAlign: isRTL ? "right" : "left" }}>
-            <h3 className="text-2xl font-bold text-gray-900">{t("availablePackages")}</h3>
-            <p className="mt-1 text-sm text-gray-500">{t("availablePackagesDescription")}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {packages.map((pkg) => {
-            const billingCycle = selectedBillingCycle[pkg.id] || "monthly";
-            const price = getPriceForCycle(pkg, billingCycle);
-            const isCurrent = currentSubscription?.packageId === pkg.id;
-            const submitKey = `${pkg.id}:${billingCycle}`;
-
-            return (
-              <div
-                key={pkg.id}
-                className={`rounded-3xl border p-6 transition-shadow hover:shadow-lg ${
-                  isCurrent ? "border-primary bg-primary/5" : "border-gray-200 bg-white"
-                }`}
-              >
-                <div className={`mb-4 flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <div style={{ textAlign: isRTL ? "right" : "left" }}>
-                    <h4 className="text-xl font-bold text-gray-900">{pkg.name}</h4>
-                    <p className="mt-2 text-sm text-gray-500">{pkg.description || t("noDescription")}</p>
-                  </div>
-                  {isCurrent && (
-                    <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white">
-                      {t("current")}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mb-5">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">{t("billingCycle")}</label>
-                  <select
-                    value={billingCycle}
-                    onChange={(e) =>
-                      setSelectedBillingCycle((prev) => ({
-                        ...prev,
-                        [pkg.id]: e.target.value as BillingCycle
-                      }))
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-primary"
-                  >
-                    {BILLING_CYCLES.map((cycle) => (
-                      <option key={cycle} value={cycle}>
-                        {formatBillingCycle(cycle)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mb-5 rounded-2xl bg-gray-50 p-4">
-                  <p className="text-sm text-gray-500">{t("price")}</p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">
-                    <Currency amount={price} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
-                  </p>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {t("commission")}: {Number(pkg.platformCommission || 0)}%
-                  </p>
-                </div>
-
-                <ul className="mb-6 space-y-2 text-sm text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
-                  <li>{t("bookings")}: {formatLimit(pkg.limits?.maxBookingsPerMonth)}</li>
-                  <li>{t("staff")}: {formatLimit(pkg.limits?.maxStaff)}</li>
-                  <li>{t("services")}: {formatLimit(pkg.limits?.maxServices)}</li>
-                  <li>{t("products")}: {formatLimit(pkg.limits?.maxProducts)}</li>
-                </ul>
-
-                <button
-                  type="button"
-                  onClick={() => requestChange(pkg)}
-                  disabled={submitting === submitKey}
-                  className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                    isCurrent
-                      ? "bg-white text-primary border border-primary hover:bg-primary/5"
-                      : "bg-primary text-white hover:bg-primary/90"
-                  } disabled:opacity-60`}
+        {!loading && subscription && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {subscription.package?.name || subscription.package?.name_ar || 'Plan'}
+                </h2>
+                <span
+                  className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
+                    subscription.status === 'active' || subscription.status === 'APPROVED_FREE_ACTIVE' || subscription.status === 'trial'
+                      ? 'bg-green-100 text-green-800'
+                      : subscription.status === 'APPROVED_PENDING_PAYMENT'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
                 >
-                  {submitting === submitKey
-                    ? t("sendingRequest")
-                    : isCurrent
-                      ? t("requestRenewal")
-                      : t("requestUpgrade")}
-                </button>
+                  {statusLabel(subscription.status)}
+                </span>
               </div>
-            );
-          })}
-        </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-gray-500">{locale === 'ar' ? 'دورة الفوترة' : 'Billing cycle'}</dt>
+                  <dd className="font-medium text-gray-900">
+                    {subscription.billingCycle === 'monthly'
+                      ? locale === 'ar'
+                        ? 'شهري'
+                        : 'Monthly'
+                      : subscription.billingCycle === 'sixMonth'
+                      ? locale === 'ar'
+                        ? 'كل 6 أشهر'
+                        : '6 months'
+                      : locale === 'ar'
+                      ? 'سنوي'
+                      : 'Annual'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">{locale === 'ar' ? 'بداية الفترة' : 'Period start'}</dt>
+                  <dd className="font-medium text-gray-900">{formatDate(subscription.currentPeriodStart)}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">{locale === 'ar' ? 'نهاية الفترة' : 'Period end'}</dt>
+                  <dd className="font-medium text-gray-900">{formatDate(subscription.currentPeriodEnd)}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">{locale === 'ar' ? 'التجديد القادم' : 'Next renewal'}</dt>
+                  <dd className="font-medium text-gray-900">{formatDate(subscription.nextBillingDate || subscription.currentPeriodEnd)}</dd>
+                </div>
+              </dl>
+              {daysUntilRenewal !== null && (subscription.status === 'active' || subscription.status === 'APPROVED_FREE_ACTIVE' || subscription.status === 'trial') && (
+                <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                  <p className="text-purple-900 font-medium">
+                    {locale === 'ar' ? `التجديد خلال ${daysUntilRenewal} يوم` : `Renewal in ${daysUntilRenewal} days`}
+                  </p>
+                  <p className="text-purple-700 text-sm mt-1">
+                    {locale === 'ar' ? 'التاريخ القادم للخصم' : 'Next billing date'}: {formatDate(subscription.nextBillingDate || subscription.currentPeriodEnd)}
+                  </p>
+                </div>
+              )}
+              {subscription.status === 'APPROVED_PENDING_PAYMENT' && (
+                <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-amber-900 font-medium">
+                    {locale === 'ar' ? 'يرجى إتمام الدفع خلال 48 ساعة لتفعيل اشتراكك.' : 'Please complete payment within 48 hours to activate your subscription.'}
+                  </p>
+                  <Link
+                    href={`/${locale}/dashboard/bills`}
+                    className="inline-block mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
+                  >
+                    {locale === 'ar' ? 'ادفع الآن' : 'Pay now'}
+                  </Link>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/${locale}/dashboard/subscription/upgrade`}
+                className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-800 rounded-lg font-medium hover:bg-gray-200"
+              >
+                {locale === 'ar' ? 'ترقية الخطة' : 'Upgrade plan'}
+              </Link>
+              <Link
+                href={`/${locale}/dashboard/bills`}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+              >
+                {locale === 'ar' ? 'فواتيري' : 'My Bills'}
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </TenantLayout>
   );
