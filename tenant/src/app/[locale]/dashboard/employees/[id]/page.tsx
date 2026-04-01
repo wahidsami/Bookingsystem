@@ -30,6 +30,14 @@ interface Employee {
   isActive: boolean;
 }
 
+interface StaffAppAccessInfo {
+  email: string | null;
+  hasAccount: boolean;
+  temporaryPassword?: string | null;
+  passwordUpdated?: boolean;
+  accountRemoved?: boolean;
+}
+
 export default function EditEmployeePage() {
   const t = useTranslations("Employees");
   const params = useParams();
@@ -51,12 +59,14 @@ export default function EditEmployeePage() {
     skills: [] as string[],
     salary: "",
     commissionRate: "",
+    staffAppPassword: "",
     isActive: true
   });
   const [newSkill, setNewSkill] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [existingPhoto, setExistingPhoto] = useState<string | null>(null);
+  const [staffAppAccess, setStaffAppAccess] = useState<StaffAppAccessInfo | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -83,6 +93,7 @@ export default function EditEmployeePage() {
           skills: emp.skills || [],
           salary: emp.salary?.toString() || "",
           commissionRate: emp.commissionRate?.toString() || "",
+          staffAppPassword: "",
           isActive: emp.isActive !== undefined ? emp.isActive : true
           // Note: workingHours removed - use Schedules section to manage employee schedules
         });
@@ -90,6 +101,10 @@ export default function EditEmployeePage() {
         if (emp.photo) {
           setExistingPhoto(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${emp.photo}`);
           setPhotoPreview(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'}/uploads/${emp.photo}`);
+        }
+
+        if (response.staffAppAccess) {
+          setStaffAppAccess(response.staffAppAccess);
         }
       } else {
         setError(response.message || "Failed to load employee");
@@ -160,6 +175,7 @@ export default function EditEmployeePage() {
       submitData.append("skills", JSON.stringify(formData.skills));
       submitData.append("salary", formData.salary);
       submitData.append("commissionRate", formData.commissionRate || "0");
+      if (formData.staffAppPassword) submitData.append("staffAppPassword", formData.staffAppPassword);
       submitData.append("isActive", formData.isActive.toString());
       // Note: workingHours removed - use Schedules section to manage employee schedules
       
@@ -171,6 +187,24 @@ export default function EditEmployeePage() {
       const response = await tenantApi.updateEmployee(id as string, submitData);
       
       if (response.success) {
+        if (response.staffAppAccess) {
+          setStaffAppAccess(response.staffAppAccess);
+        }
+
+        if (response.staffAppAccess?.temporaryPassword && response.staffAppAccess?.email) {
+          window.alert(
+            locale === 'ar'
+              ? `تم تجهيز دخول تطبيق الموظفين.\nالبريد الإلكتروني: ${response.staffAppAccess.email}\nكلمة المرور: ${response.staffAppAccess.temporaryPassword}\nيرجى مشاركتها مع الموظف بشكل آمن.`
+              : `Staff app access is ready.\nEmail: ${response.staffAppAccess.email}\nPassword: ${response.staffAppAccess.temporaryPassword}\nPlease share it with the staff member securely.`
+          );
+        } else if (response.staffAppAccess?.passwordUpdated) {
+          window.alert(
+            locale === 'ar'
+              ? 'تم تحديث كلمة مرور تطبيق الموظفين بنجاح.'
+              : 'The staff app password was updated successfully.'
+          );
+        }
+
         router.push(`/${locale}/dashboard/employees`);
       } else {
         setError(response.message || t("updateError"));
@@ -462,6 +496,40 @@ export default function EditEmployeePage() {
                     max="100"
                     step="0.01"
                     placeholder="0"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'دخول تطبيق الموظفين' : 'Staff App Access'}
+              </h3>
+
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {staffAppAccess?.hasAccount
+                    ? locale === 'ar'
+                      ? `الحساب مفعل على البريد: ${staffAppAccess.email}`
+                      : `Account is active for: ${staffAppAccess.email}`
+                    : locale === 'ar'
+                      ? 'لا يوجد حساب دخول للموظف حالياً. أضف بريداً إلكترونياً وسيتم تجهيز الحساب.'
+                      : 'This employee does not have a staff-app login yet. Add an email to provision one.'}
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'إعادة تعيين كلمة المرور' : 'Reset Staff Password'} <span className="text-gray-400">({t("optional")})</span>
+                  </label>
+                  <input
+                    type="password"
+                    name="staffAppPassword"
+                    value={formData.staffAppPassword}
+                    onChange={handleChange}
+                    minLength={8}
+                    placeholder={locale === 'ar' ? 'اتركها فارغة للإبقاء على كلمة المرور الحالية' : 'Leave blank to keep the current password'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />

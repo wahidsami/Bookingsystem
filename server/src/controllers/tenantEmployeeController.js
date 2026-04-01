@@ -7,7 +7,120 @@ const db = require('../models');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { Op } = require('sequelize');
+
+const normalizeEmail = (value) => value.trim().toLowerCase();
+
+const generateTemporaryStaffPassword = () => {
+    const suffix = crypto.randomBytes(4).toString('hex').toUpperCase();
+    return `Rifah!${suffix}`;
+};
+
+const buildStaffAppAccessPayload = ({ email, hasAccount, temporaryPassword = null, passwordUpdated = false, accountRemoved = false }) => ({
+    email,
+    hasAccount,
+    temporaryPassword,
+    passwordUpdated,
+    accountRemoved
+});
+
+const syncStaffAuthAccount = async ({
+    tenantId,
+    previousEmail = null,
+    nextEmail = null,
+    password = null,
+    transaction
+}) => {
+    const previousNormalized = previousEmail ? normalizeEmail(previousEmail) : null;
+    const nextNormalized = nextEmail ? normalizeEmail(nextEmail) : null;
+
+    if (!previousNormalized && !nextNormalized) {
+        return buildStaffAppAccessPayload({
+            email: null,
+            hasAccount: false
+        });
+    }
+
+    const findStaffUserByEmail = async (email) => db.User.findOne({
+        where: {
+            email,
+            tenantId,
+            role: 'staff'
+        },
+        transaction
+    });
+
+    const ensureEmailIsAvailable = async (email, currentUserId = null) => {
+        const conflictingUser = await db.User.findOne({
+            where: { email },
+            transaction
+        });
+
+        if (!conflictingUser) {
+            return;
+        }
+
+        if (currentUserId && conflictingUser.id === currentUserId) {
+            return;
+        }
+
+        if (conflictingUser.role !== 'staff' || conflictingUser.tenantId !== tenantId) {
+            throw new Error('This email is already used by another account');
+        }
+    };
+
+    const previousUser = previousNormalized ? await findStaffUserByEmail(previousNormalized) : null;
+
+    if (!nextNormalized) {
+        if (previousUser) {
+            await previousUser.destroy({ transaction });
+        }
+
+        return buildStaffAppAccessPayload({
+            email: null,
+            hasAccount: false,
+            accountRemoved: Boolean(previousUser)
+        });
+    }
+
+    await ensureEmailIsAvailable(nextNormalized, previousUser?.id || null);
+
+    if (previousUser) {
+        const updates = {};
+        if (previousUser.email !== nextNormalized) {
+            updates.email = nextNormalized;
+        }
+        if (password) {
+            updates.password = password;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await previousUser.update(updates, { transaction });
+        }
+
+        return buildStaffAppAccessPayload({
+            email: nextNormalized,
+            hasAccount: true,
+            passwordUpdated: Boolean(password)
+        });
+    }
+
+    const finalPassword = password || generateTemporaryStaffPassword();
+    await db.User.create({
+        email: nextNormalized,
+        password: finalPassword,
+        role: 'staff',
+        tenantId
+    }, { transaction });
+
+    return buildStaffAppAccessPayload({
+        email: nextNormalized,
+        hasAccount: true,
+        temporaryPassword: finalPassword,
+        passwordUpdated: Boolean(password)
+    });
+};
 
 // Configure multer for employee photo uploads
 const storage = multer.diskStorage({
@@ -155,9 +268,33 @@ exports.getEmployee = async (req, res) => {
             });
         }
 
+        let staffAppAccess = buildStaffAppAccessPayload({
+            email: employee.email || null,
+            hasAccount: false
+        });
+
+        if (employee.email) {
+            const existingStaffUser = await db.User.findOne({
+                where: {
+                    email: normalizeEmail(employee.email),
+                    tenantId,
+                    role: 'staff'
+                },
+                attributes: ['id', 'email']
+            });
+
+            if (existingStaffUser) {
+                staffAppAccess = buildStaffAppAccessPayload({
+                    email: existingStaffUser.email,
+                    hasAccount: true
+                });
+            }
+        }
+
         res.json({
             success: true,
-            employee
+            employee,
+            staffAppAccess
         });
     } catch (error) {
         console.error('❌ Get employee error:', {
@@ -209,6 +346,7 @@ exports.createEmployee = async (req, res) => {
             skills,
             salary,
             commissionRate,
+            staffAppPassword,
             workingHours, // Deprecated - kept for backward compatibility
             isActive = true
         } = req.body;
@@ -234,6 +372,15 @@ exports.createEmployee = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Employee name is required'
+            });
+        }
+
+        const normalizedEmail = email && email.trim() ? normalizeEmail(email) : null;
+        if (staffAppPassword && staffAppPassword.length < 8) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Staff app password must be at least 8 characters long'
             });
         }
 
@@ -469,7 +616,7 @@ exports.createEmployee = async (req, res) => {
         const employee = await db.Staff.create({
             tenantId,
             name: name.trim(),
-            email: email && email.trim() ? email.trim() : null,
+            email: normalizedEmail,
             phone: phone && phone.trim() ? phone.trim() : null,
             nationality: nationality && nationality.trim() ? nationality.trim() : null,
             bio: bio && bio.trim() ? bio.trim() : null,
@@ -482,12 +629,20 @@ exports.createEmployee = async (req, res) => {
             isActive: isActiveBool
         }, { transaction });
 
+        const staffAppAccess = await syncStaffAuthAccount({
+            tenantId,
+            nextEmail: normalizedEmail,
+            password: staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null,
+            transaction
+        });
+
         await transaction.commit();
 
         res.status(201).json({
             success: true,
             message: 'Employee created successfully',
-            employee
+            employee,
+            staffAppAccess
         });
     } catch (error) {
         await transaction.rollback();
@@ -557,6 +712,7 @@ exports.updateEmployee = async (req, res) => {
             skills,
             salary,
             commissionRate,
+            staffAppPassword,
             workingHours,
             isActive
         } = req.body;
@@ -578,6 +734,16 @@ exports.updateEmployee = async (req, res) => {
             });
         }
 
+        if (staffAppPassword && staffAppPassword.length < 8) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Staff app password must be at least 8 characters long'
+            });
+        }
+
+        const previousEmail = employee.email;
+
         // Parse skills if provided
         if (skills !== undefined) {
             if (typeof skills === 'string') {
@@ -592,7 +758,7 @@ exports.updateEmployee = async (req, res) => {
 
         // Update fields
         if (name !== undefined) employee.name = name;
-        if (email !== undefined) employee.email = email || null;
+        if (email !== undefined) employee.email = email && email.trim() ? normalizeEmail(email) : null;
         if (phone !== undefined) employee.phone = phone || null;
         if (nationality !== undefined) employee.nationality = nationality || null;
         if (bio !== undefined) employee.bio = bio || null;
@@ -615,13 +781,22 @@ exports.updateEmployee = async (req, res) => {
             employee.photo = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
         }
 
+        const staffAppAccess = await syncStaffAuthAccount({
+            tenantId,
+            previousEmail,
+            nextEmail: employee.email,
+            password: staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null,
+            transaction
+        });
+
         await employee.save({ transaction });
         await transaction.commit();
 
         res.json({
             success: true,
             message: 'Employee updated successfully',
-            employee
+            employee,
+            staffAppAccess
         });
     } catch (error) {
         await transaction.rollback();
@@ -685,6 +860,21 @@ exports.deleteEmployee = async (req, res) => {
             const photoPath = path.join(__dirname, '../../uploads', employee.photo);
             if (fs.existsSync(photoPath)) {
                 fs.unlinkSync(photoPath);
+            }
+        }
+
+        if (employee.email) {
+            const staffUser = await db.User.findOne({
+                where: {
+                    email: normalizeEmail(employee.email),
+                    tenantId,
+                    role: 'staff'
+                },
+                transaction
+            });
+
+            if (staffUser) {
+                await staffUser.destroy({ transaction });
             }
         }
 
