@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.0.0"
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -12,11 +13,14 @@
       "android": {
         "buildType": "apk"
       },
+      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://rapi.unifinitylab.com/api/v1"
       }
     },
     "production": {
+      "channel": "production",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://rapi.unifinitylab.com/api/v1"
       }

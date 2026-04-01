@@ -19,6 +19,9 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'sa.rifah.staff',
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       adaptiveIcon: {
@@ -32,6 +35,12 @@ module.exports = {
       favicon: './assets/favicon.png',
     },
     scheme: 'rifah-staff',
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
+    updates: {
+      url: 'https://u.expo.dev/6f9bc7f6-b461-46b1-95d2-a4158a47adb6',
+    },
     extra: {
       apiUrl: process.env.EXPO_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://rapi.unifinitylab.com/api/v1',
       eas: {

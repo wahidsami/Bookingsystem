@@ -1,4 +1,5 @@
 const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined;
+const updateUrl = easProjectId ? `https://u.expo.dev/${easProjectId}` : undefined;
 
 module.exports = {
   expo: {
@@ -19,6 +20,9 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: 'com.refah.mobile',
       buildNumber: '1.0.0',
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       adaptiveIcon: {
@@ -38,6 +42,14 @@ module.exports = {
       en: './locales/en.json',
     },
     supportsRTL: true,
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
+    ...(updateUrl ? {
+      updates: {
+        url: updateUrl,
+      },
+    } : {}),
     extra: {
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://rapi.unifinitylab.com/api/v1',
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
