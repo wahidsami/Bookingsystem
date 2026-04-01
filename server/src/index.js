@@ -312,6 +312,7 @@ const startServer = async () => {
         await db.Product.sync({ force: false }); // New: Product catalog
         await db.Customer.sync({ force: false });
         await db.Staff.sync({ force: false });
+        await db.MobilePushToken.sync({ force: false });
         await db.ServiceEmployee.sync({ force: false }); // New: Service-Employee junction
         await db.StaffSchedule.sync({ force: false }); // Legacy schedule (kept for backward compatibility)
         // New scheduling models (Phase 3)

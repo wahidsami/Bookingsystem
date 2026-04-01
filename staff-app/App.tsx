@@ -26,6 +26,11 @@ import {
   updateStaffAppointmentStatus,
   writeStoredSession,
 } from './src/lib/api';
+import {
+  initializeStaffNotificationHandling,
+  registerStaffPushNotifications,
+  unregisterStaffPushNotifications,
+} from './src/lib/notifications';
 
 type TabKey = 'overview' | 'appointments' | 'schedule' | 'profile';
 
@@ -84,6 +89,21 @@ export default function App() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  useEffect(() => {
+    const cleanup = initializeStaffNotificationHandling();
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    registerStaffPushNotifications(session).catch((error) => {
+      console.warn('Staff push registration warning:', error?.message || error);
+    });
+  }, [session?.accessToken, session?.staff.id]);
 
   const loadDashboard = async (activeSession: StaffSession, showSpinner = true) => {
     if (showSpinner) {
@@ -181,6 +201,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    await unregisterStaffPushNotifications(session);
     await logoutStaff(session);
     setSession(null);
     setAppointments([]);

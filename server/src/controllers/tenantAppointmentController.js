@@ -7,6 +7,7 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const { Sequelize } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const pushNotificationService = require('../services/pushNotificationService');
 
 /**
  * Get all appointments for the authenticated tenant
@@ -294,6 +295,20 @@ exports.updateAppointmentStatus = async (req, res) => {
         await appointment.save({ transaction });
         await transaction.commit();
 
+        try {
+            await pushNotificationService.sendToUser(appointment.platformUserId, {
+                title: 'Booking updated',
+                body: `Your appointment is now ${status.replace(/_/g, ' ')}.`,
+                data: {
+                    type: 'booking_status_updated',
+                    appointmentId: appointment.id,
+                    status
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Tenant booking status notification warning:', notificationError.message);
+        }
+
         res.json({
             success: true,
             message: 'Appointment status updated successfully',
@@ -407,6 +422,20 @@ exports.updatePaymentStatus = async (req, res) => {
         }
 
         await transaction.commit();
+
+        try {
+            await pushNotificationService.sendToUser(appointment.platformUserId, {
+                title: 'Booking payment updated',
+                body: `Payment status for your appointment is now ${paymentStatus.replace(/_/g, ' ')}.`,
+                data: {
+                    type: 'booking_payment_updated',
+                    appointmentId: appointment.id,
+                    paymentStatus
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Tenant booking payment notification warning:', notificationError.message);
+        }
 
         res.json({
             success: true,

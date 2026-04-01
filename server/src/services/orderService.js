@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const pushNotificationService = require('./pushNotificationService');
 
 class OrderService {
     _calculateShippingFee(deliveryType, shippingFee = null, deliveryMethod = 'standard') {
@@ -188,6 +189,21 @@ class OrderService {
                 transaction: shouldCommit ? null : transaction
             });
 
+            try {
+                const tenantName = fullOrder?.tenant?.name_ar || fullOrder?.tenant?.name_en || fullOrder?.tenant?.name || 'the store';
+                await pushNotificationService.sendToUser(platformUserId, {
+                    title: 'Order created',
+                    body: `Your order ${fullOrder?.orderNumber || order.orderNumber} has been placed with ${tenantName}.`,
+                    data: {
+                        type: 'order_created',
+                        orderId: order.id,
+                        tenantId
+                    }
+                });
+            } catch (notificationError) {
+                console.warn('Order creation notification warning:', notificationError.message);
+            }
+
             return fullOrder || order;
 
         } catch (error) {
@@ -240,6 +256,22 @@ class OrderService {
                 await transaction.commit();
             }
 
+            try {
+                await pushNotificationService.sendToUser(order.platformUserId, {
+                    title: paymentStatus === 'paid' ? 'Order payment confirmed' : 'Order payment updated',
+                    body: paymentStatus === 'paid'
+                        ? `Payment for order ${order.orderNumber} was confirmed successfully.`
+                        : `Payment status for order ${order.orderNumber} changed to ${paymentStatus}.`,
+                    data: {
+                        type: 'order_payment_updated',
+                        orderId: order.id,
+                        paymentStatus
+                    }
+                });
+            } catch (notificationError) {
+                console.warn('Order payment notification warning:', notificationError.message);
+            }
+
             return order;
 
         } catch (error) {
@@ -284,6 +316,20 @@ class OrderService {
         }
 
         await order.update(updateData, options);
+
+        try {
+            await pushNotificationService.sendToUser(order.platformUserId, {
+                title: 'Order status updated',
+                body: `Order ${order.orderNumber} is now ${status.replace(/_/g, ' ')}.`,
+                data: {
+                    type: 'order_status_updated',
+                    orderId: order.id,
+                    status
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Order status notification warning:', notificationError.message);
+        }
 
         return order;
     }
@@ -343,6 +389,19 @@ class OrderService {
 
             if (shouldCommit) {
                 await transaction.commit();
+            }
+
+            try {
+                await pushNotificationService.sendToUser(order.platformUserId, {
+                    title: 'Order cancelled',
+                    body: `Order ${order.orderNumber} has been cancelled.`,
+                    data: {
+                        type: 'order_cancelled',
+                        orderId: order.id
+                    }
+                });
+            } catch (notificationError) {
+                console.warn('Order cancellation notification warning:', notificationError.message);
             }
 
             return order;

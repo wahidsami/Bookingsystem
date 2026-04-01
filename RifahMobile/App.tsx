@@ -20,6 +20,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
+import { initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
 
 type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'forgotPassword' | 'home';
 
@@ -51,6 +52,21 @@ function AppContent() {
     };
     init();
   }, []);
+
+  useEffect(() => {
+    const cleanup = initializeNotificationHandling();
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    registerCustomerPushNotifications().catch((error) => {
+      console.warn('Customer push registration warning:', error?.message || error);
+    });
+  }, [isAuthenticated]);
 
   const loadFontsAndLanguage = async () => {
     await loadFonts();
@@ -101,6 +117,7 @@ function AppContent() {
   };
 
   const handleLogout = async () => {
+    await unregisterCustomerPushNotifications();
     await api.clearTokens();
     setIsAuthenticated(false);
     setCurrentScreen('welcome');

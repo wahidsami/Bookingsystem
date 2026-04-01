@@ -275,6 +275,34 @@ export async function changeStaffPassword(
   );
 }
 
+export async function registerStaffPushToken(
+  session: StaffSession,
+  payload: { token: string; platform: string; appVersion?: string; deviceName?: string }
+): Promise<{ success: boolean; message: string }> {
+  return authorizedRequest<{ success: boolean; message: string }>(
+    '/staff/me/push-token',
+    session,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function unregisterStaffPushToken(
+  session: StaffSession,
+  token: string
+): Promise<{ success: boolean; message: string }> {
+  return authorizedRequest<{ success: boolean; message: string }>(
+    '/staff/me/push-token',
+    session,
+    {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+    }
+  );
+}
+
 export async function logoutStaff(session: StaffSession | null): Promise<void> {
   if (session) {
     try {

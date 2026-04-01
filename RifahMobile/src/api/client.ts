@@ -544,6 +544,29 @@ class ApiClient {
         return response.user;
     }
 
+    async registerPushToken(data: {
+        token: string;
+        platform: string;
+        appVersion?: string;
+        deviceName?: string;
+    }): Promise<{ success: boolean; message: string }> {
+        return this.post<{ success: boolean; message: string }>('/users/push-token', data);
+    }
+
+    async unregisterPushToken(token: string): Promise<{ success: boolean; message: string }> {
+        const response = await this.request('/users/push-token', {
+            method: 'DELETE',
+            body: JSON.stringify({ token }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: 'Request failed' }));
+            throw new Error(error.message || `HTTP ${response.status}`);
+        }
+
+        return response.json();
+    }
+
     /**
      * Upload profile photo (authenticated).
      * POST /users/profile/photo with FormData key 'photo'.
@@ -704,7 +727,7 @@ class ApiClient {
      * Get top service providers (cross-tenant staff)
      */
     async getTopProviders(): Promise<Staff[]> {
-        const response = await this.get<{ success?: boolean; staff?: Array<Partial<Staff> & { photo?: string }> }>('/staff?isActive=true');
+        const response = await this.get<{ success?: boolean; staff?: Array<Partial<Staff> & { photo?: string }> }>('/public/providers/top');
         const staff = response.staff || [];
 
         return staff

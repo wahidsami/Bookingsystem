@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const pushNotificationService = require('../services/pushNotificationService');
 
 // Configure multer for file uploads (profile photos)
 const storage = multer.diskStorage({
@@ -356,6 +357,75 @@ const getServicesHistory = async (req, res) => {
     }
 };
 
+/**
+ * Register customer mobile push token
+ * POST /api/v1/users/push-token
+ */
+const registerPushToken = async (req, res) => {
+    try {
+        const { token, platform, appVersion, deviceName } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Push token is required'
+            });
+        }
+
+        await pushNotificationService.registerUserDevice({
+            platformUserId: req.userId,
+            token,
+            platform,
+            appVersion,
+            deviceName
+        });
+
+        res.json({
+            success: true,
+            message: 'Push token registered successfully'
+        });
+    } catch (error) {
+        console.error('Register push token error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to register push token'
+        });
+    }
+};
+
+/**
+ * Unregister customer mobile push token
+ * DELETE /api/v1/users/push-token
+ */
+const unregisterPushToken = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Push token is required'
+            });
+        }
+
+        await pushNotificationService.unregisterUserDevice({
+            platformUserId: req.userId,
+            token
+        });
+
+        res.json({
+            success: true,
+            message: 'Push token unregistered successfully'
+        });
+    } catch (error) {
+        console.error('Unregister push token error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to unregister push token'
+        });
+    }
+};
+
 module.exports = {
     getProfile,
     updateProfile,
@@ -363,6 +433,8 @@ module.exports = {
     changePassword,
     getUserBookings,
     getServicesHistory,
+    registerPushToken,
+    unregisterPushToken,
     uploadMiddleware: upload.single('photo')
 };
 

@@ -42,6 +42,6 @@ module.exports = {
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://rapi.unifinitylab.com/api/v1',
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
     },
-    plugins: ['expo-localization', 'expo-font'],
+    plugins: ['expo-localization', 'expo-font', 'expo-notifications'],
   },
 };

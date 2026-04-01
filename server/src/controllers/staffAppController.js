@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const db = require('../models');
+const pushNotificationService = require('../services/pushNotificationService');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -432,6 +433,20 @@ const updateAppointmentStatus = async (req, res) => {
         await appointment.save({ transaction });
         await transaction.commit();
 
+        try {
+            await pushNotificationService.sendToUser(appointment.platformUserId, {
+                title: 'Booking updated',
+                body: `Your appointment is now ${status.replace(/_/g, ' ')}.`,
+                data: {
+                    type: 'booking_status_updated',
+                    appointmentId: appointment.id,
+                    status
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Staff booking status notification warning:', notificationError.message);
+        }
+
         res.json({
             success: true,
             message: 'Appointment status updated successfully',
@@ -489,6 +504,67 @@ const changePassword = async (req, res) => {
     }
 };
 
+const registerPushToken = async (req, res) => {
+    try {
+        const { token, platform, appVersion, deviceName } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Push token is required'
+            });
+        }
+
+        await pushNotificationService.registerStaffDevice({
+            staffUserId: req.staffUser.id,
+            staffId: req.staffId,
+            tenantId: req.tenantId,
+            token,
+            platform,
+            appVersion,
+            deviceName
+        });
+
+        res.json({
+            success: true,
+            message: 'Staff push token registered successfully'
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to register push token'
+        });
+    }
+};
+
+const unregisterPushToken = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Push token is required'
+            });
+        }
+
+        await pushNotificationService.unregisterStaffDevice({
+            staffUserId: req.staffUser.id,
+            token
+        });
+
+        res.json({
+            success: true,
+            message: 'Staff push token unregistered successfully'
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to unregister push token'
+        });
+    }
+};
+
 module.exports = {
     login,
     refreshToken,
@@ -497,5 +573,7 @@ module.exports = {
     getAppointments,
     getSchedule,
     updateAppointmentStatus,
-    changePassword
+    changePassword,
+    registerPushToken,
+    unregisterPushToken
 };

@@ -186,6 +186,71 @@ exports.getPublicCategories = async (req, res) => {
 };
 
 /**
+ * Get top-rated active providers across active tenants
+ */
+exports.getTopProviders = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit || '8', 10), 1), 20);
+
+        const staff = await db.Staff.findAll({
+            where: {
+                isActive: true
+            },
+            include: [
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    where: { status: 'active' },
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'slug', 'logo'],
+                    required: true
+                }
+            ],
+            attributes: ['id', 'name', 'photo', 'rating', 'experience', 'skills', 'bio'],
+            order: [
+                ['rating', 'DESC'],
+                ['totalBookings', 'DESC'],
+                ['createdAt', 'DESC']
+            ],
+            limit
+        });
+
+        const providers = staff.map((member) => {
+            const memberData = member.toJSON();
+            return {
+                id: memberData.id,
+                name: memberData.name,
+                avatar: memberData.photo,
+                rating: parseFloat(memberData.rating || 0) || 0,
+                skills: Array.isArray(memberData.skills) ? memberData.skills : [],
+                experience: memberData.experience,
+                bio: memberData.bio,
+                specialty: Array.isArray(memberData.skills) && memberData.skills.length > 0
+                    ? memberData.skills[0]
+                    : null,
+                tenant: memberData.tenant ? {
+                    id: memberData.tenant.id,
+                    name: memberData.tenant.name_ar || memberData.tenant.name_en || memberData.tenant.name,
+                    slug: memberData.tenant.slug,
+                    logo: memberData.tenant.logo
+                } : null
+            };
+        });
+
+        res.json({
+            success: true,
+            staff: providers
+        });
+    } catch (error) {
+        console.error('Get top providers error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch top providers',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Get tenant basic info by slug
  */
 exports.getTenantBySlug = async (req, res) => {

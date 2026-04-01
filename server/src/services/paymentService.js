@@ -14,6 +14,7 @@ const {
 } = require('../utils/paymentErrorHandler');
 const logger = require('../utils/productionLogger');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const pushNotificationService = require('./pushNotificationService');
 
 class PaymentService {
     /**
@@ -256,6 +257,21 @@ class PaymentService {
             }
         }
 
+        try {
+            const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'booking';
+            await pushNotificationService.sendToUser(platformUserId, {
+                title: 'Booking payment confirmed',
+                body: `Your payment for ${serviceName} was received successfully.`,
+                data: {
+                    type: 'booking_payment_received',
+                    appointmentId: appointment.id,
+                    paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Booking payment notification warning:', notificationError.message);
+        }
+
         return {
             transaction,
             paymentMethodId
@@ -415,6 +431,20 @@ class PaymentService {
                 by: parseFloat(order.totalAmount || amount),
                 where: { id: platformUserId }
             });
+        }
+
+        try {
+            await pushNotificationService.sendToUser(platformUserId, {
+                title: 'Order payment confirmed',
+                body: `Payment for order ${order.orderNumber} was received successfully.`,
+                data: {
+                    type: 'order_payment_received',
+                    orderId: order.id,
+                    paymentStatus: 'paid'
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Order payment notification warning:', notificationError.message);
         }
 
         return {

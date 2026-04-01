@@ -1,6 +1,20 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const userService = require('./userService');
+const pushNotificationService = require('./pushNotificationService');
+
+const formatNotificationDate = (value) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+        ? `${value}`
+        : date.toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+};
 
 class BookingService {
 
@@ -219,6 +233,36 @@ class BookingService {
             // Commit transaction if we created it
             if (shouldCommit) {
                 await finalTransaction.commit();
+            }
+
+            try {
+                const serviceName = service.name_en || service.name_ar || 'service';
+                const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
+                const appointmentDate = formatNotificationDate(start);
+
+                await pushNotificationService.sendToUser(platformUserId, {
+                    title: 'Booking confirmed',
+                    body: `Your ${serviceName} booking for ${appointmentDate} is confirmed.`,
+                    data: {
+                        type: 'booking_created',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        staffId: finalStaffId
+                    }
+                });
+
+                await pushNotificationService.sendToStaff(finalStaffId, {
+                    title: 'New appointment assigned',
+                    body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                    data: {
+                        type: 'staff_appointment_assigned',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        platformUserId
+                    }
+                });
+            } catch (notificationError) {
+                console.warn('Booking notification warning:', notificationError.message);
             }
 
             // Release lock on success
@@ -624,8 +668,9 @@ class BookingService {
     async cancelAppointment(appointmentId, platformUserId = null) {
         const appointment = await db.Appointment.findByPk(appointmentId, {
             include: [
-                { model: db.Service },
-                { model: db.Staff }
+                { model: db.Service, as: 'service', required: false },
+                { model: db.Staff, as: 'staff', required: false },
+                { model: db.PlatformUser, as: 'user', required: false }
             ]
         });
 
@@ -643,6 +688,23 @@ class BookingService {
         }
 
         await appointment.update({ status: 'cancelled' });
+
+        try {
+            const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+            const customerName = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || 'A customer';
+            await pushNotificationService.sendToStaff(appointment.staffId, {
+                title: 'Appointment cancelled',
+                body: `${customerName} cancelled the ${serviceName} booking.`,
+                data: {
+                    type: 'staff_appointment_cancelled',
+                    appointmentId: appointment.id,
+                    tenantId: appointment.tenantId,
+                    platformUserId: appointment.platformUserId
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Booking cancellation notification warning:', notificationError.message);
+        }
 
         // Update CustomerInsight cancellation count if platform user
         if (appointment.platformUserId) {

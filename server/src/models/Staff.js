@@ -55,6 +55,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'staffId',
                 as: 'appointments'
             });
+
+            Staff.hasMany(models.MobilePushToken, {
+                foreignKey: 'staffId',
+                as: 'pushTokens'
+            });
         }
     }
 

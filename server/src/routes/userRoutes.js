@@ -16,6 +16,10 @@ router.post('/profile/photo', authenticateUser, userController.uploadMiddleware,
 // Change password
 router.put('/password', authenticateUser, userController.changePassword);
 
+// Mobile push tokens
+router.post('/push-token', authenticateUser, userController.registerPushToken);
+router.delete('/push-token', authenticateUser, userController.unregisterPushToken);
+
 // Get user bookings
 router.get('/bookings', authenticateUser, userController.getUserBookings);
 

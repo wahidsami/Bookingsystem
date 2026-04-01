@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
     class User extends Model {
         static associate(models) {
             User.belongsTo(models.Tenant, { foreignKey: 'tenantId' });
+            User.hasMany(models.MobilePushToken, { foreignKey: 'staffUserId', as: 'pushTokens' });
         }
 
         async validatePassword(password) {

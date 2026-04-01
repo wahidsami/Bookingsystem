@@ -38,6 +38,6 @@ module.exports = {
         projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || '6f9bc7f6-b461-46b1-95d2-a4158a47adb6',
       },
     },
-    plugins: ['expo-secure-store'],
+    plugins: ['expo-secure-store', 'expo-notifications'],
   },
 };
