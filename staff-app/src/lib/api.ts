@@ -244,6 +244,23 @@ export async function fetchStaffSchedule(session: StaffSession, date: string): P
   return data.schedule;
 }
 
+export async function updateStaffAppointmentStatus(
+  session: StaffSession,
+  appointmentId: string,
+  payload: { status: 'confirmed' | 'completed' | 'no_show' | 'cancelled'; notes?: string }
+): Promise<StaffAppointment> {
+  const data = await authorizedRequest<{ appointment: StaffAppointment }>(
+    `/staff/appointments/${encodeURIComponent(appointmentId)}/status`,
+    session,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return data.appointment;
+}
+
 export async function logoutStaff(session: StaffSession | null): Promise<void> {
   if (session) {
     try {

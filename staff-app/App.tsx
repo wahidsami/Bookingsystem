@@ -22,6 +22,7 @@ import {
   StaffAppointment,
   StaffSchedule,
   StaffSession,
+  updateStaffAppointmentStatus,
   writeStoredSession,
 } from './src/lib/api';
 
@@ -76,6 +77,9 @@ export default function App() {
   const [selectedTab, setSelectedTab] = useState<TabKey>('overview');
   const [selectedDate] = useState(getTodayKey());
   const [dataError, setDataError] = useState<string | null>(null);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const loadDashboard = async (activeSession: StaffSession, showSpinner = true) => {
     if (showSpinner) {
@@ -99,6 +103,9 @@ export default function App() {
       setSession(nextSession);
       setAppointments(staffAppointments);
       setSchedule(staffSchedule);
+      if (selectedAppointmentId && !staffAppointments.some((item) => item.id === selectedAppointmentId)) {
+        setSelectedAppointmentId(null);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load staff data';
       setDataError(message);
@@ -177,6 +184,60 @@ export default function App() {
     setSelectedTab('overview');
     setLoginPassword('');
     setDataError(null);
+    setActionMessage(null);
+  };
+
+  const handleAppointmentAction = async (
+    appointment: StaffAppointment,
+    status: 'confirmed' | 'completed' | 'no_show' | 'cancelled'
+  ) => {
+    if (!session) return;
+
+    setActionLoading(appointment.id);
+    setActionMessage(null);
+    setDataError(null);
+
+    try {
+      const updatedAppointment = await updateStaffAppointmentStatus(session, appointment.id, { status });
+      setAppointments((current) =>
+        current.map((item) => (item.id === appointment.id ? { ...item, ...updatedAppointment } : item))
+      );
+
+      const messageMap = {
+        confirmed: 'Customer checked in successfully.',
+        completed: 'Appointment marked as completed.',
+        no_show: 'Appointment marked as no-show.',
+        cancelled: 'Appointment cancelled successfully.',
+      };
+
+      setActionMessage(messageMap[status]);
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Failed to update appointment');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const selectedAppointment =
+    appointments.find((appointment) => appointment.id === selectedAppointmentId) || null;
+
+  const getAvailableActions = (appointment: StaffAppointment) => {
+    switch (appointment.status) {
+      case 'pending':
+        return [
+          { label: 'Check In', status: 'confirmed' as const },
+          { label: 'No Show', status: 'no_show' as const },
+          { label: 'Cancel', status: 'cancelled' as const },
+        ];
+      case 'confirmed':
+        return [
+          { label: 'Complete', status: 'completed' as const },
+          { label: 'No Show', status: 'no_show' as const },
+          { label: 'Cancel', status: 'cancelled' as const },
+        ];
+      default:
+        return [];
+    }
   };
 
   if (booting) {
@@ -289,6 +350,7 @@ export default function App() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {dataError ? <Text style={styles.errorText}>{dataError}</Text> : null}
+        {actionMessage ? <Text style={styles.successText}>{actionMessage}</Text> : null}
 
         {selectedTab === 'overview' ? (
           <>
@@ -338,29 +400,78 @@ export default function App() {
         ) : null}
 
         {selectedTab === 'appointments' ? (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Today&apos;s appointments</Text>
-            {appointments.length === 0 ? (
-              <Text style={styles.emptyText}>No appointments assigned for this date.</Text>
-            ) : (
-              appointments.map((appointment) => (
-                <View key={appointment.id} style={styles.listItem}>
-                  <View style={styles.listItemHeader}>
-                    <Text style={styles.listItemTitle}>{getCustomerName(appointment)}</Text>
-                    <Text style={styles.listItemBadge}>{appointment.status}</Text>
-                  </View>
-                  <Text style={styles.listItemText}>{getServiceName(appointment)}</Text>
-                  <Text style={styles.listItemText}>
-                    {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
-                  </Text>
-                  <Text style={styles.listItemText}>
-                    {appointment.paymentStatus || 'pending payment'} •{' '}
-                    {formatMoney(appointment.price || appointment.service?.finalPrice || appointment.service?.rawPrice)}
-                  </Text>
+          <>
+            <View style={styles.panel}>
+              <Text style={styles.panelTitle}>Today&apos;s appointments</Text>
+              {appointments.length === 0 ? (
+                <Text style={styles.emptyText}>No appointments assigned for this date.</Text>
+              ) : (
+                appointments.map((appointment) => {
+                  const isSelected = selectedAppointmentId === appointment.id;
+
+                  return (
+                    <Pressable
+                      key={appointment.id}
+                      style={[styles.listItem, isSelected ? styles.listItemSelected : null]}
+                      onPress={() => setSelectedAppointmentId(appointment.id)}
+                    >
+                      <View style={styles.listItemHeader}>
+                        <Text style={styles.listItemTitle}>{getCustomerName(appointment)}</Text>
+                        <Text style={styles.listItemBadge}>{appointment.status}</Text>
+                      </View>
+                      <Text style={styles.listItemText}>{getServiceName(appointment)}</Text>
+                      <Text style={styles.listItemText}>
+                        {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
+                      </Text>
+                      <Text style={styles.listItemText}>
+                        {appointment.paymentStatus || 'pending payment'} •{' '}
+                        {formatMoney(appointment.price || appointment.service?.finalPrice || appointment.service?.rawPrice)}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+
+            {selectedAppointment ? (
+              <View style={styles.panel}>
+                <Text style={styles.panelTitle}>Appointment detail</Text>
+                <Text style={styles.profileLine}>Customer: {getCustomerName(selectedAppointment)}</Text>
+                <Text style={styles.profileLine}>Service: {getServiceName(selectedAppointment)}</Text>
+                <Text style={styles.profileLine}>
+                  Time: {formatTime(selectedAppointment.startTime)} - {formatTime(selectedAppointment.endTime)}
+                </Text>
+                <Text style={styles.profileLine}>Status: {selectedAppointment.status}</Text>
+                <Text style={styles.profileLine}>
+                  Payment: {selectedAppointment.paymentStatus || 'pending'} ({formatMoney(selectedAppointment.price || selectedAppointment.service?.finalPrice || selectedAppointment.service?.rawPrice)})
+                </Text>
+                <Text style={styles.profileLine}>Phone: {selectedAppointment.user?.phone || 'Not provided'}</Text>
+                <Text style={styles.profileLine}>Email: {selectedAppointment.user?.email || 'Not provided'}</Text>
+                <Text style={styles.profileLine}>Notes: {selectedAppointment.notes || 'No notes'}</Text>
+
+                <View style={styles.actionRow}>
+                  {getAvailableActions(selectedAppointment).length ? (
+                    getAvailableActions(selectedAppointment).map((action) => (
+                      <Pressable
+                        key={action.status}
+                        style={styles.actionButton}
+                        onPress={() => handleAppointmentAction(selectedAppointment, action.status)}
+                        disabled={actionLoading === selectedAppointment.id}
+                      >
+                        {actionLoading === selectedAppointment.id ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.actionButtonText}>{action.label}</Text>
+                        )}
+                      </Pressable>
+                    ))
+                  ) : (
+                    <Text style={styles.emptyText}>No further actions are available for this appointment.</Text>
+                  )}
                 </View>
-              ))
-            )}
-          </View>
+              </View>
+            ) : null}
+          </>
         ) : null}
 
         {selectedTab === 'schedule' ? (
@@ -554,6 +665,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  successText: {
+    color: '#0f766e',
+    fontSize: 14,
+    lineHeight: 20,
+    backgroundColor: '#ccfbf1',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
   errorText: {
     marginTop: 12,
     color: '#b91c1c',
@@ -681,6 +801,12 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     marginTop: 14,
   },
+  listItemSelected: {
+    backgroundColor: '#f0fdfa',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   listItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -711,5 +837,24 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 20,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+  },
+  actionButton: {
+    backgroundColor: '#0f766e',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: 92,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

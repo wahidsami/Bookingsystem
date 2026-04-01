@@ -358,11 +358,101 @@ const getSchedule = async (req, res) => {
     }
 };
 
+const updateAppointmentStatus = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+
+    try {
+        const { id } = req.params;
+        const { status, notes } = req.body;
+
+        const allowedStatuses = ['confirmed', 'completed', 'no_show', 'cancelled'];
+        if (!status || !allowedStatuses.includes(status)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid staff appointment status update'
+            });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: {
+                id,
+                tenantId: req.tenantId,
+                staffId: req.staffId
+            },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar', 'duration', 'finalPrice', 'rawPrice', 'image'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage'],
+                    required: false
+                }
+            ],
+            transaction
+        });
+
+        if (!appointment) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Appointment not found'
+            });
+        }
+
+        const transitionMap = {
+            pending: ['confirmed', 'cancelled', 'no_show'],
+            confirmed: ['completed', 'cancelled', 'no_show'],
+            completed: [],
+            cancelled: [],
+            no_show: []
+        };
+
+        const currentStatus = appointment.status;
+        const allowedNextStatuses = transitionMap[currentStatus] || [];
+
+        if (!allowedNextStatuses.includes(status)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Cannot change appointment from ${currentStatus} to ${status}`
+            });
+        }
+
+        appointment.status = status;
+        if (notes !== undefined) {
+            appointment.notes = notes;
+        }
+
+        await appointment.save({ transaction });
+        await transaction.commit();
+
+        res.json({
+            success: true,
+            message: 'Appointment status updated successfully',
+            appointment
+        });
+    } catch (error) {
+        await transaction.rollback();
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update staff appointment status',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     login,
     refreshToken,
     logout,
     getMe,
     getAppointments,
-    getSchedule
+    getSchedule,
+    updateAppointmentStatus
 };
