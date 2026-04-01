@@ -5,11 +5,14 @@ const path = require('path');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 
-const DEFAULT_SEED_DIR = path.resolve(__dirname, '..', 'seeds', 'Kamy Salon');
+const DEFAULT_SEED_DIR_CANDIDATES = [
+    path.resolve(__dirname, '..', 'seeds', 'Kamy Salon'),
+    path.resolve(__dirname, 'seeds', 'Kamy Salon')
+];
 
 function parseArgs(argv) {
     const args = {
-        seedDir: DEFAULT_SEED_DIR,
+        seedDir: null,
         tenantSlug: null,
         tenantName: null,
         createStaffUsers: false,
@@ -61,7 +64,7 @@ Usage:
   node import-tenant-seed.js --tenant-name "<name>" [options]
 
 Options:
-  --seed-dir <path>           Seed directory. Defaults to seeds/Kamy Salon
+  --seed-dir <path>           Seed directory. Defaults to auto-detecting seeds/Kamy Salon
   --tenant-slug <slug>        Find tenant by exact slug
   --tenant-name "<name>"      Find tenant by business name
   --create-staff-users        Create staff auth accounts from employee emails
@@ -79,13 +82,40 @@ function readJsonFile(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
+function directoryHasSeedFiles(seedDir) {
+    const requiredFiles = [
+        'employees.json',
+        'services.json',
+        'products.json',
+        'hotDeals.json',
+        'shifts.json'
+    ];
+
+    return requiredFiles.every((file) => fs.existsSync(path.join(seedDir, file)));
+}
+
+function resolveSeedDir(seedDir) {
+    if (seedDir && directoryHasSeedFiles(seedDir)) {
+        return seedDir;
+    }
+
+    for (const candidate of DEFAULT_SEED_DIR_CANDIDATES) {
+        if (directoryHasSeedFiles(candidate)) {
+            return candidate;
+        }
+    }
+
+    return seedDir || DEFAULT_SEED_DIR_CANDIDATES[0];
+}
+
 function loadSeedData(seedDir) {
+    const resolvedSeedDir = resolveSeedDir(seedDir);
     const files = {
-        employees: path.join(seedDir, 'employees.json'),
-        services: path.join(seedDir, 'services.json'),
-        products: path.join(seedDir, 'products.json'),
-        hotDeals: path.join(seedDir, 'hotDeals.json'),
-        shifts: path.join(seedDir, 'shifts.json')
+        employees: path.join(resolvedSeedDir, 'employees.json'),
+        services: path.join(resolvedSeedDir, 'services.json'),
+        products: path.join(resolvedSeedDir, 'products.json'),
+        hotDeals: path.join(resolvedSeedDir, 'hotDeals.json'),
+        shifts: path.join(resolvedSeedDir, 'shifts.json')
     };
 
     for (const filePath of Object.values(files)) {
@@ -95,6 +125,7 @@ function loadSeedData(seedDir) {
     }
 
     return {
+        seedDir: resolvedSeedDir,
         employees: readJsonFile(files.employees),
         services: readJsonFile(files.services),
         products: readJsonFile(files.products),
@@ -540,7 +571,7 @@ async function main() {
     };
 
     console.log(`\nImporting tenant seed data for: ${tenant.name_en || tenant.name || tenant.slug}`);
-    console.log(`Seed directory: ${args.seedDir}`);
+    console.log(`Seed directory: ${seedData.seedDir}`);
     console.log(`Dry run: ${args.dryRun ? 'yes' : 'no'}`);
     console.log(`Create staff users: ${args.createStaffUsers ? 'yes' : 'no'}\n`);
 

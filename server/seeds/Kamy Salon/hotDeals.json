@@ -1,0 +1,62 @@
+[
+  {
+    "linkedService": "Haircut & Styling",
+    "title_en": "Hair Refresh Offer",
+    "title_ar": "عرض تجديد الشعر",
+    "description_en": "Get 20% off on Haircut & Styling all month.",
+    "description_ar": "احصلي على خصم 20٪ على قص وتصفيف الشعر طوال الشهر.",
+    "discountType": "percentage",
+    "discountValue": 20,
+    "validFrom": "2026-04-01",
+    "validUntil": "2026-04-30",
+    "maxRedemptions": 100
+  },
+  {
+    "linkedService": "Facial Treatment",
+    "title_en": "Glow Skin Deal",
+    "title_ar": "عرض نضارة البشرة",
+    "description_en": "Save 15% on the classic facial treatment package.",
+    "description_ar": "وفري 15٪ على جلسة تنظيف البشرة الأساسية.",
+    "discountType": "percentage",
+    "discountValue": 15,
+    "validFrom": "2026-04-01",
+    "validUntil": "2026-04-30",
+    "maxRedemptions": 80
+  },
+  {
+    "linkedService": "Relaxing Massage",
+    "title_en": "Relax Package",
+    "title_ar": "عرض الاسترخاء",
+    "description_en": "Enjoy SAR 50 off the Relaxing Massage session.",
+    "description_ar": "استمتعي بخصم 50 ريال على جلسة المساج الاسترخائي.",
+    "discountType": "fixed_amount",
+    "discountValue": 50,
+    "validFrom": "2026-04-01",
+    "validUntil": "2026-04-30",
+    "maxRedemptions": 60
+  },
+  {
+    "linkedService": "Bridal Makeup",
+    "title_en": "Bridal Special",
+    "title_ar": "عرض العروس",
+    "description_en": "Exclusive 10% bridal makeup offer for April and early May bookings.",
+    "description_ar": "خصم 10٪ على مكياج العروس لحجوزات أبريل وبداية مايو.",
+    "discountType": "percentage",
+    "discountValue": 10,
+    "validFrom": "2026-04-01",
+    "validUntil": "2026-05-15",
+    "maxRedemptions": 30
+  },
+  {
+    "linkedService": "VIP Full Package",
+    "title_en": "Luxury Package Deal",
+    "title_ar": "عرض الباقة الفاخرة",
+    "description_en": "Premium 25% discount on the VIP Full Package.",
+    "description_ar": "خصم فاخر بنسبة 25٪ على باقة كبار الشخصيات.",
+    "discountType": "percentage",
+    "discountValue": 25,
+    "validFrom": "2026-04-01",
+    "validUntil": "2026-04-30",
+    "maxRedemptions": 20
+  }
+]
