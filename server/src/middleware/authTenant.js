@@ -8,6 +8,27 @@ const jwt = require('jsonwebtoken');
 const db = require('../models');
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const FEATURE_ALIASES = {
+  hasAIContentAssistant: ['hasAIContentAssistant', 'aiContentAssistant'],
+  hasInternalMessaging: ['hasInternalMessaging', 'internalMessaging'],
+  hasProductsAndOrders: ['hasProductsAndOrders', 'productsAndOrders'],
+  maxHotDeals: ['maxHotDeals', 'hotDeals']
+};
+
+const isFeatureEnabled = (value) => {
+  if (value === true) return true;
+  if (typeof value === 'number') return value === -1 || value > 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    const numericValue = Number(normalized);
+    return Number.isFinite(numericValue) && (numericValue === -1 || numericValue > 0);
+  }
+  return false;
+};
+
+const getFeatureKeys = (feature) => FEATURE_ALIASES[feature] || [feature];
+
 /**
  * Authenticate Tenant User (Required Auth)
  * Protects routes that require tenant authentication
@@ -141,10 +162,11 @@ const checkTenantFeature = (feature) => {
 
       const { Op } = require('sequelize');
       const tenantId = req.tenantId;
+      const featureKeys = getFeatureKeys(feature);
 
       const settings = await db.TenantSettings.findOne({ where: { tenantId } });
       const tenantFeatures = settings?.features || {};
-      if (tenantFeatures[feature] === true) {
+      if (featureKeys.some((key) => isFeatureEnabled(tenantFeatures[key]))) {
         return next();
       }
 
@@ -152,7 +174,7 @@ const checkTenantFeature = (feature) => {
       const subResult = await getActiveSubscriptionForTenant(tenantId, {
         statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
       });
-      if (subResult?.package?.limits?.[feature] === true) {
+      if (featureKeys.some((key) => isFeatureEnabled(subResult?.package?.limits?.[key]))) {
         return next();
       }
 
@@ -169,7 +191,7 @@ const checkTenantFeature = (feature) => {
         }
       });
 
-      if (planPackage?.limits?.[feature] === true) {
+      if (featureKeys.some((key) => isFeatureEnabled(planPackage?.limits?.[key]))) {
         return next();
       }
 
@@ -231,6 +253,7 @@ module.exports = {
   authenticateTenant,
   optionalTenantAuth,
   checkTenantFeature,
-  rateLimitTenant
+  rateLimitTenant,
+  isFeatureEnabled
 };
 
