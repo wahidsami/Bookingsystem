@@ -99,10 +99,10 @@ RifahMobile/
 Edit `.env` file:
 
 ```bash
-# For localhost (development)
-EXPO_PUBLIC_API_URL=http://localhost:5000/api/v1
+# Production
+EXPO_PUBLIC_API_URL=https://rapi.unifinitylab.com/api/v1
 
-# For testing on physical device (replace with your PC's IP)
+# For local testing on physical device (replace with your PC's IP)
 EXPO_PUBLIC_API_URL=http://192.168.1.100:5000/api/v1
 ```
 

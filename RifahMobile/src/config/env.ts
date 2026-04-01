@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-const DEFAULT_API_URL = 'http://localhost:5000/api/v1';
+const DEFAULT_API_URL = 'https://rapi.unifinitylab.com/api/v1';
 
 function trimTrailingSlashes(value: string): string {
     return value.replace(/\/+$/, '');

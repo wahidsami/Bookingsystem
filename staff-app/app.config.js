@@ -33,7 +33,7 @@ module.exports = {
     },
     scheme: 'rifah-staff',
     extra: {
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://rapi.unifinitylab.com/api/v1',
       eas: {
         projectId: '6f9bc7f6-b461-46b1-95d2-a4158a47adb6',
       },

@@ -8,5 +8,5 @@ export function getApiUrl(): string {
   if (fromExtra && fromExtra.length > 0) return fromExtra.replace(/\/$/, '');
   const legacyEnv = process.env.NEXT_PUBLIC_API_URL;
   if (legacyEnv && legacyEnv.length > 0) return legacyEnv.replace(/\/$/, '');
-  return 'http://localhost:5000/api/v1';
+  return 'https://rapi.unifinitylab.com/api/v1';
 }

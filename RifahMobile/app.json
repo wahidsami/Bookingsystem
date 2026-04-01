@@ -34,6 +34,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
+      "apiUrl": "https://rapi.unifinitylab.com/api/v1",
       "eas": {
         "projectId": "refah-mobile-app"
       }
