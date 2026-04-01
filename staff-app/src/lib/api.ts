@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { getApiUrl } from '../config/env';
 
 const STAFF_SESSION_KEY = 'rifah_staff_session';
@@ -145,7 +145,7 @@ export async function fetchApiHealth(): Promise<{ ok: boolean; data?: HealthResp
 }
 
 export async function readStoredSession(): Promise<StaffSession | null> {
-  const raw = await AsyncStorage.getItem(STAFF_SESSION_KEY);
+  const raw = await SecureStore.getItemAsync(STAFF_SESSION_KEY);
   if (!raw) {
     return null;
   }
@@ -153,17 +153,17 @@ export async function readStoredSession(): Promise<StaffSession | null> {
   try {
     return JSON.parse(raw) as StaffSession;
   } catch {
-    await AsyncStorage.removeItem(STAFF_SESSION_KEY);
+    await SecureStore.deleteItemAsync(STAFF_SESSION_KEY);
     return null;
   }
 }
 
 export async function writeStoredSession(session: StaffSession): Promise<void> {
-  await AsyncStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session));
+  await SecureStore.setItemAsync(STAFF_SESSION_KEY, JSON.stringify(session));
 }
 
 export async function clearStoredSession(): Promise<void> {
-  await AsyncStorage.removeItem(STAFF_SESSION_KEY);
+  await SecureStore.deleteItemAsync(STAFF_SESSION_KEY);
 }
 
 export async function loginStaff(email: string, password: string): Promise<StaffSession> {

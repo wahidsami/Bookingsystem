@@ -5,7 +5,7 @@ Native mobile app for salon and spa staff members.
 This app now supports:
 
 - staff email/password sign-in
-- persisted staff sessions
+- persisted staff sessions in secure device storage
 - today overview
 - appointment list and detail
 - staff-side appointment actions
@@ -67,4 +67,5 @@ This app is built with Expo/EAS, not Coolify.
 ## Notes
 
 - staff credentials are provisioned from the tenant dashboard employee screens
-- if a staff member forgets their password before store-ready recovery flows exist, the tenant can reset it from the dashboard
+- staff can change their own password inside the app
+- tenants can still reset staff passwords from the dashboard when needed
