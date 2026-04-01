@@ -11,7 +11,9 @@ export default function HotDealDetailsPage() {
   const locale = (params?.locale as string) || 'ar';
   const hotDealId = params?.id as string;
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [deal, setDeal] = useState<any>(null);
 
   useEffect(() => {
@@ -43,6 +45,27 @@ export default function HotDealDetailsPage() {
   }, [hotDealId]);
 
   const goBack = () => router.push(`/${locale}/dashboard/hot-deals`);
+
+  const handleDelete = async () => {
+    if (!hotDealId || deleting) return;
+
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm('Delete this hot deal? This action cannot be undone.');
+
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      setActionError('');
+      await tenantApi.deleteHotDeal(hotDealId);
+      router.push(`/${locale}/dashboard/hot-deals`);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to delete hot deal.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const getStatusBadge = (status?: string) => {
     const normalizedStatus = status || 'pending';
@@ -93,10 +116,25 @@ export default function HotDealDetailsPage() {
                   <h1 className="text-2xl font-bold text-white">{deal.title_en || deal.title_ar || 'Hot Deal'}</h1>
                   <p className="text-dark-300 mt-1">{deal.title_ar || deal.title_en || ''}</p>
                 </div>
-                <span className={`px-3 py-1 text-xs rounded ${getStatusBadge(deal.status)}`}>
-                  {(deal.status || 'pending').toUpperCase()}
-                </span>
+                <div className="flex flex-col items-end gap-3">
+                  <span className={`px-3 py-1 text-xs rounded ${getStatusBadge(deal.status)}`}>
+                    {(deal.status || 'pending').toUpperCase()}
+                  </span>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="px-4 py-2 rounded-lg bg-red-500/15 border border-red-500/20 text-red-400 hover:bg-red-500/25 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete Hot Deal'}
+                  </button>
+                </div>
               </div>
+
+              {actionError && (
+                <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+                  <p className="text-red-400 text-sm">{actionError}</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="bg-dark-700 rounded-lg p-4">

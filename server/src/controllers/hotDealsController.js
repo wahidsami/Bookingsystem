@@ -17,10 +17,18 @@ const serializeHotDeal = (deal) => {
             name: plainDeal.service.name || plainDeal.service.name_en || plainDeal.service.name_ar || null
         }
         : null;
+    const tenant = plainDeal.tenant
+        ? {
+            ...plainDeal.tenant,
+            name: plainDeal.tenant.name || plainDeal.tenant.name_en || plainDeal.tenant.name_ar || null
+        }
+        : null;
 
     return {
         ...plainDeal,
+        image: plainDeal.image || service?.image || tenant?.coverImage || null,
         service,
+        tenant,
         serviceName: service?.name || null,
         redemptionCount: plainDeal.redemptionCount ?? plainDeal.currentRedemptions ?? 0
     };
@@ -522,12 +530,12 @@ const getActiveHotDeals = async (req, res) => {
                 {
                     model: db.Tenant,
                     as: 'tenant',
-                    attributes: ['id', 'businessNameEn', 'businessNameAr', 'logo', 'slug']
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'logo', 'coverImage', 'slug']
                 },
                 {
                     model: db.Service,
                     as: 'service',
-                    attributes: ['id', 'name', 'name_ar', 'duration']
+                    attributes: ['id', 'name_en', 'name_ar', 'duration', 'image']
                 }
             ],
             order: [['createdAt', 'DESC']],
@@ -536,7 +544,7 @@ const getActiveHotDeals = async (req, res) => {
 
         res.json({
             success: true,
-            deals
+            deals: deals.map(serializeHotDeal)
         });
     } catch (error) {
         console.error('Get active hot deals error:', error);
