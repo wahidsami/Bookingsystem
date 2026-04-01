@@ -39,6 +39,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦" },
     { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥" },
     { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: "🤝" },
+    { name: t("subscription"), href: `/${locale}/dashboard/subscription`, icon: "💳" },
     { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: "💰" },
     { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈" },
     { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐" },

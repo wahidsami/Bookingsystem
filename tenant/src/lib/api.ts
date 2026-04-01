@@ -1305,6 +1305,25 @@ class TenantApiClient {
   /**
    * Subscription payment (fake gateway) – get session. Use token from email link or Bearer.
    */
+  async getCurrentSubscription(): Promise<any> {
+    return this.get('/subscriptions/current');
+  }
+
+  async getAvailableSubscriptionPackages(): Promise<any> {
+    return this.get('/subscriptions/packages');
+  }
+
+  async getSubscriptionUsageStats(): Promise<any> {
+    return this.get('/subscriptions/usage');
+  }
+
+  async requestSubscriptionChange(packageId: string, billingCycle: 'monthly' | 'sixMonth' | 'annual'): Promise<any> {
+    return this.post('/subscriptions/change-request', { packageId, billingCycle });
+  }
+
+  /**
+   * Subscription payment (fake gateway) – get session. Use token from email link or Bearer.
+   */
   async getSubscriptionPaymentSession(token?: string): Promise<any> {
     const url = token
       ? `${this.baseUrl}/tenant/subscription/payment?token=${encodeURIComponent(token)}`

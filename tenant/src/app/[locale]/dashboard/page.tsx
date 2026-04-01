@@ -14,6 +14,12 @@ interface DashboardStats {
   totalCustomers: number;
 }
 
+interface SubscriptionSummary {
+  packageName: string;
+  status: string;
+  daysRemaining: number | null;
+}
+
 interface Appointment {
   id: string;
   customerName: string;
@@ -39,6 +45,7 @@ export default function DashboardPage() {
     totalCustomers: 0,
   });
   const [todaysAppointments, setTodaysAppointments] = useState<Appointment[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -53,6 +60,8 @@ export default function DashboardPage() {
         tenantApi.getDashboardStats(),
         tenantApi.getTodaysAppointments()
       ]);
+
+      const subscriptionResponse = await tenantApi.getSubscriptionUsageStats().catch(() => null);
 
       // Update stats
       if (statsResponse.success && statsResponse.stats) {
@@ -79,6 +88,16 @@ export default function DashboardPage() {
       } else {
         setTodaysAppointments([]);
       }
+
+      if (subscriptionResponse?.success && subscriptionResponse.subscription) {
+        setSubscription({
+          packageName: subscriptionResponse.subscription.packageName || (locale === 'ar' ? 'غير متاح' : 'Unavailable'),
+          status: subscriptionResponse.subscription.status || '',
+          daysRemaining: subscriptionResponse.subscription.daysRemaining ?? null
+        });
+      } else {
+        setSubscription(null);
+      }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
       // Set defaults on error
@@ -89,8 +108,24 @@ export default function DashboardPage() {
         totalCustomers: 0,
       });
       setTodaysAppointments([]);
+      setSubscription(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getSubscriptionStatusLabel = (status: string) => {
+    switch (String(status || '').toLowerCase()) {
+      case 'trial':
+        return locale === 'ar' ? 'تجريبي' : 'Trial';
+      case 'active':
+        return locale === 'ar' ? 'نشط' : 'Active';
+      case 'past_due':
+        return locale === 'ar' ? 'متأخر' : 'Past due';
+      case 'expired':
+        return locale === 'ar' ? 'منتهي' : 'Expired';
+      default:
+        return status || (locale === 'ar' ? 'غير متاح' : 'Unavailable');
     }
   };
 
@@ -170,6 +205,31 @@ export default function DashboardPage() {
               <span className="text-3xl">🤝</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="card mb-8">
+        <div className={`flex items-center justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={isRTL ? 'text-end' : ''}>
+            <p className="text-gray-600 text-sm font-medium">{locale === 'ar' ? 'الاشتراك الحالي' : 'Current Subscription'}</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-2">
+              {subscription?.packageName || (locale === 'ar' ? 'لا توجد بيانات اشتراك' : 'No subscription data')}
+            </h3>
+            {subscription && (
+              <p className="text-sm text-gray-500 mt-2">
+                {getSubscriptionStatusLabel(subscription.status)}
+                {subscription.daysRemaining !== null && subscription.daysRemaining !== undefined
+                  ? ` • ${locale === 'ar' ? `متبقي ${subscription.daysRemaining} يوم` : `${subscription.daysRemaining} days remaining`}`
+                  : ''}
+              </p>
+            )}
+          </div>
+          <button
+            className="btn-primary"
+            onClick={() => router.push(`/${locale}/dashboard/subscription`)}
+          >
+            {locale === 'ar' ? 'إدارة الاشتراك' : 'Manage Subscription'}
+          </button>
         </div>
       </div>
 
