@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -20,6 +20,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const { t, isRTL } = useLanguage();
 
     const [tenant, setTenant] = useState<Tenant | null>(null);
+    const [pageData, setPageData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'services' | 'products' | 'reviews' | 'about'>('services');
     const [services, setServices] = useState<Service[]>([]);
@@ -66,14 +67,17 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             const pageDataRes = await api.get<{ success: boolean; data: any }>(`/public/tenant/${idToFetch}/page-data`);
             let isProductsEnabled = false;
             let isServicesEnabled = true;
-            let isReviewsEnabled = true;
+            let isReviewsEnabled = false;
             let isAboutEnabled = true;
+
+            if (pageDataRes.success && pageDataRes.data) {
+                setPageData(pageDataRes.data);
+            }
 
             if (pageDataRes.success && pageDataRes.data?.generalSettings?.sections) {
                 const sections = pageDataRes.data.generalSettings.sections;
                 isProductsEnabled = sections.products !== false;
                 isServicesEnabled = sections.services !== false;
-                isReviewsEnabled = sections.reviews !== false;
                 isAboutEnabled = sections.about !== false;
 
                 setShowProductsTab(isProductsEnabled);
@@ -83,6 +87,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             } else {
                 setShowProductsTab(true); // Fallback to true if no settings found
                 isProductsEnabled = true;
+                setShowReviewsTab(false);
             }
 
             // Fallback for activeTab if the default 'services' is hidden
@@ -145,6 +150,82 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         return `${rawValue}`.replace(/_/g, ' ');
     };
 
+    const getLocalizedText = (enValue?: string | null, arValue?: string | null, fallback?: string | null) =>
+        (isRTL ? arValue || enValue : enValue || arValue) || fallback || null;
+
+    const normalizeList = (items: unknown): string[] => {
+        if (!Array.isArray(items)) {
+            return [];
+        }
+
+        return items
+            .map((item) => {
+                if (typeof item === 'string') {
+                    return item.trim();
+                }
+
+                if (item && typeof item === 'object') {
+                    return getLocalizedText((item as any).en, (item as any).ar, '');
+                }
+
+                return '';
+            })
+            .filter(Boolean) as string[];
+    };
+
+    const openExternalUrl = async (url?: string | null) => {
+        if (!url) {
+            return;
+        }
+
+        try {
+            await Linking.openURL(url);
+        } catch (error) {
+            Alert.alert('Error', 'Unable to open this link right now.');
+        }
+    };
+
+    const handleShareTenant = async () => {
+        if (!tenant) {
+            return;
+        }
+
+        const tenantUrl = tenant.slug ? `https://www.refah.sa/${tenant.slug}` : tenant.googleMapLink;
+
+        try {
+            await Share.share({
+                message: tenantUrl ? `${tenant.name}\n${tenantUrl}` : tenant.name,
+            });
+        } catch (error) {
+            console.error('Share tenant error:', error);
+        }
+    };
+
+    const aboutStory = getLocalizedText(
+        pageData?.aboutUs?.storyEn,
+        pageData?.aboutUs?.storyAr,
+        isRTL
+            ? tenant?.description_ar || tenant?.descriptionAr || tenant?.description
+            : tenant?.description_en || tenant?.description || null
+    );
+    const missions = normalizeList(pageData?.aboutUs?.missions);
+    const visions = normalizeList(pageData?.aboutUs?.visions);
+    const socialLinks = [
+        { key: 'instagram', url: tenant?.instagramUrl, icon: 'logo-instagram' as const, color: '#E1306C' },
+        { key: 'twitter', url: tenant?.twitterUrl, icon: 'logo-twitter' as const, color: '#1DA1F2' },
+        { key: 'facebook', url: tenant?.facebookUrl, icon: 'logo-facebook' as const, color: '#1877F2' },
+        { key: 'linkedin', url: tenant?.linkedinUrl, icon: 'logo-linkedin' as const, color: '#0A66C2' },
+        { key: 'youtube', url: tenant?.youtubeUrl, icon: 'logo-youtube' as const, color: '#FF0000' },
+        { key: 'tiktok', url: tenant?.tiktokUrl, icon: 'logo-tiktok' as const, color: '#111111' },
+    ].filter((item) => item.url);
+    const locationLine = [
+        tenant?.buildingNumber,
+        tenant?.street,
+        tenant?.district,
+        tenant?.city,
+        tenant?.country,
+    ].filter(Boolean).join(', ') || tenant?.address || null;
+
     const handleAddProduct = (product: Product) => {
         const result = addToCart(product);
         if (result.success) {
@@ -188,10 +269,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="white" />
                                 </TouchableOpacity>
                                 <View style={styles.heroActions}>
-                                    <TouchableOpacity style={styles.iconButton}>
-                                        <Ionicons name="heart-outline" size={24} color="white" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.iconButton}>
+                                    <TouchableOpacity style={styles.iconButton} onPress={handleShareTenant}>
                                         <Ionicons name="share-outline" size={24} color="white" />
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Cart', { tenant })}>
@@ -328,99 +406,102 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderReviews = () => (
         <View style={styles.contentSection}>
             <Text style={styles.sectionTitle}>Reviews</Text>
-            <Text style={styles.emptyText}>No reviews yet.</Text>
-            {/* Implementing mockup reviews later based on design */}
+            <Text style={styles.emptyText}>Reviews are not available in the mobile app yet.</Text>
         </View>
     );
 
     const renderAbout = () => (
         <View style={styles.contentSection}>
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('about')}</Text>
-                <Text style={styles.aboutText}>
-                    {isRTL ? (tenant?.description_ar || tenant?.descriptionAr || tenant?.description) : (tenant?.description_en || tenant?.description || 'No description available.')}
-                </Text>
-            </View>
-
-            {/* Mission & Vision - Placeholder if not in DB yet */}
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('mission')}</Text>
-                <Text style={styles.aboutText}>To provide the best beauty and wellness services with top-tier professionals.</Text>
-            </View>
-
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('vision')}</Text>
-                <Text style={styles.aboutText}>To be the leading salon platform in the region.</Text>
-            </View>
-
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('location')}</Text>
-                <Text style={styles.addressText}>{tenant?.address || 'No address provided.'}</Text>
-                <TouchableOpacity style={styles.mapPlaceholder}>
-                    <Ionicons name="map" size={32} color={colors.textSecondary} />
-                    <Text style={styles.mapText}>{t('viewOnMap')}</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('workingHours')}</Text>
-                <View style={styles.hoursContainer}>
-                    {tenant?.workingHours ? Object.entries(tenant.workingHours).map(([day, hours]: [string, any]) => (
-                        <View key={day} style={styles.hoursRow}>
-                            <Text style={styles.dayText}>{t(day as any) || day.charAt(0).toUpperCase() + day.slice(1)}</Text>
-                            <Text style={[styles.timeText, !hours.isOpen && { color: colors.error }]}>
-                                {hours.isOpen ? `${hours.open} - ${hours.close}` : t('closed')}
-                            </Text>
-                        </View>
-                    )) : (
-                        <Text style={styles.aboutText}>Hours not available.</Text>
-                    )}
+            {aboutStory ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('about')}</Text>
+                    <Text style={styles.aboutText}>{aboutStory}</Text>
                 </View>
-            </View>
+            ) : null}
 
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('contact')}</Text>
-                <View style={styles.contactRow}>
-                    <Ionicons name="call-outline" size={20} color={colors.primary} />
-                    <Text style={styles.contactText}>{tenant?.phone || tenant?.mobile || 'N/A'}</Text>
+            {missions.length > 0 ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('mission')}</Text>
+                    {missions.map((item, index) => (
+                        <Text key={`mission-${index}`} style={styles.listItemText}>• {item}</Text>
+                    ))}
                 </View>
-                <View style={styles.contactRow}>
-                    <Ionicons name="mail-outline" size={20} color={colors.primary} />
-                    <Text style={styles.contactText}>{tenant?.email || 'N/A'}</Text>
+            ) : null}
+
+            {visions.length > 0 ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('vision')}</Text>
+                    {visions.map((item, index) => (
+                        <Text key={`vision-${index}`} style={styles.listItemText}>• {item}</Text>
+                    ))}
                 </View>
-                {tenant?.website && (
-                    <View style={styles.contactRow}>
-                        <Ionicons name="globe-outline" size={20} color={colors.primary} />
-                        <Text style={styles.contactText}>{tenant.website}</Text>
+            ) : null}
+
+            {locationLine || tenant?.googleMapLink ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('location')}</Text>
+                    {locationLine ? <Text style={styles.addressText}>{locationLine}</Text> : null}
+                    {tenant?.googleMapLink ? (
+                        <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(tenant.googleMapLink)}>
+                            <Ionicons name="map" size={32} color={colors.textSecondary} />
+                            <Text style={styles.mapText}>{t('viewOnMap')}</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+            ) : null}
+
+            {tenant?.workingHours ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('workingHours')}</Text>
+                    <View style={styles.hoursContainer}>
+                        {Object.entries(tenant.workingHours).map(([day, hours]: [string, any]) => (
+                            <View key={day} style={styles.hoursRow}>
+                                <Text style={styles.dayText}>{t(day as any) || day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+                                <Text style={[styles.timeText, !hours.isOpen && { color: colors.error }]}>
+                                    {hours.isOpen ? `${hours.open} - ${hours.close}` : t('closed')}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
-                )}
-            </View>
-
-            {/* Social Media */}
-            <View style={styles.sectionBlock}>
-                <Text style={styles.sectionTitle}>{t('followUs')}</Text>
-                <View style={styles.socialRow}>
-                    {tenant?.instagramUrl && (
-                        <TouchableOpacity style={styles.socialIcon}>
-                            <Ionicons name="logo-instagram" size={24} color="#E1306C" />
-                        </TouchableOpacity>
-                    )}
-                    {tenant?.twitterUrl && (
-                        <TouchableOpacity style={styles.socialIcon}>
-                            <Ionicons name="logo-twitter" size={24} color="#1DA1F2" />
-                        </TouchableOpacity>
-                    )}
-                    {tenant?.facebookUrl && (
-                        <TouchableOpacity style={styles.socialIcon}>
-                            <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-                        </TouchableOpacity>
-                    )}
-                    {/* Add empty state if no socials */}
-                    {(!tenant?.instagramUrl && !tenant?.twitterUrl && !tenant?.facebookUrl) && (
-                        <Text style={styles.aboutText}>No social media links.</Text>
-                    )}
                 </View>
-            </View>
+            ) : null}
+
+            {tenant?.phone || tenant?.mobile || tenant?.email || tenant?.website ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('contact')}</Text>
+                    {tenant?.phone || tenant?.mobile ? (
+                        <View style={styles.contactRow}>
+                            <Ionicons name="call-outline" size={20} color={colors.primary} />
+                            <Text style={styles.contactText}>{tenant?.phone || tenant?.mobile}</Text>
+                        </View>
+                    ) : null}
+                    {tenant?.email ? (
+                        <View style={styles.contactRow}>
+                            <Ionicons name="mail-outline" size={20} color={colors.primary} />
+                            <Text style={styles.contactText}>{tenant.email}</Text>
+                        </View>
+                    ) : null}
+                    {tenant?.website ? (
+                        <TouchableOpacity style={styles.contactRow} onPress={() => openExternalUrl(tenant.website)}>
+                            <Ionicons name="globe-outline" size={20} color={colors.primary} />
+                            <Text style={styles.contactText}>{tenant.website}</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+            ) : null}
+
+            {socialLinks.length > 0 ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{t('followUs')}</Text>
+                    <View style={styles.socialRow}>
+                        {socialLinks.map((item) => (
+                            <TouchableOpacity key={item.key} style={styles.socialIcon} onPress={() => openExternalUrl(item.url)}>
+                                <Ionicons name={item.icon} size={24} color={item.color} />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            ) : null}
         </View>
     );
 
@@ -653,6 +734,12 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         color: colors.textSecondary,
         lineHeight: 24,
+    },
+    listItemText: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        lineHeight: 24,
+        marginBottom: spacing.xs,
     },
     sectionBlock: {
         marginBottom: spacing.xl,

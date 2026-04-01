@@ -93,6 +93,11 @@ export interface Tenant {
     logo?: string;
     coverImage?: string;
     city?: string;
+    district?: string;
+    street?: string;
+    buildingNumber?: string;
+    country?: string;
+    postalCode?: string;
     location?: string;
     address?: string;
     googleMapLink?: string;
@@ -107,6 +112,12 @@ export interface Tenant {
     instagramUrl?: string;
     twitterUrl?: string;
     facebookUrl?: string;
+    linkedinUrl?: string;
+    tiktokUrl?: string;
+    youtubeUrl?: string;
+    snapchatUrl?: string;
+    pinterestUrl?: string;
+    whatsappNumber?: string;
     workingHours?: {
         [key: string]: { open: string; close: string; isOpen: boolean };
     };
