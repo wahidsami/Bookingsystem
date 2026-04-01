@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { GuestView } from '../components/GuestView';
 import { useAppSession } from '../contexts/AppSessionContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { orderNeedsPayment } from '../api/client';
 
 export function PurchasesScreen({ navigation }: any) {
     const { t, language } = useLanguage();
@@ -26,9 +28,11 @@ export function PurchasesScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
 
-    useEffect(() => {
-        loadOrders();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadOrders();
+        }, [])
+    );
 
     const loadOrders = async () => {
         try {
@@ -121,7 +125,7 @@ export function PurchasesScreen({ navigation }: any) {
 
                 {/* Body: Order Info */}
                 <View style={styles.cardBody}>
-                    <Text style={styles.orderId}>#{item.id.slice(0, 8).toUpperCase()}</Text>
+                    <Text style={styles.orderId}>#{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}</Text>
                     <View style={styles.dateTimeRow}>
                         <Text style={styles.dateIcon}>📅</Text>
                         <Text style={styles.dateTimeText}>
@@ -147,14 +151,28 @@ export function PurchasesScreen({ navigation }: any) {
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
                     <Text style={styles.price}>{item.totalAmount} SAR</Text>
-                    {item.status === 'pending' && (
-                        <TouchableOpacity
-                            style={styles.cancelButton}
-                            onPress={() => handleCancel(item.id)}
-                        >
-                            <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
-                        </TouchableOpacity>
-                    )}
+                    <View style={styles.actions}>
+                        {orderNeedsPayment(item) && (
+                            <TouchableOpacity
+                                style={styles.payButton}
+                                onPress={() => navigation.navigate('Payment', {
+                                    orderId: item.id,
+                                    amount: Number(item.totalAmount),
+                                    tenantId: item.tenantId,
+                                })}
+                            >
+                                <Text style={styles.payButtonText}>{t('payNow')}</Text>
+                            </TouchableOpacity>
+                        )}
+                        {['pending', 'confirmed'].includes(item.status) && (
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => handleCancel(item.id)}
+                            >
+                                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
             </View>
         );

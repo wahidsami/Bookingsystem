@@ -131,6 +131,8 @@ class PaymentService {
             throw new Error('Insufficient funds');
         }
 
+        const requestedAmount = parseFloat(amount);
+
         // Get appointment
         const appointment = await db.Appointment.findByPk(appointmentId, {
             include: [{ model: db.Service, as: 'service' }]
@@ -144,14 +146,34 @@ class PaymentService {
             throw new Error('Unauthorized: This appointment does not belong to you');
         }
 
+        if (appointment.status === 'cancelled') {
+            throw new Error('Cancelled appointments cannot be paid');
+        }
+
+        if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
+            throw new Error('Appointment is already paid');
+        }
+
+        const totalAmount = parseFloat(appointment.price || 0);
+        const totalPaid = parseFloat(appointment.totalPaid || 0);
+        const outstandingAmount = parseFloat((totalAmount - totalPaid).toFixed(2));
+
+        if (outstandingAmount <= 0) {
+            throw new Error('Appointment has no outstanding balance');
+        }
+
+        if (Math.abs(requestedAmount - outstandingAmount) > 0.01) {
+            throw new Error(`Payment amount must match the outstanding balance of ${outstandingAmount.toFixed(2)} SAR`);
+        }
+
         // Get tenant from service or appointment
         // For now, we'll need to get tenantId from somewhere
         // Let's assume it's passed or we can get it from the booking context
         const tenantId = paymentData.tenantId;
 
         // Calculate platform fee (2.5%)
-        const platformFee = parseFloat((amount * 0.025).toFixed(2));
-        const tenantRevenue = parseFloat((amount - platformFee).toFixed(2));
+        const platformFee = parseFloat((outstandingAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((outstandingAmount - platformFee).toFixed(2));
 
         // Save payment method if requested
         let paymentMethodId = null;
@@ -187,7 +209,7 @@ class PaymentService {
             tenantId,
             appointmentId,
             paymentMethodId,
-            amount: parseFloat(amount),
+            amount: outstandingAmount,
             currency: 'SAR',
             type: 'booking',
             status: 'completed',
@@ -212,16 +234,15 @@ class PaymentService {
             paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
             paymentMethod: paymentMethodName,
             paidAt: new Date(),
-            depositAmount: 0,
-            depositPaid: true,
+            depositPaid: appointment.depositPaid || totalPaid > 0,
             remainderAmount: 0,
             remainderPaid: true,
-            totalPaid: parseFloat(amount)
+            totalPaid: totalAmount
         });
 
         // Update platform user stats
         await db.PlatformUser.increment('totalSpent', {
-            by: parseFloat(amount),
+            by: outstandingAmount,
             where: { id: platformUserId }
         });
 
@@ -231,7 +252,7 @@ class PaymentService {
                 where: { platformUserId, tenantId }
             });
             if (insight) {
-                await insight.increment('totalSpent', { by: parseFloat(amount) });
+                await insight.increment('totalSpent', { by: outstandingAmount });
             }
         }
 
@@ -293,6 +314,8 @@ class PaymentService {
             throw new Error('Insufficient funds');
         }
 
+        const requestedAmount = parseFloat(amount);
+
         // Get order
         const order = await db.Order.findByPk(orderId, {
             include: [{ model: db.Tenant, as: 'tenant' }]
@@ -310,11 +333,20 @@ class PaymentService {
             throw new Error('Order is already paid');
         }
 
+        if (['cancelled', 'refunded'].includes(order.status)) {
+            throw new Error('This order can no longer be paid');
+        }
+
+        const totalAmount = parseFloat(order.totalAmount || 0);
+        if (Math.abs(requestedAmount - totalAmount) > 0.01) {
+            throw new Error(`Payment amount must match the order total of ${totalAmount.toFixed(2)} SAR`);
+        }
+
         const tenantId = order.tenantId;
 
         // Calculate platform fee (2.5%)
-        const platformFee = parseFloat((amount * 0.025).toFixed(2));
-        const tenantRevenue = parseFloat((amount - platformFee).toFixed(2));
+        const platformFee = parseFloat((totalAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((totalAmount - platformFee).toFixed(2));
 
         // Save payment method if requested
         let paymentMethodId = null;
@@ -350,7 +382,7 @@ class PaymentService {
             tenantId,
             orderId,
             paymentMethodId,
-            amount: parseFloat(amount),
+            amount: totalAmount,
             currency: 'SAR',
             type: 'product_purchase',
             status: 'completed',

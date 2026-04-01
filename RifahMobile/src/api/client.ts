@@ -115,17 +115,21 @@ export interface Tenant {
 
 export interface Service {
     id: string;
+    tenantId?: string;
     name_en: string;
     name_ar: string;
     description_en: string;
     description_ar: string;
     category: string;
     duration: number;
-    basePrice: number;
+    basePrice?: number;
+    rawPrice?: number;
+    finalPrice?: number;
 }
 
 export interface Product {
     id: string;
+    tenantId?: string;
     name_en: string;
     name_ar: string;
     description_en: string;
@@ -197,14 +201,25 @@ export interface OrderItem {
 
 export interface Order {
     id: string;
+    orderNumber?: string;
     tenantId: string;
     platformUserId: string;
     items: OrderItem[];
     totalAmount: number;
-    status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+    status: 'pending' | 'confirmed' | 'processing' | 'ready_for_pickup' | 'shipped' | 'delivered' | 'completed' | 'cancelled' | 'refunded';
     paymentStatus: string;
     paymentMethod: string;
     createdAt: string;
+    shippingAddress?: {
+        street?: string;
+        city?: string;
+        district?: string;
+        building?: string;
+        floor?: string;
+        apartment?: string;
+        phone?: string;
+        notes?: string;
+    };
     tenant?: {
         name: string;
         logo?: string;
@@ -705,6 +720,24 @@ export interface ServiceCategory {
     sortOrder: number;
     isActive: boolean;
 }
+
+export const getServicePrice = (service: Partial<Service> | null | undefined): number => {
+    if (!service) {
+        return 0;
+    }
+
+    const candidate = service.finalPrice ?? service.basePrice ?? service.rawPrice ?? 0;
+    const parsed = Number(candidate);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+export const bookingNeedsPayment = (paymentStatus?: string | null): boolean =>
+    paymentStatus === 'pending' || paymentStatus === 'deposit_paid';
+
+export const orderNeedsPayment = (order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status'>): boolean =>
+    order.paymentMethod === 'online' &&
+    order.paymentStatus !== 'paid' &&
+    !['cancelled', 'refunded', 'completed'].includes(order.status);
 
 // Export singleton instance
 export const api = new ApiClient(API_BASE_URL);

@@ -49,8 +49,9 @@ export function PaymentScreen({ route, navigation }: any) {
                     {
                         text: t('ok'),
                         onPress: () => {
-                            navigation.popToTop(); // Go back to root (likely Home)
-                            // Or navigate to success screen
+                            navigation.navigate('Tabs', {
+                                screen: orderId ? 'Purchases' : 'Appointments',
+                            });
                         },
                     },
                 ]);

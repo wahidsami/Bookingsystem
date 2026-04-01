@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { GuestView } from '../components/GuestView';
 import { useAppSession } from '../contexts/AppSessionContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { bookingNeedsPayment } from '../api/client';
 
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
@@ -27,9 +29,11 @@ export function BookingsScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
 
-    useEffect(() => {
-        loadBookings();
-    }, [activeTab]);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadBookings();
+        }, [activeTab])
+    );
 
     const loadBookings = async () => {
         try {
@@ -147,19 +151,19 @@ export function BookingsScreen({ navigation }: any) {
                 <View style={styles.cardFooter}>
                     <Text style={styles.price}>{item.price} SAR</Text>
                     <View style={styles.actions}>
-                        {item.paymentStatus !== 'paid' && item.status !== 'cancelled' && activeTab === 'upcoming' && (
+                        {bookingNeedsPayment(item.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(item.status) && activeTab === 'upcoming' && (
                             <TouchableOpacity
                                 style={styles.payButton}
                                 onPress={() => (navigation as any).navigate('Payment', {
                                     appointmentId: item.id,
-                                    amount: item.price,
-                                    tenantId: item.tenantId
+                                    amount: Number(item.price),
+                                    tenantId: item.tenantId || item.tenant?.id
                                 })}
                             >
                                 <Text style={styles.payButtonText}>{t('payNow')}</Text>
                             </TouchableOpacity>
                         )}
-                        {item.status === 'confirmed' && activeTab === 'upcoming' && (
+                        {['confirmed', 'pending'].includes(item.status) && activeTab === 'upcoming' && (
                             <TouchableOpacity
                                 style={styles.cancelButton}
                                 onPress={() => handleCancel(item.id)}

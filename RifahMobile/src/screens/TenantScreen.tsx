@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { api, Tenant, Service, Staff, Product, getImageUrl } from '../api/client';
+import { api, Tenant, Service, Staff, Product, getImageUrl, getServicePrice } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -29,7 +29,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showProductsTab, setShowProductsTab] = useState(false);
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
-    const { itemCount, addToCart } = useCart();
+    const { itemCount, addToCart, clearCart } = useCart();
 
     useEffect(() => {
         loadTenantDetails();
@@ -106,7 +106,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             if (isProductsEnabled) {
                 try {
                     const productsRes = await api.get<{ success: boolean; products: Product[] }>(`/public/tenant/${idToFetch}/products`);
-                    if (productsRes.success) setProducts(productsRes.products || []);
+                    if (productsRes.success) {
+                        setProducts((productsRes.products || []).map((product) => ({
+                            ...product,
+                            tenantId: idToFetch,
+                        })));
+                    }
                 } catch {
                     setProducts([]);
                 }
@@ -124,6 +129,44 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             console.error('Failed to load tenant details:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const getBusinessTypeLabel = () => {
+        if (!tenant?.businessType) {
+            return null;
+        }
+
+        const rawValue = Array.isArray(tenant.businessType) ? tenant.businessType[0] : tenant.businessType;
+        if (!rawValue) {
+            return null;
+        }
+
+        return `${rawValue}`.replace(/_/g, ' ');
+    };
+
+    const handleAddProduct = (product: Product) => {
+        const result = addToCart(product);
+        if (result.success) {
+            return;
+        }
+
+        if (result.reason === 'different_tenant') {
+            Alert.alert(
+                'Replace cart?',
+                'Your cart already contains products from another tenant. Clear it and add this product instead?',
+                [
+                    { text: t('cancel'), style: 'cancel' },
+                    {
+                        text: 'Replace Cart',
+                        style: 'destructive',
+                        onPress: () => {
+                            clearCart();
+                            addToCart(product);
+                        },
+                    },
+                ]
+            );
         }
     };
 
@@ -163,16 +206,16 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             </View>
 
                             <View style={styles.heroInfo}>
-                                <View style={styles.ratingBadge}>
-                                    <Ionicons name="star" size={14} color="#F59E0B" />
-                                    <Text style={styles.ratingText}>5.0 (120+)</Text>
-                                </View>
                                 <Text style={styles.heroTitle}>{tenant.name}</Text>
-                                <Text style={styles.heroSubtitle}>Luxury Spa & Salon • 2.5km away</Text>
+                                <Text style={styles.heroSubtitle}>
+                                    {[getBusinessTypeLabel(), tenant.city].filter(Boolean).join(' • ') || tenant.slug}
+                                </Text>
 
                                 <View style={styles.openStatus}>
-                                    <View style={styles.statusDot} />
-                                    <Text style={styles.statusText}>Open Now • Closes 10 PM</Text>
+                                    <View style={[styles.statusDot, { backgroundColor: tenant.isAvailable ? '#10B981' : colors.error }]} />
+                                    <Text style={[styles.statusText, { color: tenant.isAvailable ? '#10B981' : colors.error }]}>
+                                        {tenant.isAvailable ? t('available') : t('closed')}
+                                    </Text>
                                 </View>
                             </View>
                         </View>
@@ -231,7 +274,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <View style={styles.serviceInfo}>
                                         <Text style={styles.serviceName}>{isRTL ? service.name_ar : service.name_en}</Text>
                                         <Text style={styles.serviceDuration}>{service.duration} mins</Text>
-                                        <Text style={styles.servicePrice}>{service.basePrice} SAR</Text>
+                                        <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
                                     </View>
                                     <View style={styles.addButton}>
                                         <Ionicons name="add" size={24} color={colors.primary} />
@@ -269,7 +312,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         <Text style={styles.productName} numberOfLines={2}>{isRTL ? product.name_ar : product.name_en}</Text>
                                         <Text style={styles.productPrice}>{product.price} SAR</Text>
                                     </View>
-                                    <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart(product)}>
+                                    <TouchableOpacity style={styles.addToCartButton} onPress={() => handleAddProduct(product)}>
                                         <Text style={styles.addToCartText}>{t('addToCart' as any) || 'Add'}</Text>
                                         <Ionicons name="cart-outline" size={18} color="white" />
                                     </TouchableOpacity>

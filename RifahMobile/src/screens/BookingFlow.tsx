@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Aler
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, Service, Staff, SlotItem } from '../api/client';
+import { api, Service, Staff, SlotItem, getServicePrice } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -14,7 +14,7 @@ interface BookingProps {
     navigation: any;
 }
 
-type BookingStep = 'staff' | 'datetime' | 'review' | 'payment';
+type BookingStep = 'staff' | 'datetime' | 'review';
 
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
@@ -89,12 +89,10 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             }
             setStep('review');
         }
-        else if (step === 'review') setStep('payment');
     };
 
     const handleBack = () => {
-        if (step === 'payment') setStep('review');
-        else if (step === 'review') setStep('datetime');
+        if (step === 'review') setStep('datetime');
         else if (step === 'datetime') setStep('staff');
         else navigation.goBack();
     };
@@ -113,16 +111,36 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 
         try {
             setLoading(true);
-            await api.post('/bookings/create', {
+            const response = await api.post<{ success: boolean; appointment: { id: string; price: number } }>('/bookings/create', {
                 serviceId: service.id,
                 tenantId: tenant.id,
                 staffId: selectedTime.staffId || selectedStaff?.id || undefined,
                 startTime: selectedTime.startTime,
             });
+
+            const appointmentId = response.appointment?.id;
+            const bookingAmount = Number(response.appointment?.price ?? getServicePrice(service));
+
             Alert.alert(
-                'Booking Confirmed! 🎉',
-                'Your appointment has been scheduled successfully.',
-                [{ text: 'View My Bookings', onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }) }]
+                'Booking Confirmed',
+                'Your appointment has been scheduled successfully. You can pay now or later from My Appointments.',
+                [
+                    {
+                        text: 'Pay Later',
+                        onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
+                    },
+                    appointmentId ? {
+                        text: 'Pay Now',
+                        onPress: () => navigation.navigate('Payment', {
+                            appointmentId,
+                            amount: bookingAmount,
+                            tenantId: tenant.id,
+                        }),
+                    } : {
+                        text: 'View My Bookings',
+                        onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
+                    },
+                ]
             );
         } catch (error: any) {
             const msg = error.message || 'Failed to create booking';
@@ -236,7 +254,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 </View>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Specialist</Text>
-                    <Text style={styles.summaryValue}>{selectedStaff ? selectedStaff.name : 'Any Professional'}</Text>
+                    <Text style={styles.summaryValue}>{selectedStaff ? selectedStaff.name : (selectedTime?.staffName || 'Any Professional')}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Date</Text>
@@ -250,14 +268,11 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 </View>
                 <View style={[styles.summaryRow, styles.totalRow]}>
                     <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalValue}>{service.basePrice} SAR</Text>
+                    <Text style={styles.totalValue}>{getServicePrice(service).toFixed(2)} SAR</Text>
                 </View>
             </View>
         </View>
     );
-
-    // Step 4: Payment handled by renderReview -> button triggers handleBooking for MVP
-    // Or we could show payment methods here. For now, confirming booking directly.
 
     return (
         <View style={styles.container}>
@@ -287,7 +302,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                         <ActivityIndicator color="white" />
                     ) : (
                         <Text style={styles.buttonText}>
-                            {step === 'review' ? 'Confirm & Pay' : t('next')}
+                            {step === 'review' ? 'Confirm Booking' : t('next')}
                         </Text>
                     )}
                 </TouchableOpacity>

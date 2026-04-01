@@ -7,14 +7,20 @@ export interface CartItem {
     quantity: number;
 }
 
+export interface CartAddResult {
+    success: boolean;
+    reason?: 'different_tenant';
+}
+
 interface CartContextType {
     cartItems: CartItem[];
-    addToCart: (product: Product, quantity?: number) => void;
+    addToCart: (product: Product, quantity?: number) => CartAddResult;
     removeFromCart: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
     cartTotal: number;
     itemCount: number;
+    cartTenantId: string | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -47,7 +53,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const addToCart = (product: Product, quantity: number = 1) => {
+    const addToCart = (product: Product, quantity: number = 1): CartAddResult => {
+        const currentTenantId = cartItems[0]?.product.tenantId || null;
+        if (currentTenantId && product.tenantId && currentTenantId !== product.tenantId) {
+            return { success: false, reason: 'different_tenant' };
+        }
+
         setCartItems(prev => {
             const existingItem = prev.find(item => item.product.id === product.id);
             let updatedCart;
@@ -65,6 +76,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             saveCart(updatedCart);
             return updatedCart;
         });
+
+        return { success: true };
     };
 
     const removeFromCart = (productId: string) => {
@@ -108,6 +121,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         0
     );
 
+    const cartTenantId = cartItems[0]?.product.tenantId || null;
+
     return (
         <CartContext.Provider
             value={{
@@ -117,7 +132,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 updateQuantity,
                 clearCart,
                 cartTotal,
-                itemCount
+                itemCount,
+                cartTenantId
             }}
         >
             {children}

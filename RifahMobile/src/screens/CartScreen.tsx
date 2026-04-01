@@ -16,7 +16,7 @@ interface CartScreenProps {
 export function CartScreen({ route, navigation }: CartScreenProps) {
     const { t, isRTL } = useLanguage();
     const { showLogin } = useAppSession();
-    const { cartItems, cartTotal, updateQuantity, removeFromCart, clearCart } = useCart();
+    const { cartItems, cartTotal, updateQuantity, removeFromCart, clearCart, cartTenantId } = useCart();
 
     // We expect tenant to be passed from TenantScreen when navigating to Cart
     const tenant: Tenant = route.params?.tenant;
@@ -65,9 +65,30 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     const tax = cartTotal * 0.15;
     const finalTotal = cartTotal + tax + deliveryFee;
 
+    const syncProfileAddress = async () => {
+        try {
+            await api.updateProfile({
+                addressCity: city,
+                addressStreet: street,
+                addressBuilding: building || undefined,
+                addressPhone: customerPhone,
+            });
+        } catch (error) {
+            console.error('Failed to sync checkout profile data:', error);
+        }
+    };
+
     const handleCheckout = async () => {
-        if (!tenant?.id) {
+        const itemTenantIds = Array.from(new Set(cartItems.map((item) => item.product.tenantId).filter(Boolean)));
+        const checkoutTenantId = tenant?.id || cartTenantId || itemTenantIds[0];
+
+        if (!checkoutTenantId) {
             Alert.alert('Error', 'Tenant information is missing.');
+            return;
+        }
+
+        if (itemTenantIds.length > 1) {
+            Alert.alert('Error', 'Your cart contains products from multiple tenants. Please keep one tenant per order.');
             return;
         }
 
@@ -86,41 +107,52 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
         }
 
         const payload = {
+            tenantId: checkoutTenantId,
             items: cartItems.map(item => ({
                 productId: item.product.id,
                 quantity: item.quantity
             })),
-            customerName,
-            customerEmail,
-            customerPhone,
-            city,
-            district,
-            street,
-            building,
-            deliveryMethod,
-            paymentMethod
+            paymentMethod: paymentMethod === 'online' ? 'online' : 'cash_on_delivery',
+            deliveryType: 'delivery',
+            shippingAddress: {
+                city,
+                district,
+                street,
+                building,
+                phone: customerPhone,
+                notes: '',
+            },
+            notes: `${customerName} | ${customerEmail}`,
         };
 
-        if (paymentMethod === 'online') {
-            navigation.navigate('PaymentSimulator', { payload, tenantId: tenant.id, total: finalTotal });
-        } else {
-            // Process cash on delivery immediately
-            try {
-                setLoading(true);
-                const res = await api.post<{ success: boolean; data: any; message?: string }>(`/public/tenant/${tenant.id}/orders`, payload);
-                if (res.success) {
-                    clearCart();
-                    Alert.alert('Success', 'Order placed successfully!', [
-                        { text: 'OK', onPress: () => navigation.popToTop() }
-                    ]);
-                } else {
-                    Alert.alert('Error', res.message || 'Failed to place order.');
-                }
-            } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to place order.');
-            } finally {
-                setLoading(false);
+        try {
+            setLoading(true);
+            const res = await api.post<{ success: boolean; order: any; message?: string }>('/orders', payload);
+            if (!res.success || !res.order) {
+                Alert.alert('Error', res.message || 'Failed to place order.');
+                return;
             }
+
+            await syncProfileAddress();
+
+            if (paymentMethod === 'online') {
+                clearCart();
+                navigation.navigate('Payment', {
+                    orderId: res.order.id,
+                    amount: Number(res.order.totalAmount),
+                    tenantId: checkoutTenantId,
+                });
+                return;
+            }
+
+            clearCart();
+            Alert.alert('Success', 'Order placed successfully!', [
+                { text: 'OK', onPress: () => navigation.navigate('Tabs', { screen: 'Purchases' }) }
+            ]);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to place order.');
+        } finally {
+            setLoading(false);
         }
     };
 
