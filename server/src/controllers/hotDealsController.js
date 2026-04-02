@@ -20,7 +20,9 @@ const serializeHotDeal = (deal) => {
     const tenant = plainDeal.tenant
         ? {
             ...plainDeal.tenant,
-            name: plainDeal.tenant.name || plainDeal.tenant.name_en || plainDeal.tenant.name_ar || null
+            name: plainDeal.tenant.name || plainDeal.tenant.name_en || plainDeal.tenant.name_ar || null,
+            businessNameEn: plainDeal.tenant.businessNameEn || plainDeal.tenant.name_en || plainDeal.tenant.name || null,
+            businessNameAr: plainDeal.tenant.businessNameAr || plainDeal.tenant.name_ar || plainDeal.tenant.nameAr || null
         }
         : null;
 
@@ -218,7 +220,16 @@ const createHotDeal = async (req, res) => {
         }
 
         // Calculate discounted price
-        const originalPrice = parseFloat(service.price);
+        const originalPrice = parseFloat(
+            service.finalPrice || service.rawPrice || service.basePrice || 0
+        );
+
+        if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Service price is not configured correctly for hot deals'
+            });
+        }
         let discountedPrice;
 
         if (discountType === 'percentage') {
@@ -245,7 +256,7 @@ const createHotDeal = async (req, res) => {
         }
 
         // Create hot deal
-        const status = canCreate.autoApprove ? 'approved' : 'pending';
+        const status = canCreate.autoApprove ? 'active' : 'pending';
 
         const deal = await db.HotDeal.create({
             tenantId,
@@ -398,12 +409,12 @@ const getPendingHotDeals = async (req, res) => {
                 {
                     model: db.Tenant,
                     as: 'tenant',
-                    attributes: ['id', 'businessNameEn', 'businessNameAr']
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'nameAr', 'coverImage']
                 },
                 {
                     model: db.Service,
                     as: 'service',
-                    attributes: ['id', 'name', 'name_ar', 'price']
+                    attributes: ['id', 'name_en', 'name_ar', 'rawPrice', 'finalPrice', 'image']
                 }
             ],
             order: [['createdAt', 'ASC']]
@@ -411,7 +422,7 @@ const getPendingHotDeals = async (req, res) => {
 
         res.json({
             success: true,
-            deals
+            deals: deals.map(serializeHotDeal)
         });
     } catch (error) {
         console.error('Get pending hot deals error:', error);
@@ -429,7 +440,7 @@ const getPendingHotDeals = async (req, res) => {
 const approveHotDeal = async (req, res) => {
     try {
         const { id } = req.params;
-        const adminId = req.user.id;
+        const adminId = req.adminId;
 
         const deal = await db.HotDeal.findByPk(id);
         if (!deal) {
