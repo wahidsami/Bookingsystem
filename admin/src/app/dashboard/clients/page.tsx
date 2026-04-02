@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
+import { humanizeValue } from "@/lib/display";
 import Link from "next/link";
 
 interface Tenant {
@@ -290,9 +291,7 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className="capitalize text-dark-300">
-                            {Array.isArray(tenant.businessType)
-                              ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
-                              : tenant.businessType?.replace("_", " ") || "-"}
+                            {humanizeValue(tenant.businessType)}
                           </span>
                         </td>
                         <td>
@@ -309,7 +308,7 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className={`badge ${getPlanBadge(tenant.plan)}`}>
-                            {tenant.plan?.replace("_", " ")}
+                            {humanizeValue(tenant.plan)}
                           </span>
                         </td>
                         <td className="text-dark-400 text-sm">

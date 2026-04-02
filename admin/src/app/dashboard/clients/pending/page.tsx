@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
+import { humanizeValue } from "@/lib/display";
 import Link from "next/link";
 
 interface Tenant {
@@ -154,9 +155,7 @@ export default function PendingClientsPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-white">{tenant.name}</h3>
                       <p className="text-sm text-dark-400 capitalize">
-                        {Array.isArray(tenant.businessType)
-                          ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
-                          : tenant.businessType?.replace("_", " ")} • {tenant.city || "Location not set"}
+                        {humanizeValue(tenant.businessType)} • {tenant.city || "Location not set"}
                       </p>
                     </div>
                   </div>

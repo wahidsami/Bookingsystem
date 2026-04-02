@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi, getImageUrl } from "@/lib/api";
 import { Currency } from "@/components/Currency";
+import { humanizeValue } from "@/lib/display";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -211,9 +212,7 @@ export default function ClientDetailsPage() {
                 <span className={`badge ${statusBadge.class}`}>{statusBadge.text}</span>
               </div>
               <p className="text-dark-400 mt-1 capitalize">
-                {Array.isArray(tenant.businessType)
-                  ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
-                  : tenant.businessType?.replace("_", " ")} • {tenant.city || "Location not set"}
+                {humanizeValue(tenant.businessType)} • {tenant.city || "Location not set"}
               </p>
               <p className="text-dark-500 text-sm mt-1">ID: {tenant.id}</p>
             </div>
@@ -327,9 +326,7 @@ export default function ClientDetailsPage() {
                   <div>
                     <p className="text-dark-400 text-xs">Type</p>
                     <p className="text-white mt-1 capitalize">
-                      {Array.isArray(tenant.businessType)
-                        ? tenant.businessType.map(t => t.replace("_", " ")).join(", ")
-                        : tenant.businessType?.replace("_", " ") || "-"}
+                      {humanizeValue(tenant.businessType)}
                     </p>
                   </div>
                   <div>
@@ -478,8 +475,7 @@ export default function ClientDetailsPage() {
                     <p className="text-dark-400 text-xs">Plan</p>
                     <p className="text-white mt-1 capitalize">
                       {(tenant as any).subscription?.package?.name
-                        || tenant.plan?.replace("_", " ")
-                        || "No plan"}
+                        || humanizeValue(tenant.plan, "No plan")}
                     </p>
                   </div>
                   <div>
@@ -491,7 +487,7 @@ export default function ClientDetailsPage() {
                   <div>
                     <p className="text-dark-400 text-xs">Billing Cycle</p>
                     <p className="text-white mt-1 capitalize">
-                      {(tenant as any).subscription?.billingCycle?.replace("sixMonth", "6 Months") || "—"}
+                      {String((tenant as any).subscription?.billingCycle || "—").replace("sixMonth", "6 Months")}
                     </p>
                   </div>
                   <div>
@@ -683,4 +679,3 @@ export default function ClientDetailsPage() {
     </AdminLayout>
   );
 }
-

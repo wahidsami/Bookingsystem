@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
 import { Currency } from "@/components/Currency";
+import { humanizeValue } from "@/lib/display";
 import Link from "next/link";
 
 interface Stats {
@@ -323,7 +324,7 @@ export default function DashboardPage() {
                           {activity.performedByName || "System"}
                         </span>{" "}
                         <span className={getActionColor(activity.action)}>{activity.action}</span>{" "}
-                        a {activity.entityType.replace("_", " ")}
+                        a {humanizeValue(activity.entityType, "item")}
                       </p>
                       <p className="text-xs text-dark-500 mt-1">
                         {formatTimeAgo(activity.createdAt)}
@@ -348,7 +349,7 @@ export default function DashboardPage() {
                   <div key={item.type}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-dark-300 capitalize">
-                        {item.type?.replace("_", " ") || "Unknown"}
+                        {humanizeValue(item.type, "Unknown")}
                       </span>
                       <span className="text-white font-medium">{item.count}</span>
                     </div>
@@ -368,7 +369,7 @@ export default function DashboardPage() {
                 <h4 className="font-semibold text-white mb-4">By Plan</h4>
                 {stats?.breakdowns.tenantsByPlan.map((item) => (
                   <div key={item.plan} className="flex items-center justify-between py-2">
-                    <span className="text-dark-300 capitalize">{item.plan?.replace("_", " ")}</span>
+                    <span className="text-dark-300 capitalize">{humanizeValue(item.plan)}</span>
                     <span className="badge badge-primary">{item.count}</span>
                   </div>
                 ))}

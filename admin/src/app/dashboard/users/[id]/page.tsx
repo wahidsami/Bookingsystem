@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi, getImageUrl } from "@/lib/api";
 import { Currency } from "@/components/Currency";
+import { humanizeValue } from "@/lib/display";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -345,7 +346,7 @@ export default function UserDetailsPage() {
                 <tbody>
                   {transactions.slice(0, 10).map((tx) => (
                     <tr key={tx.id}>
-                      <td className="text-white capitalize">{tx.type?.replace("_", " ")}</td>
+                      <td className="text-white capitalize">{humanizeValue(tx.type)}</td>
                       <td className={tx.type === "refund" ? "text-success" : "text-white"}>
                         {tx.type === "refund" ? "+" : "-"}
                         <Currency amount={parseFloat(tx.amount.toString())} />
@@ -432,4 +433,3 @@ export default function UserDetailsPage() {
     </AdminLayout>
   );
 }
-

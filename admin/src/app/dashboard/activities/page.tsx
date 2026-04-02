@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
+import { humanizeValue } from "@/lib/display";
 
 interface Activity {
   id: string;
@@ -141,7 +142,7 @@ export default function ActivitiesPage() {
                             </span>{" "}
                             a{" "}
                             <span className="text-dark-300">
-                              {activity.entityType.replace("_", " ")}
+                              {humanizeValue(activity.entityType, "item")}
                             </span>
                           </p>
                           {activity.details && Object.keys(activity.details).length > 0 && (
