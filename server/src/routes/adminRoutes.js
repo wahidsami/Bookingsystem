@@ -44,6 +44,7 @@ router.post('/tenants/:id/reject', requirePermission('tenants', 'approve'), admi
 router.post('/tenants/:id/request-more-info', requirePermission('tenants', 'approve'), adminTenantsController.requestMoreInfo);
 router.post('/tenants/:id/suspend', requirePermission('tenants', 'edit'), adminTenantsController.suspendTenant);
 router.post('/tenants/:id/activate', requirePermission('tenants', 'edit'), adminTenantsController.activateTenant);
+router.delete('/tenants/:id', requirePermission('tenants', 'delete'), adminTenantsController.deleteTenant);
 
 // ===== USERS MANAGEMENT =====
 router.get('/users', requirePermission('users', 'view'), adminUsersController.listUsers);

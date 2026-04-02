@@ -1,6 +1,8 @@
 const db = require('../models');
 const { Op, fn, col } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Get all tenants with filters and pagination
@@ -588,6 +590,158 @@ const activateTenant = async (req, res) => {
 };
 
 /**
+ * Safely delete a tenant account in non-active states.
+ * Intended for cleanup/testing resets, not routine production removal of live tenants.
+ */
+const deleteTenant = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const tenant = await db.Tenant.findByPk(id);
+
+        if (!tenant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tenant not found'
+            });
+        }
+
+        const deletableStatuses = [
+            'pending_approval',
+            'more_info_required',
+            'rejected',
+            'payment_pending',
+            'payment_failed',
+            'payment_expired',
+            'inactive',
+            'suspended'
+        ];
+
+        if (!deletableStatuses.includes(tenant.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Tenant with status ${tenant.status} cannot be deleted from admin cleanup. Suspend it first or use a controlled DB purge.`
+            });
+        }
+
+        const uploadedPaths = [
+            tenant.logo,
+            tenant.coverImage,
+            tenant.crDocument,
+            tenant.taxDocument,
+            tenant.licenseDocument
+        ].filter(Boolean);
+
+        const deleteByTenantTables = [
+            ['MobilePushToken', db.MobilePushToken],
+            ['TenantPushUsage', db.TenantPushUsage],
+            ['TenantPushCampaign', db.TenantPushCampaign],
+            ['UsageAlert', db.UsageAlert],
+            ['CustomerInsight', db.CustomerInsight],
+            ['Review', db.Review],
+            ['StaffMessage', db.StaffMessage],
+            ['StaffPayroll', db.StaffPayroll],
+            ['Appointment', db.Appointment],
+            ['Order', db.Order],
+            ['Transaction', db.Transaction],
+            ['HotDeal', db.HotDeal],
+            ['Product', db.Product],
+            ['Service', db.Service],
+            ['PublicPageData', db.PublicPageData],
+            ['TenantSettings', db.TenantSettings],
+            ['TenantUsage', db.TenantUsage],
+            ['User', db.User],
+            ['Staff', db.Staff]
+        ].filter(([, model]) => Boolean(model));
+
+        await db.sequelize.transaction(async (transaction) => {
+            // Remove child rows tied to subscription first.
+            const subscriptionIds = await db.TenantSubscription.findAll({
+                where: { tenantId: tenant.id },
+                attributes: ['id'],
+                transaction,
+                raw: true
+            });
+            const subscriptionIdList = subscriptionIds.map((row) => row.id);
+
+            if (subscriptionIdList.length > 0 && db.Bill) {
+                await db.Bill.destroy({
+                    where: { tenantSubscriptionId: { [Op.in]: subscriptionIdList } },
+                    transaction
+                });
+            }
+
+            for (const [, model] of deleteByTenantTables) {
+                await model.destroy({
+                    where: { tenantId: tenant.id },
+                    transaction
+                });
+            }
+
+            await db.TenantSubscription.destroy({
+                where: { tenantId: tenant.id },
+                transaction
+            });
+
+            await db.ActivityLog.destroy({
+                where: {
+                    [Op.or]: [
+                        { entityType: 'tenant', entityId: tenant.id },
+                        { performedByType: 'tenant_user', performedById: tenant.id }
+                    ]
+                },
+                transaction
+            });
+
+            await db.Tenant.destroy({
+                where: { id: tenant.id },
+                transaction
+            });
+
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: tenant.id,
+                action: 'deleted',
+                performedByType: 'super_admin',
+                performedById: req.adminId,
+                performedByName: req.adminName,
+                details: {
+                    tenantName: tenant.name_en || tenant.name,
+                    tenantEmail: tenant.email,
+                    deletedStatus: tenant.status,
+                    cleanupMode: 'safe_admin_delete'
+                },
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
+            }, { transaction });
+        });
+
+        for (const relativeUploadPath of uploadedPaths) {
+            try {
+                const absolutePath = path.join(__dirname, '../../uploads', relativeUploadPath);
+                if (absolutePath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(absolutePath)) {
+                    fs.unlinkSync(absolutePath);
+                }
+            } catch (fileError) {
+                console.warn(`[DeleteTenant] Failed to remove file ${relativeUploadPath}:`, fileError.message);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Tenant deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete tenant error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete tenant',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Update tenant details
  */
 const updateTenant = async (req, res) => {
@@ -793,6 +947,7 @@ module.exports = {
     requestMoreInfo,
     suspendTenant,
     activateTenant,
+    deleteTenant,
     updateTenant,
     getTenantActivities
 };
