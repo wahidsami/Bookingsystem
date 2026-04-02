@@ -116,6 +116,37 @@ export default function ClientsPage() {
     }
   };
 
+  const handleSuspendTenant = async (tenant: Tenant) => {
+    const reason = window.prompt(`Suspend ${(tenant as any).name_en || tenant.name}? Enter a reason:`, "Admin cleanup");
+    if (!reason || !reason.trim()) return;
+
+    try {
+      await adminApi.suspendTenant(tenant.id, reason.trim());
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === tenant.id ? { ...t, status: "suspended", suspensionReason: reason.trim() } : t
+        )
+      );
+    } catch (error: any) {
+      console.error("Failed to suspend tenant:", error);
+      alert(error.message || "Failed to suspend tenant");
+    }
+  };
+
+  const handleActivateTenant = async (tenant: Tenant) => {
+    try {
+      await adminApi.activateTenant(tenant.id);
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === tenant.id ? { ...t, status: "active", suspensionReason: "" } : t
+        )
+      );
+    } catch (error: any) {
+      console.error("Failed to activate tenant:", error);
+      alert(error.message || "Failed to activate tenant");
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6 animate-fade-in">
@@ -322,6 +353,24 @@ export default function ClientsPage() {
                             >
                               View
                             </Link>
+                            {tenant.status === "active" && (
+                              <button
+                                type="button"
+                                onClick={() => handleSuspendTenant(tenant)}
+                                className="btn btn-warning btn-sm"
+                              >
+                                Suspend
+                              </button>
+                            )}
+                            {tenant.status === "suspended" && (
+                              <button
+                                type="button"
+                                onClick={() => handleActivateTenant(tenant)}
+                                className="btn btn-success btn-sm"
+                              >
+                                Reactivate
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setDeleteModal({ open: true, tenant })}

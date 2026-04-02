@@ -97,7 +97,7 @@ export default function ClientDetailsPage() {
     try {
       const response = await adminApi.approveTenant(tenant!.id);
       if (response.success) {
-        setTenant({ ...tenant!, status: "approved", approvedAt: new Date().toISOString() });
+        setTenant({ ...tenant!, status: "payment_pending", approvedAt: new Date().toISOString() });
         loadTenantDetails();
       }
     } catch (error) {
@@ -135,7 +135,7 @@ export default function ClientDetailsPage() {
     try {
       const response = await adminApi.activateTenant(tenant!.id);
       if (response.success) {
-        setTenant({ ...tenant!, status: "approved", suspensionReason: "" });
+        setTenant({ ...tenant!, status: "active", suspensionReason: "" });
         loadTenantDetails();
       }
     } catch (error) {
@@ -149,9 +149,16 @@ export default function ClientDetailsPage() {
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { class: string; text: string }> = {
       pending: { class: "badge-warning", text: "Pending" },
+      pending_approval: { class: "badge-warning", text: "Pending Approval" },
+      more_info_required: { class: "badge-warning", text: "More Info Required" },
+      payment_pending: { class: "badge-warning", text: "Payment Pending" },
+      active: { class: "badge-success", text: "Active" },
       approved: { class: "badge-success", text: "Approved" },
       rejected: { class: "badge-danger", text: "Rejected" },
       suspended: { class: "badge-danger", text: "Suspended" },
+      inactive: { class: "badge-danger", text: "Inactive" },
+      payment_failed: { class: "badge-danger", text: "Payment Failed" },
+      payment_expired: { class: "badge-danger", text: "Payment Expired" },
     };
     return badges[status] || { class: "badge-info", text: status };
   };
@@ -221,12 +228,12 @@ export default function ClientDetailsPage() {
             <Link href="/dashboard/clients" className="btn btn-secondary">
               ← Back
             </Link>
-            {tenant.status === "pending" && (
+            {tenant.status === "pending_approval" && (
               <button onClick={handleApprove} disabled={actionLoading} className="btn btn-success">
                 ✓ Approve
               </button>
             )}
-            {tenant.status === "approved" && (
+            {tenant.status === "active" && (
               <button
                 onClick={() => setSuspendModal(true)}
                 disabled={actionLoading}
