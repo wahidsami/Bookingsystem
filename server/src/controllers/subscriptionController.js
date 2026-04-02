@@ -239,9 +239,10 @@ exports.acknowledgeAlert = async (req, res) => {
 exports.requestSubscriptionChange = async (req, res) => {
     try {
         const tenantId = getTenantId(req);
-        const { packageId, billingCycle } = req.body;
+        const { packageId, newPackageId, billingCycle } = req.body;
+        const requestedPackageId = packageId || newPackageId;
         
-        if (!packageId || !billingCycle) {
+        if (!requestedPackageId || !billingCycle) {
             return res.status(400).json({
                 success: false,
                 message: 'Package ID and billing cycle are required'
@@ -256,7 +257,7 @@ exports.requestSubscriptionChange = async (req, res) => {
         }
         
         // Get new package
-        const newPackage = await db.SubscriptionPackage.findByPk(packageId);
+        const newPackage = await db.SubscriptionPackage.findByPk(requestedPackageId);
         if (!newPackage || !newPackage.isActive) {
             return res.status(404).json({
                 success: false,
@@ -296,7 +297,7 @@ exports.requestSubscriptionChange = async (req, res) => {
         const paymentUrl = baseUrl
             ? `${baseUrl}/${locale}/payment?token=${paymentToken}`
             : `/${locale}/payment?token=${paymentToken}`;
-        const type = currentSubscription.packageId === packageId ? 'renewal' : 'upgrade';
+        const type = currentSubscription.packageId === requestedPackageId ? 'renewal' : 'upgrade';
 
         const bill = await db.Bill.create({
             tenantId,
@@ -334,7 +335,7 @@ exports.requestSubscriptionChange = async (req, res) => {
                 billId: bill.id,
                 billNumber,
                 currentPackageId: currentSubscription.packageId,
-                requestedPackageId: packageId,
+                requestedPackageId: requestedPackageId,
                 requestedBillingCycle: billingCycle,
                 amount,
                 type

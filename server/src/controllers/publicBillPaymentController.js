@@ -157,6 +157,7 @@ exports.payBillByToken = async (req, res) => {
 
         const now = new Date();
         const subscription = bill.subscription;
+        const shouldActivateTenant = bill.tenant?.status === 'payment_pending';
 
         if (!subscription) {
             return res.status(400).json({
@@ -196,6 +197,13 @@ exports.payBillByToken = async (req, res) => {
                 }
             }, { transaction });
 
+            if (shouldActivateTenant) {
+                await bill.tenant.update({
+                    status: 'active',
+                    paymentDueAt: null
+                }, { transaction });
+            }
+
             const usage = await db.TenantUsage.findOne({
                 where: { tenantId: bill.tenantId },
                 transaction
@@ -218,6 +226,13 @@ exports.payBillByToken = async (req, res) => {
                 }, { transaction });
             }
         });
+
+        if (shouldActivateTenant) {
+            const { sendPaymentSuccessEmail } = require('../utils/emailService');
+            sendPaymentSuccessEmail(bill.tenant).catch(err => {
+                console.error('[BillPayment] Success email failed:', err.message);
+            });
+        }
 
         res.json({
             success: true,

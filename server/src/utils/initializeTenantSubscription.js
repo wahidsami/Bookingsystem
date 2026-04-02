@@ -1,5 +1,19 @@
 const db = require('../models');
 
+function getPeriodEndForBillingCycle(startDate, billingCycle = 'monthly') {
+    const periodEnd = new Date(startDate);
+
+    if (billingCycle === 'annual') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else if (billingCycle === 'sixMonth') {
+        periodEnd.setMonth(periodEnd.getMonth() + 6);
+    } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    return periodEnd;
+}
+
 /**
  * Initialize subscription and usage for a newly approved tenant
  * This is called when a tenant is approved by the admin
@@ -30,12 +44,9 @@ async function initializeTenantSubscription(tenantId, packageSlug = 'free-trial'
         const trialEnd = new Date(now);
         trialEnd.setDate(trialEnd.getDate() + 30); // 30-day trial
 
-        let periodEnd = new Date(now);
-        if (packageSlug === 'free-trial') {
-            periodEnd = trialEnd;
-        } else {
-            periodEnd.setMonth(periodEnd.getMonth() + 1); // 1 month for paid plans
-        }
+        const periodEnd = packageSlug === 'free-trial'
+            ? trialEnd
+            : getPeriodEndForBillingCycle(now, 'monthly');
 
         // Create subscription
         const subscription = await db.TenantSubscription.create({
@@ -194,8 +205,7 @@ async function activateTenantAfterPayment(tenantId) {
         include: [{ model: db.SubscriptionPackage, as: 'package' }]
     });
     if (subscription) {
-        const periodEnd = new Date(now);
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        const periodEnd = getPeriodEndForBillingCycle(now, subscription.billingCycle);
         await subscription.update({
             status: 'active',
             currentPeriodStart: now,

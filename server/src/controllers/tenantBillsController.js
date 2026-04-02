@@ -43,3 +43,45 @@ exports.getBills = async (req, res) => {
         });
     }
 };
+
+exports.getCurrentUnpaidBill = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+
+        const bill = await db.Bill.findOne({
+            where: {
+                tenantId,
+                status: 'UNPAID'
+            },
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!bill) {
+            return res.status(404).json({
+                success: false,
+                message: 'No unpaid bill found'
+            });
+        }
+
+        res.json({
+            success: true,
+            bill: {
+                id: bill.id,
+                billNumber: bill.billNumber,
+                amount: parseFloat(bill.amount || 0),
+                currency: bill.currency,
+                dueDate: bill.dueDate,
+                status: bill.status,
+                type: bill.type,
+                paymentToken: bill.paymentToken,
+                planSnapshot: bill.planSnapshot || {}
+            }
+        });
+    } catch (error) {
+        console.error('getCurrentUnpaidBill error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load unpaid bill'
+        });
+    }
+};

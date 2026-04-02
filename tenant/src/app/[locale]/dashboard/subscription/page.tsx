@@ -5,10 +5,12 @@ import { TenantLayout } from '@/components/TenantLayout';
 import { tenantApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTenantAuth } from '@/contexts/TenantAuthContext';
 
 export default function SubscriptionPage() {
   const params = useParams();
   const locale = (params?.locale as string) || 'ar';
+  const { user } = useTenantAuth();
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,10 +28,13 @@ export default function SubscriptionPage() {
 
   const statusLabel = (s: string) => {
     const map: Record<string, string> = locale === 'ar'
-      ? { active: 'نشط', trial: 'تجريبي', past_due: 'متأخر', APPROVED_PENDING_PAYMENT: 'بانتظار الدفع', APPROVED_FREE_ACTIVE: 'نشط' }
-      : { active: 'Active', trial: 'Trial', past_due: 'Past due', APPROVED_PENDING_PAYMENT: 'Pending payment', APPROVED_FREE_ACTIVE: 'Active' };
+      ? { active: 'نشط', trial: 'تجريبي', past_due: 'متأخر', payment_pending: 'بانتظار الدفع' }
+      : { active: 'Active', trial: 'Trial', past_due: 'Past due', payment_pending: 'Pending payment' };
     return map[s] || s;
   };
+
+  const displayStatus = user?.status === 'payment_pending' ? 'payment_pending' : subscription?.status;
+  const isPaymentPending = user?.status === 'payment_pending';
 
   const daysUntilRenewal = subscription?.currentPeriodEnd
     ? Math.max(0, Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -69,18 +74,20 @@ export default function SubscriptionPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {subscription.package?.name || subscription.package?.name_ar || 'Plan'}
+                  {locale === 'ar'
+                    ? subscription.package?.name_ar || subscription.package?.name || 'Plan'
+                    : subscription.package?.name || subscription.package?.name_ar || 'Plan'}
                 </h2>
                 <span
                   className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                    subscription.status === 'active' || subscription.status === 'APPROVED_FREE_ACTIVE' || subscription.status === 'trial'
+                    subscription.status === 'active' || subscription.status === 'trial'
                       ? 'bg-green-100 text-green-800'
-                      : subscription.status === 'APPROVED_PENDING_PAYMENT'
+                      : isPaymentPending
                       ? 'bg-amber-100 text-amber-800'
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  {statusLabel(subscription.status)}
+                  {statusLabel(displayStatus)}
                 </span>
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -113,7 +120,7 @@ export default function SubscriptionPage() {
                   <dd className="font-medium text-gray-900">{formatDate(subscription.nextBillingDate || subscription.currentPeriodEnd)}</dd>
                 </div>
               </dl>
-              {daysUntilRenewal !== null && (subscription.status === 'active' || subscription.status === 'APPROVED_FREE_ACTIVE' || subscription.status === 'trial') && (
+              {daysUntilRenewal !== null && !isPaymentPending && (subscription.status === 'active' || subscription.status === 'trial') && (
                 <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
                   <p className="text-purple-900 font-medium">
                     {locale === 'ar' ? `التجديد خلال ${daysUntilRenewal} يوم` : `Renewal in ${daysUntilRenewal} days`}
@@ -123,13 +130,13 @@ export default function SubscriptionPage() {
                   </p>
                 </div>
               )}
-              {subscription.status === 'APPROVED_PENDING_PAYMENT' && (
+              {isPaymentPending && (
                 <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
                   <p className="text-amber-900 font-medium">
                     {locale === 'ar' ? 'يرجى إتمام الدفع خلال 48 ساعة لتفعيل اشتراكك.' : 'Please complete payment within 48 hours to activate your subscription.'}
                   </p>
                   <Link
-                    href={`/${locale}/dashboard/bills`}
+                    href={`/${locale}/payment`}
                     className="inline-block mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
                   >
                     {locale === 'ar' ? 'ادفع الآن' : 'Pay now'}

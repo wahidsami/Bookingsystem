@@ -56,7 +56,23 @@ export default function UnifiedPaymentPage() {
         setError("");
         setPayError("");
 
-        if (!token || isJwtToken) {
+        if (!token) {
+          try {
+            const response = await tenantApi.getCurrentUnpaidBill();
+            if (!mounted) return;
+
+            if (response?.success && response?.bill) {
+              setMode("bill");
+              setAlreadyPaid(false);
+              setBillSession(response.bill as BillSession);
+              return;
+            }
+          } catch {
+            // Fallback to legacy registration payment flow for older pending tenants.
+          }
+        }
+
+        if (token && isJwtToken) {
           const response = await tenantApi.getSubscriptionPaymentSession(token || undefined);
           if (!mounted) return;
 
@@ -70,7 +86,7 @@ export default function UnifiedPaymentPage() {
             });
             return;
           }
-        } else {
+        } else if (token) {
           const response = await tenantApi.getBillPaymentDetails(token);
           if (!mounted) return;
 
@@ -78,6 +94,20 @@ export default function UnifiedPaymentPage() {
           setAlreadyPaid(Boolean(response?.alreadyPaid));
           setBillSession((response?.bill || null) as BillSession | null);
           return;
+        } else {
+          const response = await tenantApi.getSubscriptionPaymentSession();
+          if (!mounted) return;
+
+          if (response?.success) {
+            setMode("registration");
+            setRegistrationSession({
+              packageName: response.packageName,
+              amount: response.amount,
+              currency: response.currency || "SAR",
+              paymentDueAt: response.paymentDueAt,
+            });
+            return;
+          }
         }
 
         if (mounted) {

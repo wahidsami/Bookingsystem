@@ -60,6 +60,14 @@ class TenantApiClient {
     localStorage.setItem('rifah_tenant_refresh_token', refreshToken);
   }
 
+  setAuthTokens(accessToken: string, refreshToken?: string | null): void {
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem('rifah_tenant_access_token', accessToken);
+    if (refreshToken) {
+      localStorage.setItem('rifah_tenant_refresh_token', refreshToken);
+    }
+  }
+
   /**
    * Clear tokens from storage
    */
@@ -262,12 +270,16 @@ class TenantApiClient {
     return this.get('/tenant/bills');
   }
 
+  async getCurrentUnpaidBill(): Promise<any> {
+    return this.get('/tenant/bills/current-unpaid');
+  }
+
   async getCurrentSubscription(): Promise<{ success: boolean; subscription: any }> {
     return this.get('/subscription/current');
   }
 
   async requestUpgrade(newPackageId: string, billingCycle: string): Promise<{ success: boolean; paymentUrl?: string; billNumber?: string; amount?: number; dueDate?: string }> {
-    return this.post('/subscription/request-upgrade', { newPackageId, billingCycle });
+    return this.post('/subscription/request-upgrade', { packageId: newPackageId, billingCycle });
   }
 
   async getBillPaymentDetails(token: string): Promise<any> {

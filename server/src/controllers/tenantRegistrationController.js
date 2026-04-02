@@ -68,6 +68,7 @@ exports.uploadMiddleware = upload.fields([
  * @access Public
  */
 exports.register = async (req, res) => {
+    let transaction;
     try {
         const {
             // Step 1: Entity Details
@@ -164,6 +165,20 @@ exports.register = async (req, res) => {
             });
         }
 
+        if (!selectedPackageId) {
+            return res.status(400).json({
+                success: false,
+                message: 'A subscription package must be selected'
+            });
+        }
+
+        if (!selectedBillingPeriod || !['monthly', 'sixMonth', 'annual'].includes(selectedBillingPeriod)) {
+            return res.status(400).json({
+                success: false,
+                message: 'A valid billing period is required'
+            });
+        }
+
         // Check if tenant with this email already exists (before transaction)
         const existingTenant = await db.Tenant.findOne({ where: { email } });
         if (existingTenant) {
@@ -174,7 +189,7 @@ exports.register = async (req, res) => {
         }
 
         // Start transaction for database operations
-        const transaction = await db.sequelize.transaction();
+        transaction = await db.sequelize.transaction();
 
         // Get uploaded file paths
         const logo = req.files?.logo?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
@@ -283,49 +298,52 @@ exports.register = async (req, res) => {
             }
         }, { transaction });
 
-        // Create pending subscription if package selected
-        let subscriptionPackage = null;
-        if (selectedPackageId) {
-            subscriptionPackage = await db.SubscriptionPackage.findByPk(selectedPackageId);
+        let subscriptionPackage = await db.SubscriptionPackage.findOne({
+            where: {
+                id: selectedPackageId,
+                isActive: true
+            },
+            transaction
+        });
 
-            if (subscriptionPackage) {
-                // Calculate price based on billing period
-                let priceToPay = 0;
-                if (selectedBillingPeriod === 'monthly') {
-                    priceToPay = subscriptionPackage.monthlyPrice;
-                } else if (selectedBillingPeriod === 'sixMonth') {
-                    priceToPay = subscriptionPackage.sixMonthPrice;
-                } else if (selectedBillingPeriod === 'annual') {
-                    priceToPay = subscriptionPackage.annualPrice;
-                }
-
-                // Calculate period dates
-                const now = new Date();
-                let periodEnd = new Date(now);
-                if (selectedBillingPeriod === 'monthly') {
-                    periodEnd.setMonth(periodEnd.getMonth() + 1);
-                } else if (selectedBillingPeriod === 'sixMonth') {
-                    periodEnd.setMonth(periodEnd.getMonth() + 6);
-                } else if (selectedBillingPeriod === 'annual') {
-                    periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-                }
-
-                // Create subscription (status: 'trial' for pending approval, will be activated when approved)
-                await db.TenantSubscription.create({
-                    tenantId: tenant.id,
-                    packageId: selectedPackageId,
-                    billingCycle: selectedBillingPeriod || 'monthly', // Fixed: billingCycle not billingPeriod
-                    amount: priceToPay, // Fixed: amount not pricePaid
-                    currency: 'SAR', // Added: required field
-                    status: 'trial', // Fixed: 'trial' instead of 'pending' (will be activated when tenant is approved)
-                    currentPeriodStart: now, // Added: required field
-                    currentPeriodEnd: periodEnd, // Added: required field
-                    nextBillingDate: periodEnd, // Added: for tracking
-                    autoRenew: true
-                    // Removed: featuresSnapshot and limitsSnapshot (fields don't exist in model)
-                }, { transaction });
-            }
+        if (!subscriptionPackage) {
+            throw new Error('Selected subscription package was not found or is inactive');
         }
+
+        // Calculate price based on billing period
+        let priceToPay = 0;
+        if (selectedBillingPeriod === 'monthly') {
+            priceToPay = subscriptionPackage.monthlyPrice;
+        } else if (selectedBillingPeriod === 'sixMonth') {
+            priceToPay = subscriptionPackage.sixMonthPrice;
+        } else if (selectedBillingPeriod === 'annual') {
+            priceToPay = subscriptionPackage.annualPrice;
+        }
+
+        // Calculate period dates
+        const now = new Date();
+        let periodEnd = new Date(now);
+        if (selectedBillingPeriod === 'monthly') {
+            periodEnd.setMonth(periodEnd.getMonth() + 1);
+        } else if (selectedBillingPeriod === 'sixMonth') {
+            periodEnd.setMonth(periodEnd.getMonth() + 6);
+        } else if (selectedBillingPeriod === 'annual') {
+            periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+        }
+
+        // Create subscription draft that will be activated after approval + payment
+        await db.TenantSubscription.create({
+            tenantId: tenant.id,
+            packageId: selectedPackageId,
+            billingCycle: selectedBillingPeriod,
+            amount: priceToPay,
+            currency: 'SAR',
+            status: 'trial',
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+            nextBillingDate: periodEnd,
+            autoRenew: true
+        }, { transaction });
 
         // Log activity (within transaction)
         await db.ActivityLog.create({
@@ -351,7 +369,7 @@ exports.register = async (req, res) => {
         // Generate JWT token (for immediate login after registration)
         const accessToken = jwt.sign(
             {
-                tenantId: tenant.id,
+                id: tenant.id,
                 email: tenant.email,
                 type: 'tenant'
             },
@@ -361,8 +379,9 @@ exports.register = async (req, res) => {
 
         const refreshToken = jwt.sign(
             {
-                tenantId: tenant.id,
-                type: 'tenant'
+                id: tenant.id,
+                type: 'tenant',
+                isRefresh: true
             },
             process.env.JWT_REFRESH_SECRET,
             { expiresIn: '30d' }
@@ -397,7 +416,8 @@ exports.register = async (req, res) => {
                 logo: tenant.logo,
                 createdAt: tenant.createdAt
             },
-            accessToken
+            accessToken,
+            refreshToken
         });
 
     } catch (error) {

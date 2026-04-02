@@ -991,7 +991,13 @@ const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
                                     <div className="text-3xl font-bold text-gray-900">
                                         <span className="riyal-symbol">﷼</span> {price.toFixed(2)}
                                     </div>
-                                    <div className="text-sm text-gray-500">per month</div>
+                                    <div className="text-sm text-gray-500">
+                                        {selectedTab === 'monthly'
+                                            ? 'per month'
+                                            : selectedTab === 'sixMonth'
+                                                ? 'total for 6 months'
+                                                : 'total for 12 months'}
+                                    </div>
                                     {savings > 0 && (
                                         <div className="text-sm text-green-600 font-semibold mt-1">
                                             Save <span className="riyal-symbol">﷼</span> {savings.toFixed(2)}
@@ -1233,6 +1239,14 @@ export default function RegisterPage() {
             if (!formData.ownerNationalId) newErrors.ownerNationalId = 'National ID / Iqama is required';
         }
 
+        if (step === 6) {
+            if (!formData.selectedPackageId) {
+                newErrors.selectedPackageId = locale === 'ar'
+                    ? 'يرجى اختيار باقة الاشتراك'
+                    : 'Please select a subscription package';
+            }
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -1305,9 +1319,12 @@ export default function RegisterPage() {
                 throw new Error(data.message || t('errors.registrationFailed'));
             }
 
-            // Store token
+            // Store tokens in the same keys used by tenant login
             if (data.accessToken) {
-                localStorage.setItem('tenant_token', data.accessToken);
+                sessionStorage.setItem('rifah_tenant_access_token', data.accessToken);
+            }
+            if (data.refreshToken) {
+                localStorage.setItem('rifah_tenant_refresh_token', data.refreshToken);
             }
 
             // Show success screen instead of immediate redirect

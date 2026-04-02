@@ -114,6 +114,7 @@ router.patch('/orders/:id/status', tenantOrderController.updateOrderStatus);
 router.patch('/orders/:id/payment', tenantOrderController.updatePaymentStatus);
 
 // Billing
+router.get('/bills/current-unpaid', tenantBillsController.getCurrentUnpaidBill);
 router.get('/bills', tenantBillsController.getBills);
 
 // Messaging

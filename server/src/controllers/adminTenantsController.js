@@ -151,7 +151,9 @@ const getTenantDetails = async (req, res) => {
 };
 
 /**
- * Approve tenant → set payment_pending, send payment link (48h window). Activation happens after payment.
+ * Approve tenant registration based on the selected package.
+ * Free packages activate immediately.
+ * Paid packages move to payment_pending and receive an initial invoice link.
  */
 const approveTenant = async (req, res) => {
     try {
@@ -174,38 +176,125 @@ const approveTenant = async (req, res) => {
             });
         }
 
+        const subscription = await db.TenantSubscription.findOne({
+            where: { tenantId: tenant.id },
+            include: [{ model: db.SubscriptionPackage, as: 'package' }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!subscription || !subscription.package) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tenant registration is missing a valid subscription package'
+            });
+        }
+
         const now = new Date();
         const paymentDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
+        const amount = parseFloat(subscription.amount || 0);
+        const locale = tenant?.settings?.language === 'en' ? 'en' : 'ar';
 
-        await tenant.update({
-            status: 'payment_pending',
-            paymentDueAt,
-            approvedAt: now,
-            approvedBy: req.adminId
-        });
+        if (amount <= 0) {
+            await tenant.update({
+                approvedAt: now,
+                approvedBy: req.adminId
+            });
 
-        // Log activity
-        await db.ActivityLog.create({
-            entityType: 'tenant',
-            entityId: tenant.id,
-            action: 'approved',
-            performedByType: 'super_admin',
-            performedById: req.adminId,
-            performedByName: req.adminName,
-            details: { notes, paymentDueAt },
-            ipAddress: req.ip,
-            userAgent: req.headers['user-agent']
-        });
+            const { activateTenantAfterPayment } = require('../utils/initializeTenantSubscription');
+            await activateTenantAfterPayment(tenant.id);
 
-        // Generate payment link with short-lived token (valid until paymentDueAt)
-        const jwt = require('jsonwebtoken');
-        const paymentToken = jwt.sign(
-            { tenantId: tenant.id, action: 'subscription_payment' },
-            process.env.JWT_SECRET,
-            { expiresIn: '48h' }
-        );
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: tenant.id,
+                action: 'approved',
+                performedByType: 'super_admin',
+                performedById: req.adminId,
+                performedByName: req.adminName,
+                details: {
+                    notes,
+                    paymentRequired: false,
+                    packageId: subscription.packageId,
+                    billingCycle: subscription.billingCycle
+                },
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
+            });
+
+            const { sendPaymentSuccessEmail } = require('../utils/emailService');
+            sendPaymentSuccessEmail(tenant).catch(err => {
+                console.error('[Approval] Failed to send activation email:', err.message);
+            });
+
+            return res.json({
+                success: true,
+                message: 'Tenant approved and activated successfully.',
+                tenant: await db.Tenant.findByPk(tenant.id)
+            });
+        }
+
+        const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
+        const billNumber = await generateBillNumber();
+        const paymentToken = generatePaymentToken();
         const baseUrl = getTenantDashboardBaseUrl();
-        const paymentUrl = `${baseUrl}/ar/payment?token=${paymentToken}`;
+        const paymentUrl = baseUrl
+            ? `${baseUrl}/${locale}/payment?token=${paymentToken}`
+            : `/${locale}/payment?token=${paymentToken}`;
+
+        const [updatedTenant, bill] = await db.sequelize.transaction(async (transaction) => {
+            await tenant.update({
+                status: 'payment_pending',
+                paymentDueAt,
+                approvedAt: now,
+                approvedBy: req.adminId
+            }, { transaction });
+
+            const createdBill = await db.Bill.create({
+                tenantId: tenant.id,
+                tenantSubscriptionId: subscription.id,
+                billNumber,
+                amount,
+                currency: subscription.currency || 'SAR',
+                dueDate: paymentDueAt.toISOString().slice(0, 10),
+                status: 'UNPAID',
+                paymentToken,
+                paymentTokenExpiresAt: paymentDueAt,
+                type: 'initial',
+                planSnapshot: {
+                    packageId: subscription.packageId,
+                    packageName: subscription.package?.name,
+                    packageNameAr: subscription.package?.name_ar,
+                    billingCycle: subscription.billingCycle
+                },
+                metadata: {
+                    createdFrom: 'tenant_approval',
+                    approvedBy: req.adminId,
+                    billingCycle: subscription.billingCycle
+                }
+            }, { transaction });
+
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: tenant.id,
+                action: 'approved',
+                performedByType: 'super_admin',
+                performedById: req.adminId,
+                performedByName: req.adminName,
+                details: {
+                    notes,
+                    paymentRequired: true,
+                    paymentDueAt,
+                    billId: createdBill.id,
+                    billNumber: createdBill.billNumber,
+                    packageId: subscription.packageId,
+                    billingCycle: subscription.billingCycle,
+                    amount
+                },
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
+            }, { transaction });
+
+            return [tenant, createdBill];
+        });
 
         const { sendApprovalEmail } = require('../utils/emailService');
         sendApprovalEmail(tenant, { paymentUrl, paymentDueAt }).catch(err => {
@@ -214,8 +303,14 @@ const approveTenant = async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Tenant approved. Payment link sent. Account will activate after payment within 48 hours.',
-            tenant
+            message: 'Tenant approved. Initial invoice created and payment link sent.',
+            tenant: updatedTenant,
+            bill: {
+                id: bill.id,
+                billNumber: bill.billNumber,
+                amount: parseFloat(bill.amount || 0),
+                paymentUrl
+            }
         });
 
     } catch (error) {
