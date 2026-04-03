@@ -43,6 +43,8 @@ router.post('/tenant/:tenantId/contact', publicTenantController.submitContactFor
 
 // Bill payment links
 router.get('/bills/by-token/:token', publicBillPaymentController.getBillByToken);
+router.get('/bills/by-token/:token/invoice-pdf', publicBillPaymentController.getInvoicePdfByToken);
+router.get('/bills/by-token/:token/receipt-pdf', publicBillPaymentController.getReceiptPdfByToken);
 router.post('/bills/by-token/:token/pay', publicBillPaymentController.payBillByToken);
 
 module.exports = router;

@@ -257,15 +257,47 @@
             </p>
 
             <div class="info-box">
-                <h3 class="ar">📊 معلومات حسابك</h3>
-                <h3 class="en">Your Account Information</h3>
+                <h3 class="ar">🧾 تفاصيل الفاتورة والاشتراك</h3>
+                <h3 class="en">Invoice & Subscription Details</h3>
                 <div class="info-row">
                     <span class="info-label">البريد الإلكتروني | Email:</span>
                     <span class="info-value">{{email}}</span>
                 </div>
                 <div class="info-row">
+                    <span class="info-label">الباقة | Package:</span>
+                    <span class="info-value">{{packageName}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">دورة الفوترة | Billing Cycle:</span>
+                    <span class="info-value">{{billingCycle}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">رقم الفاتورة | Invoice No.:</span>
+                    <span class="info-value">{{invoiceNumber}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">المجموع الفرعي | Subtotal:</span>
+                    <span class="info-value">{{subtotalAmountText}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">ضريبة القيمة المضافة | VAT:</span>
+                    <span class="info-value">{{vatAmountText}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">الإجمالي شامل الضريبة | Total:</span>
+                    <span class="info-value">{{totalAmountText}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">آخر موعد للدفع | Due By:</span>
+                    <span class="info-value">{{paymentDueText}}</span>
+                </div>
+                <div class="info-row">
                     <span class="info-label">رابط الدفع | Payment link:</span>
                     <span class="info-value"><a href="{{paymentUrl}}" style="color: #8B5ADF;">{{paymentUrl}}</a></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">ملف الفاتورة PDF | Invoice PDF:</span>
+                    <span class="info-value"><a href="{{invoicePdfUrl}}" style="color: #8B5ADF;">Open invoice</a></span>
                 </div>
             </div>
 

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../models');
 const {
     ensureInvoicePdf,
@@ -8,6 +10,8 @@ const {
     notifyTenantBillExpired,
     notifyTenantBillPaid
 } = require('../services/adminNotificationService');
+
+const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
 function getEffectiveExpiry(bill) {
     if (bill.paymentTokenExpiresAt) {
@@ -21,6 +25,22 @@ function getEffectiveExpiry(bill) {
 
 function isBillExpired(bill) {
     return getEffectiveExpiry(bill) < new Date();
+}
+
+function resolveBillDocumentPath(relativePath) {
+    if (!relativePath) return null;
+
+    const sanitizedRelativePath = relativePath
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .replace(/^uploads\//, '');
+    const absolutePath = path.resolve(UPLOADS_ROOT, sanitizedRelativePath);
+
+    if (!absolutePath.startsWith(UPLOADS_ROOT)) {
+        return null;
+    }
+
+    return absolutePath;
 }
 
 function getPeriodEnd(start, billingCycle) {
@@ -37,6 +57,65 @@ function getPeriodEnd(start, billingCycle) {
     return periodEnd;
 }
 
+async function serveBillDocumentByToken(req, res, documentField) {
+    try {
+        const { token } = req.params;
+        const bill = await db.Bill.findOne({
+            where: { paymentToken: token },
+            include: [
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'email', 'settings']
+                },
+                {
+                    model: db.TenantSubscription,
+                    as: 'subscription',
+                    include: [{ model: db.SubscriptionPackage, as: 'package' }]
+                }
+            ]
+        });
+
+        if (!bill) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invalid or expired payment link'
+            });
+        }
+
+        if (documentField === 'receiptPdfPath' && bill.status !== 'PAID') {
+            return res.status(400).json({
+                success: false,
+                message: 'Receipt is only available after payment'
+            });
+        }
+
+        const absolutePath = resolveBillDocumentPath(bill[documentField]);
+        if (absolutePath && fs.existsSync(absolutePath)) {
+            return res.sendFile(absolutePath);
+        }
+
+        const generatedDocument = documentField === 'receiptPdfPath'
+            ? await ensureReceiptPdf(bill)
+            : await ensureInvoicePdf(bill);
+
+        if (!generatedDocument?.absolutePath || !fs.existsSync(generatedDocument.absolutePath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Document not generated yet'
+            });
+        }
+
+        return res.sendFile(generatedDocument.absolutePath);
+    } catch (error) {
+        console.error(`serveBillDocumentByToken ${documentField} error:`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to load bill document'
+        });
+    }
+}
+
 exports.getBillByToken = async (req, res) => {
     try {
         const { token } = req.params;
@@ -47,7 +126,7 @@ exports.getBillByToken = async (req, res) => {
                 {
                     model: db.Tenant,
                     as: 'tenant',
-                    attributes: ['id', 'name', 'name_en', 'name_ar', 'email']
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'email', 'settings']
                 },
                 {
                     model: db.TenantSubscription,
@@ -96,6 +175,12 @@ exports.getBillByToken = async (req, res) => {
                     tenant: bill.tenant,
                     bill
                 });
+                if (bill.tenant?.email) {
+                    const { sendPaymentExpiredEmail } = require('../utils/emailService');
+                    sendPaymentExpiredEmail(bill.tenant, { bill }).catch(err => {
+                        console.error('[BillPayment] Expired email failed:', err.message);
+                    });
+                }
             }
 
             return res.status(400).json({
@@ -126,6 +211,10 @@ exports.getBillByToken = async (req, res) => {
         });
     }
 };
+
+exports.getInvoicePdfByToken = async (req, res) => serveBillDocumentByToken(req, res, 'invoicePdfPath');
+
+exports.getReceiptPdfByToken = async (req, res) => serveBillDocumentByToken(req, res, 'receiptPdfPath');
 
 exports.payBillByToken = async (req, res) => {
     try {
@@ -187,6 +276,12 @@ exports.payBillByToken = async (req, res) => {
                     tenant: bill.tenant,
                     bill
                 });
+                if (bill.tenant?.email) {
+                    const { sendPaymentExpiredEmail } = require('../utils/emailService');
+                    sendPaymentExpiredEmail(bill.tenant, { bill }).catch(err => {
+                        console.error('[BillPayment] Expired email failed:', err.message);
+                    });
+                }
             }
 
             return res.status(400).json({
@@ -318,7 +413,21 @@ exports.payBillByToken = async (req, res) => {
 
         if (shouldActivateTenant) {
             const { sendPaymentSuccessEmail } = require('../utils/emailService');
-            sendPaymentSuccessEmail(bill.tenant).catch(err => {
+            sendPaymentSuccessEmail(bill.tenant, {
+                bill: {
+                    ...bill.toJSON(),
+                    status: 'PAID',
+                    paidAt: now,
+                    paymentProvider: resolvedPaymentProvider,
+                    paymentReference: resolvedPaymentReference,
+                    paymentMethod: resolvedPaymentMethod,
+                    paymentCapturedAmount: targetAmount
+                },
+                packageName: bill.subscription?.package?.name,
+                billingCycle: targetBillingCycle,
+                periodStart: now,
+                periodEnd
+            }).catch(err => {
                 console.error('[BillPayment] Success email failed:', err.message);
             });
         }

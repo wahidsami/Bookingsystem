@@ -22,6 +22,7 @@
 <body>
     <div class="container">
         <div class="header">
+            <img src="RifahNewLogoWhite.png" alt="Rifah Platform Logo" style="max-width:180px;height:auto;margin-bottom:16px;" />
             <h1>تم الدفع بنجاح | Payment Successful</h1>
         </div>
         <div class="content">
@@ -29,8 +30,18 @@
             <p class="message">تم استلام دفعتك بنجاح. حسابك مفعّل الآن ويمكنك استخدام لوحة التحكم.</p>
             <p class="message">Your payment was received successfully. Your account is now active and you can use your dashboard.</p>
             <div class="info-box">
-                <p><strong>ابدأ الآن | Get started</strong></p>
-                <p>سجّل الدخول وأكمل إعداد صفحتك وخدماتك.</p>
+                <p><strong>تفاصيل السداد | Payment Details</strong></p>
+                <p><strong>رقم الفاتورة | Invoice No.:</strong> {{invoiceNumber}}</p>
+                <p><strong>الباقة | Package:</strong> {{packageName}}</p>
+                <p><strong>دورة الفوترة | Billing Cycle:</strong> {{billingCycle}}</p>
+                <p><strong>المجموع الفرعي | Subtotal:</strong> {{subtotalAmountText}}</p>
+                <p><strong>ضريبة القيمة المضافة | VAT:</strong> {{vatAmountText}}</p>
+                <p><strong>الإجمالي المدفوع | Paid Total:</strong> {{totalAmountText}}</p>
+                <p><strong>تاريخ السداد | Paid At:</strong> {{paidDateText}}</p>
+                <p><strong>فترة الاشتراك | Subscription Period:</strong> {{periodStartText}} → {{periodEndText}}</p>
+                <p><strong>إيصال السداد PDF | Paid Receipt PDF:</strong> <a href="{{receiptPdfUrl}}" style="color:#8B5ADF;">Open receipt</a></p>
+                <p><strong>فاتورة PDF | Invoice PDF:</strong> <a href="{{invoicePdfUrl}}" style="color:#8B5ADF;">Open invoice</a></p>
+                <p style="margin-top:18px;">سجّل الدخول وأكمل إعداد صفحتك وخدماتك.</p>
                 <p>Log in and complete your profile and services setup.</p>
                 <a href="{{loginUrl}}" class="cta-button">لوحة التحكم | Dashboard</a>
             </div>

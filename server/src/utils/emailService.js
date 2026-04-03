@@ -1,7 +1,11 @@
 const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
-const { getTenantDashboardLoginUrl, getStaffAppLoginUrl } = require('./url');
+const {
+    getServerPublicUrl,
+    getTenantDashboardLoginUrl,
+    getStaffAppLoginUrl
+} = require('./url');
 
 /**
  * Email Service Utility - Resend
@@ -56,7 +60,8 @@ const sendEmail = async (options) => {
         // Replace placeholders with actual data
         Object.keys(data).forEach(key => {
             const placeholder = new RegExp(`{{${key}}}`, 'g');
-            htmlContent = htmlContent.replace(placeholder, data[key] || '');
+            const value = data[key] === null || data[key] === undefined ? '' : String(data[key]);
+            htmlContent = htmlContent.replace(placeholder, value);
         });
 
         // Resend supports inline images via contentId; keep cid:logo in HTML
@@ -114,9 +119,13 @@ const sendEmail = async (options) => {
  * Send welcome email after registration
  */
 const sendWelcomeEmail = async (tenantData) => {
+    const locale = getTenantPreferredLocale(tenantData);
+
     return sendEmail({
         to: tenantData.email,
-        subject: 'Welcome to Rifah - Registration Received',
+        subject: locale === 'en'
+            ? 'Welcome to Rifah - Registration Received'
+            : 'مرحباً بك في رفاه - تم استلام طلب التسجيل',
         template: 'welcome',
         data: {
             tenantName: tenantData.name_en || tenantData.name,
@@ -132,24 +141,21 @@ const sendWelcomeEmail = async (tenantData) => {
  * @param {Object} [options] - { paymentUrl, paymentDueAt }
  */
 const sendApprovalEmail = async (tenantData, options = {}) => {
-    const loginUrl = getTenantDashboardLoginUrl('ar');
-    const paymentUrl = options.paymentUrl || process.env.TENANT_PAYMENT_LINK_URL || loginUrl;
-    const paymentDueAt = options.paymentDueAt;
-    const paymentDueText = paymentDueAt
-        ? new Date(paymentDueAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
-        : '48 hours';
+    const locale = getTenantPreferredLocale(tenantData);
+    const fallbackLoginUrl = getTenantDashboardLoginUrl(locale);
+    const paymentUrl = options.paymentUrl || process.env.TENANT_PAYMENT_LINK_URL || fallbackLoginUrl;
+    const data = buildBillingEmailData(tenantData, {
+        ...options,
+        paymentUrl
+    });
+
     return sendEmail({
         to: tenantData.email,
-        subject: 'Congratulations! Complete Your Payment – Rifah Account Approved ✨',
+        subject: locale === 'en'
+            ? `Rifah account approved - invoice ${data.invoiceNumber}`
+            : `تم قبول حساب رفاه - فاتورة ${data.invoiceNumber}`,
         template: 'approved',
-        data: {
-            tenantName: tenantData.name_en || tenantData.name,
-            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
-            email: tenantData.email,
-            loginUrl,
-            paymentUrl,
-            paymentDueText
-        }
+        data
     });
 };
 
@@ -157,9 +163,13 @@ const sendApprovalEmail = async (tenantData, options = {}) => {
  * Send rejection email
  */
 const sendRejectionEmail = async (tenantData, reason) => {
+    const locale = getTenantPreferredLocale(tenantData);
+
     return sendEmail({
         to: tenantData.email,
-        subject: 'Rifah Account Application Update',
+        subject: locale === 'en'
+            ? 'Rifah Account Application Update'
+            : 'تحديث طلب انضمامك إلى رفاه',
         template: 'rejected',
         data: {
             tenantName: tenantData.name_en || tenantData.name,
@@ -172,34 +182,38 @@ const sendRejectionEmail = async (tenantData, reason) => {
 /**
  * Send payment window expired email
  */
-const sendPaymentExpiredEmail = async (tenantData) => {
-    const supportEmail = process.env.SUPPORT_EMAIL || 'support@rifah.sa';
+const sendPaymentExpiredEmail = async (tenantData, options = {}) => {
+    const locale = getTenantPreferredLocale(tenantData);
+
     return sendEmail({
         to: tenantData.email,
-        subject: 'Rifah – Payment window expired',
+        subject: locale === 'en'
+            ? 'Rifah - Payment window expired'
+            : 'رفاه - انتهت مهلة الدفع',
         template: 'payment_expired',
-        data: {
-            tenantName: tenantData.name_en || tenantData.name,
-            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
-            supportEmail
-        }
+        data: buildBillingEmailData(tenantData, options)
     });
 };
 
 /**
  * Send payment success email (account active)
  */
-const sendPaymentSuccessEmail = async (tenantData) => {
-    const loginUrl = getTenantDashboardLoginUrl('ar');
+const sendPaymentSuccessEmail = async (tenantData, options = {}) => {
+    const locale = getTenantPreferredLocale(tenantData);
+    const data = buildBillingEmailData(tenantData, options);
+    const hasInvoiceNumber = data.invoiceNumber && data.invoiceNumber !== '-';
+
     return sendEmail({
         to: tenantData.email,
-        subject: 'Rifah – Payment successful, your account is active',
+        subject: locale === 'en'
+            ? (hasInvoiceNumber
+                ? `Rifah - Payment successful for ${data.invoiceNumber}`
+                : 'Rifah - Your account is active')
+            : (hasInvoiceNumber
+                ? `رفاه - تم السداد بنجاح للفاتورة ${data.invoiceNumber}`
+                : 'رفاه - تم تفعيل حسابك بنجاح'),
         template: 'payment_success',
-        data: {
-            tenantName: tenantData.name_en || tenantData.name,
-            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
-            loginUrl
-        }
+        data
     });
 };
 
@@ -207,17 +221,107 @@ const sendPaymentSuccessEmail = async (tenantData) => {
  * Send payment failed email (can retry within 48h)
  */
 const sendPaymentFailedEmail = async (tenantData) => {
-    const loginUrl = getTenantDashboardLoginUrl('ar');
+    const locale = getTenantPreferredLocale(tenantData);
+
     return sendEmail({
         to: tenantData.email,
-        subject: 'Rifah – Payment could not be completed',
+        subject: locale === 'en'
+            ? 'Rifah - Payment could not be completed'
+            : 'رفاه - تعذر إتمام الدفع',
         template: 'payment_failed',
-        data: {
-            tenantName: tenantData.name_en || tenantData.name,
-            tenantNameAr: tenantData.name_ar || tenantData.nameAr,
-            loginUrl
-        }
+        data: buildBillingEmailData(tenantData)
     });
+};
+
+const getTenantPreferredLocale = (tenantData = {}) =>
+    tenantData?.settings?.language === 'en' ? 'en' : 'ar';
+
+const formatBillingCycle = (cycle, locale = 'ar') => {
+    const labels = locale === 'en'
+        ? { monthly: 'Monthly', sixMonth: '6 Months', annual: 'Annual' }
+        : { monthly: 'شهري', sixMonth: 'كل 6 أشهر', annual: 'سنوي' };
+
+    return labels[cycle] || cycle || '-';
+};
+
+const formatMoney = (amount, currency = 'SAR', locale = 'ar') => {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) {
+        return '-';
+    }
+
+    return new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'ar-SA', {
+        style: 'currency',
+        currency: currency || 'SAR',
+        maximumFractionDigits: 2
+    }).format(numericAmount);
+};
+
+const formatDateTime = (value, locale = 'ar') => {
+    if (!value) return '-';
+
+    return new Date(value).toLocaleString(locale === 'en' ? 'en-GB' : 'ar-SA', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+    });
+};
+
+const formatDateOnly = (value, locale = 'ar') => {
+    if (!value) return '-';
+
+    return new Date(value).toLocaleDateString(locale === 'en' ? 'en-GB' : 'ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+};
+
+const getBillPlanName = (bill = {}, locale = 'ar') => {
+    if (locale === 'en') {
+        return bill?.planSnapshot?.packageName || bill?.planSnapshot?.packageNameAr || '-';
+    }
+
+    return bill?.planSnapshot?.packageNameAr || bill?.planSnapshot?.packageName || '-';
+};
+
+const getBillPdfUrl = (bill = {}, documentType = 'invoice') => {
+    if (!bill?.paymentToken) return '';
+
+    const publicUrl = getServerPublicUrl();
+    const pathName = `/api/v1/public/bills/by-token/${encodeURIComponent(bill.paymentToken)}/${documentType}-pdf`;
+
+    return publicUrl ? `${publicUrl}${pathName}` : pathName;
+};
+
+const buildBillingEmailData = (tenantData = {}, options = {}) => {
+    const locale = getTenantPreferredLocale(tenantData);
+    const loginUrl = getTenantDashboardLoginUrl(locale);
+    const bill = options.bill || {};
+    const billingCycle = options.billingCycle || bill?.planSnapshot?.billingCycle || '';
+    const subtotalAmount = bill?.subtotalAmount ?? bill?.amount ?? options.amount ?? 0;
+    const vatAmount = bill?.vatAmount ?? 0;
+    const totalAmount = bill?.totalAmount ?? bill?.amount ?? options.amount ?? 0;
+
+    return {
+        tenantName: tenantData.name_en || tenantData.name || '',
+        tenantNameAr: tenantData.name_ar || tenantData.nameAr || tenantData.name || '',
+        email: tenantData.email || '',
+        loginUrl,
+        paymentUrl: options.paymentUrl || '',
+        paymentDueText: formatDateTime(options.paymentDueAt, locale),
+        packageName: options.packageName || getBillPlanName(bill, locale),
+        billingCycle: formatBillingCycle(billingCycle, locale),
+        invoiceNumber: bill?.billNumber || '-',
+        subtotalAmountText: formatMoney(subtotalAmount, bill?.currency || options.currency || 'SAR', locale),
+        vatAmountText: formatMoney(vatAmount, bill?.currency || options.currency || 'SAR', locale),
+        totalAmountText: formatMoney(totalAmount, bill?.currency || options.currency || 'SAR', locale),
+        invoicePdfUrl: options.invoicePdfUrl || getBillPdfUrl(bill, 'invoice') || options.paymentUrl || loginUrl,
+        receiptPdfUrl: options.receiptPdfUrl || getBillPdfUrl(bill, 'receipt') || loginUrl,
+        paidDateText: formatDateTime(bill?.paidAt || options.paidAt, locale),
+        periodStartText: formatDateOnly(options.periodStart || bill?.invoiceIssuedAt, locale),
+        periodEndText: formatDateOnly(options.periodEnd || bill?.subscription?.currentPeriodEnd, locale),
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@rifah.sa'
+    };
 };
 
 const sendStaffInviteEmail = async ({ email, staffName, tenantName, temporaryPassword }) => {

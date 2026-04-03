@@ -30,8 +30,13 @@
             <p class="message">Payment could not be completed. You can try again before the link expires (48 hours).</p>
             <div class="info-box">
                 <p><strong>أعد المحاولة | Try again</strong></p>
+                <p><strong>رقم الفاتورة | Invoice No.:</strong> {{invoiceNumber}}</p>
+                <p><strong>الباقة | Package:</strong> {{packageName}}</p>
+                <p><strong>دورة الفوترة | Billing Cycle:</strong> {{billingCycle}}</p>
+                <p><strong>الإجمالي | Total:</strong> {{totalAmountText}}</p>
                 <p>يمكنك المحاولة مرة أخرى عبر الرابط في بريد الموافقة (خلال 48 ساعة)، أو تواصل مع الدعم للمساعدة.</p>
                 <p>You can try again via the link in your approval email (within 48 hours), or contact support for help.</p>
+                <a href="{{invoicePdfUrl}}" class="cta-button">الفاتورة PDF | Open Invoice</a>
                 <a href="{{loginUrl}}" class="cta-button">تسجيل الدخول | Login</a>
             </div>
         </div>

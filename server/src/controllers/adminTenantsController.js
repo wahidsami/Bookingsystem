@@ -263,7 +263,13 @@ const approveTenant = async (req, res) => {
             });
 
             const { sendPaymentSuccessEmail } = require('../utils/emailService');
-            sendPaymentSuccessEmail(tenant).catch(err => {
+            sendPaymentSuccessEmail(tenant, {
+                packageName: subscription.package?.name,
+                billingCycle: subscription.billingCycle,
+                amount: 0,
+                periodStart: subscription.currentPeriodStart,
+                periodEnd: subscription.currentPeriodEnd
+            }).catch(err => {
                 console.error('[Approval] Failed to send activation email:', err.message);
             });
 
@@ -378,7 +384,13 @@ const approveTenant = async (req, res) => {
         ensureInvoicePdf(bill).catch(err => {
             console.error('[Approval] Failed to generate invoice PDF:', err.message);
         });
-        sendApprovalEmail(tenant, { paymentUrl, paymentDueAt }).catch(err => {
+        sendApprovalEmail(tenant, {
+            paymentUrl,
+            paymentDueAt,
+            bill,
+            packageName: subscription.package?.name,
+            billingCycle: subscription.billingCycle
+        }).catch(err => {
             console.error('[Approval] Failed to send approval email:', err.message);
         });
 
