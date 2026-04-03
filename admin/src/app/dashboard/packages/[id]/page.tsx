@@ -15,7 +15,6 @@ const RESOURCE_PRICE_MAP: Record<string, { featureKey: string; multiplier?: numb
 };
 
 const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boolean }> = {
-    hasSubscriptionFee: { featureKey: 'subscriptionFee', isBoolean: true },
     hasProductsAndOrders: { featureKey: 'productsAndOrders', isBoolean: true },
     hasInternalMessaging: { featureKey: 'internalMessaging', isBoolean: true },
     reports: { featureKey: 'reports', isBoolean: true },
@@ -40,12 +39,12 @@ const defaultFormData = {
     displayOrder: '0',
     isActive: true,
     isFeatured: false,
+    subscriptionFeeAmount: '0',
     maxBookingsPerMonth: '100',
     maxStaff: '5',
     maxServices: '20',
     maxProducts: '10',
     storageGB: '2',
-    hasSubscriptionFee: true,
     hasProductsAndOrders: false,
     hasInternalMessaging: false,
     reports: false,
@@ -109,12 +108,12 @@ export default function EditPackagePage() {
                 displayOrder: toStr(pkg.displayOrder, '0'),
                 isActive: pkg.isActive !== false,
                 isFeatured: pkg.isFeatured === true,
+                subscriptionFeeAmount: toStr(limits.subscriptionFeeAmount, limits.hasSubscriptionFee ? '0' : '0'),
                 maxBookingsPerMonth: toStr(limits.maxBookingsPerMonth, '100'),
                 maxStaff: toStr(limits.maxStaff, '5'),
                 maxServices: toStr(limits.maxServices, '20'),
                 maxProducts: toStr(limits.maxProducts, '10'),
                 storageGB: toStr(limits.storageGB, '2'),
-                hasSubscriptionFee: toBool(limits.hasSubscriptionFee, true),
                 hasProductsAndOrders: toBool(limits.hasProductsAndOrders, false),
                 hasInternalMessaging: toBool(limits.hasInternalMessaging, false),
                 reports: toBool(limits.reports ?? limits.hasAdvancedReports ?? limits.advancedAnalytics, false),
@@ -170,8 +169,10 @@ export default function EditPackagePage() {
 
     const featuresTotal = Object.keys(FEATURES_PRICE_MAP).reduce((sum, key) => sum + getFeatureItemCost(key), 0);
 
+    const subscriptionFeeAmount = Math.max(0, parseFloat(formData.subscriptionFeeAmount) || 0);
+
     const commissionPct = parseFloat(formData.platformCommission) || 0;
-    const rawCostAmountA = resourceLimitsTotal + featuresTotal;
+    const rawCostAmountA = subscriptionFeeAmount + resourceLimitsTotal + featuresTotal;
     const costWithCommissionAmountB = rawCostAmountA + (rawCostAmountA * (commissionPct / 100));
     const finalMonthlyPrice = costWithCommissionAmountB + (costWithCommissionAmountB * 0.15);
     const finalSixMonthPrice = (costWithCommissionAmountB * 6) + ((costWithCommissionAmountB * 6) * 0.15);
@@ -182,6 +183,7 @@ export default function EditPackagePage() {
         setLoading(true);
         try {
             const limits = {
+                subscriptionFeeAmount,
                 maxBookingsPerMonth: formData.maxBookingsPerMonth === '-1' ? -1 : parseInt(formData.maxBookingsPerMonth),
                 maxStaff: formData.maxStaff === '-1' ? -1 : parseInt(formData.maxStaff),
                 maxServices: formData.maxServices === '-1' ? -1 : parseInt(formData.maxServices),
@@ -189,7 +191,7 @@ export default function EditPackagePage() {
                     ? (formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts))
                     : 0,
                 storageGB: parseInt(formData.storageGB),
-                hasSubscriptionFee: formData.hasSubscriptionFee,
+                hasSubscriptionFee: subscriptionFeeAmount > 0,
                 hasProductsAndOrders: formData.hasProductsAndOrders,
                 hasInternalMessaging: formData.hasInternalMessaging,
                 reports: formData.reports,
@@ -334,8 +336,21 @@ export default function EditPackagePage() {
 
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
                             <h2 className="text-lg font-semibold text-white mb-4">Pricing Calculation (SAR)</h2>
-                            <p className="text-sm text-dark-400 mb-6">Prices are automatically calculated from limits & features, plus the platform commission, and 15% VAT (ضريبة القيمة المضافة).</p>
+                            <p className="text-sm text-dark-400 mb-6">Monthly subscription fee, limits, and feature costs are summed first, then platform commission and 15% VAT are applied.</p>
                             <div className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">Base Subscription Fee / Month</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={formData.subscriptionFeeAmount}
+                                        onChange={(e) => setFormData({ ...formData, subscriptionFeeAmount: e.target.value })}
+                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                    <p className="text-xs text-dark-400 mt-1">Manual subscription fee charged for this package before commission and VAT.</p>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-dark-300 mb-1">Platform Commission (%)</label>
                                     <input
@@ -447,7 +462,6 @@ export default function EditPackagePage() {
                             </div>
                             <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-2 border-b border-dark-700 pb-6">
                                 {[
-                                    { key: 'hasSubscriptionFee', label: 'Subscription Fee' },
                                     { key: 'hasProductsAndOrders', label: 'Products & Orders (E-commerce)' },
                                     { key: 'hasInternalMessaging', label: 'Internal Messaging' },
                                     { key: 'reports', label: 'Reports & Analytics' },

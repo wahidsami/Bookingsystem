@@ -427,7 +427,7 @@ function FeaturePricingTab() {
             setLoading(true);
             const response = await adminApi.getFeaturePricing();
             if (response.success) {
-                setFeatures(response.features);
+                setFeatures((response.features || []).filter((feature: any) => feature.featureKey !== 'subscriptionFee'));
             }
         } catch (err: any) {
             setError(err.message || "Failed to load feature pricing");
@@ -486,7 +486,7 @@ function FeaturePricingTab() {
             <div>
                 <h3 className="text-lg font-semibold text-white">Features Pricing Master List</h3>
                 <p className="text-sm text-dark-400">
-                    Set the baseline unit cost for all platform features. These prices are used in the Package Builder.
+                    Set the baseline unit cost for package features. Base subscription fee is configured directly inside each package.
                 </p>
             </div>
 

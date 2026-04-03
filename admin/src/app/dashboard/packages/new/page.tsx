@@ -16,7 +16,6 @@ const RESOURCE_PRICE_MAP: Record<string, { featureKey: string; multiplier?: numb
 
 // Mapping for standard platform features
 const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boolean }> = {
-    hasSubscriptionFee: { featureKey: 'subscriptionFee', isBoolean: true },
     hasProductsAndOrders: { featureKey: 'productsAndOrders', isBoolean: true },
     hasInternalMessaging: { featureKey: 'internalMessaging', isBoolean: true },
     reports: { featureKey: 'reports', isBoolean: true },
@@ -58,13 +57,13 @@ export default function NewPackagePage() {
         isActive: true,
         isFeatured: false,
         // Limits
+        subscriptionFeeAmount: '0',
         maxBookingsPerMonth: '100',
         maxStaff: '5',
         maxServices: '20',
         maxProducts: '10',
         storageGB: '2',
         // Features
-        hasSubscriptionFee: true,
         hasProductsAndOrders: false,
         hasInternalMessaging: false,
         reports: false,
@@ -121,8 +120,10 @@ export default function NewPackagePage() {
     // Total cost for all features
     const featuresTotal = Object.keys(FEATURES_PRICE_MAP).reduce((sum, key) => sum + getFeatureItemCost(key), 0);
 
+    const subscriptionFeeAmount = Math.max(0, parseFloat(formData.subscriptionFeeAmount) || 0);
+
     // --- AUTO-CALCULATED PRICING ---
-    const rawCostAmountA = resourceLimitsTotal + featuresTotal;
+    const rawCostAmountA = subscriptionFeeAmount + resourceLimitsTotal + featuresTotal;
     const commissionPct = parseFloat(formData.platformCommission) || 0;
     const costWithCommissionAmountB = rawCostAmountA + (rawCostAmountA * (commissionPct / 100));
 
@@ -137,6 +138,7 @@ export default function NewPackagePage() {
         try {
             // Build limits object
             const limits = {
+                subscriptionFeeAmount,
                 maxBookingsPerMonth: formData.maxBookingsPerMonth === '-1' ? -1 : parseInt(formData.maxBookingsPerMonth),
                 maxStaff: formData.maxStaff === '-1' ? -1 : parseInt(formData.maxStaff),
                 maxServices: formData.maxServices === '-1' ? -1 : parseInt(formData.maxServices),
@@ -145,7 +147,7 @@ export default function NewPackagePage() {
                     : 0,
                 storageGB: parseInt(formData.storageGB),
                 // Feature Booleans
-                hasSubscriptionFee: formData.hasSubscriptionFee,
+                hasSubscriptionFee: subscriptionFeeAmount > 0,
                 hasProductsAndOrders: formData.hasProductsAndOrders,
                 hasInternalMessaging: formData.hasInternalMessaging,
                 reports: formData.reports,
@@ -294,9 +296,24 @@ export default function NewPackagePage() {
                         {/* Pricing */}
                         <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700">
                             <h2 className="text-lg font-semibold text-white mb-4">Pricing Calculation (SAR)</h2>
-                            <p className="text-sm text-dark-400 mb-6">Prices are automatically calculated from limits & features, plus the platform commission, and 15% VAT (ضريبة القيمة المضافة).</p>
+                            <p className="text-sm text-dark-400 mb-6">Monthly subscription fee, limits, and feature costs are summed first, then platform commission and 15% VAT are applied.</p>
 
                             <div className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-dark-300 mb-1">
+                                        Base Subscription Fee / Month
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={formData.subscriptionFeeAmount}
+                                        onChange={(e) => setFormData({ ...formData, subscriptionFeeAmount: e.target.value })}
+                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                    <p className="text-xs text-dark-400 mt-1">Manual subscription fee charged for this package before commission and VAT.</p>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-dark-300 mb-1">
                                         Platform Commission (%)
@@ -431,7 +448,6 @@ export default function NewPackagePage() {
                             {/* Checkbox Features (Monthly Cost) */}
                             <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-2 border-b border-dark-700 pb-6">
                                 {[
-                                    { key: 'hasSubscriptionFee', label: 'Subscription Fee' },
                                     { key: 'hasProductsAndOrders', label: 'Products & Orders (E-commerce)' },
                                     { key: 'hasInternalMessaging', label: 'Internal Messaging' },
                                     { key: 'reports', label: 'Reports & Analytics' },

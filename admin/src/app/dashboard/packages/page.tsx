@@ -51,7 +51,11 @@ function getKeyLimitsList(limits: any): { label: string; value: string }[] {
         list.push({ label: 'Storage', value: `${limits.storageGB} GB` });
 
     // Boolean features — only list if true (included)
-    if (limits.hasSubscriptionFee === true) list.push({ label: 'Subscription fee', value: 'Included' });
+    if (isIncludedNum(limits.subscriptionFeeAmount)) {
+        list.push({ label: 'Subscription fee', value: `SAR ${limits.subscriptionFeeAmount} /mo` });
+    } else if (limits.hasSubscriptionFee === true) {
+        list.push({ label: 'Subscription fee', value: 'Included' });
+    }
     if (limits.hasProductsAndOrders === true) list.push({ label: 'Products & orders', value: 'Included' });
     if (limits.hasInternalMessaging === true) list.push({ label: 'Internal messaging', value: 'Included' });
     if (limits.hasNewToRefah === true)
