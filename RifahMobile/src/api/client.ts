@@ -168,12 +168,13 @@ export interface Staff {
 
 export interface Booking {
     id: string;
+    bookingNumber?: string | null;
     serviceId: string;
     staffId: string;
     platformUserId: string;
     startTime: string;
     endTime: string;
-    status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+    status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'cancelled' | 'completed' | 'no_show';
     price: number;
     paymentStatus?: string;
     paymentMethod?: string;
@@ -606,7 +607,7 @@ class ApiClient {
         }
 
         if (status === 'upcoming') {
-            return normalized.filter((appointment) => ['pending', 'confirmed'].includes(appointment.status));
+            return normalized.filter((appointment) => ['pending', 'confirmed', 'checked_in', 'in_service'].includes(appointment.status));
         }
 
         if (status === 'completed') {

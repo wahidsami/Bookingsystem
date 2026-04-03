@@ -111,7 +111,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 
         try {
             setLoading(true);
-            const response = await api.post<{ success: boolean; appointment: { id: string; price: number } }>('/bookings/create', {
+            const response = await api.post<{ success: boolean; appointment: { id: string; bookingNumber?: string | null; price: number } }>('/bookings/create', {
                 serviceId: service.id,
                 tenantId: tenant.id,
                 staffId: selectedTime.staffId || selectedStaff?.id || undefined,
@@ -119,25 +119,33 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             });
 
             const appointmentId = response.appointment?.id;
+            const bookingNumber = response.appointment?.bookingNumber || appointmentId?.slice(0, 8)?.toUpperCase();
             const bookingAmount = Number(response.appointment?.price ?? getServicePrice(service));
+            const successTitle = language === 'ar' ? 'تم تأكيد الحجز' : 'Booking Confirmed';
+            const successMessage = language === 'ar'
+                ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.\nيمكنك الدفع الآن أو لاحقاً من حجوزاتي.`
+                : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.\nYou can pay now or later from My Appointments.`;
+            const payLaterLabel = language === 'ar' ? 'الدفع لاحقاً' : 'Pay Later';
+            const payNowLabel = language === 'ar' ? 'الدفع الآن' : 'Pay Now';
+            const viewBookingsLabel = language === 'ar' ? 'عرض حجوزاتي' : 'View My Bookings';
 
             Alert.alert(
-                'Booking Confirmed',
-                'Your appointment has been scheduled successfully. You can pay now or later from My Appointments.',
+                successTitle,
+                successMessage,
                 [
                     {
-                        text: 'Pay Later',
+                        text: payLaterLabel,
                         onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
                     },
                     appointmentId ? {
-                        text: 'Pay Now',
+                        text: payNowLabel,
                         onPress: () => navigation.navigate('Payment', {
                             appointmentId,
                             amount: bookingAmount,
                             tenantId: tenant.id,
                         }),
                     } : {
-                        text: 'View My Bookings',
+                        text: viewBookingsLabel,
                         onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
                     },
                 ]
