@@ -47,6 +47,7 @@ export default function UnifiedPaymentPage() {
   const [billSession, setBillSession] = useState<BillSession | null>(null);
   const [error, setError] = useState("");
   const [payError, setPayError] = useState("");
+  const [paySuccess, setPaySuccess] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -56,6 +57,7 @@ export default function UnifiedPaymentPage() {
         setLoading(true);
         setError("");
         setPayError("");
+        setPaySuccess("");
 
         if (!token) {
           try {
@@ -129,6 +131,7 @@ export default function UnifiedPaymentPage() {
 
   const handlePay = async (success: boolean) => {
     setPayError("");
+    setPaySuccess("");
     setPaying(true);
 
     try {
@@ -154,18 +157,33 @@ export default function UnifiedPaymentPage() {
           return;
         }
 
+        setPaySuccess(
+          locale === "ar"
+            ? "تم الدفع بنجاح. يتم تحويلك الآن..."
+            : "Payment completed successfully. Redirecting..."
+        );
+
         const hasActiveTenantSession = typeof window !== "undefined"
           && Boolean(sessionStorage.getItem("rifah_tenant_access_token"));
 
-        router.push(hasActiveTenantSession
-          ? `/${locale}/dashboard/subscription`
-          : `/${locale}/login`);
+        setTimeout(() => {
+          router.push(hasActiveTenantSession
+            ? `/${locale}/dashboard/subscription`
+            : `/${locale}/login`);
+        }, 1200);
         return;
       }
 
       const data = await tenantApi.submitSubscriptionPayment(success, token || undefined);
       if (data.success && data.status === "active") {
-        router.push(`/${locale}/dashboard`);
+        setPaySuccess(
+          locale === "ar"
+            ? "تم الدفع وتفعيل الحساب بنجاح. يتم تحويلك إلى لوحة التحكم..."
+            : "Payment successful and account activated. Redirecting to dashboard..."
+        );
+        setTimeout(() => {
+          router.push(`/${locale}/dashboard`);
+        }, 1200);
         return;
       }
 
@@ -262,6 +280,12 @@ export default function UnifiedPaymentPage() {
         {payError && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             {payError}
+          </div>
+        )}
+
+        {paySuccess && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            {paySuccess}
           </div>
         )}
 
