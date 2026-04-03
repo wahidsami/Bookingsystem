@@ -4,16 +4,52 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
 
+type AdminSettingsState = {
+  serviceCommissionRate: number;
+  productCommissionRate: number;
+  taxRate: number;
+  invoiceSellerNameAr: string;
+  invoiceSellerNameEn: string;
+  invoiceVatNumber: string;
+  invoiceCrNumber: string;
+  invoiceAddressAr: string;
+  invoiceAddressEn: string;
+  invoiceCity: string;
+  invoiceCountry: string;
+  invoiceEmail: string;
+  invoicePhone: string;
+  invoicePrefix: string;
+  invoiceFooterNoteAr: string;
+  invoiceFooterNoteEn: string;
+  invoiceLogoPath: string;
+};
+
+const DEFAULT_SETTINGS: AdminSettingsState = {
+  serviceCommissionRate: 10,
+  productCommissionRate: 10,
+  taxRate: 15,
+  invoiceSellerNameAr: "رفاه",
+  invoiceSellerNameEn: "Refah",
+  invoiceVatNumber: "",
+  invoiceCrNumber: "",
+  invoiceAddressAr: "",
+  invoiceAddressEn: "",
+  invoiceCity: "Riyadh",
+  invoiceCountry: "Saudi Arabia",
+  invoiceEmail: "",
+  invoicePhone: "",
+  invoicePrefix: "INV",
+  invoiceFooterNoteAr: "",
+  invoiceFooterNoteEn: "",
+  invoiceLogoPath: "",
+};
+
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [settings, setSettings] = useState({
-    serviceCommissionRate: 10.00,
-    productCommissionRate: 10.00,
-    taxRate: 15.00
-  });
+  const [settings, setSettings] = useState<AdminSettingsState>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     loadSettings();
@@ -24,7 +60,24 @@ export default function SettingsPage() {
       setLoading(true);
       const response = await adminApi.getSettings();
       if (response.success) {
-        setSettings(response.settings);
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...(response.settings || {}),
+          invoiceSellerNameAr: response.settings?.invoiceSellerNameAr || "",
+          invoiceSellerNameEn: response.settings?.invoiceSellerNameEn || "",
+          invoiceVatNumber: response.settings?.invoiceVatNumber || "",
+          invoiceCrNumber: response.settings?.invoiceCrNumber || "",
+          invoiceAddressAr: response.settings?.invoiceAddressAr || "",
+          invoiceAddressEn: response.settings?.invoiceAddressEn || "",
+          invoiceCity: response.settings?.invoiceCity || "",
+          invoiceCountry: response.settings?.invoiceCountry || "Saudi Arabia",
+          invoiceEmail: response.settings?.invoiceEmail || "",
+          invoicePhone: response.settings?.invoicePhone || "",
+          invoicePrefix: response.settings?.invoicePrefix || "INV",
+          invoiceFooterNoteAr: response.settings?.invoiceFooterNoteAr || "",
+          invoiceFooterNoteEn: response.settings?.invoiceFooterNoteEn || "",
+          invoiceLogoPath: response.settings?.invoiceLogoPath || "",
+        });
       }
     } catch (err: any) {
       console.error("Failed to load settings:", err);
@@ -34,11 +87,11 @@ export default function SettingsPage() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setSettings(prev => ({
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    setSettings((prev) => ({
       ...prev,
-      [name]: parseFloat(value) || 0
+      [name]: type === "number" ? Number.parseFloat(value) || 0 : value,
     }));
   };
 
@@ -206,6 +259,199 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
+                <div className="pt-4 border-t border-dark-700">
+                  <p className="text-sm font-semibold text-white">Official Invoice Identity</p>
+                  <p className="text-xs text-dark-400 mt-1">
+                    These values are copied into each newly issued Refah VAT invoice snapshot and QR metadata.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Seller Legal Name (Arabic)
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceSellerNameAr"
+                      value={settings.invoiceSellerNameAr}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="رفاه"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Seller Legal Name (English)
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceSellerNameEn"
+                      value={settings.invoiceSellerNameEn}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="Refah"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      VAT Number
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceVatNumber"
+                      value={settings.invoiceVatNumber}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="Enter VAT number when issued"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Commercial Registration No.
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceCrNumber"
+                      value={settings.invoiceCrNumber}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="CR number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice City
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceCity"
+                      value={settings.invoiceCity}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="Riyadh"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Country
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceCountry"
+                      value={settings.invoiceCountry}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="Saudi Arabia"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Email
+                    </label>
+                    <input
+                      type="email"
+                      name="invoiceEmail"
+                      value={settings.invoiceEmail}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="billing@refah.sa"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Phone
+                    </label>
+                    <input
+                      type="text"
+                      name="invoicePhone"
+                      value={settings.invoicePhone}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="+966..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Prefix
+                    </label>
+                    <input
+                      type="text"
+                      name="invoicePrefix"
+                      value={settings.invoicePrefix}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="INV"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Logo Path
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceLogoPath"
+                      value={settings.invoiceLogoPath}
+                      onChange={handleChange}
+                      className="input"
+                      placeholder="/uploads/logo-white.png"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-dark-400 mb-2">
+                    National Address (Arabic)
+                  </label>
+                  <textarea
+                    name="invoiceAddressAr"
+                    value={settings.invoiceAddressAr}
+                    onChange={handleChange}
+                    className="input min-h-[84px]"
+                    placeholder="العنوان الوطني لشركة رفاه"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-dark-400 mb-2">
+                    National Address (English)
+                  </label>
+                  <textarea
+                    name="invoiceAddressEn"
+                    value={settings.invoiceAddressEn}
+                    onChange={handleChange}
+                    className="input min-h-[84px]"
+                    placeholder="Refah legal national address"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Footer Note (Arabic)
+                    </label>
+                    <textarea
+                      name="invoiceFooterNoteAr"
+                      value={settings.invoiceFooterNoteAr}
+                      onChange={handleChange}
+                      className="input min-h-[84px]"
+                      placeholder="ملاحظة تظهر أسفل الفاتورة"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-dark-400 mb-2">
+                      Invoice Footer Note (English)
+                    </label>
+                    <textarea
+                      name="invoiceFooterNoteEn"
+                      value={settings.invoiceFooterNoteEn}
+                      onChange={handleChange}
+                      className="input min-h-[84px]"
+                      placeholder="Footer note shown at the bottom of invoices"
+                    />
+                  </div>
+                </div>
+
                 <div className="pt-4">
                   <button
                     type="submit"
@@ -300,7 +546,7 @@ export default function SettingsPage() {
               <h4 className="text-white font-semibold">Settings Management Coming Soon</h4>
               <p className="text-dark-400 text-sm mt-1">
                 Full settings management including pricing plans, commission rates, admin user
-                management, and platform configuration will be available in the next update.
+                management, and platform configuration is being rolled out progressively. Invoice identity and VAT fields are now configurable for new invoice snapshots.
               </p>
             </div>
           </div>

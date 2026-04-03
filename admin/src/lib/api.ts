@@ -280,11 +280,11 @@ class AdminApi {
 
   // Settings
   async getSettings() {
-    return this.request<{ success: boolean; settings: { serviceCommissionRate: number; productCommissionRate: number; taxRate: number; updatedAt: string } }>('/admin/settings');
+    return this.request<{ success: boolean; settings: any }>('/admin/settings');
   }
 
-  async updateSettings(settings: { serviceCommissionRate: number; productCommissionRate: number; taxRate: number }) {
-    return this.request<{ success: boolean; message: string; settings: { serviceCommissionRate: number; productCommissionRate: number; taxRate: number; updatedAt: string } }>('/admin/settings', 'PUT', { body: settings });
+  async updateSettings(settings: Record<string, any>) {
+    return this.request<{ success: boolean; message: string; settings: any }>('/admin/settings', 'PUT', { body: settings });
   }
 
   // Financial Reporting

@@ -1,5 +1,10 @@
 const db = require('../models');
+const { randomUUID } = require('crypto');
 const { normalizePackageEntitlements } = require('./packageEntitlements');
+const {
+    buildZatcaPhase1QrPayload,
+    formatSaudiIsoTimestamp
+} = require('./zatcaInvoiceQr');
 
 const BILLING_CYCLE_MONTHS = {
     monthly: 1,
@@ -217,6 +222,15 @@ async function buildSubscriptionInvoiceSnapshot({
         ? new Date(subscription.currentPeriodEnd)
         : getCycleEndDate(periodStart, selectedCycle);
     const invoiceLocale = getTenantLanguage(tenant);
+    const invoiceUuid = randomUUID();
+    const zatcaInvoiceTimestamp = formatSaudiIsoTimestamp(issueDate);
+    const zatcaQrPayload = buildZatcaPhase1QrPayload({
+        sellerName: sellerSnapshot.sellerNameAr || sellerSnapshot.sellerNameEn || 'Refah',
+        vatNumber: sellerSnapshot.vatNumber || '',
+        invoiceTimestamp: issueDate,
+        totalAmount: finalTotalAmount,
+        vatAmount
+    });
 
     return {
         amount: finalTotalAmount,
@@ -271,9 +285,25 @@ async function buildSubscriptionInvoiceSnapshot({
         },
         metadata: {
             invoiceLanguage: invoiceLocale,
+            invoiceUuid,
             dueDate,
             issueDate: issueDate.toISOString(),
-            sellerTaxRate: vatRate
+            sellerTaxRate: vatRate,
+            zatca: {
+                enabled: true,
+                profile: 'reporting-readiness',
+                phase: 'phase_1_qr_tlv',
+                standard: 'TLV_BASE64',
+                qrTags: ['seller_name', 'seller_vat_number', 'invoice_timestamp', 'invoice_total', 'vat_total'],
+                sellerName: sellerSnapshot.sellerNameAr || sellerSnapshot.sellerNameEn || 'Refah',
+                sellerVatNumber: sellerSnapshot.vatNumber || null,
+                invoiceUuid,
+                invoiceTimestamp: zatcaInvoiceTimestamp,
+                qrPayload: zatcaQrPayload,
+                xmlDocumentStatus: 'not_generated',
+                clearanceStatus: 'not_integrated',
+                complianceNote: 'Stores Phase 1 QR-ready invoice metadata only. ZATCA XML/UBL clearance/reporting is not integrated yet.'
+            }
         }
     };
 }

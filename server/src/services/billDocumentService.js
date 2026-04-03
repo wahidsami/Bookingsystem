@@ -3,6 +3,7 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const db = require('../models');
 const { serializeBill, toNumber } = require('../utils/invoiceSnapshotBuilder');
+const { generateZatcaQrImageBuffer } = require('../utils/zatcaInvoiceQr');
 
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 const billsRoot = path.join(uploadsRoot, 'bills');
@@ -254,6 +255,85 @@ function drawLineItems(doc, bill) {
     });
 }
 
+function drawZatcaQrPanel(doc, bill, qrImageBuffer) {
+    const zatca = bill.metadata?.zatca || {};
+
+    doc.roundedRect(36, 600, 524, 126, 16).fill('#FFFFFF').stroke('#E2E8F0');
+
+    doc.fillColor('#7C3AED')
+        .fontSize(11)
+        .text('رمز QR للفاتورة | ZATCA QR Code', 178, 616, {
+            width: 360,
+            align: 'right'
+        });
+
+    doc.fillColor('#475569')
+        .fontSize(8)
+        .text(
+            'جاهزية TLV للمرحلة الأولى فقط | Phase 1 TLV-ready metadata only',
+            178,
+            634,
+            {
+                width: 360,
+                align: 'right'
+            }
+        );
+
+    drawLabelValue(
+        doc,
+        366,
+        654,
+        172,
+        'UUID الفاتورة',
+        'Invoice UUID',
+        zatca.invoiceUuid || bill.metadata?.invoiceUuid || '-',
+        { labelSize: 7, valueSize: 8 }
+    );
+    drawLabelValue(
+        doc,
+        178,
+        654,
+        170,
+        'وقت الإصدار',
+        'Issue Timestamp',
+        zatca.invoiceTimestamp || '-',
+        { labelSize: 7, valueSize: 8 }
+    );
+    drawLabelValue(
+        doc,
+        178,
+        686,
+        360,
+        'حالة تكامل ZATCA',
+        'ZATCA Integration Status',
+        zatca.clearanceStatus || 'not_integrated',
+        { labelSize: 7, valueSize: 8 }
+    );
+
+    if (qrImageBuffer) {
+        try {
+            doc.image(qrImageBuffer, 56, 616, {
+                fit: [96, 96]
+            });
+        } catch (error) {
+            doc.fillColor('#DC2626')
+                .fontSize(8)
+                .text('QR unavailable', 56, 660, {
+                    width: 96,
+                    align: 'center'
+                });
+        }
+    } else {
+        doc.roundedRect(56, 618, 96, 96, 12).stroke('#CBD5E1');
+        doc.fillColor('#64748B')
+            .fontSize(8)
+            .text('No QR payload', 64, 656, {
+                width: 80,
+                align: 'center'
+            });
+    }
+}
+
 function drawFooter(doc, bill) {
     const footerNote = [
         bill.sellerSnapshot?.footerNoteAr,
@@ -265,7 +345,7 @@ function drawFooter(doc, bill) {
         .text(
             footerNote || 'شكراً لاختياركم رفاه | Thank you for choosing Refah',
             36,
-            760,
+            786,
             {
                 width: 524,
                 align: 'center'
@@ -276,6 +356,7 @@ function drawFooter(doc, bill) {
 async function renderBillPdf(billRecord, documentKind = 'invoice') {
     const bill = serializeBill(billRecord, { includePaymentToken: true });
     const { relativePath, absolutePath } = getDocumentPaths(bill, documentKind);
+    const qrImageBuffer = await generateZatcaQrImageBuffer(bill.metadata?.zatca?.qrPayload);
 
     ensureDirectory(path.dirname(absolutePath));
 
@@ -305,6 +386,7 @@ async function renderBillPdf(billRecord, documentKind = 'invoice') {
         drawPartyCards(doc, bill);
         drawInvoiceMeta(doc, bill);
         drawLineItems(doc, bill);
+        drawZatcaQrPanel(doc, bill, qrImageBuffer);
         drawFooter(doc, bill);
 
         if (documentKind === 'receipt') {
@@ -313,7 +395,7 @@ async function renderBillPdf(billRecord, documentKind = 'invoice') {
                 .text(
                     `تم الدفع | Paid on ${formatDateTime(bill.paidAt)} | ${bill.paymentProvider || '-'} | ${bill.paymentReference || '-'}`,
                     36,
-                    600,
+                    730,
                     {
                         width: 524,
                         align: 'center'
@@ -325,7 +407,7 @@ async function renderBillPdf(billRecord, documentKind = 'invoice') {
                 .text(
                     'يرجى سداد الفاتورة قبل تاريخ الاستحقاق | Please pay this invoice before the due date',
                     36,
-                    600,
+                    730,
                     {
                         width: 524,
                         align: 'center'

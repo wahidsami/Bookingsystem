@@ -5,6 +5,13 @@
 
 const db = require('../models');
 
+function normalizeOptionalText(value) {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const normalized = value.toString().trim();
+    return normalized || null;
+}
+
 function serializeSettings(settings) {
     return {
         serviceCommissionRate: parseFloat(settings.serviceCommissionRate),
@@ -66,9 +73,7 @@ exports.getSettings = async (req, res) => {
         if (!settings) {
             try {
                 settings = await db.GlobalSettings.create({
-                    serviceCommissionRate: 10.00,
-                    productCommissionRate: 10.00,
-                    taxRate: 15.00
+                    ...defaultSettingsPayload()
                 });
             } catch (createError) {
                 // If table doesn't exist, return defaults
@@ -150,6 +155,18 @@ exports.updateSettings = async (req, res) => {
             });
         }
 
+        const normalizedInvoicePrefix = normalizeOptionalText(invoicePrefix);
+        if (
+            normalizedInvoicePrefix !== undefined &&
+            normalizedInvoicePrefix !== null &&
+            !/^[A-Za-z0-9-]{1,16}$/.test(normalizedInvoicePrefix)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invoice prefix must use only letters, numbers, and dashes, with max length 16'
+            });
+        }
+
         // Get or create settings
         let settings = await db.GlobalSettings.findOne({
             order: [['updatedAt', 'DESC']]
@@ -161,7 +178,21 @@ exports.updateSettings = async (req, res) => {
                     ...defaultSettingsPayload({
                         serviceCommissionRate: serviceCommissionRate !== undefined ? serviceCommissionRate : 10.00,
                         productCommissionRate: productCommissionRate !== undefined ? productCommissionRate : 10.00,
-                        taxRate: taxRate !== undefined ? taxRate : 15.00
+                        taxRate: taxRate !== undefined ? taxRate : 15.00,
+                        invoiceSellerNameAr: normalizeOptionalText(invoiceSellerNameAr) || 'رفاه',
+                        invoiceSellerNameEn: normalizeOptionalText(invoiceSellerNameEn) || 'Refah',
+                        invoiceVatNumber: normalizeOptionalText(invoiceVatNumber),
+                        invoiceCrNumber: normalizeOptionalText(invoiceCrNumber),
+                        invoiceAddressAr: normalizeOptionalText(invoiceAddressAr),
+                        invoiceAddressEn: normalizeOptionalText(invoiceAddressEn),
+                        invoiceCity: normalizeOptionalText(invoiceCity) || 'Riyadh',
+                        invoiceCountry: normalizeOptionalText(invoiceCountry) || 'Saudi Arabia',
+                        invoiceEmail: normalizeOptionalText(invoiceEmail),
+                        invoicePhone: normalizeOptionalText(invoicePhone),
+                        invoicePrefix: normalizedInvoicePrefix || 'INV',
+                        invoiceFooterNoteAr: normalizeOptionalText(invoiceFooterNoteAr),
+                        invoiceFooterNoteEn: normalizeOptionalText(invoiceFooterNoteEn),
+                        invoiceLogoPath: normalizeOptionalText(invoiceLogoPath)
                     }),
                     updatedBy: adminId || null
                 });
@@ -189,20 +220,20 @@ exports.updateSettings = async (req, res) => {
             if (taxRate !== undefined) {
                 updateData.taxRate = taxRate;
             }
-            if (invoiceSellerNameAr !== undefined) updateData.invoiceSellerNameAr = invoiceSellerNameAr;
-            if (invoiceSellerNameEn !== undefined) updateData.invoiceSellerNameEn = invoiceSellerNameEn;
-            if (invoiceVatNumber !== undefined) updateData.invoiceVatNumber = invoiceVatNumber;
-            if (invoiceCrNumber !== undefined) updateData.invoiceCrNumber = invoiceCrNumber;
-            if (invoiceAddressAr !== undefined) updateData.invoiceAddressAr = invoiceAddressAr;
-            if (invoiceAddressEn !== undefined) updateData.invoiceAddressEn = invoiceAddressEn;
-            if (invoiceCity !== undefined) updateData.invoiceCity = invoiceCity;
-            if (invoiceCountry !== undefined) updateData.invoiceCountry = invoiceCountry;
-            if (invoiceEmail !== undefined) updateData.invoiceEmail = invoiceEmail;
-            if (invoicePhone !== undefined) updateData.invoicePhone = invoicePhone;
-            if (invoicePrefix !== undefined) updateData.invoicePrefix = invoicePrefix;
-            if (invoiceFooterNoteAr !== undefined) updateData.invoiceFooterNoteAr = invoiceFooterNoteAr;
-            if (invoiceFooterNoteEn !== undefined) updateData.invoiceFooterNoteEn = invoiceFooterNoteEn;
-            if (invoiceLogoPath !== undefined) updateData.invoiceLogoPath = invoiceLogoPath;
+            if (invoiceSellerNameAr !== undefined) updateData.invoiceSellerNameAr = normalizeOptionalText(invoiceSellerNameAr);
+            if (invoiceSellerNameEn !== undefined) updateData.invoiceSellerNameEn = normalizeOptionalText(invoiceSellerNameEn);
+            if (invoiceVatNumber !== undefined) updateData.invoiceVatNumber = normalizeOptionalText(invoiceVatNumber);
+            if (invoiceCrNumber !== undefined) updateData.invoiceCrNumber = normalizeOptionalText(invoiceCrNumber);
+            if (invoiceAddressAr !== undefined) updateData.invoiceAddressAr = normalizeOptionalText(invoiceAddressAr);
+            if (invoiceAddressEn !== undefined) updateData.invoiceAddressEn = normalizeOptionalText(invoiceAddressEn);
+            if (invoiceCity !== undefined) updateData.invoiceCity = normalizeOptionalText(invoiceCity);
+            if (invoiceCountry !== undefined) updateData.invoiceCountry = normalizeOptionalText(invoiceCountry) || 'Saudi Arabia';
+            if (invoiceEmail !== undefined) updateData.invoiceEmail = normalizeOptionalText(invoiceEmail);
+            if (invoicePhone !== undefined) updateData.invoicePhone = normalizeOptionalText(invoicePhone);
+            if (invoicePrefix !== undefined) updateData.invoicePrefix = normalizedInvoicePrefix || 'INV';
+            if (invoiceFooterNoteAr !== undefined) updateData.invoiceFooterNoteAr = normalizeOptionalText(invoiceFooterNoteAr);
+            if (invoiceFooterNoteEn !== undefined) updateData.invoiceFooterNoteEn = normalizeOptionalText(invoiceFooterNoteEn);
+            if (invoiceLogoPath !== undefined) updateData.invoiceLogoPath = normalizeOptionalText(invoiceLogoPath);
 
             await settings.update(updateData);
         }
