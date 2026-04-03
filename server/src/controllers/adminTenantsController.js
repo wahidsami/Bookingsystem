@@ -140,12 +140,20 @@ const getTenantDetails = async (req, res) => {
         });
 
         // Get live tenant stats from shared tables
-        const bookingStats = await getBookingStats(tenant.id, tenant.stats);
+        const [bookingStats, subscription] = await Promise.all([
+            getBookingStats(tenant.id, tenant.stats),
+            db.TenantSubscription.findOne({
+                where: { tenantId: tenant.id },
+                include: [{ model: db.SubscriptionPackage, as: 'package' }],
+                order: [['createdAt', 'DESC']]
+            })
+        ]);
         const tenantData = tenant.toJSON();
         tenantData.stats = {
             ...(tenantData.stats || {}),
             ...bookingStats
         };
+        tenantData.subscription = subscription ? subscription.toJSON() : null;
 
         res.json({
             success: true,
