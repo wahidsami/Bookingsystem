@@ -1,4 +1,77 @@
 const db = require('../models');
+const fs = require('fs');
+const path = require('path');
+const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
+
+const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
+
+function resolveBillDocumentPath(relativePath) {
+    if (!relativePath) return null;
+
+    const sanitizedRelativePath = relativePath
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .replace(/^uploads\//, '');
+    const absolutePath = path.resolve(UPLOADS_ROOT, sanitizedRelativePath);
+
+    if (!absolutePath.startsWith(UPLOADS_ROOT)) {
+        return null;
+    }
+
+    return absolutePath;
+}
+
+async function findTenantBill(tenantId, billId) {
+    return db.Bill.findOne({
+        where: {
+            id: billId,
+            tenantId
+        },
+        include: [{
+            model: db.TenantSubscription,
+            as: 'subscription',
+            include: [{
+                model: db.SubscriptionPackage,
+                as: 'package'
+            }]
+        }, {
+            model: db.Tenant,
+            as: 'tenant',
+            attributes: ['id', 'name', 'name_ar', 'name_en', 'email', 'phone']
+        }]
+    });
+}
+
+async function serveTenantBillDocument(req, res, documentField) {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const { id } = req.params;
+        const bill = await findTenantBill(tenantId, id);
+
+        if (!bill) {
+            return res.status(404).json({
+                success: false,
+                message: 'Bill not found'
+            });
+        }
+
+        const absolutePath = resolveBillDocumentPath(bill[documentField]);
+        if (!absolutePath || !fs.existsSync(absolutePath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Document not generated yet'
+            });
+        }
+
+        return res.sendFile(absolutePath);
+    } catch (error) {
+        console.error(`serveTenantBillDocument ${documentField} error:`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to load bill document'
+        });
+    }
+}
 
 exports.getBills = async (req, res) => {
     try {
@@ -12,28 +85,18 @@ exports.getBills = async (req, res) => {
                 as: 'subscription',
                 include: [{
                     model: db.SubscriptionPackage,
-                    as: 'package',
-                    attributes: ['id', 'name', 'name_ar']
+                    as: 'package'
                 }]
+            }, {
+                model: db.Tenant,
+                as: 'tenant',
+                attributes: ['id', 'name', 'name_ar', 'name_en', 'email', 'phone']
             }]
         });
 
         res.json({
             success: true,
-            bills: bills.map((bill) => ({
-                id: bill.id,
-                billNumber: bill.billNumber,
-                amount: parseFloat(bill.amount || 0),
-                currency: bill.currency,
-                dueDate: bill.dueDate,
-                status: bill.status,
-                paidAt: bill.paidAt,
-                createdAt: bill.createdAt,
-                type: bill.type,
-                planSnapshot: bill.planSnapshot || {},
-                metadata: bill.metadata || {},
-                paymentToken: bill.status === 'UNPAID' ? bill.paymentToken : undefined
-            }))
+            bills: bills.map((bill) => serializeBill(bill, { includePaymentToken: true }))
         });
     } catch (error) {
         console.error('getBills error:', error);
@@ -65,17 +128,7 @@ exports.getCurrentUnpaidBill = async (req, res) => {
 
         res.json({
             success: true,
-            bill: {
-                id: bill.id,
-                billNumber: bill.billNumber,
-                amount: parseFloat(bill.amount || 0),
-                currency: bill.currency,
-                dueDate: bill.dueDate,
-                status: bill.status,
-                type: bill.type,
-                paymentToken: bill.paymentToken,
-                planSnapshot: bill.planSnapshot || {}
-            }
+            bill: serializeBill(bill, { includePaymentToken: true })
         });
     } catch (error) {
         console.error('getCurrentUnpaidBill error:', error);
@@ -85,3 +138,33 @@ exports.getCurrentUnpaidBill = async (req, res) => {
         });
     }
 };
+
+exports.getBillDetails = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const { id } = req.params;
+        const bill = await findTenantBill(tenantId, id);
+
+        if (!bill) {
+            return res.status(404).json({
+                success: false,
+                message: 'Bill not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            bill: serializeBill(bill, { includePaymentToken: true })
+        });
+    } catch (error) {
+        console.error('getBillDetails error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load bill details'
+        });
+    }
+};
+
+exports.getInvoicePdf = async (req, res) => serveTenantBillDocument(req, res, 'invoicePdfPath');
+
+exports.getReceiptPdf = async (req, res) => serveTenantBillDocument(req, res, 'receiptPdfPath');

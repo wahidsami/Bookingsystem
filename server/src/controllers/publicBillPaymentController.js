@@ -1,4 +1,5 @@
 const db = require('../models');
+const { serializeBill, toNumber } = require('../utils/invoiceSnapshotBuilder');
 
 function getEffectiveExpiry(bill) {
     if (bill.paymentTokenExpiresAt) {
@@ -43,7 +44,7 @@ exports.getBillByToken = async (req, res) => {
                 {
                     model: db.TenantSubscription,
                     as: 'subscription',
-                    include: [{ model: db.SubscriptionPackage, as: 'package', attributes: ['id', 'name', 'name_ar'] }]
+                    include: [{ model: db.SubscriptionPackage, as: 'package' }]
                 }
             ]
         });
@@ -59,20 +60,27 @@ exports.getBillByToken = async (req, res) => {
             return res.json({
                 success: true,
                 alreadyPaid: true,
-                bill: {
-                    billNumber: bill.billNumber,
-                    amount: parseFloat(bill.amount || 0),
-                    currency: bill.currency,
-                    paidAt: bill.paidAt,
-                    type: bill.type,
-                    planSnapshot: bill.planSnapshot || {}
-                }
+                bill: serializeBill(bill)
             });
         }
 
         if (bill.status === 'EXPIRED' || isBillExpired(bill)) {
             if (bill.status !== 'EXPIRED') {
                 await bill.update({ status: 'EXPIRED' });
+                await db.ActivityLog.create({
+                    entityType: 'tenant',
+                    entityId: bill.tenantId,
+                    action: 'updated',
+                    performedByType: 'system',
+                    performedByName: 'billing-system',
+                    details: {
+                        event: 'invoice_expired',
+                        billId: bill.id,
+                        billNumber: bill.billNumber,
+                        paymentTokenExpiresAt: bill.paymentTokenExpiresAt,
+                        dueDate: bill.dueDate
+                    }
+                });
             }
 
             return res.status(400).json({
@@ -86,13 +94,7 @@ exports.getBillByToken = async (req, res) => {
             success: true,
             alreadyPaid: false,
             bill: {
-                id: bill.id,
-                billNumber: bill.billNumber,
-                amount: parseFloat(bill.amount || 0),
-                currency: bill.currency,
-                dueDate: bill.dueDate,
-                type: bill.type,
-                planSnapshot: bill.planSnapshot || {},
+                ...serializeBill(bill, { includePaymentToken: true }),
                 tenantName: bill.tenant?.name_ar || bill.tenant?.name_en || bill.tenant?.name || '',
                 subscriptionId: bill.tenantSubscriptionId
             }
@@ -109,6 +111,11 @@ exports.getBillByToken = async (req, res) => {
 exports.payBillByToken = async (req, res) => {
     try {
         const { token } = req.params;
+        const {
+            paymentProvider,
+            paymentReference,
+            paymentMethod
+        } = req.body || {};
 
         const bill = await db.Bill.findOne({
             where: { paymentToken: token },
@@ -136,16 +143,27 @@ exports.payBillByToken = async (req, res) => {
             return res.json({
                 success: true,
                 alreadyPaid: true,
-                bill: {
-                    billNumber: bill.billNumber,
-                    paidAt: bill.paidAt
-                }
+                bill: serializeBill(bill)
             });
         }
 
         if (bill.status === 'EXPIRED' || isBillExpired(bill)) {
             if (bill.status !== 'EXPIRED') {
                 await bill.update({ status: 'EXPIRED' });
+                await db.ActivityLog.create({
+                    entityType: 'tenant',
+                    entityId: bill.tenantId,
+                    action: 'updated',
+                    performedByType: 'system',
+                    performedByName: 'billing-system',
+                    details: {
+                        event: 'invoice_expired',
+                        billId: bill.id,
+                        billNumber: bill.billNumber,
+                        paymentTokenExpiresAt: bill.paymentTokenExpiresAt,
+                        dueDate: bill.dueDate
+                    }
+                });
             }
 
             return res.status(400).json({
@@ -171,11 +189,24 @@ exports.payBillByToken = async (req, res) => {
         const targetBillingCycle = metadata.requestedBillingCycle || subscription.billingCycle || 'monthly';
         const targetAmount = parseFloat(metadata.requestedAmount || bill.amount || 0);
         const periodEnd = getPeriodEnd(now, targetBillingCycle);
+        const resolvedPaymentProvider = paymentProvider || bill.paymentProvider || 'refah_manual_payment';
+        const resolvedPaymentReference = paymentReference || bill.paymentReference || `${bill.billNumber}-${now.getTime()}`;
+        const resolvedPaymentMethod = paymentMethod || bill.paymentMethod || 'online';
 
         await db.sequelize.transaction(async (transaction) => {
             await bill.update({
                 status: 'PAID',
-                paidAt: now
+                paidAt: now,
+                paymentProvider: resolvedPaymentProvider,
+                paymentReference: resolvedPaymentReference,
+                paymentMethod: resolvedPaymentMethod,
+                paymentCapturedAmount: targetAmount,
+                paymentFailureReason: null,
+                metadata: {
+                    ...(bill.metadata || {}),
+                    paidThrough: 'public_payment_link',
+                    paymentRecordedAt: now.toISOString()
+                }
             }, { transaction });
 
             await subscription.update({
@@ -203,6 +234,27 @@ exports.payBillByToken = async (req, res) => {
                     paymentDueAt: null
                 }, { transaction });
             }
+
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: bill.tenantId,
+                action: 'payment_received',
+                performedByType: 'system',
+                performedByName: 'billing-system',
+                details: {
+                    event: 'invoice_paid',
+                    billId: bill.id,
+                    billNumber: bill.billNumber,
+                    billType: bill.type,
+                    amount: toNumber(bill.amount, 0),
+                    totalAmount: toNumber(bill.totalAmount, toNumber(bill.amount, 0)),
+                    paymentProvider: resolvedPaymentProvider,
+                    paymentMethod: resolvedPaymentMethod,
+                    paymentReference: resolvedPaymentReference,
+                    targetPackageId,
+                    targetBillingCycle
+                }
+            }, { transaction });
 
             const usage = await db.TenantUsage.findOne({
                 where: { tenantId: bill.tenantId },
@@ -237,12 +289,15 @@ exports.payBillByToken = async (req, res) => {
         res.json({
             success: true,
             message: 'Payment successful. Subscription updated successfully.',
-            bill: {
-                billNumber: bill.billNumber,
-                amount: parseFloat(bill.amount || 0),
-                currency: bill.currency,
-                paidAt: now
-            },
+            bill: serializeBill({
+                ...bill.toJSON(),
+                status: 'PAID',
+                paidAt: now,
+                paymentProvider: resolvedPaymentProvider,
+                paymentReference: resolvedPaymentReference,
+                paymentMethod: resolvedPaymentMethod,
+                paymentCapturedAmount: targetAmount
+            }),
             subscription: {
                 packageId: targetPackageId,
                 billingCycle: targetBillingCycle,

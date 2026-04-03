@@ -1,6 +1,13 @@
 const db = require('../models');
 const { Op, fn, col } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
+const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
+const {
+    buildSubscriptionInvoiceSnapshot,
+    getAmountForBillingCycle,
+    serializeBill,
+    toNumber
+} = require('../utils/invoiceSnapshotBuilder');
 const fs = require('fs');
 const path = require('path');
 
@@ -213,8 +220,10 @@ const approveTenant = async (req, res) => {
 
         const now = new Date();
         const paymentDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
-        const amount = parseFloat(subscription.amount || 0);
         const locale = tenant?.settings?.language === 'en' ? 'en' : 'ar';
+        const amount = toNumber(subscription.amount, 0) > 0
+            ? toNumber(subscription.amount, 0)
+            : getAmountForBillingCycle(subscription.package, subscription.billingCycle);
 
         if (amount <= 0) {
             await tenant.update({
@@ -254,13 +263,23 @@ const approveTenant = async (req, res) => {
             });
         }
 
-        const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
         const billNumber = await generateBillNumber();
         const paymentToken = generatePaymentToken();
         const baseUrl = getTenantDashboardBaseUrl();
         const paymentUrl = baseUrl
             ? `${baseUrl}/${locale}/payment?token=${paymentToken}`
             : `/${locale}/payment?token=${paymentToken}`;
+
+        const invoiceSnapshot = await buildSubscriptionInvoiceSnapshot({
+            tenant,
+            subscriptionPackage: subscription.package,
+            subscription,
+            billingCycle: subscription.billingCycle,
+            billType: 'initial',
+            dueDate: paymentDueAt.toISOString().slice(0, 10),
+            issueDate: now,
+            totalAmount: amount
+        });
 
         const [updatedTenant, bill] = await db.sequelize.transaction(async (transaction) => {
             await tenant.update({
@@ -274,24 +293,43 @@ const approveTenant = async (req, res) => {
                 tenantId: tenant.id,
                 tenantSubscriptionId: subscription.id,
                 billNumber,
-                amount,
+                ...invoiceSnapshot,
+                amount: invoiceSnapshot.amount,
                 currency: subscription.currency || 'SAR',
                 dueDate: paymentDueAt.toISOString().slice(0, 10),
                 status: 'UNPAID',
                 paymentToken,
                 paymentTokenExpiresAt: paymentDueAt,
                 type: 'initial',
-                planSnapshot: {
-                    packageId: subscription.packageId,
-                    packageName: subscription.package?.name,
-                    packageNameAr: subscription.package?.name_ar,
-                    billingCycle: subscription.billingCycle
-                },
                 metadata: {
+                    ...(invoiceSnapshot.metadata || {}),
                     createdFrom: 'tenant_approval',
                     approvedBy: req.adminId,
                     billingCycle: subscription.billingCycle
                 }
+            }, { transaction });
+
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: tenant.id,
+                action: 'created',
+                performedByType: 'super_admin',
+                performedById: req.adminId,
+                performedByName: req.adminName,
+                details: {
+                    event: 'invoice_created',
+                    billId: createdBill.id,
+                    billNumber: createdBill.billNumber,
+                    billType: createdBill.type,
+                    status: createdBill.status,
+                    amount: toNumber(createdBill.amount, 0),
+                    totalAmount: toNumber(createdBill.totalAmount, toNumber(createdBill.amount, 0)),
+                    packageId: subscription.packageId,
+                    billingCycle: subscription.billingCycle,
+                    paymentTokenExpiresAt: paymentDueAt
+                },
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
             }, { transaction });
 
             await db.ActivityLog.create({
@@ -328,9 +366,7 @@ const approveTenant = async (req, res) => {
             message: 'Tenant approved. Initial invoice created and payment link sent.',
             tenant: updatedTenant,
             bill: {
-                id: bill.id,
-                billNumber: bill.billNumber,
-                amount: parseFloat(bill.amount || 0),
+                ...serializeBill(bill, { includePaymentToken: true }),
                 paymentUrl
             }
         });

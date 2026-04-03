@@ -3,6 +3,13 @@ const { Op } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
 const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
 const {
+    buildSubscriptionInvoiceSnapshot,
+    getAmountForBillingCycle,
+    serializeBill,
+    toNumber
+} = require('../utils/invoiceSnapshotBuilder');
+const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
+const {
     getActiveSubscriptionForTenant,
     ACTIVE_SUBSCRIPTION_STATUSES
 } = require('../services/tenantSubscriptionService');
@@ -11,19 +18,6 @@ const BILLING_CYCLES = ['monthly', 'sixMonth', 'annual'];
 
 function getTenantId(req) {
     return req.tenantId || req.tenant?.id;
-}
-
-function getAmountForBillingCycle(pkg, billingCycle) {
-    switch (billingCycle) {
-        case 'monthly':
-            return parseFloat(pkg.monthlyPrice || 0);
-        case 'sixMonth':
-            return parseFloat(pkg.sixMonthPrice || 0);
-        case 'annual':
-            return parseFloat(pkg.annualPrice || 0);
-        default:
-            return 0;
-    }
 }
 
 /**
@@ -69,10 +63,15 @@ exports.getCurrentSubscription = async (req, res) => {
                 message: 'No active subscription found'
             });
         }
+
+        const subscription = result.subscription.toJSON();
+        if (subscription.package) {
+            subscription.package.limits = normalizePackageEntitlements(subscription.package.limits || {});
+        }
         
         res.json({
             success: true,
-            subscription: result.subscription
+            subscription
         });
     } catch (error) {
         console.error('Get subscription error:', error);
@@ -298,25 +297,31 @@ exports.requestSubscriptionChange = async (req, res) => {
             ? `${baseUrl}/${locale}/payment?token=${paymentToken}`
             : `/${locale}/payment?token=${paymentToken}`;
         const type = currentSubscription.packageId === requestedPackageId ? 'renewal' : 'upgrade';
+        const invoiceSnapshot = await buildSubscriptionInvoiceSnapshot({
+            tenant,
+            subscriptionPackage: newPackage,
+            subscription: currentSubscription,
+            billingCycle,
+            billType: type,
+            dueDate,
+            issueDate: now,
+            totalAmount: amount
+        });
 
         const bill = await db.Bill.create({
             tenantId,
             tenantSubscriptionId: currentSubscription.id,
             billNumber,
-            amount,
+            ...invoiceSnapshot,
+            amount: invoiceSnapshot.amount,
             currency: currentSubscription.currency || 'SAR',
             dueDate,
             status: 'UNPAID',
             paymentToken,
             paymentTokenExpiresAt: expiresAt,
-            planSnapshot: {
-                packageId: newPackage.id,
-                packageName: newPackage.name,
-                packageNameAr: newPackage.name_ar,
-                billingCycle
-            },
             type,
             metadata: {
+                ...(invoiceSnapshot.metadata || {}),
                 currentPackageId: currentSubscription.packageId,
                 currentBillingCycle: currentSubscription.billingCycle,
                 requestedPackageId: newPackage.id,
@@ -324,21 +329,26 @@ exports.requestSubscriptionChange = async (req, res) => {
                 requestedAmount: amount
             }
         });
-        
+
         await db.ActivityLog.create({
-            actorType: 'tenant',
-            actorId: tenantId,
-            action: type === 'renewal' ? 'subscription_renewal_requested' : 'subscription_change_requested',
-            resourceType: 'bill',
-            resourceId: bill.id,
+            entityType: 'tenant',
+            entityId: tenantId,
+            action: 'created',
+            performedByType: 'tenant_user',
+            performedById: tenantId,
+            performedByName: tenant?.name_en || tenant?.name_ar || tenant?.name || null,
             details: {
+                event: 'invoice_created',
                 billId: bill.id,
                 billNumber,
+                requestAction: type === 'renewal' ? 'subscription_renewal_requested' : 'subscription_change_requested',
+                billType: type,
+                status: bill.status,
+                amount: toNumber(bill.amount, 0),
+                totalAmount: toNumber(bill.totalAmount, toNumber(bill.amount, 0)),
                 currentPackageId: currentSubscription.packageId,
-                requestedPackageId: requestedPackageId,
-                requestedBillingCycle: billingCycle,
-                amount,
-                type
+                requestedPackageId: newPackage.id,
+                requestedBillingCycle: billingCycle
             }
         });
         
@@ -350,6 +360,7 @@ exports.requestSubscriptionChange = async (req, res) => {
             estimatedAmount: amount,
             billId: bill.id,
             billNumber,
+            bill: serializeBill(bill, { includePaymentToken: true }),
             paymentToken,
             paymentUrl,
             dueDate,

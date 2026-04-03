@@ -295,6 +295,7 @@ const startServer = async () => {
         // Sync models in dependency order
         await db.SuperAdmin.sync({ force: false });
         await db.ActivityLog.sync({ force: false });
+        await db.GlobalSettings.sync({ force: false });
 
         // Subscription System (must be before Tenant sync for foreign keys)
         await db.SubscriptionPackage.sync({ force: false }); // Base packages

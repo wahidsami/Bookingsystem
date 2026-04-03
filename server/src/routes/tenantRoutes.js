@@ -139,6 +139,9 @@ router.patch('/orders/:id/payment', checkTenantFeature('hasProductsAndOrders'), 
 // Billing
 router.get('/bills/current-unpaid', tenantBillsController.getCurrentUnpaidBill);
 router.get('/bills', tenantBillsController.getBills);
+router.get('/bills/:id', tenantBillsController.getBillDetails);
+router.get('/bills/:id/invoice-pdf', tenantBillsController.getInvoicePdf);
+router.get('/bills/:id/receipt-pdf', tenantBillsController.getReceiptPdf);
 
 // Messaging
 router.get('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.getMessages);

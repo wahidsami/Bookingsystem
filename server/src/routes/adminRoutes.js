@@ -7,6 +7,7 @@ const adminUsersController = require('../controllers/adminUsersController');
 const adminStatsController = require('../controllers/adminStatsController');
 const adminPackagesController = require('../controllers/adminPackagesController');
 const adminSettingsController = require('../controllers/adminSettingsController');
+const adminBillsController = require('../controllers/adminBillsController');
 const adminFinancialController = require('../controllers/adminFinancialController');
 const adminCategoryController = require('../controllers/adminCategoryController');
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
@@ -15,6 +16,9 @@ const adminFeaturePricingController = require('../controllers/adminFeaturePricin
 router.use(authenticateSuperAdmin);
 
 // ===== FINANCIAL REPORTING =====
+router.get('/bills/:id', requirePermission('financial', 'view'), adminBillsController.getBillDetails);
+router.get('/bills/:id/invoice-pdf', requirePermission('financial', 'view'), adminBillsController.getInvoicePdf);
+router.get('/bills/:id/receipt-pdf', requirePermission('financial', 'view'), adminBillsController.getReceiptPdf);
 router.get('/financial/dashboard', adminFinancialController.getDashboardOverview);
 router.get('/financial/summary', adminFinancialController.getPlatformSummary);
 router.get('/financial/tenants', adminFinancialController.getTenantFinancials);
@@ -37,6 +41,7 @@ router.get('/stats/charts', adminStatsController.getChartData);
 router.get('/tenants', requirePermission('tenants', 'view'), adminTenantsController.listTenants);
 router.get('/tenants/pending', requirePermission('tenants', 'approve'), adminTenantsController.getPendingTenants);
 router.get('/tenants/:id', requirePermission('tenants', 'view'), adminTenantsController.getTenantDetails);
+router.get('/tenants/:tenantId/bills', requirePermission('tenants', 'view'), adminBillsController.getTenantBills);
 router.get('/tenants/:id/activities', requirePermission('tenants', 'view'), adminTenantsController.getTenantActivities);
 router.put('/tenants/:id', requirePermission('tenants', 'edit'), adminTenantsController.updateTenant);
 router.post('/tenants/:id/approve', requirePermission('tenants', 'approve'), adminTenantsController.approveTenant);
