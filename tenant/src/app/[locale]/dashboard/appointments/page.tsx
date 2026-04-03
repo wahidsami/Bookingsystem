@@ -33,6 +33,7 @@ interface User {
 
 interface Appointment {
   id: string;
+  bookingNumber?: string | null;
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
@@ -422,6 +423,9 @@ export default function AppointmentsPage() {
                   {/* Middle: Details */}
                   <div className="flex-1">
                     <div className="mb-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'رقم الحجز' : 'Booking No.'} {appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
+                      </p>
                       <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                         {locale === 'ar' ? appointment.service.name_ar : appointment.service.name_en}
                       </h3>

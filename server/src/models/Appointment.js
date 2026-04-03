@@ -64,6 +64,34 @@ module.exports = (sequelize, DataTypes) => {
                 employeeCommission: parseFloat(employeeCommission.toFixed(2))
             };
         }
+
+        /**
+         * Generate a short, human-readable booking number for reception/POS lookup.
+         * Format: BKG-YYYY-XXXXXX
+         */
+        static async generateBookingNumber() {
+            const year = new Date().getFullYear();
+            const prefix = `BKG-${year}-`;
+
+            const lastAppointment = await Appointment.findOne({
+                where: {
+                    bookingNumber: {
+                        [sequelize.Sequelize.Op.like]: `${prefix}%`
+                    }
+                },
+                order: [['createdAt', 'DESC']]
+            });
+
+            let sequence = 1;
+            if (lastAppointment?.bookingNumber) {
+                const lastSequence = parseInt(lastAppointment.bookingNumber.split('-')[2], 10);
+                if (Number.isFinite(lastSequence)) {
+                    sequence = lastSequence + 1;
+                }
+            }
+
+            return `${prefix}${sequence.toString().padStart(6, '0')}`;
+        }
     }
 
     Appointment.init({
@@ -71,6 +99,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true
+        },
+        bookingNumber: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            unique: true,
+            comment: 'Human-friendly booking number for POS/reception lookup'
         },
         serviceId: {
             type: DataTypes.UUID,
@@ -268,8 +302,19 @@ module.exports = (sequelize, DataTypes) => {
             {
                 fields: ['tenantId', 'startTime'],
                 name: 'idx_tenant_time'
+            },
+            {
+                fields: ['bookingNumber'],
+                unique: true,
+                name: 'idx_appointments_booking_number'
             }
         ]
+    });
+
+    Appointment.beforeCreate(async (appointment) => {
+        if (!appointment.bookingNumber) {
+            appointment.bookingNumber = await Appointment.generateBookingNumber();
+        }
     });
 
     return Appointment;

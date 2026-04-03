@@ -64,6 +64,7 @@ interface PaymentTransaction {
 
 interface Appointment {
   id: string;
+  bookingNumber?: string | null;
   tenantId?: string;
   serviceId?: string;
   staffId?: string;
@@ -398,6 +399,10 @@ export default function AppointmentDetailsPage() {
               {t("appointmentDetails")}
             </h2>
             <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              <span className="font-semibold text-primary">
+                {locale === 'ar' ? 'رقم الحجز' : 'Booking No.'} {appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
+              </span>
+              {' • '}
               {start.date} • {start.time} - {end.time}
             </p>
           </div>

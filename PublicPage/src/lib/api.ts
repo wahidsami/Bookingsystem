@@ -380,7 +380,17 @@ class PublicAPI {
     paymentMethod: 'at-center' | 'online-full' | 'booking-fee';
     location?: string;
     platformUserId?: string; // Optional - for authenticated users
-  }): Promise<{ success: boolean; message: string; data: { bookingId: string; bookingReference: string; totalAmount: number; bookingFee: number } }> {
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      bookingId: string;
+      bookingReference: string;
+      bookingQrUrl?: string;
+      totalAmount: number;
+      bookingFee: number;
+    };
+  }> {
     return this.request(`/tenant/${tenantId}/bookings`, {
       method: 'POST',
       body: JSON.stringify(bookingData),

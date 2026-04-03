@@ -466,7 +466,7 @@ exports.updatePaymentStatus = async (req, res) => {
                         : 'cash'
                 ),
                 status: 'completed',
-                transactionRef: transactionRef || `APT-PAY-${appointment.id.slice(0, 8).toUpperCase()}`,
+                transactionRef: transactionRef || `APT-PAY-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
                 processedBy: null,
                 processedAt: appointment.paidAt || new Date(),
                 notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID

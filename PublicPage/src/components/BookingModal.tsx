@@ -205,7 +205,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
         // Store booking reference for display
         setBookingData({
           ...bookingData,
-          bookingReference: response.data.bookingReference
+          bookingReference: response.data.bookingReference,
+          bookingQrUrl: response.data.bookingQrUrl,
         });
       } else {
         setError('Failed to create booking. Please try again.');
@@ -665,6 +666,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
             <div className="bg-gray-50 rounded-2xl p-6 mb-6 text-left max-w-md mx-auto">
               <p className="text-sm text-gray-500 mb-1">Booking Reference</p>
               <p className="text-xl mb-4">{bookingData.bookingReference || 'BOOKING-' + Date.now().toString(36).toUpperCase()}</p>
+              {bookingData.bookingQrUrl && (
+                <div className="mb-4 flex justify-center rounded-2xl bg-white p-4">
+                  <img
+                    src={toAbsoluteMediaUrl(bookingData.bookingQrUrl) || bookingData.bookingQrUrl}
+                    alt="Booking QR"
+                    className="h-40 w-40 object-contain"
+                  />
+                </div>
+              )}
               <p className="text-sm text-gray-500 mb-1">Appointment Details</p>
               <p>{selectedService?.name_en || selectedService?.name_ar || 'Service'}</p>
               <p className="text-gray-600">

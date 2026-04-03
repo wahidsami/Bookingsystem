@@ -6,6 +6,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const QRCode = require('qrcode');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const {
     assertServicePaymentMethodAllowed,
@@ -920,7 +921,7 @@ exports.createPublicBooking = async (req, res) => {
                 status: 'completed',
                 processedBy: null,
                 processedAt: appointment.paidAt || new Date(),
-                transactionRef: `PUBLIC-BOOKING-FULL-${appointment.id.substring(0, 8).toUpperCase()}`,
+                transactionRef: `PUBLIC-BOOKING-FULL-${appointment.bookingNumber || appointment.id.substring(0, 8).toUpperCase()}`,
                 notes: 'Full online booking payment',
                 metadata: {
                     source: 'public_booking_checkout',
@@ -963,7 +964,7 @@ exports.createPublicBooking = async (req, res) => {
                 status: 'completed',
                 processedBy: null,
                 processedAt: appointment.paidAt || new Date(),
-                transactionRef: `PUBLIC-BOOKING-DEPOSIT-${appointment.id.substring(0, 8).toUpperCase()}`,
+                transactionRef: `PUBLIC-BOOKING-DEPOSIT-${appointment.bookingNumber || appointment.id.substring(0, 8).toUpperCase()}`,
                 notes: 'Online booking deposit payment',
                 metadata: {
                     source: 'public_booking_checkout',
@@ -996,9 +997,13 @@ exports.createPublicBooking = async (req, res) => {
             message: 'Booking created successfully',
             data: {
                 bookingId: appointment.id,
-                bookingReference: appointment.id.substring(0, 8).toUpperCase(),
+                bookingReference: appointment.bookingNumber || appointment.id.substring(0, 8).toUpperCase(),
+                bookingQrUrl: `/api/v1/public/tenant/${tenantId}/bookings/${encodeURIComponent(
+                    appointment.bookingNumber || appointment.id
+                )}/qr`,
                 appointment: {
                     id: appointment.id,
+                    bookingNumber: appointment.bookingNumber,
                     startTime: appointment.startTime,
                     endTime: appointment.endTime,
                     status: appointment.status,
@@ -1038,6 +1043,80 @@ exports.createPublicBooking = async (req, res) => {
         res.status(statusCode).json({
             success: false,
             message: error.message || 'Failed to create booking'
+        });
+    }
+};
+
+/**
+ * Generate a QR code image for a booking reference.
+ */
+exports.getBookingQrCode = async (req, res) => {
+    try {
+        const { tenantId, bookingNumber } = req.params;
+
+        const appointment = await db.Appointment.findOne({
+            where: {
+                tenantId,
+                [Op.or]: [
+                    { bookingNumber },
+                    { id: bookingNumber }
+                ]
+            },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['name_en', 'name_ar'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['firstName', 'lastName', 'phone'],
+                    required: false
+                }
+            ]
+        });
+
+        if (!appointment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        const customerName = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim();
+        const qrPayload = JSON.stringify({
+            type: 'refah_booking',
+            tenantId,
+            appointmentId: appointment.id,
+            bookingNumber: appointment.bookingNumber || appointment.id,
+            customerName: customerName || null,
+            customerPhone: appointment.user?.phone || null,
+            serviceName: appointment.service?.name_en || appointment.service?.name_ar || null,
+            startTime: appointment.startTime
+        });
+
+        const qrImage = await QRCode.toBuffer(qrPayload, {
+            type: 'png',
+            width: 512,
+            margin: 2,
+            errorCorrectionLevel: 'M',
+            color: {
+                dark: '#7C3AED',
+                light: '#FFFFFF'
+            }
+        });
+
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.send(qrImage);
+    } catch (error) {
+        console.error('Get booking QR code error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate booking QR code',
+            error: error.message
         });
     }
 };

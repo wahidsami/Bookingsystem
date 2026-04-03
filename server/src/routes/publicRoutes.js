@@ -34,6 +34,7 @@ router.get('/tenant/:tenantId/staff', publicTenantController.getPublicStaff);
 
 // Bookings (public, no auth)
 router.post('/tenant/:tenantId/bookings', publicTenantController.createPublicBooking);
+router.get('/tenant/:tenantId/bookings/:bookingNumber/qr', publicTenantController.getBookingQrCode);
 
 // Orders (public, no auth)
 router.post('/tenant/:tenantId/orders', optionalAuth, publicTenantController.createPublicOrder);

@@ -82,7 +82,7 @@ const mapAppointmentQueueItem = (appointment) => ({
     id: `appointment-${appointment.id}`,
     entityType: 'appointment',
     entityId: appointment.id,
-    reference: appointment.id,
+    reference: appointment.bookingNumber || appointment.id,
     customerName: getCustomerName(appointment.user),
     customerPhone: appointment.user?.phone || null,
     title: getServiceName(appointment.service),
@@ -130,7 +130,7 @@ const mapPaymentTransaction = (transaction) => {
     const appointment = transaction.appointment;
     const order = transaction.order;
     const entityType = appointment ? 'appointment' : 'order';
-    const reference = appointment?.id || order?.orderNumber || transaction.transactionRef || transaction.id;
+    const reference = appointment?.bookingNumber || appointment?.id || order?.orderNumber || transaction.transactionRef || transaction.id;
     const user = appointment?.user || order?.user;
 
     return {
@@ -177,6 +177,7 @@ const buildAppointmentSearchWhere = (tenantId, search) => {
 
     if (search) {
         const searchConditions = [
+                { bookingNumber: { [Op.iLike]: `%${search}%` } },
                 { '$user.firstName$': { [Op.iLike]: `%${search}%` } },
                 { '$user.lastName$': { [Op.iLike]: `%${search}%` } },
                 { '$user.phone$': { [Op.iLike]: `%${search}%` } },
@@ -360,7 +361,7 @@ exports.getTransactions = async (req, res) => {
                 {
                     model: db.Appointment,
                     as: 'appointment',
-                    attributes: ['id', 'tenantId', 'startTime', 'paymentStatus', 'status'],
+                    attributes: ['id', 'bookingNumber', 'tenantId', 'startTime', 'paymentStatus', 'status'],
                     required: false,
                     include: [
                         {
