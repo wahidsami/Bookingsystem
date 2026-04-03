@@ -20,6 +20,7 @@ router.use(authenticateSuperAdmin);
 router.get('/bills/:id', requirePermission('financial', 'view'), adminBillsController.getBillDetails);
 router.get('/bills/:id/invoice-pdf', requirePermission('financial', 'view'), adminBillsController.getInvoicePdf);
 router.get('/bills/:id/receipt-pdf', requirePermission('financial', 'view'), adminBillsController.getReceiptPdf);
+router.post('/bills/:id/reconcile-payment', requirePermission('financial', 'refund'), adminBillsController.reconcileBillPayment);
 router.get('/financial/dashboard', adminFinancialController.getDashboardOverview);
 router.get('/financial/summary', adminFinancialController.getPlatformSummary);
 router.get('/financial/tenants', adminFinancialController.getTenantFinancials);

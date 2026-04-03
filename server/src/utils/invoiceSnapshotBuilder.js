@@ -13,6 +13,33 @@ const BILLING_CYCLE_LABELS = {
     annual: { ar: 'سنوي', en: 'Annual' }
 };
 
+function serializePaymentAttempt(attempt) {
+    if (!attempt) return null;
+
+    return {
+        id: attempt.id,
+        billId: attempt.billId,
+        source: attempt.source,
+        status: attempt.status,
+        paymentProvider: attempt.paymentProvider,
+        paymentMethod: attempt.paymentMethod,
+        paymentReference: attempt.paymentReference,
+        checkoutSessionId: attempt.checkoutSessionId,
+        gatewayStatus: attempt.gatewayStatus,
+        requestedAmount: toNumber(attempt.requestedAmount, 0),
+        capturedAmount: toNumber(attempt.capturedAmount, 0),
+        failureReason: attempt.failureReason,
+        idempotencyKey: attempt.idempotencyKey,
+        processedAt: attempt.processedAt,
+        performedByType: attempt.performedByType,
+        performedById: attempt.performedById,
+        performedByName: attempt.performedByName,
+        notes: attempt.notes,
+        gatewaySummary: attempt.gatewaySummary || {},
+        createdAt: attempt.createdAt
+    };
+}
+
 function toNumber(value, fallback = 0) {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -255,6 +282,7 @@ function serializeBill(bill, options = {}) {
     if (!bill) return null;
 
     const includePaymentToken = options.includePaymentToken && bill.status === 'UNPAID';
+    const includePaymentAttempts = Boolean(options.includePaymentAttempts);
     const tenant = bill.tenant || null;
     const subscription = bill.subscription || null;
     const packageRecord = subscription?.package || null;
@@ -294,6 +322,9 @@ function serializeBill(bill, options = {}) {
         paymentFailureReason: bill.paymentFailureReason,
         type: bill.type,
         metadata: bill.metadata || {},
+        paymentAttempts: includePaymentAttempts && Array.isArray(bill.paymentAttempts)
+            ? bill.paymentAttempts.map(serializePaymentAttempt)
+            : undefined,
         createdAt: bill.createdAt,
         updatedAt: bill.updatedAt,
         tenant: tenant
@@ -336,5 +367,6 @@ module.exports = {
     buildSubscriptionInvoiceSnapshot,
     getAmountForBillingCycle,
     serializeBill,
+    serializePaymentAttempt,
     toNumber
 };

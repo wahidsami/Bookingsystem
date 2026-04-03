@@ -308,6 +308,7 @@ const startServer = async () => {
         // Subscription relationships (after Tenant)
         await db.TenantSubscription.sync({ force: false }); // Tenant subscriptions
         await db.Bill.sync({ force: false }); // Subscription invoices
+        await db.BillPaymentAttempt.sync({ force: false }); // Bill payment reconciliation and audit trail
         await db.TenantUsage.sync({ force: false }); // Usage tracking
         await db.UsageAlert.sync({ force: false }); // Usage alerts
         await db.TenantPushUsage.sync({ force: false }); // Marketing push quota usage

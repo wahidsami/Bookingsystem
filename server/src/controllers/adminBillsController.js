@@ -6,6 +6,9 @@ const {
     ensureReceiptPdf
 } = require('../services/billDocumentService');
 const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
+const {
+    settleBillPayment
+} = require('../services/billPaymentReconciliationService');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
@@ -46,6 +49,15 @@ async function findBillById(id, tenantId = null) {
                     model: db.SubscriptionPackage,
                     as: 'package'
                 }]
+            },
+            {
+                model: db.BillPaymentAttempt,
+                as: 'paymentAttempts',
+                separate: true,
+                order: [
+                    ['processedAt', 'DESC'],
+                    ['createdAt', 'DESC']
+                ]
             }
         ]
     });
@@ -108,6 +120,15 @@ exports.getTenantBills = async (req, res) => {
                         model: db.SubscriptionPackage,
                         as: 'package'
                     }]
+                },
+                {
+                    model: db.BillPaymentAttempt,
+                    as: 'paymentAttempts',
+                    separate: true,
+                    order: [
+                        ['processedAt', 'DESC'],
+                        ['createdAt', 'DESC']
+                    ]
                 }
             ]
         });
@@ -141,7 +162,10 @@ exports.getTenantBills = async (req, res) => {
 
         res.json({
             success: true,
-            bills: bills.map((bill) => serializeBill(bill, { includePaymentToken: true })),
+            bills: bills.map((bill) => serializeBill(bill, {
+                includePaymentToken: true,
+                includePaymentAttempts: true
+            })),
             summary
         });
     } catch (error) {
@@ -167,7 +191,10 @@ exports.getBillDetails = async (req, res) => {
 
         res.json({
             success: true,
-            bill: serializeBill(bill, { includePaymentToken: true })
+            bill: serializeBill(bill, {
+                includePaymentToken: true,
+                includePaymentAttempts: true
+            })
         });
     } catch (error) {
         console.error('getBillDetails error:', error);
@@ -181,3 +208,83 @@ exports.getBillDetails = async (req, res) => {
 exports.getInvoicePdf = async (req, res) => serveBillDocument(req, res, 'invoicePdfPath');
 
 exports.getReceiptPdf = async (req, res) => serveBillDocument(req, res, 'receiptPdfPath');
+
+exports.reconcileBillPayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            paymentProvider,
+            paymentReference,
+            paymentMethod,
+            checkoutSessionId,
+            gatewayStatus,
+            gatewaySummary,
+            notes,
+            idempotencyKey
+        } = req.body || {};
+
+        if (!paymentProvider || !paymentReference || !paymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment provider, payment reference, and payment method are required'
+            });
+        }
+
+        const reconciliation = await settleBillPayment({
+            billId: id,
+            source: 'admin_manual_reconciliation',
+            paymentStatus: 'succeeded',
+            paymentProvider,
+            paymentReference,
+            paymentMethod,
+            checkoutSessionId,
+            gatewayStatus: gatewayStatus || 'admin_reconciled',
+            gatewaySummary,
+            notes,
+            idempotencyKey,
+            actor: {
+                type: 'super_admin',
+                id: req.adminId || null,
+                name: req.adminName || 'super-admin'
+            }
+        });
+
+        if (reconciliation.expired) {
+            return res.status(400).json({
+                success: false,
+                message: 'This invoice is expired and cannot be reconciled as paid',
+                bill: reconciliation.bill,
+                attempt: reconciliation.attempt
+            });
+        }
+
+        if (!reconciliation.success) {
+            return res.status(400).json({
+                success: false,
+                message: reconciliation.attempt?.failureReason || 'Failed to reconcile invoice payment',
+                duplicate: Boolean(reconciliation.duplicate),
+                bill: reconciliation.bill,
+                attempt: reconciliation.attempt
+            });
+        }
+
+        res.json({
+            success: true,
+            message: reconciliation.alreadyPaid
+                ? 'Invoice is already paid'
+                : reconciliation.duplicate
+                    ? 'This reconciliation request was already processed'
+                : 'Invoice payment reconciled successfully',
+            alreadyPaid: Boolean(reconciliation.alreadyPaid),
+            duplicate: Boolean(reconciliation.duplicate),
+            bill: reconciliation.bill,
+            attempt: reconciliation.attempt
+        });
+    } catch (error) {
+        console.error('reconcileBillPayment error:', error);
+        res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message || 'Failed to reconcile invoice payment'
+        });
+    }
+};

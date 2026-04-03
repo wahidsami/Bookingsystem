@@ -13,6 +13,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantSubscriptionId',
                 as: 'subscription'
             });
+
+            Bill.hasMany(models.BillPaymentAttempt, {
+                foreignKey: 'billId',
+                as: 'paymentAttempts'
+            });
         }
     }
 

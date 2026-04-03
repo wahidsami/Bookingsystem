@@ -132,12 +132,27 @@ export default function UnifiedPaymentPage() {
 
     try {
       if (mode === "bill") {
+        await tenantApi.payBillByToken(token, {
+          success,
+          paymentProvider: "refah_test_gateway",
+          paymentMethod: "test_card",
+          paymentReference: billSession?.billNumber
+            ? `${billSession.billNumber}-${success ? "TEST-SUCCESS" : `TEST-FAILED-${Date.now()}`}`
+            : undefined,
+          gatewayStatus: success ? "authorized" : "declined",
+          paymentFailureReason: success
+            ? undefined
+            : "Simulated test payment failure from the Refah test gateway",
+          idempotencyKey: success
+            ? `public_payment_link:${token}:success`
+            : `public_payment_link:${token}:failed:${Date.now()}`
+        });
+
         if (!success) {
           setPayError(locale === "ar" ? "فشل الدفع التجريبي. يمكنك المحاولة مرة أخرى." : "Test payment failed. You can try again.");
           return;
         }
 
-        await tenantApi.payBillByToken(token);
         router.push(`/${locale}/dashboard/subscription`);
         return;
       }

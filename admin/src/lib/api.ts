@@ -189,6 +189,28 @@ class AdminApi {
     return this.requestBlob(`/admin/bills/${id}/receipt-pdf`);
   }
 
+  async reconcileBillPayment(
+    id: string,
+    payload: {
+      paymentProvider: string;
+      paymentReference: string;
+      paymentMethod: string;
+      checkoutSessionId?: string;
+      gatewayStatus?: string;
+      notes?: string;
+      idempotencyKey?: string;
+    }
+  ) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      alreadyPaid?: boolean;
+      duplicate?: boolean;
+      bill?: any;
+      attempt?: any;
+    }>(`/admin/bills/${id}/reconcile-payment`, 'POST', { body: payload });
+  }
+
   async approveTenant(id: string, notes?: string) {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/approve`, 'POST', { body: { notes } });
   }

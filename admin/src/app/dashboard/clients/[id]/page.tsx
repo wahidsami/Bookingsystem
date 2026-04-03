@@ -76,6 +76,21 @@ interface Bill {
   paymentReference?: string | null;
   paymentProvider?: string | null;
   paymentCapturedAmount?: number | string | null;
+  paymentAttempts?: Array<{
+    id: string;
+    source: string;
+    status: string;
+    paymentProvider?: string | null;
+    paymentMethod?: string | null;
+    paymentReference?: string | null;
+    gatewayStatus?: string | null;
+    capturedAmount?: number | string | null;
+    failureReason?: string | null;
+    performedByType?: string | null;
+    performedByName?: string | null;
+    processedAt?: string | null;
+    notes?: string | null;
+  }>;
   planSnapshot?: {
     packageName?: string;
     packageNameAr?: string;
@@ -84,8 +99,11 @@ interface Bill {
   lineItemsSnapshot?: Array<{
     labelAr?: string;
     labelEn?: string;
+    descriptionAr?: string;
+    descriptionEn?: string;
     quantity?: number;
     total?: number;
+    totalAmount?: number;
   }>;
 }
 
@@ -111,6 +129,16 @@ export default function ClientDetailsPage() {
   const [billingSummary, setBillingSummary] = useState<any>(null);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [billDocumentLoading, setBillDocumentLoading] = useState<string | null>(null);
+  const [reconcileModalBill, setReconcileModalBill] = useState<Bill | null>(null);
+  const [reconcileForm, setReconcileForm] = useState({
+    paymentProvider: "manual_bank_transfer",
+    paymentReference: "",
+    paymentMethod: "bank_transfer",
+    checkoutSessionId: "",
+    gatewayStatus: "admin_reconciled",
+    notes: "",
+  });
+  const [reconcileLoading, setReconcileLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "billing" | "documents" | "activity" | "settings">("overview");
@@ -256,6 +284,52 @@ export default function ClientDetailsPage() {
       alert(error instanceof Error ? error.message : `Failed to open ${type} PDF`);
     } finally {
       setBillDocumentLoading(null);
+    }
+  };
+
+  const openReconcileModal = (bill: Bill) => {
+    setReconcileModalBill(bill);
+    setReconcileForm({
+      paymentProvider: bill.paymentProvider || "manual_bank_transfer",
+      paymentReference: bill.paymentReference || `${bill.billNumber}-MANUAL`,
+      paymentMethod: bill.paymentMethod || "bank_transfer",
+      checkoutSessionId: "",
+      gatewayStatus: "admin_reconciled",
+      notes: "",
+    });
+  };
+
+  const handleReconcilePayment = async () => {
+    if (!reconcileModalBill) return;
+    if (!reconcileForm.paymentProvider.trim() || !reconcileForm.paymentReference.trim() || !reconcileForm.paymentMethod.trim()) {
+      alert("Payment provider, reference, and method are required.");
+      return;
+    }
+
+    setReconcileLoading(true);
+    try {
+      const response = await adminApi.reconcileBillPayment(reconcileModalBill.id, {
+        paymentProvider: reconcileForm.paymentProvider.trim(),
+        paymentReference: reconcileForm.paymentReference.trim(),
+        paymentMethod: reconcileForm.paymentMethod.trim(),
+        checkoutSessionId: reconcileForm.checkoutSessionId.trim() || undefined,
+        gatewayStatus: reconcileForm.gatewayStatus.trim() || "admin_reconciled",
+        notes: reconcileForm.notes.trim() || undefined,
+        idempotencyKey: `admin_manual_reconciliation:${reconcileModalBill.id}:${reconcileForm.paymentReference.trim()}`,
+      });
+
+      if (response.success) {
+        if (response.bill) {
+          setSelectedBill(response.bill as Bill);
+        }
+        setReconcileModalBill(null);
+        await loadTenantDetails();
+      }
+    } catch (error) {
+      console.error("Failed to reconcile payment:", error);
+      alert(error instanceof Error ? error.message : "Failed to reconcile payment");
+    } finally {
+      setReconcileLoading(false);
     }
   };
 
@@ -742,6 +816,15 @@ export default function ClientDetailsPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-3 mt-4">
+                          {bill.status === "UNPAID" && (
+                            <button
+                              type="button"
+                              onClick={() => openReconcileModal(bill)}
+                              className="btn btn-primary btn-sm"
+                            >
+                              Reconcile Payment
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setSelectedBill(bill)}
@@ -974,13 +1057,17 @@ export default function ClientDetailsPage() {
                                 className="border-t border-dark-700"
                               >
                                 <td className="px-4 py-3 text-white text-sm">
-                                  {item.labelEn || item.labelAr || "—"}
+                                  {item.descriptionEn ||
+                                    item.descriptionAr ||
+                                    item.labelEn ||
+                                    item.labelAr ||
+                                    "—"}
                                 </td>
                                 <td className="px-4 py-3 text-dark-200 text-sm">
                                   {item.quantity ?? 1}
                                 </td>
                                 <td className="px-4 py-3 text-white text-sm font-semibold">
-                                  <Currency amount={Number(item.total) || 0} />
+                                  <Currency amount={Number(item.totalAmount ?? item.total) || 0} />
                                 </td>
                               </tr>
                             ))
@@ -1034,7 +1121,65 @@ export default function ClientDetailsPage() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl bg-dark-700/40 border border-dark-700 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
+                    <h4 className="font-semibold text-white">Payment Attempts / Reconciliation Trail</h4>
+                    <span className="text-xs text-dark-400">
+                      {(selectedBill.paymentAttempts || []).length} event(s)
+                    </span>
+                  </div>
+                  <div className="divide-y divide-dark-700">
+                    {(selectedBill.paymentAttempts || []).length === 0 ? (
+                      <div className="px-4 py-5 text-center text-dark-400 text-sm">
+                        No payment attempts have been recorded for this invoice yet.
+                      </div>
+                    ) : (
+                      selectedBill.paymentAttempts?.map((attempt) => (
+                        <div key={attempt.id} className="px-4 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`badge ${getBillStatusBadge(attempt.status === "succeeded" || attempt.status === "already_paid" ? "PAID" : attempt.status === "failed" ? "EXPIRED" : "UNPAID").className}`}>
+                                {humanizeValue(attempt.status)}
+                              </span>
+                              <p className="text-white font-semibold">
+                                {attempt.paymentProvider || "—"} • {attempt.paymentMethod || "—"}
+                              </p>
+                            </div>
+                            <p className="text-sm text-dark-300 mt-2 break-all">
+                              Ref: {attempt.paymentReference || "—"} • Source: {humanizeValue(attempt.source)} • Gateway: {attempt.gatewayStatus || "—"}
+                            </p>
+                            {attempt.failureReason && (
+                              <p className="text-sm text-danger mt-2">{attempt.failureReason}</p>
+                            )}
+                            {attempt.notes && (
+                              <p className="text-xs text-dark-400 mt-2">Notes: {attempt.notes}</p>
+                            )}
+                          </div>
+                          <div className="lg:text-right text-sm text-dark-300">
+                            <p>
+                              By {attempt.performedByName || humanizeValue(attempt.performedByType || "system")}
+                            </p>
+                            <p className="mt-1">{formatDate(attempt.processedAt || "")}</p>
+                            <p className="mt-1 font-semibold text-white">
+                              <Currency amount={Number(attempt.capturedAmount) || 0} />
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap justify-end gap-3">
+                  {selectedBill.status === "UNPAID" && (
+                    <button
+                      type="button"
+                      onClick={() => openReconcileModal(selectedBill)}
+                      className="btn btn-primary"
+                    >
+                      Reconcile Payment
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => openBillDocument(selectedBill, "invoice")}
@@ -1057,6 +1202,114 @@ export default function ClientDetailsPage() {
                         : "Open Paid Receipt"}
                     </button>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reconcileModalBill && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="card w-full max-w-xl">
+              <div className="card-header flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-primary-300 text-sm font-medium">Manual Payment Reconciliation</p>
+                  <h3 className="font-semibold text-white text-xl mt-1">
+                    {reconcileModalBill.billNumber}
+                  </h3>
+                  <p className="text-dark-400 text-sm mt-1">
+                    Use this only when an external payment provider confirms payment but the invoice still appears unpaid.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReconcileModalBill(null)}
+                  className="btn btn-secondary btn-sm"
+                  disabled={reconcileLoading}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="card-body space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Payment Provider</label>
+                    <input
+                      className="form-input"
+                      value={reconcileForm.paymentProvider}
+                      onChange={(e) => setReconcileForm({ ...reconcileForm, paymentProvider: e.target.value })}
+                      placeholder="manual_bank_transfer"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Payment Method</label>
+                    <input
+                      className="form-input"
+                      value={reconcileForm.paymentMethod}
+                      onChange={(e) => setReconcileForm({ ...reconcileForm, paymentMethod: e.target.value })}
+                      placeholder="bank_transfer / card / mada"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Payment Reference</label>
+                    <input
+                      className="form-input"
+                      value={reconcileForm.paymentReference}
+                      onChange={(e) => setReconcileForm({ ...reconcileForm, paymentReference: e.target.value })}
+                      placeholder="Gateway transaction/reference ID"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Checkout / Session ID</label>
+                    <input
+                      className="form-input"
+                      value={reconcileForm.checkoutSessionId}
+                      onChange={(e) => setReconcileForm({ ...reconcileForm, checkoutSessionId: e.target.value })}
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="form-label">Gateway Status</label>
+                    <input
+                      className="form-input"
+                      value={reconcileForm.gatewayStatus}
+                      onChange={(e) => setReconcileForm({ ...reconcileForm, gatewayStatus: e.target.value })}
+                      placeholder="admin_reconciled / captured / settled"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="form-label">Admin Notes</label>
+                    <textarea
+                      className="form-input min-h-[100px]"
+                      value={reconcileForm.notes}
+                      onChange={(e) => setReconcileForm({ ...reconcileForm, notes: e.target.value })}
+                      placeholder="Explain the evidence used to manually reconcile this payment."
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-warning/10 border border-warning/20 p-3 text-sm text-warning">
+                  This action will mark the invoice as paid, activate/update the tenant subscription, generate a paid receipt PDF, notify admin, and send the tenant payment success email.
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReconcileModalBill(null)}
+                    className="btn btn-secondary"
+                    disabled={reconcileLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReconcilePayment}
+                    className="btn btn-success"
+                    disabled={reconcileLoading}
+                  >
+                    {reconcileLoading ? "Reconciling..." : "Mark Invoice as Paid"}
+                  </button>
                 </div>
               </div>
             </div>

@@ -356,11 +356,33 @@ class TenantApiClient {
     return data;
   }
 
-  async payBillByToken(token: string): Promise<any> {
+  async payBillByToken(
+    token: string,
+    options?: {
+      success?: boolean;
+      paymentProvider?: string;
+      paymentReference?: string;
+      paymentMethod?: string;
+      checkoutSessionId?: string;
+      gatewayStatus?: string;
+      paymentFailureReason?: string;
+      idempotencyKey?: string;
+    }
+  ): Promise<any> {
+    const success = options?.success !== false;
     const res = await fetch(`${this.baseUrl}/public/bills/by-token/${encodeURIComponent(token)}/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        paymentStatus: success ? 'succeeded' : 'failed',
+        paymentProvider: options?.paymentProvider || 'refah_test_gateway',
+        paymentReference: options?.paymentReference,
+        paymentMethod: options?.paymentMethod || 'test_card',
+        checkoutSessionId: options?.checkoutSessionId,
+        gatewayStatus: options?.gatewayStatus || (success ? 'authorized' : 'declined'),
+        paymentFailureReason: options?.paymentFailureReason,
+        idempotencyKey: options?.idempotencyKey
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Payment failed');
