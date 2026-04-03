@@ -112,9 +112,37 @@ exports.getTenantBills = async (req, res) => {
             ]
         });
 
+        const summary = bills.reduce(
+            (accumulator, bill) => {
+                const amount = Number(bill.totalAmount ?? bill.amount ?? 0);
+                if (bill.status === 'PAID') {
+                    accumulator.paidCount += 1;
+                    accumulator.paidTotal += amount;
+                } else if (bill.status === 'UNPAID') {
+                    accumulator.unpaidCount += 1;
+                    accumulator.unpaidTotal += amount;
+                } else if (bill.status === 'EXPIRED') {
+                    accumulator.expiredCount += 1;
+                    accumulator.expiredTotal += amount;
+                }
+                accumulator.totalAmount += amount;
+                return accumulator;
+            },
+            {
+                paidCount: 0,
+                paidTotal: 0,
+                unpaidCount: 0,
+                unpaidTotal: 0,
+                expiredCount: 0,
+                expiredTotal: 0,
+                totalAmount: 0
+            }
+        );
+
         res.json({
             success: true,
-            bills: bills.map((bill) => serializeBill(bill, { includePaymentToken: true }))
+            bills: bills.map((bill) => serializeBill(bill, { includePaymentToken: true })),
+            summary
         });
     } catch (error) {
         console.error('getTenantBills error:', error);

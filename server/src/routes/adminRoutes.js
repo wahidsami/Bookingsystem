@@ -8,6 +8,7 @@ const adminStatsController = require('../controllers/adminStatsController');
 const adminPackagesController = require('../controllers/adminPackagesController');
 const adminSettingsController = require('../controllers/adminSettingsController');
 const adminBillsController = require('../controllers/adminBillsController');
+const adminNotificationsController = require('../controllers/adminNotificationsController');
 const adminFinancialController = require('../controllers/adminFinancialController');
 const adminCategoryController = require('../controllers/adminCategoryController');
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
@@ -36,6 +37,12 @@ router.get('/financial/employee-metrics/:tenantId', adminFinancialController.get
 router.get('/stats/dashboard', adminStatsController.getDashboardStats);
 router.get('/stats/activities', adminStatsController.getRecentActivities);
 router.get('/stats/charts', adminStatsController.getChartData);
+
+// ===== NOTIFICATIONS =====
+router.get('/notifications', adminNotificationsController.listNotifications);
+router.get('/notifications/unread-count', adminNotificationsController.getUnreadCount);
+router.patch('/notifications/:id/read', adminNotificationsController.markNotificationAsRead);
+router.patch('/notifications/read-all', adminNotificationsController.markAllNotificationsAsRead);
 
 // ===== TENANTS MANAGEMENT =====
 router.get('/tenants', requirePermission('tenants', 'view'), adminTenantsController.listTenants);

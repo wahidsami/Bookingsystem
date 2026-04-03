@@ -86,6 +86,12 @@ class AdminApi {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        sessionStorage.removeItem('rifah_admin_token');
+        sessionStorage.removeItem('rifah_admin_refresh_token');
+        window.location.href = '/login';
+      }
+
       const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         const data = await response.json();
@@ -124,6 +130,29 @@ class AdminApi {
 
   async getRecentActivities(limit: number = 20) {
     return this.request<{ success: boolean; activities: any[] }>(`/admin/stats/activities?limit=${limit}`);
+  }
+
+  async getAdminNotifications(params: { page?: number; limit?: number; unreadOnly?: boolean; type?: string; severity?: string } = {}) {
+    const query = new URLSearchParams();
+    if (params.page != null) query.append('page', params.page.toString());
+    if (params.limit != null) query.append('limit', params.limit.toString());
+    if (params.unreadOnly != null) query.append('unreadOnly', String(params.unreadOnly));
+    if (params.type) query.append('type', params.type);
+    if (params.severity) query.append('severity', params.severity);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{ success: boolean; notifications: any[]; unreadCount: number; pagination: any }>(`/admin/notifications${suffix}`);
+  }
+
+  async getAdminNotificationUnreadCount() {
+    return this.request<{ success: boolean; unreadCount: number }>('/admin/notifications/unread-count');
+  }
+
+  async markAdminNotificationRead(id: string) {
+    return this.request<{ success: boolean; notification: any }>(`/admin/notifications/${id}/read`, 'PATCH');
+  }
+
+  async markAllAdminNotificationsRead() {
+    return this.request<{ success: boolean }>('/admin/notifications/read-all', 'PATCH');
   }
 
   async getChartData(period: string = '30d') {

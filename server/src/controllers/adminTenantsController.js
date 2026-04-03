@@ -9,6 +9,10 @@ const {
     toNumber
 } = require('../utils/invoiceSnapshotBuilder');
 const { ensureInvoicePdf } = require('../services/billDocumentService');
+const {
+    notifyTenantApprovedFreeActive,
+    notifyTenantApprovedInvoiceCreated
+} = require('../services/adminNotificationService');
 const fs = require('fs');
 const path = require('path');
 
@@ -252,6 +256,12 @@ const approveTenant = async (req, res) => {
                 userAgent: req.headers['user-agent']
             });
 
+            await notifyTenantApprovedFreeActive({
+                tenant,
+                packageName: subscription.package?.name,
+                billingCycle: subscription.billingCycle
+            });
+
             const { sendPaymentSuccessEmail } = require('../utils/emailService');
             sendPaymentSuccessEmail(tenant).catch(err => {
                 console.error('[Approval] Failed to send activation email:', err.message);
@@ -353,6 +363,13 @@ const approveTenant = async (req, res) => {
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
             }, { transaction });
+
+            await notifyTenantApprovedInvoiceCreated({
+                tenant,
+                bill: createdBill,
+                packageName: subscription.package?.name,
+                billingCycle: subscription.billingCycle
+            }, transaction);
 
             return [tenant, createdBill];
         });

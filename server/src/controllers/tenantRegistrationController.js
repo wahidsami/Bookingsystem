@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const { notifyTenantRegistered } = require('../services/adminNotificationService');
 
 const VALID_BUSINESS_TYPES = ['salon', 'spa', 'barbershop', 'beauty_center', 'clinic', 'nail_studio', 'other'];
 
@@ -404,6 +405,8 @@ exports.register = async (req, res) => {
                 selectedPackage: subscriptionPackage?.name || 'None'
             }
         }, { transaction });
+
+        await notifyTenantRegistered(tenant, transaction);
 
         // Commit transaction
         await transaction.commit();

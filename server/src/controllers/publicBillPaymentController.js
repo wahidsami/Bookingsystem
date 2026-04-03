@@ -4,6 +4,10 @@ const {
     ensureReceiptPdf
 } = require('../services/billDocumentService');
 const { serializeBill, toNumber } = require('../utils/invoiceSnapshotBuilder');
+const {
+    notifyTenantBillExpired,
+    notifyTenantBillPaid
+} = require('../services/adminNotificationService');
 
 function getEffectiveExpiry(bill) {
     if (bill.paymentTokenExpiresAt) {
@@ -87,6 +91,10 @@ exports.getBillByToken = async (req, res) => {
                         paymentTokenExpiresAt: bill.paymentTokenExpiresAt,
                         dueDate: bill.dueDate
                     }
+                });
+                await notifyTenantBillExpired({
+                    tenant: bill.tenant,
+                    bill
                 });
             }
 
@@ -174,6 +182,10 @@ exports.payBillByToken = async (req, res) => {
                         paymentTokenExpiresAt: bill.paymentTokenExpiresAt,
                         dueDate: bill.dueDate
                     }
+                });
+                await notifyTenantBillExpired({
+                    tenant: bill.tenant,
+                    bill
                 });
             }
 
@@ -266,6 +278,20 @@ exports.payBillByToken = async (req, res) => {
                     targetBillingCycle
                 }
             }, { transaction });
+
+            await notifyTenantBillPaid({
+                tenant: bill.tenant,
+                bill: {
+                    ...bill.toJSON(),
+                    status: 'PAID',
+                    paidAt: now,
+                    paymentProvider: resolvedPaymentProvider,
+                    paymentReference: resolvedPaymentReference,
+                    paymentMethod: resolvedPaymentMethod
+                },
+                packageName: bill.subscription?.package?.name,
+                billingCycle: targetBillingCycle
+            }, transaction);
 
             const usage = await db.TenantUsage.findOne({
                 where: { tenantId: bill.tenantId },

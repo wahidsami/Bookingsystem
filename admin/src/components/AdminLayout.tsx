@@ -5,10 +5,21 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, adminApi } from "@/lib/api";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
+}
+
+interface AdminNotification {
+  id: string;
+  type: string;
+  severity: string;
+  titleEn: string;
+  messageEn: string;
+  actionUrl?: string | null;
+  isRead: boolean;
+  createdAt: string;
 }
 
 const navigation = [
@@ -20,6 +31,7 @@ const navigation = [
   { name: "Packages", href: "/dashboard/packages", icon: "📦" },
   { name: "Marketing", href: "/dashboard/marketing", icon: "🔥" },
   { name: "Clients Control", href: "/dashboard/clients-control", icon: "🎛️" },
+  { name: "Notifications", href: "/dashboard/notifications", icon: "🔔" },
   { name: "Activities", href: "/dashboard/activities", icon: "📋" },
   { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
 ];
@@ -30,6 +42,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const [pendingCount, setPendingCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -61,11 +76,70 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let isMounted = true;
+
+    const fetchNotifications = async () => {
+      try {
+        const response = await adminApi.getAdminNotifications({ page: 1, limit: 6 });
+        if (isMounted && response.success) {
+          setNotifications(response.notifications || []);
+          setUnreadCount(response.unreadCount || 0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch admin notifications:", error);
+      }
+    };
+
+    fetchNotifications();
+    const interval = window.setInterval(fetchNotifications, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
   const isActive = (href: string) => {
     if (href === "/dashboard") {
       return pathname === "/dashboard";
     }
     return pathname?.startsWith(href);
+  };
+
+  const getNotificationDotClass = (severity: string) => {
+    const styles: Record<string, string> = {
+      success: "bg-success",
+      warning: "bg-warning",
+      danger: "bg-danger",
+      info: "bg-primary-500",
+    };
+    return styles[severity] || "bg-primary-500";
+  };
+
+  const openNotification = async (notification: AdminNotification) => {
+    try {
+      if (!notification.isRead) {
+        await adminApi.markAdminNotificationRead(notification.id);
+        setNotifications((current) =>
+          current.map((item) =>
+            item.id === notification.id ? { ...item, isRead: true } : item
+          )
+        );
+        setUnreadCount((current) => Math.max(0, current - 1));
+      }
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
+
+    setNotificationOpen(false);
+    if (notification.actionUrl) {
+      router.push(notification.actionUrl);
+    } else {
+      router.push("/dashboard/notifications");
+    }
   };
 
   if (isLoading) {
@@ -99,7 +173,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </div>
             <span className="font-semibold text-white">Rifah Admin</span>
           </div>
-          <div className="w-8" />
+          <Link
+            href="/dashboard/notifications"
+            className="relative h-9 w-9 rounded-xl bg-dark-700/60 flex items-center justify-center text-lg"
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-[10px] font-bold text-white flex items-center justify-center">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </Link>
         </div>
       </header>
 
@@ -187,6 +271,83 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 {navigation.find((item) => isActive(item.href))?.name || "Dashboard"}
               </h1>
               <div className="flex items-center gap-4">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setNotificationOpen((open) => !open)}
+                    className="relative h-10 w-10 rounded-xl bg-dark-700/60 hover:bg-dark-700 flex items-center justify-center text-lg transition-colors"
+                    aria-label="Open notifications"
+                  >
+                    🔔
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full bg-danger text-[10px] font-bold text-white flex items-center justify-center">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {notificationOpen && (
+                    <div className="absolute right-0 mt-3 w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl border border-dark-700 bg-dark-800 shadow-2xl overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-dark-700">
+                        <div>
+                          <p className="text-sm font-semibold text-white">Notifications</p>
+                          <p className="text-xs text-dark-400">{unreadCount} unread</p>
+                        </div>
+                        <Link
+                          href="/dashboard/notifications"
+                          onClick={() => setNotificationOpen(false)}
+                          className="text-xs font-medium text-primary-400 hover:text-primary-300"
+                        >
+                          View all
+                        </Link>
+                      </div>
+
+                      <div className="max-h-[420px] overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-8 text-center text-sm text-dark-400">
+                            No notifications yet
+                          </div>
+                        ) : (
+                          notifications.map((notification) => (
+                            <button
+                              key={notification.id}
+                              type="button"
+                              onClick={() => openNotification(notification)}
+                              className={`w-full text-left px-4 py-3 border-b border-dark-700/70 hover:bg-dark-700/40 transition-colors ${
+                                notification.isRead ? "opacity-75" : ""
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <span
+                                  className={`mt-1 h-2.5 w-2.5 rounded-full ${getNotificationDotClass(
+                                    notification.severity
+                                  )}`}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-white line-clamp-1">
+                                    {notification.titleEn}
+                                  </p>
+                                  <p className="text-xs text-dark-300 mt-1 line-clamp-2">
+                                    {notification.messageEn}
+                                  </p>
+                                  <p className="text-[11px] text-dark-500 mt-2">
+                                    {new Date(notification.createdAt).toLocaleString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit"
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <span className="text-sm text-dark-400">
                   {new Date().toLocaleDateString("en-US", {
                     weekday: "long",
@@ -206,4 +367,3 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     </div>
   );
 }
-

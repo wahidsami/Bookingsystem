@@ -14,6 +14,9 @@ const {
     getActiveSubscriptionForTenant,
     ACTIVE_SUBSCRIPTION_STATUSES
 } = require('../services/tenantSubscriptionService');
+const {
+    notifyTenantSubscriptionChangeRequested
+} = require('../services/adminNotificationService');
 
 const BILLING_CYCLES = ['monthly', 'sixMonth', 'annual'];
 
@@ -351,6 +354,13 @@ exports.requestSubscriptionChange = async (req, res) => {
                 requestedPackageId: newPackage.id,
                 requestedBillingCycle: billingCycle
             }
+        });
+
+        await notifyTenantSubscriptionChangeRequested({
+            tenant,
+            bill,
+            packageName: newPackage.name,
+            billingCycle
         });
 
         ensureInvoicePdf(bill).catch(err => {
