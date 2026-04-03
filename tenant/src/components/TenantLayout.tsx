@@ -98,19 +98,19 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
 
     const restrictedRoutes = [
-      { href: `/${locale}/dashboard/products`, allowed: hasProductsAndOrders },
-      { href: `/${locale}/dashboard/orders`, allowed: hasProductsAndOrders },
-      { href: `/${locale}/dashboard/hot-deals`, allowed: hasHotDeals },
-      { href: `/${locale}/dashboard/messages`, allowed: hasInternalMessaging },
-      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications },
-      { href: `/${locale}/dashboard/payroll`, allowed: hasPayroll },
-      { href: `/${locale}/dashboard/reports`, allowed: hasReports },
-      { href: `/${locale}/dashboard/mypage`, allowed: hasPublicPageCustomization }
+      { href: `/${locale}/dashboard/products`, allowed: hasProductsAndOrders, feature: "productsAndOrders" },
+      { href: `/${locale}/dashboard/orders`, allowed: hasProductsAndOrders, feature: "productsAndOrders" },
+      { href: `/${locale}/dashboard/hot-deals`, allowed: hasHotDeals, feature: "hotDeals" },
+      { href: `/${locale}/dashboard/messages`, allowed: hasInternalMessaging, feature: "internalMessaging" },
+      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications, feature: "pushNotifications" },
+      { href: `/${locale}/dashboard/payroll`, allowed: hasPayroll, feature: "payroll" },
+      { href: `/${locale}/dashboard/reports`, allowed: hasReports, feature: "reports" },
+      { href: `/${locale}/dashboard/mypage`, allowed: hasPublicPageCustomization, feature: "publicPageCustomization" }
     ];
 
     const blockedRoute = restrictedRoutes.find((route) => pathname.startsWith(route.href) && !route.allowed);
     if (blockedRoute) {
-      router.replace(`/${locale}/dashboard/subscription`);
+      router.replace(`/${locale}/dashboard/subscription?lockedFeature=${blockedRoute.feature}`);
     }
   }, [entitlements, entitlementsLoadFailed, entitlementsLoaded, hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, pathname, router]);
 
