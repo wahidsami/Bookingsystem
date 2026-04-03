@@ -639,228 +639,6 @@ const Step4OwnerDetails = ({ formData, handleChange, errors }: any) => {
     );
 };
 
-// Step 5: Business Details Component
-const Step5BusinessDetails = ({ formData, setFormData, handleChange, errors }: any) => {
-    const t = useTranslations('register');
-
-    return (
-        <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('step5.title')}</h2>
-                <p className="text-gray-600">{t('step5.description')}</p>
-            </div>
-
-            {/* Yes/No Questions */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <label className="text-sm font-medium text-gray-700">
-                        {t('step5.homeServices')}
-                    </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="providesHomeServices"
-                                value="true"
-                                checked={formData.providesHomeServices === true}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, providesHomeServices: true }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.yes')}</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="providesHomeServices"
-                                value="false"
-                                checked={formData.providesHomeServices === false}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, providesHomeServices: false }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.no')}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <label className="text-sm font-medium text-gray-700">
-                        {t('step5.sellProducts')}
-                    </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="sellsProducts"
-                                value="true"
-                                checked={formData.sellsProducts === true}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, sellsProducts: true }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.yes')}</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="sellsProducts"
-                                value="false"
-                                checked={formData.sellsProducts === false}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, sellsProducts: false }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.no')}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <label className="text-sm font-medium text-gray-700">
-                        {t('step5.paymentGateway')}
-                    </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="hasOwnPaymentGateway"
-                                value="true"
-                                checked={formData.hasOwnPaymentGateway === true}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, hasOwnPaymentGateway: true }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.yes')}</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="hasOwnPaymentGateway"
-                                value="false"
-                                checked={formData.hasOwnPaymentGateway === false}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, hasOwnPaymentGateway: false }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.no')}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <label className="text-sm font-medium text-gray-700">
-                        {t('step5.socialMedia')}
-                    </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="advertiseOnSocialMedia"
-                                value="true"
-                                checked={formData.advertiseOnSocialMedia === true}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, advertiseOnSocialMedia: true }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.yes')}</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="advertiseOnSocialMedia"
-                                value="false"
-                                checked={formData.advertiseOnSocialMedia === false}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, advertiseOnSocialMedia: false }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.no')}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <label className="text-sm font-medium text-gray-700">
-                        {t('step5.rifahPromotion')}
-                    </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="wantsRifahPromotion"
-                                value="true"
-                                checked={formData.wantsRifahPromotion === true}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, wantsRifahPromotion: true }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.yes')}</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="radio"
-                                name="wantsRifahPromotion"
-                                value="false"
-                                checked={formData.wantsRifahPromotion === false}
-                                onChange={() => setFormData((prev: any) => ({ ...prev, wantsRifahPromotion: false }))}
-                                className="w-4 h-4 text-purple-600"
-                            />
-                            <span className="ml-2 text-sm">{t('step5.no')}</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            {/* Other Fields */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('step5.staffCount')}
-                </label>
-                <input
-                    type="number"
-                    name="staffCount"
-                    value={formData.staffCount}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    min="0"
-                    placeholder="0"
-                />
-            </div>
-
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('step5.mainService')}
-                </label>
-                <textarea
-                    name="mainService"
-                    value={formData.mainService}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder={t('step5.mainServicePlaceholder')}
-                />
-            </div>
-
-            {/* Service Ranking */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('step5.serviceRanking')}
-                </label>
-                <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                            key={star}
-                            type="button"
-                            onClick={() => handleChange({
-                                target: { name: 'serviceRanking', value: star }
-                            } as any)}
-                            className={`text-3xl ${star <= formData.serviceRanking
-                                ? 'text-yellow-400'
-                                : 'text-gray-300'
-                                }`}
-                        >
-                            ★
-                        </button>
-                    ))}
-                </div>
-                <p className="text-sm text-gray-500 mt-1">{t('step5.rankingHint')}</p>
-            </div>
-        </div>
-    );
-};
-
 // Step 6: Subscription Package Selection Component
 const Step6SubscriptionPackage = ({ formData, setFormData, errors }: any) => {
     const t = useTranslations('register');
@@ -1111,6 +889,7 @@ export default function RegisterPage() {
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<any>({});
     const [isSuccess, setIsSuccess] = useState(false);
+    const totalSteps = 6;
 
     const [formData, setFormData] = useState({
         // Step 1: Entity Details
@@ -1149,7 +928,8 @@ export default function RegisterPage() {
         ownerEmail: '',
         ownerNationalId: '',
 
-        // Step 5: Business Details
+        // Legacy business detail fields are no longer shown in the wizard,
+        // but we keep safe defaults so the backend payload remains valid.
         providesHomeServices: false,
         staffCount: '',
         mainService: '',
@@ -1239,7 +1019,7 @@ export default function RegisterPage() {
             if (!formData.ownerNationalId) newErrors.ownerNationalId = 'National ID / Iqama is required';
         }
 
-        if (step === 6) {
+        if (step === 5) {
             if (!formData.selectedPackageId) {
                 newErrors.selectedPackageId = locale === 'ar'
                     ? 'يرجى اختيار باقة الاشتراك'
@@ -1253,7 +1033,7 @@ export default function RegisterPage() {
 
     const nextStep = () => {
         if (validateStep(currentStep)) {
-            setCurrentStep(prev => Math.min(prev + 1, 7));
+            setCurrentStep(prev => Math.min(prev + 1, totalSteps));
         }
     };
 
@@ -1268,7 +1048,7 @@ export default function RegisterPage() {
             return;
         }
 
-        if (currentStep < 7) {
+        if (currentStep < totalSteps) {
             nextStep();
             return;
         }
@@ -1390,7 +1170,7 @@ export default function RegisterPage() {
                 {/* Progress Bar */}
                 <div className="mb-8 bg-white rounded-xl p-6 shadow-xl border border-gray-200">
                     <div className="flex items-center justify-between">
-                        {[1, 2, 3, 4, 5, 6, 7].map((step) => (
+                        {Array.from({ length: totalSteps }, (_, index) => index + 1).map((step) => (
                             <div key={step} className="flex-1">
                                 <div className="flex items-center">
                                     <div
@@ -1401,7 +1181,7 @@ export default function RegisterPage() {
                                     >
                                         {step}
                                     </div>
-                                    {step < 7 && (
+                                    {step < totalSteps && (
                                         <div
                                             className={`flex-1 h-1 mx-2 rounded ${step < currentStep ? 'bg-purple-600' : 'bg-gray-300'
                                                 }`}
@@ -1481,15 +1261,6 @@ export default function RegisterPage() {
                                 )}
 
                                 {currentStep === 5 && (
-                                    <Step5BusinessDetails
-                                        formData={formData}
-                                        setFormData={setFormData}
-                                        handleChange={handleChange}
-                                        errors={errors}
-                                    />
-                                )}
-
-                                {currentStep === 6 && (
                                     <Step6SubscriptionPackage
                                         formData={formData}
                                         setFormData={setFormData}
@@ -1497,7 +1268,7 @@ export default function RegisterPage() {
                                     />
                                 )}
 
-                                {currentStep === 7 && (
+                                {currentStep === 6 && (
                                     <Step7ServiceAgreement
                                         formData={formData}
                                         handleChange={handleChange}
@@ -1517,7 +1288,7 @@ export default function RegisterPage() {
                                         </button>
                                     )}
 
-                                    {currentStep < 7 ? (
+                                    {currentStep < totalSteps ? (
                                         <button
                                             type="button"
                                             onClick={nextStep}
