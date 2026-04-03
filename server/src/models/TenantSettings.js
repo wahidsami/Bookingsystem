@@ -99,8 +99,22 @@ module.exports = (sequelize, DataTypes) => {
         // Payment settings
         paymentSettings: {
             type: DataTypes.JSON,
-            defaultValue: {},
-            comment: 'Payment methods and preferences'
+            defaultValue: {
+                acceptCash: true,
+                acceptCard: true,
+                acceptWallet: true,
+                allowServicePayAtCenter: true,
+                allowServiceFullOnline: true,
+                allowServiceDeposit: true,
+                serviceDepositMode: 'fixed',
+                serviceDepositFixedAmount: 50,
+                serviceDepositPercentage: 50,
+                allowProductOnline: true,
+                allowProductPayOnPickup: true,
+                allowProductCashOnDelivery: true,
+                defaultDeliveryFee: 25
+            },
+            comment: 'Payment methods and tenant payment policy for bookings/orders'
         },
         acceptCash: {
             type: DataTypes.BOOLEAN,

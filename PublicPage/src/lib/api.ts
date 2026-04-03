@@ -50,6 +50,21 @@ export interface Tenant {
   pinterestUrl: string | null;
   whatsappNumber: string | null;
   workingHours?: WorkingHours;
+  paymentSettings?: {
+    acceptCash: boolean;
+    acceptCard: boolean;
+    acceptWallet: boolean;
+    allowServicePayAtCenter: boolean;
+    allowServiceFullOnline: boolean;
+    allowServiceDeposit: boolean;
+    serviceDepositMode: 'fixed' | 'percentage';
+    serviceDepositFixedAmount: number;
+    serviceDepositPercentage: number;
+    allowProductOnline: boolean;
+    allowProductPayOnPickup: boolean;
+    allowProductCashOnDelivery: boolean;
+    defaultDeliveryFee: number;
+  };
 }
 
 export interface PublicPageData {
@@ -388,7 +403,7 @@ class PublicAPI {
     notes?: string;
     postalCode?: string;
     deliveryMethod: 'standard' | 'express' | 'pickup';
-    paymentMethod: 'online' | 'cash-on-delivery';
+    paymentMethod: 'online' | 'cash-on-delivery' | 'pay-on-visit';
     platformUserId?: string; // Optional - for authenticated users
   }): Promise<{ success: boolean; message: string; data: { orderId: string; orderReference: string; total: number; items: any[] } }> {
     return this.request(`/tenant/${tenantId}/orders`, {

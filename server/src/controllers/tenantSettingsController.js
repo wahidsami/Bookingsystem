@@ -8,6 +8,10 @@ const { Op } = require('sequelize');
 const { checkResourceLimit } = require('../utils/tenantLimitsUtil');
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
+const {
+    normalizeTenantPaymentSettings,
+    validateTenantPaymentSettings
+} = require('../utils/tenantPaymentSettings');
 
 /**
  * Get subscription limits and current usage for the tenant.
@@ -106,6 +110,7 @@ exports.getSettings = async (req, res) => {
                 acceptCash: true,
                 acceptCard: true,
                 acceptWallet: true,
+                paymentSettings: normalizeTenantPaymentSettings(),
                 enableEmailNotifications: true,
                 enableSmsNotifications: false,
                 enableWhatsAppNotifications: false,
@@ -115,11 +120,21 @@ exports.getSettings = async (req, res) => {
             }
         });
 
+        const normalizedPaymentSettings = normalizeTenantPaymentSettings(settings.paymentSettings, {
+            acceptCash: settings.acceptCash,
+            acceptCard: settings.acceptCard,
+            acceptWallet: settings.acceptWallet
+        });
+
         res.json({
             success: true,
             data: {
                 business: tenant,
-                settings: settings
+                settings: {
+                    ...settings.toJSON(),
+                    paymentSettings: normalizedPaymentSettings,
+                    defaultDeliveryFee: normalizedPaymentSettings.defaultDeliveryFee
+                }
             }
         });
 
@@ -378,36 +393,57 @@ exports.updateNotificationSettings = async (req, res) => {
 exports.updatePaymentSettings = async (req, res) => {
     try {
         const tenantId = req.tenant.id;
-        const {
-            acceptCash,
-            acceptCard,
-            acceptWallet,
-            payoutBankAccount
-        } = req.body;
+        const normalizedPaymentSettings = normalizeTenantPaymentSettings(
+            req.body?.paymentSettings || req.body || {},
+            {
+                acceptCash: req.body?.acceptCash,
+                acceptCard: req.body?.acceptCard,
+                acceptWallet: req.body?.acceptWallet
+            }
+        );
+
+        validateTenantPaymentSettings(normalizedPaymentSettings);
 
         let [settings] = await db.TenantSettings.findOrCreate({
             where: { tenantId },
-            defaults: { tenantId }
+            defaults: {
+                tenantId,
+                paymentSettings: normalizedPaymentSettings
+            }
         });
 
         await settings.update({
-            acceptCash: acceptCash !== undefined ? acceptCash : settings.acceptCash,
-            acceptCard: acceptCard !== undefined ? acceptCard : settings.acceptCard,
-            acceptWallet: acceptWallet !== undefined ? acceptWallet : settings.acceptWallet,
-            payoutBankAccount: payoutBankAccount !== undefined ? payoutBankAccount : settings.payoutBankAccount
+            acceptCash: normalizedPaymentSettings.acceptCash,
+            acceptCard: normalizedPaymentSettings.acceptCard,
+            acceptWallet: normalizedPaymentSettings.acceptWallet,
+            paymentSettings: normalizedPaymentSettings,
+            payoutBankAccount: req.body?.payoutBankAccount !== undefined
+                ? req.body.payoutBankAccount
+                : settings.payoutBankAccount
         });
 
         res.json({
             success: true,
             message: 'Payment settings updated',
-            data: settings
+            data: {
+                ...settings.toJSON(),
+                paymentSettings: normalizedPaymentSettings,
+                defaultDeliveryFee: normalizedPaymentSettings.defaultDeliveryFee
+            }
         });
 
     } catch (error) {
         console.error('Update payment settings error:', error);
-        res.status(500).json({
+        const isValidationError = [
+            'At least one service booking payment option must be enabled',
+            'At least one product payment option must be enabled',
+            'Service deposit fixed amount must be greater than 0',
+            'Service deposit percentage must be between 1 and 100'
+        ].includes(error.message);
+
+        res.status(isValidationError ? 400 : 500).json({
             success: false,
-            message: 'Failed to update payment settings',
+            message: isValidationError ? error.message : 'Failed to update payment settings',
             error: error.message
         });
     }

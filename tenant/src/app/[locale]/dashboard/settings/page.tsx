@@ -109,6 +109,15 @@ export default function SettingsPage() {
     acceptCash: true,
     acceptCard: true,
     acceptWallet: true,
+    allowServicePayAtCenter: true,
+    allowServiceFullOnline: true,
+    allowServiceDeposit: true,
+    serviceDepositMode: 'fixed' as 'fixed' | 'percentage',
+    serviceDepositFixedAmount: 50,
+    serviceDepositPercentage: 50,
+    allowProductOnline: true,
+    allowProductPayOnPickup: true,
+    allowProductCashOnDelivery: true,
     defaultDeliveryFee: 0,
   });
 
@@ -191,10 +200,27 @@ export default function SettingsPage() {
           });
 
           setPaymentSettings({
-            acceptCash: settings.acceptCash ?? true,
-            acceptCard: settings.acceptCard ?? true,
-            acceptWallet: settings.acceptWallet ?? true,
-            defaultDeliveryFee: settings.defaultDeliveryFee != null ? Number(settings.defaultDeliveryFee) : 0,
+            acceptCash: settings.paymentSettings?.acceptCash ?? settings.acceptCash ?? true,
+            acceptCard: settings.paymentSettings?.acceptCard ?? settings.acceptCard ?? true,
+            acceptWallet: settings.paymentSettings?.acceptWallet ?? settings.acceptWallet ?? true,
+            allowServicePayAtCenter: settings.paymentSettings?.allowServicePayAtCenter !== false,
+            allowServiceFullOnline: settings.paymentSettings?.allowServiceFullOnline !== false,
+            allowServiceDeposit: settings.paymentSettings?.allowServiceDeposit !== false,
+            serviceDepositMode: settings.paymentSettings?.serviceDepositMode === 'percentage' ? 'percentage' : 'fixed',
+            serviceDepositFixedAmount: settings.paymentSettings?.serviceDepositFixedAmount != null
+              ? Number(settings.paymentSettings.serviceDepositFixedAmount)
+              : 50,
+            serviceDepositPercentage: settings.paymentSettings?.serviceDepositPercentage != null
+              ? Number(settings.paymentSettings.serviceDepositPercentage)
+              : 50,
+            allowProductOnline: settings.paymentSettings?.allowProductOnline !== false,
+            allowProductPayOnPickup: settings.paymentSettings?.allowProductPayOnPickup !== false,
+            allowProductCashOnDelivery: settings.paymentSettings?.allowProductCashOnDelivery !== false,
+            defaultDeliveryFee: settings.paymentSettings?.defaultDeliveryFee != null
+              ? Number(settings.paymentSettings.defaultDeliveryFee)
+              : settings.defaultDeliveryFee != null
+                ? Number(settings.defaultDeliveryFee)
+                : 25,
           });
 
           setLocalizationSettings({
@@ -983,6 +1009,138 @@ export default function SettingsPage() {
                   </label>
                 </div>
 
+                <div className="pt-4 border-t border-gray-200 space-y-4">
+                  <h3 className="font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'خيارات دفع حجوزات الخدمات' : 'Service booking payment options'}
+                  </h3>
+
+                  <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.allowServicePayAtCenter}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, allowServicePayAtCenter: e.target.checked }))}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700">{locale === 'ar' ? 'السماح بالدفع عند الوصول للمركز' : 'Allow pay at center on arrival'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.allowServiceFullOnline}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, allowServiceFullOnline: e.target.checked }))}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700">{locale === 'ar' ? 'السماح بالدفع الإلكتروني الكامل' : 'Allow full online payment'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.allowServiceDeposit}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, allowServiceDeposit: e.target.checked }))}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700">{locale === 'ar' ? 'السماح بدفع عربون / جزء من قيمة الحجز' : 'Allow deposit / partial booking payment'}</span>
+                  </label>
+
+                  {paymentSettings.allowServiceDeposit && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-2xl bg-gray-50 p-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'نوع العربون' : 'Deposit mode'}
+                        </label>
+                        <select
+                          value={paymentSettings.serviceDepositMode}
+                          onChange={(e) => setPaymentSettings(prev => ({
+                            ...prev,
+                            serviceDepositMode: e.target.value === 'percentage' ? 'percentage' : 'fixed'
+                          }))}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:ring-2 focus:ring-primary-500"
+                        >
+                          <option value="fixed">{locale === 'ar' ? 'مبلغ ثابت' : 'Fixed amount'}</option>
+                          <option value="percentage">{locale === 'ar' ? 'نسبة من قيمة الخدمة' : 'Percentage of service price'}</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {paymentSettings.serviceDepositMode === 'percentage'
+                            ? locale === 'ar'
+                              ? 'نسبة العربون %'
+                              : 'Deposit percentage %'
+                            : locale === 'ar'
+                              ? 'مبلغ العربون (ر.س)'
+                              : 'Deposit amount (SAR)'}
+                        </label>
+                        <input
+                          type="number"
+                          min={paymentSettings.serviceDepositMode === 'percentage' ? 1 : 0}
+                          max={paymentSettings.serviceDepositMode === 'percentage' ? 100 : undefined}
+                          step={paymentSettings.serviceDepositMode === 'percentage' ? 1 : 0.01}
+                          value={paymentSettings.serviceDepositMode === 'percentage'
+                            ? paymentSettings.serviceDepositPercentage
+                            : paymentSettings.serviceDepositFixedAmount}
+                          onChange={(e) => {
+                            const numericValue = parseFloat(e.target.value) || 0;
+                            setPaymentSettings(prev => ({
+                              ...prev,
+                              serviceDepositPercentage: prev.serviceDepositMode === 'percentage'
+                                ? Math.min(100, Math.max(1, numericValue))
+                                : prev.serviceDepositPercentage,
+                              serviceDepositFixedAmount: prev.serviceDepositMode === 'fixed'
+                                ? Math.max(0, numericValue)
+                                : prev.serviceDepositFixedAmount
+                            }));
+                          }}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:ring-2 focus:ring-primary-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar'
+                            ? 'مثال: اختر نسبة 50% لتفعيل دفع نصف المبلغ الآن والنصف المتبقي في المركز.'
+                            : 'Example: set 50% to support true 50/50 booking payments.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-gray-200 space-y-4">
+                  <h3 className="font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'خيارات دفع طلبات المنتجات' : 'Product order payment options'}
+                  </h3>
+
+                  <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.allowProductOnline}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, allowProductOnline: e.target.checked }))}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700">{locale === 'ar' ? 'السماح بالدفع الإلكتروني للمنتجات' : 'Allow online product payment'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.allowProductPayOnPickup}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, allowProductPayOnPickup: e.target.checked }))}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700">{locale === 'ar' ? 'السماح بالدفع عند الاستلام من المركز' : 'Allow pay at center pickup'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.allowProductCashOnDelivery}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, allowProductCashOnDelivery: e.target.checked }))}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700">{locale === 'ar' ? 'السماح بالدفع عند التوصيل' : 'Allow cash on delivery'}</span>
+                  </label>
+                </div>
+
                 <div className="pt-4 border-t border-gray-200">
                   <h3 className="font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'رسوم التوصيل الافتراضية (ر.س)' : 'Default delivery fee (SAR)'}
@@ -1079,4 +1237,3 @@ export default function SettingsPage() {
     </TenantLayout>
   );
 }
-

@@ -9,6 +9,7 @@ const { Sequelize } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('../services/pushNotificationService');
 const bookingService = require('../services/bookingService');
+const { calculateSplitPayment } = require('../services/splitPaymentService');
 
 /**
  * Get all appointments for the authenticated tenant
@@ -390,10 +391,10 @@ exports.updatePaymentStatus = async (req, res) => {
             appointment.depositPaid = true;
             appointment.remainderPaid = false;
             if (!appointment.depositAmount || parseFloat(appointment.depositAmount) === 0) {
-                const depositAmount = parseFloat((parseFloat(appointment.price || 0) * 0.25).toFixed(2));
-                appointment.depositAmount = depositAmount;
-                appointment.remainderAmount = parseFloat((parseFloat(appointment.price || 0) - depositAmount).toFixed(2));
-                appointment.totalPaid = depositAmount;
+                const splitPayment = await calculateSplitPayment(tenantId, appointment.price || 0);
+                appointment.depositAmount = splitPayment.depositAmount;
+                appointment.remainderAmount = splitPayment.remainderAmount;
+                appointment.totalPaid = splitPayment.depositAmount;
             }
             appointment.paidAt = appointment.paidAt || new Date();
         } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {

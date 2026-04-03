@@ -26,10 +26,15 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const deliveryCharge = checkoutData.deliveryType === 'delivery' ? 25 : 0;
+  const paymentPolicy = tenant?.paymentSettings;
+  const deliveryFeeAmount = paymentPolicy?.defaultDeliveryFee ?? 25;
+  const deliveryCharge = checkoutData.deliveryType === 'delivery' ? deliveryFeeAmount : 0;
   const subtotal = getCartTotal();
   const vat = subtotal * 0.15;
   const total = subtotal + deliveryCharge + vat;
+  const canPayOnline = paymentPolicy?.allowProductOnline !== false;
+  const canPayOnPickup = paymentPolicy?.allowProductPayOnPickup !== false;
+  const canPayOnDelivery = paymentPolicy?.allowProductCashOnDelivery !== false;
 
   // Pre-fill user data when authenticated
   useEffect(() => {
@@ -95,13 +100,11 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
         ? `${checkoutData.street || ''}, ${checkoutData.district || ''}, ${checkoutData.city || ''}${checkoutData.building ? `, ${checkoutData.building}` : ''}`.trim()
         : '';
 
-      // Map payment method - backend expects 'online' or 'cash-on-delivery'
-      let paymentMethod: 'online' | 'cash-on-delivery' = 'cash-on-delivery';
-      if (checkoutData.paymentMethod === 'online') {
-        paymentMethod = 'online';
-      } else if (checkoutData.paymentMethod === 'pay-on-delivery') {
-        paymentMethod = 'cash-on-delivery';
-      }
+      const paymentMethod = checkoutData.paymentMethod === 'pay-on-visit'
+        ? 'pay-on-visit'
+        : checkoutData.paymentMethod === 'online'
+          ? 'online'
+          : 'cash-on-delivery';
 
       // Map delivery method - backend expects 'standard' or 'express'
       const deliveryMethod = checkoutData.deliveryType === 'delivery' ? 'standard' : 'standard';
@@ -239,7 +242,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
             <h3 className="mb-6">Delivery Options</h3>
             <div className="space-y-4 mb-6">
               <button
-                onClick={() => setCheckoutData({ ...checkoutData, deliveryType: 'pickup' })}
+                onClick={() => setCheckoutData({ ...checkoutData, deliveryType: 'pickup', paymentMethod: undefined })}
                 className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
                   checkoutData.deliveryType === 'pickup'
                     ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
@@ -251,7 +254,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
                 <p className="text-sm text-green-600">Free</p>
               </button>
               <button
-                onClick={() => setCheckoutData({ ...checkoutData, deliveryType: 'delivery' })}
+                onClick={() => setCheckoutData({ ...checkoutData, deliveryType: 'delivery', paymentMethod: undefined })}
                 className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
                   checkoutData.deliveryType === 'delivery'
                     ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
@@ -260,7 +263,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
               >
                 <h4 className="mb-2">Home Delivery</h4>
                 <p className="text-gray-600 mb-2">We deliver to your doorstep</p>
-                <p className="text-sm text-[var(--color-primary)]"><Currency amount={30} /></p>
+                <p className="text-sm text-[var(--color-primary)]"><Currency amount={deliveryFeeAmount} /></p>
               </button>
             </div>
 
@@ -317,28 +320,55 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onComplete }
           <div>
             <h3 className="mb-6">Payment Method</h3>
             <div className="space-y-4">
-              <button
-                onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'pay-on-delivery' })}
-                className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  checkoutData.paymentMethod === 'pay-on-delivery'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-gray-200 hover:border-[var(--color-primary)]/50'
-                }`}
-              >
-                <h4 className="mb-2">Pay on Delivery</h4>
-                <p className="text-gray-600">Pay with cash when your order arrives</p>
-              </button>
-              <button
-                onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'online' })}
-                className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  checkoutData.paymentMethod === 'online'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-gray-200 hover:border-[var(--color-primary)]/50'
-                }`}
-              >
-                <h4 className="mb-2">Online Payment</h4>
-                <p className="text-gray-600">Secure payment with credit/debit card</p>
-              </button>
+              {checkoutData.deliveryType === 'pickup' && canPayOnPickup && (
+                <button
+                  onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'pay-on-visit' })}
+                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
+                    checkoutData.paymentMethod === 'pay-on-visit'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
+                  }`}
+                >
+                  <h4 className="mb-2">Pay at Center Pickup</h4>
+                  <p className="text-gray-600">Pick up your order and pay at reception</p>
+                </button>
+              )}
+
+              {checkoutData.deliveryType === 'delivery' && canPayOnDelivery && (
+                <button
+                  onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'pay-on-delivery' })}
+                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
+                    checkoutData.paymentMethod === 'pay-on-delivery'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
+                  }`}
+                >
+                  <h4 className="mb-2">Pay on Delivery</h4>
+                  <p className="text-gray-600">Pay with cash when your order arrives</p>
+                </button>
+              )}
+
+              {canPayOnline && (
+                <button
+                  onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'online' })}
+                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
+                    checkoutData.paymentMethod === 'online'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
+                  }`}
+                >
+                  <h4 className="mb-2">Online Payment</h4>
+                  <p className="text-gray-600">Secure payment with credit/debit card</p>
+                </button>
+              )}
+
+              {!canPayOnline
+                && !(checkoutData.deliveryType === 'pickup' && canPayOnPickup)
+                && !(checkoutData.deliveryType === 'delivery' && canPayOnDelivery) && (
+                  <div className="p-4 rounded-2xl bg-red-50 text-sm text-red-700 border border-red-200">
+                    No payment option is currently enabled for this delivery mode.
+                  </div>
+                )}
             </div>
           </div>
         );

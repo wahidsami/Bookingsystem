@@ -7,6 +7,12 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const {
+    assertServicePaymentMethodAllowed,
+    calculateServiceDeposit,
+    getTenantPaymentSettings,
+    resolvePublicOrderPaymentMethod
+} = require('../utils/tenantPaymentSettings');
 
 const BUSINESS_TYPE_META = {
     beauty_salon: { name_en: 'Beauty Salon', name_ar: 'صالون تجميل', icon: '💄' },
@@ -302,6 +308,7 @@ exports.getTenantBySlug = async (req, res) => {
         const tenantData = tenant.toJSON();
         tenantData.profileImage = tenantData.coverImage;
         tenantData.whatsappNumber = tenantData.whatsapp;
+        tenantData.paymentSettings = await getTenantPaymentSettings(tenant.id);
         // Keep coverImage for Client App compatibility
         // delete tenantData.coverImage;
         delete tenantData.whatsapp;
@@ -864,6 +871,9 @@ exports.createPublicBooking = async (req, res) => {
             });
         }
 
+        const tenantPaymentSettings = await getTenantPaymentSettings(tenantId);
+        assertServicePaymentMethodAllowed(paymentMethod || 'at-center', tenantPaymentSettings);
+
         // Use unified booking service
         // This handles all validation, conflict checking, pricing, etc.
         const appointment = await bookingService.createBooking({
@@ -883,11 +893,9 @@ exports.createPublicBooking = async (req, res) => {
             platformFee: appointment.platformFee
         };
 
-        // Calculate booking fee if needed (for future payment processing)
-        let bookingFee = 0;
-        if (paymentMethod === 'booking-fee') {
-            bookingFee = 50; // Default booking fee (can be configured later)
-        }
+        const bookingFee = paymentMethod === 'booking-fee'
+            ? calculateServiceDeposit(appointment.price || 0, tenantPaymentSettings).depositAmount
+            : 0;
 
         if (paymentMethod === 'online-full') {
             const totalPaid = parseFloat(appointment.price || 0);
@@ -914,7 +922,8 @@ exports.createPublicBooking = async (req, res) => {
             });
         } else if (paymentMethod === 'booking-fee') {
             const totalPrice = parseFloat(appointment.price || 0);
-            const safeBookingFee = Math.min(bookingFee, totalPrice);
+            const splitPayment = calculateServiceDeposit(totalPrice, tenantPaymentSettings);
+            const safeBookingFee = splitPayment.depositAmount;
 
             await appointment.update({
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
@@ -922,7 +931,7 @@ exports.createPublicBooking = async (req, res) => {
                 paidAt: new Date(),
                 depositAmount: safeBookingFee,
                 depositPaid: safeBookingFee > 0,
-                remainderAmount: parseFloat((totalPrice - safeBookingFee).toFixed(2)),
+                remainderAmount: splitPayment.remainderAmount,
                 remainderPaid: false,
                 totalPaid: safeBookingFee
             });
@@ -971,7 +980,12 @@ exports.createPublicBooking = async (req, res) => {
         
         // Determine appropriate status code
         let statusCode = 500;
-        if (error.message.includes('required') || error.message.includes('Invalid')) {
+        if (error.message.includes('required')
+            || error.message.includes('Invalid')
+            || error.message.includes('payment option')
+            || error.message.includes('Pay at')
+            || error.message.includes('Cash on delivery')
+            || error.message.includes('Online product payment')) {
             statusCode = 400;
         } else if (error.message.includes('not found')) {
             statusCode = 404;
@@ -1060,8 +1074,13 @@ exports.createPublicOrder = async (req, res) => {
             notes: notes || ''
         } : null;
 
-        const normalizedPaymentMethod = paymentMethod === 'online' ? 'online' : 'cash_on_delivery';
         const deliveryType = shippingAddressData ? 'delivery' : 'pickup';
+        const tenantPaymentSettings = await getTenantPaymentSettings(tenantId);
+        const normalizedPaymentMethod = resolvePublicOrderPaymentMethod(
+            paymentMethod,
+            deliveryType,
+            tenantPaymentSettings
+        );
 
         const order = await orderService.createOrder({
             platformUserId,
@@ -1071,6 +1090,7 @@ exports.createPublicOrder = async (req, res) => {
             deliveryType,
             deliveryMethod: deliveryMethod || 'standard',
             shippingAddress: shippingAddressData,
+            shippingFee: tenantPaymentSettings.defaultDeliveryFee,
             notes: notes || null
         });
 
@@ -1098,9 +1118,17 @@ exports.createPublicOrder = async (req, res) => {
         });
     } catch (error) {
         console.error('Create public order error:', error);
-        res.status(500).json({
+        const statusCode = error.message.includes('payment')
+            || error.message.includes('Pay at')
+            || error.message.includes('Cash on delivery')
+            || error.message.includes('Missing required')
+            || error.message.includes('Invalid')
+            ? 400
+            : 500;
+
+        res.status(statusCode).json({
             success: false,
-            message: 'Failed to create order',
+            message: error.message || 'Failed to create order',
             error: error.message
         });
     }

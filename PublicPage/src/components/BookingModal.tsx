@@ -17,7 +17,7 @@ interface BookingModalProps {
 type BookingStep = 'date' | 'time' | 'service-type' | 'staff' | 'customer' | 'payment' | 'confirmation' | 'success';
 
 export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, initialServiceId }) => {
-  const { tenantId } = useTenant();
+  const { tenantId, tenant } = useTenant();
   const { user, isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState<BookingStep>('date');
   const [bookingData, setBookingData] = useState<BookingData>({
@@ -118,6 +118,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
   if (!isOpen) return null;
 
   const selectedService = services.find((s) => s.id === bookingData.serviceId);
+  const paymentPolicy = tenant?.paymentSettings;
+  const canPayAtCenter = paymentPolicy?.allowServicePayAtCenter !== false;
+  const canPayOnline = paymentPolicy?.allowServiceFullOnline !== false;
+  const canPayDeposit = paymentPolicy?.allowServiceDeposit !== false;
+  const serviceDepositAmount = selectedService
+    ? Math.min(
+        selectedService.finalPrice || 0,
+        paymentPolicy?.serviceDepositMode === 'percentage'
+          ? ((selectedService.finalPrice || 0) * (paymentPolicy?.serviceDepositPercentage ?? 50)) / 100
+          : paymentPolicy?.serviceDepositFixedAmount ?? 50
+      )
+    : paymentPolicy?.serviceDepositMode === 'fixed'
+      ? paymentPolicy?.serviceDepositFixedAmount ?? 50
+      : paymentPolicy?.serviceDepositPercentage ?? 50;
 
   const handleNext = () => {
     const steps: BookingStep[] = ['date', 'time', 'service-type', 'staff', 'customer', 'payment', 'confirmation', 'success'];
@@ -527,39 +541,58 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
               <h3>Select Payment Method</h3>
             </div>
             <div className="space-y-4">
-              <button
-                onClick={() => setBookingData({ ...bookingData, paymentMethod: 'at-center' })}
-                className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  bookingData.paymentMethod === 'at-center'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-gray-200 hover:border-[var(--color-primary)]/50'
-                }`}
-              >
-                <h4 className="mb-2">Pay at Center</h4>
-                <p className="text-gray-600">Pay when you arrive for your appointment</p>
-              </button>
-              <button
-                onClick={() => setBookingData({ ...bookingData, paymentMethod: 'online-full' })}
-                className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  bookingData.paymentMethod === 'online-full'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-gray-200 hover:border-[var(--color-primary)]/50'
-                }`}
-              >
-                <h4 className="mb-2">Pay Online (Full Amount)</h4>
-                <p className="text-gray-600">Secure online payment with card</p>
-              </button>
-              <button
-                onClick={() => setBookingData({ ...bookingData, paymentMethod: 'booking-fee' })}
-                className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  bookingData.paymentMethod === 'booking-fee'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-gray-200 hover:border-[var(--color-primary)]/50'
-                }`}
-              >
-                <h4 className="mb-2">Pay Booking Fee Only</h4>
-                <p className="text-gray-600">Pay <Currency amount={50} /> now, rest at the center</p>
-              </button>
+              {canPayAtCenter && (
+                <button
+                  onClick={() => setBookingData({ ...bookingData, paymentMethod: 'at-center' })}
+                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
+                    bookingData.paymentMethod === 'at-center'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
+                  }`}
+                >
+                  <h4 className="mb-2">Pay at Center</h4>
+                  <p className="text-gray-600">Pay when you arrive for your appointment</p>
+                </button>
+              )}
+
+              {canPayOnline && (
+                <button
+                  onClick={() => setBookingData({ ...bookingData, paymentMethod: 'online-full' })}
+                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
+                    bookingData.paymentMethod === 'online-full'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
+                  }`}
+                >
+                  <h4 className="mb-2">Pay Online (Full Amount)</h4>
+                  <p className="text-gray-600">Secure online payment with card</p>
+                </button>
+              )}
+
+              {canPayDeposit && (
+                <button
+                  onClick={() => setBookingData({ ...bookingData, paymentMethod: 'booking-fee' })}
+                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
+                    bookingData.paymentMethod === 'booking-fee'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
+                  }`}
+                >
+                  <h4 className="mb-2">Pay Booking Deposit Only</h4>
+                  <p className="text-gray-600">
+                    {paymentPolicy?.serviceDepositMode === 'percentage'
+                      ? `Pay ${paymentPolicy?.serviceDepositPercentage ?? 50}% now`
+                      : <>Pay <Currency amount={Number(serviceDepositAmount.toFixed(2))} /> now</>}
+                    , rest at the center
+                  </p>
+                </button>
+              )}
+
+              {!canPayAtCenter && !canPayOnline && !canPayDeposit && (
+                <div className="p-4 rounded-2xl bg-red-50 text-sm text-red-700 border border-red-200">
+                  This center has not enabled any booking payment option yet.
+                </div>
+              )}
             </div>
           </div>
         );

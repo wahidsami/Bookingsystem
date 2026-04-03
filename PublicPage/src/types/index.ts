@@ -84,5 +84,5 @@ export interface CheckoutData {
   district?: string;
   street?: string;
   building?: string;
-  paymentMethod?: 'pay-on-delivery' | 'online' | 'booking-fee';
+  paymentMethod?: 'pay-on-delivery' | 'pay-on-visit' | 'online' | 'booking-fee';
 }

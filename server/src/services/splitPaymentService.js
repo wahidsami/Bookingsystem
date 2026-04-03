@@ -5,6 +5,10 @@
 
 const db = require('../models');
 const paymentService = require('./paymentService');
+const {
+    calculateServiceDeposit,
+    getTenantPaymentSettings
+} = require('../utils/tenantPaymentSettings');
 
 /**
  * Calculate deposit and remainder amounts based on tenant settings
@@ -13,19 +17,8 @@ const paymentService = require('./paymentService');
  * @returns {Promise<Object>} { depositAmount, remainderAmount, depositPercentage }
  */
 const calculateSplitPayment = async (tenantId, totalPrice) => {
-    // TODO: Get deposit percentage from tenant settings
-    // For now, use default 25%
-    const depositPercentage = 25;
-
-    const price = parseFloat(totalPrice);
-    const depositAmount = parseFloat((price * (depositPercentage / 100)).toFixed(2));
-    const remainderAmount = parseFloat((price - depositAmount).toFixed(2));
-
-    return {
-        depositAmount,
-        remainderAmount,
-        depositPercentage
-    };
+    const paymentSettings = await getTenantPaymentSettings(tenantId);
+    return calculateServiceDeposit(totalPrice, paymentSettings);
 };
 
 /**
