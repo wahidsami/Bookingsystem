@@ -1289,6 +1289,11 @@ export default function RegisterPage() {
             // Append all form fields with proper type handling
             Object.entries(formData).forEach(([key, value]) => {
                 if (key !== 'confirmPassword') {
+                    if (Array.isArray(value)) {
+                        submitData.append(key, JSON.stringify(value));
+                        return;
+                    }
+
                     // Convert booleans to 'true'/'false' strings for FormData
                     // but preserve numeric strings for staff count
                     if (typeof value === 'boolean') {

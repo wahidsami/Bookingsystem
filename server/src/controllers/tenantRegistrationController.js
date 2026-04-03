@@ -4,6 +4,43 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 
+const VALID_BUSINESS_TYPES = ['salon', 'spa', 'barbershop', 'beauty_center', 'clinic', 'nail_studio', 'other'];
+
+const normalizeBusinessTypes = (businessTypeInput) => {
+    if (businessTypeInput == null) {
+        return [];
+    }
+
+    if (Array.isArray(businessTypeInput)) {
+        return businessTypeInput
+            .map((type) => String(type).trim())
+            .filter((type) => VALID_BUSINESS_TYPES.includes(type));
+    }
+
+    const rawValue = String(businessTypeInput).trim();
+    if (!rawValue) {
+        return [];
+    }
+
+    if (rawValue.startsWith('[') && rawValue.endsWith(']')) {
+        try {
+            const parsed = JSON.parse(rawValue);
+            if (Array.isArray(parsed)) {
+                return parsed
+                    .map((type) => String(type).trim())
+                    .filter((type) => VALID_BUSINESS_TYPES.includes(type));
+            }
+        } catch (error) {
+            // Fall back to comma-separated parsing below.
+        }
+    }
+
+    return rawValue
+        .split(',')
+        .map((type) => type.trim())
+        .filter((type) => VALID_BUSINESS_TYPES.includes(type));
+};
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -129,6 +166,9 @@ exports.register = async (req, res) => {
             preferredLanguage
         } = req.body;
 
+        const normalizedBusinessTypes = normalizeBusinessTypes(businessType);
+        const primaryBusinessType = normalizedBusinessTypes[0];
+
         // Validation (before transaction to avoid unnecessary DB calls)
         if (!name_en || !name_ar) {
             return res.status(400).json({
@@ -137,10 +177,10 @@ exports.register = async (req, res) => {
             });
         }
 
-        if (!businessType) {
+        if (!primaryBusinessType) {
             return res.status(400).json({
                 success: false,
-                message: 'Business type is required'
+                message: 'At least one valid business type is required'
             });
         }
 
@@ -230,7 +270,7 @@ exports.register = async (req, res) => {
             nameAr: name_ar, // Legacy field
             slug: finalSlug,
             dbSchema,
-            businessType,
+            businessType: primaryBusinessType,
             password,
 
             // Contact Info
@@ -289,6 +329,7 @@ exports.register = async (req, res) => {
                 currency: 'SAR',
                 timezone: 'Asia/Riyadh',
                 language: preferredLanguage || 'ar',
+                businessTypes: normalizedBusinessTypes,
                 bookingBuffer: 15,
                 maxAdvanceBooking: 30,
                 cancellationPolicy: 24,
@@ -356,7 +397,8 @@ exports.register = async (req, res) => {
             userAgent: req.headers['user-agent'],
             details: {
                 businessName: name_en,
-                businessType,
+                businessType: primaryBusinessType,
+                businessTypes: normalizedBusinessTypes,
                 email,
                 status: 'pending_approval',
                 selectedPackage: subscriptionPackage?.name || 'None'
@@ -410,6 +452,7 @@ exports.register = async (req, res) => {
                 name_en: tenant.name_en,
                 name_ar: tenant.name_ar,
                 businessType: tenant.businessType,
+                businessTypes: normalizedBusinessTypes,
                 email: tenant.email,
                 slug: tenant.slug,
                 status: tenant.status,
