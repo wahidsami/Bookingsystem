@@ -372,6 +372,37 @@ class AdminApi {
     return this.request<{ success: boolean; data: Record<string, { count: number; totalAmount: number }> }>(`/admin/financial/bills-summary${params}`);
   }
 
+  async getFinancialInvoices(
+    params: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      type?: string;
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+      tenantId?: string;
+    } = {}
+  ) {
+    const search = new URLSearchParams();
+    if (params.page != null) search.append('page', params.page.toString());
+    if (params.limit != null) search.append('limit', params.limit.toString());
+    if (params.status) search.append('status', params.status);
+    if (params.type) search.append('type', params.type);
+    if (params.search) search.append('search', params.search);
+    if (params.startDate) search.append('startDate', params.startDate);
+    if (params.endDate) search.append('endDate', params.endDate);
+    if (params.tenantId) search.append('tenantId', params.tenantId);
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+
+    return this.request<{
+      success: boolean;
+      bills: any[];
+      summary: Record<string, { count: number; totalAmount: number }>;
+      pagination: { total: number; page: number; limit: number; totalPages: number };
+    }>(`/admin/financial/invoices${suffix}`);
+  }
+
   async getPlatformTransactions(params: { startDate?: string; endDate?: string; tenantId?: string; type?: string; limit?: number; offset?: number } = {}) {
     const search = new URLSearchParams();
     if (params.startDate) search.append('startDate', params.startDate);

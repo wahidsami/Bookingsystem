@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { adminApi } from '@/lib/api';
 import { format, subDays } from 'date-fns';
 
@@ -36,12 +36,86 @@ type RevenueByType = Record<
   { count: number; amount: number; platformFee: number; tenantRevenue: number }
 >;
 
+type InvoiceRow = {
+  id: string;
+  billNumber: string;
+  type: string;
+  status: 'UNPAID' | 'PAID' | 'EXPIRED';
+  amount: number;
+  totalAmount?: number;
+  dueDate?: string | null;
+  paidAt?: string | null;
+  invoiceIssuedAt?: string | null;
+  packageName?: string;
+  packageNameAr?: string;
+  billingCycle?: string;
+  buyer?: {
+    name?: string;
+    nameAr?: string;
+    nameEn?: string;
+    email?: string;
+  };
+  tenant?: {
+    id?: string;
+    name?: string;
+    name_ar?: string;
+    name_en?: string;
+    email?: string;
+  };
+};
+
+type InvoicePagination = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+const formatMoney = (amount: number) =>
+  `SAR ${(Number(amount) || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`;
+
+const formatInvoiceDate = (value?: string | null) => {
+  if (!value) return '-';
+  return format(new Date(value), 'dd MMM yyyy');
+};
+
+const formatBillType = (value?: string) => {
+  if (!value) return '-';
+
+  return value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
+
+const formatBillingCycle = (value?: string) => {
+  if (value === 'monthly') return 'Monthly';
+  if (value === 'sixMonth') return '6 Months';
+  if (value === 'annual') return 'Annual';
+  return value || '-';
+};
+
 export default function FinancialOverviewPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [monthly, setMonthly] = useState<MonthlyData[]>([]);
   const [commissionBreakdown, setCommissionBreakdown] = useState<CommissionByPackageItem[]>([]);
   const [revenueByType, setRevenueByType] = useState<RevenueByType | null>(null);
   const [billsSummary, setBillsSummary] = useState<Record<string, { count: number; totalAmount: number }> | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [invoiceSummary, setInvoiceSummary] = useState<Record<string, { count: number; totalAmount: number }> | null>(null);
+  const [invoicePagination, setInvoicePagination] = useState<InvoicePagination>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1
+  });
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoiceStatus, setInvoiceStatus] = useState('ALL');
+  const [invoiceType, setInvoiceType] = useState('ALL');
+  const [invoiceSearchDraft, setInvoiceSearchDraft] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [invoiceLoading, setInvoiceLoading] = useState(true);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('30');
@@ -49,6 +123,10 @@ export default function FinancialOverviewPage() {
   useEffect(() => {
     fetchData();
   }, [period]);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [period, invoicePage, invoiceStatus, invoiceType, invoiceSearch]);
 
   const fetchData = async () => {
     try {
@@ -76,6 +154,75 @@ export default function FinancialOverviewPage() {
       console.error('Error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchInvoices = async () => {
+    try {
+      setInvoiceLoading(true);
+      setInvoiceError(null);
+
+      const startDate = format(subDays(new Date(), parseInt(period)), 'yyyy-MM-dd');
+      const endDate = format(new Date(), 'yyyy-MM-dd');
+      const response = await adminApi.getFinancialInvoices({
+        page: invoicePage,
+        limit: 10,
+        status: invoiceStatus,
+        type: invoiceType,
+        search: invoiceSearch.trim(),
+        startDate,
+        endDate
+      });
+
+      if (response.success) {
+        setInvoices(response.bills || []);
+        setInvoiceSummary(response.summary || null);
+        setInvoicePagination(response.pagination || {
+          total: 0,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        });
+      }
+    } catch (err) {
+      setInvoiceError(err instanceof Error ? err.message : 'Failed to load invoices');
+      console.error('Invoice list error:', err);
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
+
+  const handleInvoiceSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setInvoicePage(1);
+    setInvoiceSearch(invoiceSearchDraft);
+  };
+
+  const handleInvoiceStatusChange = (value: string) => {
+    setInvoiceStatus(value);
+    setInvoicePage(1);
+  };
+
+  const handleInvoiceTypeChange = (value: string) => {
+    setInvoiceType(value);
+    setInvoicePage(1);
+  };
+
+  const downloadPdf = async (billId: string, kind: 'invoice' | 'receipt') => {
+    try {
+      const file = kind === 'invoice'
+        ? await adminApi.downloadBillInvoicePdf(billId)
+        : await adminApi.downloadBillReceiptPdf(billId);
+      const url = URL.createObjectURL(file.blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = file.filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : `Failed to download ${kind} PDF`);
     }
   };
 
@@ -211,6 +358,214 @@ export default function FinancialOverviewPage() {
           </div>
         </div>
       )}
+
+      {/* Subscription invoices */}
+      <div className="card p-6">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Subscription Invoices</h2>
+            <p className="text-sm text-dark-300">
+              Search tenant invoices, track payment status, and download invoice or receipt PDFs.
+            </p>
+          </div>
+
+          <form
+            onSubmit={handleInvoiceSearchSubmit}
+            className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center"
+          >
+            <input
+              type="text"
+              value={invoiceSearchDraft}
+              onChange={(event) => setInvoiceSearchDraft(event.target.value)}
+              placeholder="Search invoice, tenant, email, payment ref"
+              className="w-full rounded-lg border border-dark-700 bg-dark-800 px-4 py-2 text-sm text-white placeholder:text-dark-400 focus:border-primary-500 focus:outline-none lg:w-80"
+            />
+            <select
+              value={invoiceStatus}
+              onChange={(event) => handleInvoiceStatusChange(event.target.value)}
+              className="rounded-lg border border-dark-700 bg-dark-800 px-3 py-2 text-sm text-white"
+            >
+              <option value="ALL" className="bg-dark-900">All Statuses</option>
+              <option value="UNPAID" className="bg-dark-900">Unpaid</option>
+              <option value="PAID" className="bg-dark-900">Paid</option>
+              <option value="EXPIRED" className="bg-dark-900">Expired</option>
+            </select>
+            <select
+              value={invoiceType}
+              onChange={(event) => handleInvoiceTypeChange(event.target.value)}
+              className="rounded-lg border border-dark-700 bg-dark-800 px-3 py-2 text-sm text-white"
+            >
+              <option value="ALL" className="bg-dark-900">All Types</option>
+              <option value="initial" className="bg-dark-900">Initial</option>
+              <option value="renewal" className="bg-dark-900">Renewal</option>
+              <option value="upgrade" className="bg-dark-900">Upgrade</option>
+              <option value="subscription" className="bg-dark-900">Subscription</option>
+            </select>
+            <button
+              type="submit"
+              className="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
+            >
+              Search
+            </button>
+          </form>
+        </div>
+
+        {invoiceSummary && (
+          <div className="mb-6 grid gap-3 md:grid-cols-3">
+            {(['UNPAID', 'PAID', 'EXPIRED'] as const).map((statusKey) => (
+              <div
+                key={statusKey}
+                className="rounded-xl border border-dark-700 bg-dark-900/40 p-4"
+              >
+                <p className="text-xs uppercase tracking-[0.2em] text-dark-400">{statusKey}</p>
+                <p className="mt-2 text-xl font-bold text-white">
+                  {invoiceSummary[statusKey]?.count ?? 0} invoices
+                </p>
+                <p className="text-sm text-dark-300">
+                  {formatMoney(invoiceSummary[statusKey]?.totalAmount ?? 0)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {invoiceError && (
+          <div className="mb-4 rounded-lg border border-red-600/50 bg-red-900/20 p-3 text-sm text-red-200">
+            {invoiceError}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Tenant</th>
+                <th>Package</th>
+                <th>Status</th>
+                <th>Issued</th>
+                <th>Due / Paid</th>
+                <th className="text-right">Amount</th>
+                <th className="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoiceLoading ? (
+                <tr>
+                  <td colSpan={8} className="text-center text-dark-300">
+                    Loading invoices...
+                  </td>
+                </tr>
+              ) : invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center text-dark-300">
+                    No invoices match the current filters.
+                  </td>
+                </tr>
+              ) : (
+                invoices.map((invoice) => {
+                  const tenantName = invoice.buyer?.name
+                    || invoice.buyer?.nameEn
+                    || invoice.buyer?.nameAr
+                    || invoice.tenant?.name_en
+                    || invoice.tenant?.name_ar
+                    || invoice.tenant?.name
+                    || '-';
+                  const tenantEmail = invoice.buyer?.email || invoice.tenant?.email || '-';
+
+                  return (
+                    <tr key={invoice.id}>
+                      <td>
+                        <div className="font-semibold text-white">{invoice.billNumber}</div>
+                        <div className="text-xs text-dark-400">{formatBillType(invoice.type)}</div>
+                      </td>
+                      <td>
+                        <div className="text-sm text-white">{tenantName}</div>
+                        <div className="text-xs text-dark-400">{tenantEmail}</div>
+                      </td>
+                      <td>
+                        <div className="text-sm text-white">
+                          {invoice.packageName || invoice.packageNameAr || '-'}
+                        </div>
+                        <div className="text-xs text-dark-400">
+                          {formatBillingCycle(invoice.billingCycle)}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            invoice.status === 'PAID'
+                              ? 'bg-green-900/40 text-green-300'
+                              : invoice.status === 'EXPIRED'
+                                ? 'bg-gray-700 text-gray-300'
+                                : 'bg-amber-900/40 text-amber-300'
+                          }`}
+                        >
+                          {invoice.status}
+                        </span>
+                      </td>
+                      <td className="text-sm text-dark-200">
+                        {formatInvoiceDate(invoice.invoiceIssuedAt)}
+                      </td>
+                      <td className="text-sm text-dark-200">
+                        {invoice.status === 'PAID'
+                          ? formatInvoiceDate(invoice.paidAt)
+                          : formatInvoiceDate(invoice.dueDate)}
+                      </td>
+                      <td className="text-right text-sm font-semibold text-white">
+                        {formatMoney(invoice.totalAmount ?? invoice.amount)}
+                      </td>
+                      <td>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => downloadPdf(invoice.id, 'invoice')}
+                            className="rounded-lg border border-dark-600 px-3 py-1 text-xs text-dark-100 transition hover:border-primary-500 hover:text-primary-300"
+                          >
+                            Invoice PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadPdf(invoice.id, 'receipt')}
+                            className="rounded-lg border border-dark-600 px-3 py-1 text-xs text-dark-100 transition hover:border-green-500 hover:text-green-300 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={invoice.status !== 'PAID'}
+                          >
+                            Receipt PDF
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 border-t border-dark-700 pt-4 text-sm text-dark-300 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            Showing page {invoicePagination.page} of {invoicePagination.totalPages} · {invoicePagination.total} invoices
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setInvoicePage((page) => Math.max(page - 1, 1))}
+              disabled={invoicePagination.page <= 1 || invoiceLoading}
+              className="rounded-lg border border-dark-700 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setInvoicePage((page) => Math.min(page + 1, invoicePagination.totalPages))}
+              disabled={invoicePagination.page >= invoicePagination.totalPages || invoiceLoading}
+              className="rounded-lg border border-dark-700 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Revenue by type */}
       {revenueByType && (

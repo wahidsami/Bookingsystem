@@ -18,6 +18,7 @@ router.use(authenticateSuperAdmin);
 
 // ===== FINANCIAL REPORTING =====
 router.get('/bills/:id', requirePermission('financial', 'view'), adminBillsController.getBillDetails);
+router.get('/financial/invoices', requirePermission('financial', 'view'), adminBillsController.listBills);
 router.get('/bills/:id/invoice-pdf', requirePermission('financial', 'view'), adminBillsController.getInvoicePdf);
 router.get('/bills/:id/receipt-pdf', requirePermission('financial', 'view'), adminBillsController.getReceiptPdf);
 router.post('/bills/:id/reconcile-payment', requirePermission('financial', 'refund'), adminBillsController.reconcileBillPayment);

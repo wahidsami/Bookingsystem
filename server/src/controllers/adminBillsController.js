@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { Op } = require('sequelize');
 const db = require('../models');
 const {
     ensureInvoicePdf,
@@ -62,6 +63,132 @@ async function findBillById(id, tenantId = null) {
         ]
     });
 }
+
+exports.listBills = async (req, res) => {
+    try {
+        const {
+            status,
+            type,
+            tenantId,
+            search,
+            startDate,
+            endDate,
+            page = 1,
+            limit = 20
+        } = req.query;
+
+        const numericLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const numericPage = Math.max(parseInt(page, 10) || 1, 1);
+        const offset = (numericPage - 1) * numericLimit;
+        const where = {};
+
+        if (status && status !== 'ALL') {
+            where.status = status;
+        }
+
+        if (type && type !== 'ALL') {
+            where.type = type;
+        }
+
+        if (tenantId) {
+            where.tenantId = tenantId;
+        }
+
+        if (startDate || endDate) {
+            where.createdAt = {};
+            if (startDate) {
+                where.createdAt[Op.gte] = new Date(`${startDate}T00:00:00.000Z`);
+            }
+            if (endDate) {
+                where.createdAt[Op.lte] = new Date(`${endDate}T23:59:59.999Z`);
+            }
+        }
+
+        const include = [
+            {
+                model: db.Tenant,
+                as: 'tenant',
+                attributes: ['id', 'name', 'name_ar', 'name_en', 'email', 'phone', 'status'],
+                required: false
+            },
+            {
+                model: db.TenantSubscription,
+                as: 'subscription',
+                include: [{
+                    model: db.SubscriptionPackage,
+                    as: 'package'
+                }]
+            }
+        ];
+
+        if (search) {
+            const pattern = `%${search.trim()}%`;
+            where[Op.or] = [
+                { billNumber: { [Op.iLike]: pattern } },
+                { paymentReference: { [Op.iLike]: pattern } },
+                { '$tenant.name$': { [Op.iLike]: pattern } },
+                { '$tenant.name_en$': { [Op.iLike]: pattern } },
+                { '$tenant.name_ar$': { [Op.iLike]: pattern } },
+                { '$tenant.email$': { [Op.iLike]: pattern } }
+            ];
+        }
+
+        const [{ count, rows }, summaryRows] = await Promise.all([
+            db.Bill.findAndCountAll({
+            where,
+            include,
+            distinct: true,
+            order: [['createdAt', 'DESC']],
+            limit: numericLimit,
+            offset
+            }),
+            db.Bill.findAll({
+                where,
+                include,
+                attributes: ['id', 'status', 'amount', 'totalAmount']
+            })
+        ]);
+
+        const summary = summaryRows.reduce(
+            (accumulator, bill) => {
+                const amount = Number(bill.totalAmount ?? bill.amount ?? 0);
+                const statusKey = bill.status || 'UNPAID';
+                if (!accumulator[statusKey]) {
+                    accumulator[statusKey] = { count: 0, totalAmount: 0 };
+                }
+                accumulator[statusKey].count += 1;
+                accumulator[statusKey].totalAmount += amount;
+                return accumulator;
+            },
+            {
+                UNPAID: { count: 0, totalAmount: 0 },
+                PAID: { count: 0, totalAmount: 0 },
+                EXPIRED: { count: 0, totalAmount: 0 }
+            }
+        );
+
+        return res.json({
+            success: true,
+            bills: rows.map((bill) => serializeBill(bill, {
+                includePaymentToken: true,
+                includePaymentAttempts: false
+            })),
+            summary,
+            pagination: {
+                total: count,
+                page: numericPage,
+                limit: numericLimit,
+                totalPages: Math.ceil(count / numericLimit) || 1
+            }
+        });
+    } catch (error) {
+        console.error('listBills error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to load invoices'
+        });
+    }
+};
 
 async function serveBillDocument(req, res, documentField) {
     try {

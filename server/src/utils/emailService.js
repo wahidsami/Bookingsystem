@@ -196,6 +196,22 @@ const sendPaymentExpiredEmail = async (tenantData, options = {}) => {
 };
 
 /**
+ * Send payment reminder email for unpaid invoices close to expiry
+ */
+const sendPaymentReminderEmail = async (tenantData, options = {}) => {
+    const locale = getTenantPreferredLocale(tenantData);
+
+    return sendEmail({
+        to: tenantData.email,
+        subject: locale === 'en'
+            ? `Rifah - Payment reminder for invoice ${options?.bill?.billNumber || ''}`.trim()
+            : `رفاه - تذكير بسداد الفاتورة ${options?.bill?.billNumber || ''}`.trim(),
+        template: 'payment_reminder',
+        data: buildBillingEmailData(tenantData, options)
+    });
+};
+
+/**
  * Send payment success email (account active)
  */
 const sendPaymentSuccessEmail = async (tenantData, options = {}) => {
@@ -362,6 +378,7 @@ module.exports = {
     sendApprovalEmail,
     sendRejectionEmail,
     sendPaymentExpiredEmail,
+    sendPaymentReminderEmail,
     sendPaymentSuccessEmail,
     sendPaymentFailedEmail,
     sendStaffInviteEmail,

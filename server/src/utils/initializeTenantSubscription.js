@@ -1,4 +1,5 @@
 const db = require('../models');
+const { getTenantDashboardBaseUrl } = require('./url');
 
 function getPeriodEndForBillingCycle(startDate, billingCycle = 'monthly') {
     const periodEnd = new Date(startDate);
@@ -243,16 +244,87 @@ async function activateTenantAfterPayment(tenantId) {
 async function expirePaymentPendingTenants() {
     try {
         const now = new Date();
+        const reminderWindowEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const {
+            sendPaymentExpiredEmail,
+            sendPaymentReminderEmail
+        } = require('./emailService');
+
+        const billsDueSoon = await db.Bill.findAll({
+            where: {
+                status: 'UNPAID',
+                paymentTokenExpiresAt: {
+                    [db.Sequelize.Op.gte]: now,
+                    [db.Sequelize.Op.lte]: reminderWindowEnd
+                }
+            },
+            include: [
+                {
+                    model: db.Tenant,
+                    as: 'tenant'
+                },
+                {
+                    model: db.TenantSubscription,
+                    as: 'subscription',
+                    required: false,
+                    include: [{ model: db.SubscriptionPackage, as: 'package' }]
+                }
+            ]
+        });
+
+        let remindersSent = 0;
+        for (const bill of billsDueSoon) {
+            const metadata = bill.metadata && typeof bill.metadata === 'object'
+                ? bill.metadata
+                : {};
+
+            if (metadata.paymentReminderSentAt) {
+                continue;
+            }
+
+            const tenant = bill.tenant;
+            if (!tenant?.email) {
+                continue;
+            }
+
+            const reminderResult = await sendPaymentReminderEmail(tenant, {
+                bill,
+                billingCycle: bill.planSnapshot?.billingCycle || bill.subscription?.billingCycle,
+                packageName: bill.planSnapshot?.packageNameAr || bill.planSnapshot?.packageName,
+                paymentUrl: bill.metadata?.paymentUrl || buildBillPaymentUrl(bill, tenant),
+                paymentDueAt: bill.paymentTokenExpiresAt || tenant.paymentDueAt
+            });
+
+            if (reminderResult?.success) {
+                await bill.update({
+                    metadata: {
+                        ...metadata,
+                        paymentReminderSentAt: now.toISOString(),
+                        paymentReminderMessageId: reminderResult.messageId || null
+                    }
+                });
+                remindersSent += 1;
+            } else {
+                console.error(
+                    '[Cron] Payment reminder email failed:',
+                    reminderResult?.error || 'Unknown email delivery error'
+                );
+            }
+        }
+
         const tenants = await db.Tenant.findAll({
             where: {
                 status: 'payment_pending',
                 paymentDueAt: { [db.Sequelize.Op.lt]: now }
             }
         });
-        const { sendPaymentExpiredEmail } = require('./emailService');
+
         for (const t of tenants) {
             await t.update({ status: 'payment_expired' });
             sendPaymentExpiredEmail(t).catch(err => console.error('[Cron] Payment expired email failed:', err.message));
+        }
+        if (remindersSent > 0) {
+            console.log(`[Cron] Sent ${remindersSent} payment reminder email(s)`);
         }
         if (tenants.length > 0) {
             console.log(`[Cron] Expired ${tenants.length} tenant(s) payment window (payment_pending → payment_expired)`);
@@ -272,3 +344,14 @@ module.exports = {
     expirePaymentPendingTenants
 };
 
+function buildBillPaymentUrl(bill, tenant) {
+    if (!bill?.paymentToken) {
+        return '';
+    }
+
+    const locale = tenant?.settings?.language === 'en' ? 'en' : 'ar';
+    const baseUrl = getTenantDashboardBaseUrl();
+    const paymentPath = `/${locale}/payment?token=${bill.paymentToken}`;
+
+    return baseUrl ? `${baseUrl}${paymentPath}` : paymentPath;
+}
