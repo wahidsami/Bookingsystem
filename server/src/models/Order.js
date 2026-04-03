@@ -27,6 +27,12 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'orderId',
                 as: 'transaction'
             });
+
+            // Order can have multiple payment transactions for POS/collections and refunds
+            Order.hasMany(models.PaymentTransaction, {
+                foreignKey: 'orderId',
+                as: 'paymentTransactions'
+            });
         }
 
         /**

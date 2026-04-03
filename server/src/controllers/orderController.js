@@ -258,7 +258,7 @@ const updateOrderStatus = async (req, res) => {
 const updatePaymentStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { paymentStatus } = req.body;
+        const { paymentStatus, paymentMethod, transactionRef, notes } = req.body;
         const tenantId = req.tenantId;
 
         if (!tenantId) {
@@ -280,7 +280,16 @@ const updatePaymentStatus = async (req, res) => {
             });
         }
 
-        const updatedOrder = await orderService.updatePaymentStatus(id, paymentStatus);
+        const updatedOrder = await orderService.updatePaymentStatus(id, paymentStatus, {
+            paymentMethod,
+            processedBy: req.staffId || null,
+            transactionRef,
+            notes,
+            metadata: {
+                source: 'legacy_order_payment_update',
+                tenantId
+            }
+        });
 
         res.json({
             success: true,

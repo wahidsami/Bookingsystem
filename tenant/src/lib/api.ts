@@ -1031,9 +1031,20 @@ class TenantApiClient {
     });
   }
 
-  async updateOrderPaymentStatus(id: string, paymentStatus: string): Promise<any> {
+  async updateOrderPaymentStatus(
+    id: string,
+    paymentStatus: string,
+    paymentData?: {
+      paymentMethod?: string;
+      transactionRef?: string;
+      notes?: string;
+    }
+  ): Promise<any> {
     return this.patch(`/tenant/orders/${id}/payment`, {
-      paymentStatus
+      paymentStatus,
+      paymentMethod: paymentData?.paymentMethod,
+      transactionRef: paymentData?.transactionRef,
+      notes: paymentData?.notes
     });
   }
 

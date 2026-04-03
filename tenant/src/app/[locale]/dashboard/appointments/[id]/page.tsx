@@ -47,6 +47,21 @@ interface User {
   profileImage?: string; // API returns customer avatar as profileImage
 }
 
+interface PaymentTransaction {
+  id: string;
+  type: 'deposit' | 'remainder' | 'full' | 'refund';
+  amount: number;
+  paymentMethod: 'online' | 'cash' | 'card_pos' | 'wallet' | 'bank_transfer';
+  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
+  transactionRef?: string | null;
+  notes?: string | null;
+  processedAt: string;
+  processor?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
 interface Appointment {
   id: string;
   tenantId?: string;
@@ -75,6 +90,7 @@ interface Appointment {
   service: Service;
   staff: Employee;
   user?: User;
+  paymentTransactions?: PaymentTransaction[];
   createdAt: string;
 }
 
@@ -317,6 +333,25 @@ export default function AppointmentDetailsPage() {
       case 'partially_refunded': return t("partiallyRefunded");
       default: return status;
     }
+  };
+
+  const formatTransactionKind = (transaction: PaymentTransaction) => {
+    const typeLabel = {
+      deposit: locale === 'ar' ? 'عربون' : 'Deposit',
+      remainder: locale === 'ar' ? 'دفعة متبقية' : 'Remainder',
+      full: locale === 'ar' ? 'دفعة كاملة' : 'Full payment',
+      refund: locale === 'ar' ? 'استرداد' : 'Refund',
+    }[transaction.type] || transaction.type;
+
+    const methodLabel = {
+      online: locale === 'ar' ? 'دفع إلكتروني' : 'Online',
+      cash: locale === 'ar' ? 'نقدًا' : 'Cash',
+      card_pos: locale === 'ar' ? 'بطاقة / مدى' : 'Card POS',
+      wallet: locale === 'ar' ? 'محفظة رقمية' : 'Wallet',
+      bank_transfer: locale === 'ar' ? 'تحويل بنكي' : 'Bank transfer',
+    }[transaction.paymentMethod] || transaction.paymentMethod;
+
+    return `${typeLabel} - ${methodLabel}`;
   };
 
   if (loading) {
@@ -750,6 +785,70 @@ export default function AppointmentDetailsPage() {
               </div>
             </div>
           )}
+
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              {locale === 'ar' ? 'سجل معاملات الدفع' : 'Payment Transactions'}
+            </h3>
+            {appointment.paymentTransactions && appointment.paymentTransactions.length > 0 ? (
+              <div className="space-y-3">
+                {appointment.paymentTransactions
+                  .slice()
+                  .sort((left, right) => new Date(right.processedAt).getTime() - new Date(left.processedAt).getTime())
+                  .map((transaction) => (
+                    <div key={transaction.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                      <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {formatTransactionKind(transaction)}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(transaction.processedAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}
+                          </p>
+                          {transaction.transactionRef && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {locale === 'ar' ? 'المرجع' : 'Reference'}: {transaction.transactionRef}
+                            </p>
+                          )}
+                          {transaction.processor?.name && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {locale === 'ar' ? 'تم التحصيل بواسطة' : 'Processed by'}: {transaction.processor.name}
+                            </p>
+                          )}
+                          {transaction.notes && (
+                            <p className="text-xs text-gray-700 mt-2">
+                              {transaction.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-end">
+                          <p className="text-sm font-bold text-gray-900">
+                            <Currency amount={Number(transaction.amount || 0)} />
+                          </p>
+                          <span className={`inline-block mt-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                            transaction.status === 'completed'
+                              ? 'bg-green-100 text-green-700'
+                              : transaction.status === 'failed'
+                                ? 'bg-red-100 text-red-700'
+                                : transaction.status === 'refunded'
+                                  ? 'bg-gray-200 text-gray-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {transaction.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar'
+                  ? 'لا توجد معاملات دفع مسجلة لهذا الموعد حتى الآن.'
+                  : 'No payment transactions have been recorded for this appointment yet.'}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -832,4 +931,3 @@ export default function AppointmentDetailsPage() {
     </TenantLayout>
   );
 }
-

@@ -166,6 +166,19 @@ exports.getOrder = async (req, res) => {
                     as: 'tenant',
                     attributes: ['id', 'name', 'name_en', 'name_ar', 'logo', 'phone', 'email'],
                     required: false
+                },
+                {
+                    model: db.PaymentTransaction,
+                    as: 'paymentTransactions',
+                    include: [
+                        {
+                            model: db.Staff,
+                            as: 'processor',
+                            attributes: ['id', 'name'],
+                            required: false
+                        }
+                    ],
+                    required: false
                 }
             ]
         });
@@ -280,7 +293,7 @@ exports.updatePaymentStatus = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { paymentStatus } = req.body;
+        const { paymentStatus, paymentMethod, transactionRef, notes } = req.body;
 
         // Verify order belongs to tenant
         const order = await db.Order.findOne({
@@ -295,7 +308,16 @@ exports.updatePaymentStatus = async (req, res) => {
         }
 
         // Update payment status using orderService
-        const updatedOrder = await orderService.updatePaymentStatus(id, paymentStatus);
+        const updatedOrder = await orderService.updatePaymentStatus(id, paymentStatus, {
+            paymentMethod,
+            processedBy: req.staffId || null,
+            transactionRef,
+            notes,
+            metadata: {
+                source: 'tenant_dashboard_order_payment_update',
+                tenantId
+            }
+        });
 
         // Reload order with associations
         const fullOrder = await db.Order.findByPk(id, {
@@ -313,6 +335,19 @@ exports.updatePaymentStatus = async (req, res) => {
                         {
                             model: db.Product,
                             as: 'product',
+                            required: false
+                        }
+                    ],
+                    required: false
+                },
+                {
+                    model: db.PaymentTransaction,
+                    as: 'paymentTransactions',
+                    include: [
+                        {
+                            model: db.Staff,
+                            as: 'processor',
+                            attributes: ['id', 'name'],
                             required: false
                         }
                     ],

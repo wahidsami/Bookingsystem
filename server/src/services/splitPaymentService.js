@@ -9,6 +9,10 @@ const {
     calculateServiceDeposit,
     getTenantPaymentSettings
 } = require('../utils/tenantPaymentSettings');
+const {
+    createAppointmentTransaction,
+    resolveLedgerPaymentMethod
+} = require('./paymentTransactionLedgerService');
 
 /**
  * Calculate deposit and remainder amounts based on tenant settings
@@ -44,7 +48,7 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
     }
 
     // Record transaction
-    await db.PaymentTransaction.create({
+    await createAppointmentTransaction({
         appointmentId,
         type: 'remainder',
         amount,
@@ -52,7 +56,13 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
         status: 'completed',
         processedBy,
         processedAt: new Date(),
-        notes
+        notes,
+        metadata: {
+            source: 'tenant_remainder_collection',
+            previousPaymentStatus: appointment.paymentStatus,
+            previousTotalPaid: parseFloat(appointment.totalPaid || 0),
+            remainingBalanceBefore: parseFloat(appointment.remainderAmount || 0)
+        }
     });
 
     // Update appointment
@@ -77,6 +87,12 @@ const getPaymentSummary = async (appointmentId) => {
         include: [{
             model: db.PaymentTransaction,
             as: 'paymentTransactions',
+            include: [{
+                model: db.Staff,
+                as: 'processor',
+                attributes: ['id', 'name'],
+                required: false
+            }],
             order: [['processedAt', 'ASC']]
         }]
     });
@@ -117,15 +133,20 @@ const refundPayment = async (appointmentId, refundData) => {
     }
 
     // Record refund transaction
-    const transaction = await db.PaymentTransaction.create({
+    const transaction = await createAppointmentTransaction({
         appointmentId,
         type: 'refund',
         amount,
-        paymentMethod: 'online',
-        status: 'completed',
+        paymentMethod: resolveLedgerPaymentMethod(appointment.paymentMethod, 'online'),
+        status: 'refunded',
         processedBy,
         processedAt: new Date(),
-        notes: reason
+        notes: reason,
+        metadata: {
+            source: 'appointment_refund',
+            paymentStatusBefore: appointment.paymentStatus,
+            totalPaidBefore: parseFloat(appointment.totalPaid || 0)
+        }
     });
 
     // Update appointment

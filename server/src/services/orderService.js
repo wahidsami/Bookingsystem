@@ -6,6 +6,10 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const pushNotificationService = require('./pushNotificationService');
+const {
+    createOrderTransaction,
+    resolveLedgerPaymentMethod
+} = require('./paymentTransactionLedgerService');
 
 class OrderService {
     _calculateShippingFee(deliveryType, shippingFee = null, deliveryMethod = 'standard') {
@@ -223,6 +227,14 @@ class OrderService {
     async updatePaymentStatus(orderId, paymentStatus, options = {}) {
         const transaction = options.transaction || await db.sequelize.transaction();
         const shouldCommit = !options.transaction;
+        const {
+            paymentMethod,
+            processedBy = null,
+            notes = null,
+            transactionRef = null,
+            gatewayResponse = {},
+            metadata = {}
+        } = options;
 
         try {
             const order = await db.Order.findByPk(orderId, { transaction });
@@ -245,11 +257,68 @@ class OrderService {
             }
 
             if (previousPaymentStatus !== 'paid' && paymentStatus === 'paid') {
+                await createOrderTransaction({
+                    orderId: order.id,
+                    type: 'full',
+                    amount: parseFloat(order.totalAmount || 0),
+                    paymentMethod: resolveLedgerPaymentMethod(paymentMethod || order.paymentMethod, order.paymentMethod),
+                    status: 'completed',
+                    processedBy,
+                    processedAt: order.paidAt || new Date(),
+                    transactionRef: transactionRef || `ORDER-PAY-${order.orderNumber}`,
+                    notes: notes || 'Order payment collected',
+                    metadata: {
+                        source: 'order_payment_status_update',
+                        previousPaymentStatus,
+                        nextPaymentStatus: paymentStatus,
+                        customerPaymentMethod: order.paymentMethod,
+                        ...metadata
+                    }
+                }, { transaction });
+
                 await db.PlatformUser.increment('totalSpent', {
                     by: parseFloat(order.totalAmount || 0),
                     where: { id: order.platformUserId },
                     transaction
                 });
+            } else if (paymentStatus === 'failed' && previousPaymentStatus !== 'failed') {
+                await createOrderTransaction({
+                    orderId: order.id,
+                    type: 'full',
+                    amount: parseFloat(order.totalAmount || 0),
+                    paymentMethod: resolveLedgerPaymentMethod(paymentMethod || order.paymentMethod, order.paymentMethod),
+                    status: 'failed',
+                    processedBy,
+                    processedAt: new Date(),
+                    transactionRef: transactionRef || `ORDER-FAILED-${order.orderNumber}`,
+                    notes: notes || 'Order payment marked as failed',
+                    metadata: {
+                        source: 'order_payment_status_update',
+                        previousPaymentStatus,
+                        nextPaymentStatus: paymentStatus,
+                        customerPaymentMethod: order.paymentMethod,
+                        ...metadata
+                    }
+                }, { transaction });
+            } else if (paymentStatus === 'refunded' && previousPaymentStatus !== 'refunded') {
+                await createOrderTransaction({
+                    orderId: order.id,
+                    type: 'refund',
+                    amount: parseFloat(order.totalAmount || 0),
+                    paymentMethod: resolveLedgerPaymentMethod(paymentMethod || order.paymentMethod, order.paymentMethod),
+                    status: 'refunded',
+                    processedBy,
+                    processedAt: new Date(),
+                    transactionRef: transactionRef || `ORDER-REFUND-${order.orderNumber}`,
+                    notes: notes || 'Order payment refunded',
+                    metadata: {
+                        source: 'order_payment_status_update',
+                        previousPaymentStatus,
+                        nextPaymentStatus: paymentStatus,
+                        customerPaymentMethod: order.paymentMethod,
+                        ...metadata
+                    }
+                }, { transaction });
             }
 
             if (shouldCommit) {
@@ -385,6 +454,23 @@ class OrderService {
                 await order.update({
                     paymentStatus: 'refunded'
                 }, { transaction });
+
+                await createOrderTransaction({
+                    orderId: order.id,
+                    type: 'refund',
+                    amount: parseFloat(order.totalAmount || 0),
+                    paymentMethod: resolveLedgerPaymentMethod(order.paymentMethod, order.paymentMethod),
+                    status: 'refunded',
+                    processedBy: null,
+                    processedAt: new Date(),
+                    transactionRef: `ORDER-CANCEL-REFUND-${order.orderNumber}`,
+                    notes: reason || 'Order cancelled after payment',
+                    metadata: {
+                        source: 'order_cancel_refund',
+                        previousPaymentStatus: 'paid',
+                        nextPaymentStatus: 'refunded'
+                    }
+                }, { transaction });
             }
 
             if (shouldCommit) {
@@ -477,7 +563,20 @@ class OrderService {
                     ]
                 },
                 { model: db.Tenant, as: 'tenant' },
-                { model: db.PlatformUser, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'phone'] }
+                { model: db.PlatformUser, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'phone'] },
+                {
+                    model: db.PaymentTransaction,
+                    as: 'paymentTransactions',
+                    include: [
+                        {
+                            model: db.Staff,
+                            as: 'processor',
+                            attributes: ['id', 'name'],
+                            required: false
+                        }
+                    ],
+                    required: false
+                }
             ]
         });
 

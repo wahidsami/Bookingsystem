@@ -33,6 +33,21 @@ interface User {
   photo?: string;
 }
 
+interface PaymentTransaction {
+  id: string;
+  type: 'deposit' | 'remainder' | 'full' | 'refund';
+  amount: number;
+  paymentMethod: 'online' | 'cash' | 'card_pos' | 'wallet' | 'bank_transfer';
+  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
+  transactionRef?: string | null;
+  notes?: string | null;
+  processedAt: string;
+  processor?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
@@ -53,6 +68,7 @@ interface Order {
   notes?: string;
   user?: User;
   items?: OrderItem[];
+  paymentTransactions?: PaymentTransaction[];
 }
 
 export default function OrderDetailsPage() {
@@ -71,6 +87,9 @@ export default function OrderDetailsPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [newStatus, setNewStatus] = useState<string>("");
   const [newPaymentStatus, setNewPaymentStatus] = useState<string>("");
+  const [paymentCollectionMethod, setPaymentCollectionMethod] = useState("cash");
+  const [paymentTransactionRef, setPaymentTransactionRef] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
   const [trackingNumber, setTrackingNumber] = useState<string>("");
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState<string>("");
 
@@ -133,12 +152,18 @@ export default function OrderDetailsPage() {
 
     try {
       setUpdating(true);
-      const response = await tenantApi.updateOrderPaymentStatus(orderId, newPaymentStatus);
+      const response = await tenantApi.updateOrderPaymentStatus(orderId, newPaymentStatus, {
+        paymentMethod: paymentCollectionMethod,
+        transactionRef: paymentTransactionRef || undefined,
+        notes: paymentNotes || undefined,
+      });
 
       if (response.success) {
         setOrder(response.order);
         setShowPaymentModal(false);
         setNewPaymentStatus("");
+        setPaymentTransactionRef("");
+        setPaymentNotes("");
       } else {
         alert(response.message || t("updateError"));
       }
@@ -184,6 +209,25 @@ export default function OrderDetailsPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const formatTransactionKind = (transaction: PaymentTransaction) => {
+    const typeLabel = {
+      deposit: locale === 'ar' ? 'عربون' : 'Deposit',
+      remainder: locale === 'ar' ? 'دفعة متبقية' : 'Remainder',
+      full: locale === 'ar' ? 'دفعة كاملة' : 'Full payment',
+      refund: locale === 'ar' ? 'استرداد' : 'Refund',
+    }[transaction.type] || transaction.type;
+
+    const methodLabel = {
+      online: locale === 'ar' ? 'دفع إلكتروني' : 'Online',
+      cash: locale === 'ar' ? 'نقدًا' : 'Cash',
+      card_pos: locale === 'ar' ? 'بطاقة / مدى' : 'Card POS',
+      wallet: locale === 'ar' ? 'محفظة رقمية' : 'Wallet',
+      bank_transfer: locale === 'ar' ? 'تحويل بنكي' : 'Bank transfer',
+    }[transaction.paymentMethod] || transaction.paymentMethod;
+
+    return `${typeLabel} - ${methodLabel}`;
   };
 
   if (loading) {
@@ -265,6 +309,9 @@ export default function OrderDetailsPage() {
                 <button
                   onClick={() => {
                     setNewPaymentStatus(order.paymentStatus);
+                    setPaymentCollectionMethod(order.paymentMethod === 'online' ? 'online' : 'cash');
+                    setPaymentTransactionRef("");
+                    setPaymentNotes("");
                     setShowPaymentModal(true);
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -475,6 +522,73 @@ export default function OrderDetailsPage() {
           </div>
         )}
 
+        <div className="card">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            {locale === 'ar' ? 'سجل معاملات الدفع' : 'Payment Transactions'}
+          </h3>
+          {order.paymentTransactions && order.paymentTransactions.length > 0 ? (
+            <div className="space-y-3">
+              {order.paymentTransactions
+                .slice()
+                .sort((left, right) => new Date(right.processedAt).getTime() - new Date(left.processedAt).getTime())
+                .map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        <p className="font-semibold text-gray-900">
+                          {formatTransactionKind(transaction)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDate(transaction.processedAt)}
+                        </p>
+                        {transaction.transactionRef && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {locale === 'ar' ? 'المرجع' : 'Reference'}: {transaction.transactionRef}
+                          </p>
+                        )}
+                        {transaction.processor?.name && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {locale === 'ar' ? 'تم التحصيل بواسطة' : 'Processed by'}: {transaction.processor.name}
+                          </p>
+                        )}
+                        {transaction.notes && (
+                          <p className="text-sm text-gray-700 mt-2">
+                            {transaction.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-end">
+                        <p className="font-bold text-gray-900">
+                          <Currency amount={Number(transaction.amount || 0)} />
+                        </p>
+                        <span className={`inline-block mt-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                          transaction.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : transaction.status === 'failed'
+                              ? 'bg-red-100 text-red-700'
+                              : transaction.status === 'refunded'
+                                ? 'bg-gray-200 text-gray-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {transaction.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              {locale === 'ar'
+                ? 'لا توجد معاملات دفع مسجلة لهذا الطلب حتى الآن.'
+                : 'No payment transactions have been recorded for this order yet.'}
+            </p>
+          )}
+        </div>
+
         {/* Status Update Modal */}
         {showStatusModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
@@ -578,6 +692,53 @@ export default function OrderDetailsPage() {
                     <option value="refunded">{t("refunded")}</option>
                   </select>
                 </div>
+
+                {(newPaymentStatus === 'paid' || newPaymentStatus === 'refunded') && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'طريقة التحصيل' : 'Collection method'}
+                      </label>
+                      <select
+                        value={paymentCollectionMethod}
+                        onChange={(e) => setPaymentCollectionMethod(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      >
+                        <option value="cash">{locale === 'ar' ? 'نقدًا' : 'Cash'}</option>
+                        <option value="card_pos">{locale === 'ar' ? 'بطاقة / مدى' : 'Card POS'}</option>
+                        <option value="wallet">{locale === 'ar' ? 'محفظة' : 'Wallet'}</option>
+                        <option value="bank_transfer">{locale === 'ar' ? 'تحويل بنكي' : 'Bank transfer'}</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'مرجع العملية / رقم جهاز مدى' : 'Transaction reference'}
+                      </label>
+                      <input
+                        type="text"
+                        value={paymentTransactionRef}
+                        onChange={(e) => setPaymentTransactionRef(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'ملاحظات التحصيل' : 'Collection notes'}
+                      </label>
+                      <textarea
+                        value={paymentNotes}
+                        onChange={(e) => setPaymentNotes(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                        rows={3}
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="flex gap-2 pt-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <button
                     onClick={handlePaymentStatusUpdate}
@@ -590,6 +751,8 @@ export default function OrderDetailsPage() {
                     onClick={() => {
                       setShowPaymentModal(false);
                       setNewPaymentStatus("");
+                      setPaymentTransactionRef("");
+                      setPaymentNotes("");
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >

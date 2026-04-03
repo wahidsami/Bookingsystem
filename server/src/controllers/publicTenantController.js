@@ -13,6 +13,7 @@ const {
     getTenantPaymentSettings,
     resolvePublicOrderPaymentMethod
 } = require('../utils/tenantPaymentSettings');
+const { createAppointmentTransaction } = require('../services/paymentTransactionLedgerService');
 
 const BUSINESS_TYPE_META = {
     beauty_salon: { name_en: 'Beauty Salon', name_ar: 'صالون تجميل', icon: '💄' },
@@ -911,6 +912,24 @@ exports.createPublicBooking = async (req, res) => {
                 totalPaid
             });
 
+            await createAppointmentTransaction({
+                appointmentId: appointment.id,
+                type: 'full',
+                amount: totalPaid,
+                paymentMethod: 'online',
+                status: 'completed',
+                processedBy: null,
+                processedAt: appointment.paidAt || new Date(),
+                transactionRef: `PUBLIC-BOOKING-FULL-${appointment.id.substring(0, 8).toUpperCase()}`,
+                notes: 'Full online booking payment',
+                metadata: {
+                    source: 'public_booking_checkout',
+                    paymentChoice: 'online-full',
+                    tenantId,
+                    platformUserId: platformUser.id
+                }
+            });
+
             await db.PlatformUser.increment('totalSpent', {
                 by: totalPaid,
                 where: { id: platformUser.id }
@@ -934,6 +953,27 @@ exports.createPublicBooking = async (req, res) => {
                 remainderAmount: splitPayment.remainderAmount,
                 remainderPaid: false,
                 totalPaid: safeBookingFee
+            });
+
+            await createAppointmentTransaction({
+                appointmentId: appointment.id,
+                type: 'deposit',
+                amount: safeBookingFee,
+                paymentMethod: 'online',
+                status: 'completed',
+                processedBy: null,
+                processedAt: appointment.paidAt || new Date(),
+                transactionRef: `PUBLIC-BOOKING-DEPOSIT-${appointment.id.substring(0, 8).toUpperCase()}`,
+                notes: 'Online booking deposit payment',
+                metadata: {
+                    source: 'public_booking_checkout',
+                    paymentChoice: 'booking-fee',
+                    depositMode: splitPayment.depositMode,
+                    depositPercentage: splitPayment.depositPercentage,
+                    remainderAmount: splitPayment.remainderAmount,
+                    tenantId,
+                    platformUserId: platformUser.id
+                }
             });
 
             if (safeBookingFee > 0) {
@@ -1096,7 +1136,16 @@ exports.createPublicOrder = async (req, res) => {
 
         let finalOrder = order;
         if (normalizedPaymentMethod === 'online') {
-            await orderService.updatePaymentStatus(order.id, 'paid');
+            await orderService.updatePaymentStatus(order.id, 'paid', {
+                paymentMethod: 'online',
+                transactionRef: `PUBLIC-ORDER-${order.orderNumber}`,
+                notes: 'Online order payment from public checkout',
+                metadata: {
+                    source: 'public_order_checkout',
+                    tenantId,
+                    platformUserId
+                }
+            });
             finalOrder = await orderService.getOrderById(order.id);
         }
 

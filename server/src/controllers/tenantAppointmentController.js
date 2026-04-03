@@ -10,6 +10,10 @@ const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatu
 const pushNotificationService = require('../services/pushNotificationService');
 const bookingService = require('../services/bookingService');
 const { calculateSplitPayment } = require('../services/splitPaymentService');
+const {
+    createAppointmentTransaction,
+    resolveLedgerPaymentMethod
+} = require('../services/paymentTransactionLedgerService');
 
 /**
  * Get all appointments for the authenticated tenant
@@ -223,6 +227,19 @@ exports.getAppointment = async (req, res) => {
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
                     required: false
+                },
+                {
+                    model: db.PaymentTransaction,
+                    as: 'paymentTransactions',
+                    include: [
+                        {
+                            model: db.Staff,
+                            as: 'processor',
+                            attributes: ['id', 'name'],
+                            required: false
+                        }
+                    ],
+                    required: false
                 }
             ]
         });
@@ -375,6 +392,7 @@ exports.updatePaymentStatus = async (req, res) => {
         }
 
         const previousTotalPaid = parseFloat(appointment.totalPaid || 0);
+        const previousPaymentStatus = appointment.paymentStatus;
 
         appointment.paymentStatus = paymentStatus;
         if (paymentMethod) {
@@ -408,6 +426,39 @@ exports.updatePaymentStatus = async (req, res) => {
 
         const nextTotalPaid = parseFloat(appointment.totalPaid || 0);
         const paymentDelta = parseFloat((nextTotalPaid - previousTotalPaid).toFixed(2));
+
+        if (paymentDelta > 0) {
+            const transactionType = paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                ? 'deposit'
+                : previousPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                    ? 'remainder'
+                    : 'full';
+
+            await createAppointmentTransaction({
+                appointmentId: appointment.id,
+                type: transactionType,
+                amount: paymentDelta,
+                paymentMethod: resolveLedgerPaymentMethod(
+                    paymentMethod || appointment.paymentMethod,
+                    paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                        ? appointment.paymentMethod || 'cash'
+                        : 'cash'
+                ),
+                status: 'completed',
+                processedBy: null,
+                processedAt: appointment.paidAt || new Date(),
+                notes: paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                    ? 'Deposit collected from tenant dashboard'
+                    : 'Full payment collected from tenant dashboard',
+                metadata: {
+                    source: 'tenant_appointment_payment_status_update',
+                    previousTotalPaid,
+                    nextTotalPaid,
+                    previousPaymentStatus,
+                    nextPaymentStatus: paymentStatus
+                }
+            }, { transaction });
+        }
 
         if (appointment.platformUserId && paymentDelta > 0) {
             await db.PlatformUser.increment('totalSpent', {
