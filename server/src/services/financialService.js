@@ -1,4 +1,5 @@
 const { sequelize } = require('../models');
+const { createBillStatusSummarySeed } = require('../utils/billStatus');
 
 const toNumber = (value) => {
   const parsed = Number.parseFloat(value);
@@ -352,11 +353,7 @@ class FinancialService {
         type: sequelize.QueryTypes.SELECT,
       });
 
-      const result = {
-        UNPAID: { count: 0, totalAmount: 0 },
-        PAID: { count: 0, totalAmount: 0 },
-        EXPIRED: { count: 0, totalAmount: 0 },
-      };
+      const result = createBillStatusSummarySeed();
 
       for (const row of rows || []) {
         if (!result[row.status]) continue;
@@ -369,11 +366,7 @@ class FinancialService {
       return result;
     } catch (error) {
       console.error('Error in getBillsSummary:', error);
-      return {
-        UNPAID: { count: 0, totalAmount: 0 },
-        PAID: { count: 0, totalAmount: 0 },
-        EXPIRED: { count: 0, totalAmount: 0 },
-      };
+      return createBillStatusSummarySeed();
     }
   }
 

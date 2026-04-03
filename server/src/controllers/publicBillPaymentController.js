@@ -11,6 +11,10 @@ const {
     settleBillPayment,
     isBillExpired
 } = require('../services/billPaymentReconciliationService');
+const {
+    BILL_STATUS,
+    getBlockedPaymentStatusMessage
+} = require('../utils/billStatus');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
@@ -101,7 +105,7 @@ exports.getBillByToken = async (req, res) => {
             });
         }
 
-        if (bill.status === 'PAID') {
+        if (bill.status === BILL_STATUS.PAID) {
             ensureReceiptPdf(bill).catch(err => {
                 console.error('[BillPayment] Failed to generate receipt PDF:', err.message);
             });
@@ -112,7 +116,15 @@ exports.getBillByToken = async (req, res) => {
             });
         }
 
-        if (bill.status === 'EXPIRED' || isBillExpired(bill)) {
+        if ([BILL_STATUS.DRAFT, BILL_STATUS.VOID].includes(bill.status)) {
+            return res.status(400).json({
+                success: false,
+                message: getBlockedPaymentStatusMessage(bill.status),
+                bill: serializeBill(bill)
+            });
+        }
+
+        if (bill.status === BILL_STATUS.EXPIRED || isBillExpired(bill)) {
             await settleBillPayment({
                 paymentToken: token,
                 source: 'public_payment_link',

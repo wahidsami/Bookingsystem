@@ -10,6 +10,10 @@ const {
     serializePaymentAttempt,
     toNumber
 } = require('../utils/invoiceSnapshotBuilder');
+const {
+    BILL_STATUS,
+    getBlockedPaymentStatusMessage
+} = require('../utils/billStatus');
 
 const BILL_PAYMENT_INCLUDE = [
     {
@@ -203,9 +207,9 @@ async function markBillExpired({ bill, transaction, source, actor, now, notes = 
         };
     }
 
-    if (bill.status !== 'EXPIRED') {
+    if (bill.status !== BILL_STATUS.EXPIRED) {
         await bill.update({
-            status: 'EXPIRED',
+            status: BILL_STATUS.EXPIRED,
             paymentFailureReason: 'Payment link expired before completion',
             metadata: {
                 ...(bill.metadata || {}),
@@ -303,6 +307,14 @@ async function settleBillPayment({
             (paymentStatus === 'succeeded' ? 'succeeded' : paymentStatus === 'failed' ? 'failed' : 'pending')
         );
         const shouldActivateTenant = bill.tenant?.status === 'payment_pending';
+        const duplicateLookupKey = buildIdempotencyKey({
+            bill,
+            source,
+            paymentStatus,
+            paymentReference: resolvedPaymentReference,
+            checkoutSessionId,
+            idempotencyKey
+        });
 
         if (bill.status === 'PAID') {
             const { attempt } = await createPaymentAttempt({
@@ -337,7 +349,36 @@ async function settleBillPayment({
         const allowExpiredAdminReconciliation =
             source === 'admin_manual_reconciliation' && paymentStatus === 'succeeded';
 
-        if (!allowExpiredAdminReconciliation && (bill.status === 'EXPIRED' || isBillExpired(bill, now))) {
+        if ([BILL_STATUS.VOID, BILL_STATUS.DRAFT].includes(bill.status)) {
+            const { attempt } = await createPaymentAttempt({
+                bill,
+                transaction,
+                source,
+                status: 'failed',
+                paymentProvider: resolvedPaymentProvider,
+                paymentMethod: resolvedPaymentMethod,
+                paymentReference: resolvedPaymentReference,
+                checkoutSessionId,
+                gatewayStatus: resolvedGatewayStatus,
+                requestedAmount,
+                capturedAmount: 0,
+                failureReason: getBlockedPaymentStatusMessage(bill.status),
+                notes,
+                gatewaySummary,
+                idempotencyKey: duplicateLookupKey,
+                actor
+            });
+
+            resultPayload = {
+                success: false,
+                status: bill.status.toLowerCase(),
+                bill,
+                attempt
+            };
+            return;
+        }
+
+        if (!allowExpiredAdminReconciliation && (bill.status === BILL_STATUS.EXPIRED || isBillExpired(bill, now))) {
             const expiredResult = await markBillExpired({
                 bill,
                 transaction,
@@ -367,14 +408,6 @@ async function settleBillPayment({
             return;
         }
 
-        const duplicateLookupKey = buildIdempotencyKey({
-            bill,
-            source,
-            paymentStatus,
-            paymentReference: resolvedPaymentReference,
-            checkoutSessionId,
-            idempotencyKey
-        });
         const existingAttempt = await db.BillPaymentAttempt.findOne({
             where: { idempotencyKey: duplicateLookupKey },
             transaction
@@ -413,6 +446,7 @@ async function settleBillPayment({
             });
 
             await bill.update({
+                status: BILL_STATUS.FAILED,
                 paymentProvider: resolvedPaymentProvider,
                 paymentReference: resolvedPaymentReference,
                 paymentMethod: resolvedPaymentMethod,
@@ -492,7 +526,7 @@ async function settleBillPayment({
         const periodEnd = getPeriodEnd(now, targetBillingCycle);
 
         await bill.update({
-            status: 'PAID',
+            status: BILL_STATUS.PAID,
             paidAt: now,
             paymentProvider: resolvedPaymentProvider,
             paymentReference: resolvedPaymentReference,
@@ -577,7 +611,7 @@ async function settleBillPayment({
             tenant: bill.tenant,
             bill: {
                 ...bill.toJSON(),
-                status: 'PAID',
+                status: BILL_STATUS.PAID,
                 paidAt: now,
                 paymentProvider: resolvedPaymentProvider,
                 paymentReference: resolvedPaymentReference,
@@ -611,7 +645,7 @@ async function settleBillPayment({
 
         pdfBillPayload = {
             ...bill.toJSON(),
-            status: 'PAID',
+            status: BILL_STATUS.PAID,
             paidAt: now,
             paymentProvider: resolvedPaymentProvider,
             paymentReference: resolvedPaymentReference,
@@ -638,7 +672,7 @@ async function settleBillPayment({
             status: 'succeeded',
             bill: {
                 ...bill.toJSON(),
-                status: 'PAID',
+                status: BILL_STATUS.PAID,
                 paidAt: now,
                 paymentProvider: resolvedPaymentProvider,
                 paymentReference: resolvedPaymentReference,

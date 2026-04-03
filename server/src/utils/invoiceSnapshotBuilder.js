@@ -1,6 +1,7 @@
 const db = require('../models');
 const { randomUUID } = require('crypto');
 const { normalizePackageEntitlements } = require('./packageEntitlements');
+const { isBillPayableStatus } = require('./billStatus');
 const {
     buildZatcaPhase1QrPayload,
     formatSaudiIsoTimestamp
@@ -311,7 +312,7 @@ async function buildSubscriptionInvoiceSnapshot({
 function serializeBill(bill, options = {}) {
     if (!bill) return null;
 
-    const includePaymentToken = options.includePaymentToken && bill.status === 'UNPAID';
+    const includePaymentToken = options.includePaymentToken && isBillPayableStatus(bill.status);
     const includePaymentAttempts = Boolean(options.includePaymentAttempts);
     const tenant = bill.tenant || null;
     const subscription = bill.subscription || null;

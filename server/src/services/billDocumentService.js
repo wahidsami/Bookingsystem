@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const db = require('../models');
 const { serializeBill, toNumber } = require('../utils/invoiceSnapshotBuilder');
 const { generateZatcaQrImageBuffer } = require('../utils/zatcaInvoiceQr');
+const { BILL_STATUS } = require('../utils/billStatus');
 
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 const billsRoot = path.join(uploadsRoot, 'bills');
@@ -84,6 +85,19 @@ function drawLabelValue(doc, x, y, width, labelAr, labelEn, value, options = {})
         });
 }
 
+function formatBillStatusLabel(status) {
+    const labels = {
+        DRAFT: 'DRAFT | مسودة',
+        UNPAID: 'UNPAID | غير مدفوعة',
+        FAILED: 'FAILED | فشل الدفع',
+        PAID: 'PAID | مدفوعة',
+        EXPIRED: 'EXPIRED | منتهية',
+        VOID: 'VOID | ملغاة'
+    };
+
+    return labels[status] || `${status || '-'}`;
+}
+
 function getLogoPath(sellerSnapshot) {
     const logoPath = resolveUploadPath(sellerSnapshot?.logoPath);
     if (logoPath && fs.existsSync(logoPath)) {
@@ -132,7 +146,7 @@ function drawPageFrame(doc, bill, isPaidDocument) {
         doc.roundedRect(48, 78, 108, 28, 14).fill('#10B981');
         doc.fillColor('#FFFFFF')
             .fontSize(11)
-            .text('PAID | مدفوعة', 56, 84, {
+            .text(formatBillStatusLabel(BILL_STATUS.PAID), 56, 84, {
                 width: 92,
                 align: 'center'
             });
@@ -192,7 +206,7 @@ function drawInvoiceMeta(doc, bill) {
 
     drawLabelValue(doc, 376, 309, 160, 'تاريخ الإصدار', 'Issue Date', formatDate(bill.invoiceIssuedAt || bill.createdAt));
     drawLabelValue(doc, 212, 309, 140, 'تاريخ الاستحقاق', 'Due Date', formatDate(bill.dueDate));
-    drawLabelValue(doc, 52, 309, 136, 'حالة الفاتورة', 'Invoice Status', `${bill.status || '-'}`);
+    drawLabelValue(doc, 52, 309, 136, 'حالة الفاتورة', 'Invoice Status', formatBillStatusLabel(bill.status));
     drawLabelValue(doc, 376, 341, 160, 'نوع الفاتورة', 'Invoice Type', `${bill.type || '-'}`);
     drawLabelValue(doc, 212, 341, 140, 'طريقة الدفع', 'Payment Method', bill.paymentMethod || '-');
     drawLabelValue(doc, 52, 341, 136, 'مرجع الدفع', 'Payment Ref.', bill.paymentReference || '-');
@@ -455,7 +469,7 @@ async function ensureReceiptPdf(billRecord) {
     const bill = billRecord?.toJSON ? billRecord : await db.Bill.findByPk(billRecord?.id || billRecord);
     if (!bill) return null;
 
-    if (bill.status !== 'PAID') {
+    if (bill.status !== BILL_STATUS.PAID) {
         return null;
     }
 

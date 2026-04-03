@@ -20,6 +20,10 @@ const {
 const {
     buildSubscriptionConsumption
 } = require('../services/subscriptionConsumptionService');
+const {
+    BILL_STATUS,
+    RETIRABLE_BILL_STATUSES
+} = require('../utils/billStatus');
 
 const BILLING_CYCLES = ['monthly', 'sixMonth', 'annual'];
 
@@ -315,55 +319,85 @@ exports.requestSubscriptionChange = async (req, res) => {
             totalAmount: amount
         });
 
-        const bill = await db.Bill.create({
-            tenantId,
-            tenantSubscriptionId: currentSubscription.id,
-            billNumber,
-            ...invoiceSnapshot,
-            amount: invoiceSnapshot.amount,
-            currency: currentSubscription.currency || 'SAR',
-            dueDate,
-            status: 'UNPAID',
-            paymentToken,
-            paymentTokenExpiresAt: expiresAt,
-            type,
-            metadata: {
-                ...(invoiceSnapshot.metadata || {}),
-                currentPackageId: currentSubscription.packageId,
-                currentBillingCycle: currentSubscription.billingCycle,
-                requestedPackageId: newPackage.id,
-                requestedBillingCycle: billingCycle,
-                requestedAmount: amount
-            }
-        });
-
-        await db.ActivityLog.create({
-            entityType: 'tenant',
-            entityId: tenantId,
-            action: 'created',
-            performedByType: 'tenant_user',
-            performedById: tenantId,
-            performedByName: tenant?.name_en || tenant?.name_ar || tenant?.name || null,
-            details: {
-                event: 'invoice_created',
-                billId: bill.id,
+        const bill = await db.sequelize.transaction(async (transaction) => {
+            const createdBill = await db.Bill.create({
+                tenantId,
+                tenantSubscriptionId: currentSubscription.id,
                 billNumber,
-                requestAction: type === 'renewal' ? 'subscription_renewal_requested' : 'subscription_change_requested',
-                billType: type,
-                status: bill.status,
-                amount: toNumber(bill.amount, 0),
-                totalAmount: toNumber(bill.totalAmount, toNumber(bill.amount, 0)),
-                currentPackageId: currentSubscription.packageId,
-                requestedPackageId: newPackage.id,
-                requestedBillingCycle: billingCycle
-            }
-        });
+                ...invoiceSnapshot,
+                amount: invoiceSnapshot.amount,
+                currency: currentSubscription.currency || 'SAR',
+                dueDate,
+                status: BILL_STATUS.UNPAID,
+                paymentToken,
+                paymentTokenExpiresAt: expiresAt,
+                type,
+                metadata: {
+                    ...(invoiceSnapshot.metadata || {}),
+                    currentPackageId: currentSubscription.packageId,
+                    currentBillingCycle: currentSubscription.billingCycle,
+                    requestedPackageId: newPackage.id,
+                    requestedBillingCycle: billingCycle,
+                    requestedAmount: amount
+                }
+            }, { transaction });
 
-        await notifyTenantSubscriptionChangeRequested({
-            tenant,
-            bill,
-            packageName: newPackage.name,
-            billingCycle
+            await db.Bill.update(
+                {
+                    status: BILL_STATUS.VOID,
+                    paymentFailureReason: 'Superseded by a newer subscription change invoice',
+                    metadata: db.Sequelize.literal(`
+                        COALESCE(metadata, '{}'::jsonb) ||
+                        jsonb_build_object(
+                            'voidedAt', '${now.toISOString()}',
+                            'voidReason', 'superseded_by_new_subscription_request',
+                            'voidedByBillId', '${createdBill.id}',
+                            'voidedByBillNumber', '${createdBill.billNumber}'
+                        )
+                    `)
+                },
+                {
+                    where: {
+                        id: { [Op.ne]: createdBill.id },
+                        tenantId,
+                        tenantSubscriptionId: currentSubscription.id,
+                        status: { [Op.in]: RETIRABLE_BILL_STATUSES },
+                        type: { [Op.in]: ['renewal', 'upgrade'] }
+                    },
+                    transaction
+                }
+            );
+
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: tenantId,
+                action: 'created',
+                performedByType: 'tenant_user',
+                performedById: tenantId,
+                performedByName: tenant?.name_en || tenant?.name_ar || tenant?.name || null,
+                details: {
+                    event: 'invoice_created',
+                    billId: createdBill.id,
+                    billNumber,
+                    requestAction: type === 'renewal' ? 'subscription_renewal_requested' : 'subscription_change_requested',
+                    billType: type,
+                    status: createdBill.status,
+                    amount: toNumber(createdBill.amount, 0),
+                    totalAmount: toNumber(createdBill.totalAmount, toNumber(createdBill.amount, 0)),
+                    currentPackageId: currentSubscription.packageId,
+                    requestedPackageId: newPackage.id,
+                    requestedBillingCycle: billingCycle
+                }
+            }, { transaction });
+
+            await notifyTenantSubscriptionChangeRequested({
+                tenant,
+                bill: createdBill,
+                packageName: newPackage.name,
+                billingCycle
+            }, transaction);
+
+            return createdBill;
         });
 
         ensureInvoicePdf(bill).catch(err => {

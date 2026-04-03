@@ -1,5 +1,9 @@
 const db = require('../models');
 const { getTenantDashboardBaseUrl } = require('./url');
+const {
+    BILL_STATUS,
+    PAYABLE_BILL_STATUSES
+} = require('./billStatus');
 
 function getPeriodEndForBillingCycle(startDate, billingCycle = 'monthly') {
     const periodEnd = new Date(startDate);
@@ -252,7 +256,9 @@ async function expirePaymentPendingTenants() {
 
         const billsDueSoon = await db.Bill.findAll({
             where: {
-                status: 'UNPAID',
+                status: {
+                    [db.Sequelize.Op.in]: PAYABLE_BILL_STATUSES
+                },
                 paymentTokenExpiresAt: {
                     [db.Sequelize.Op.gte]: now,
                     [db.Sequelize.Op.lte]: reminderWindowEnd
@@ -321,6 +327,20 @@ async function expirePaymentPendingTenants() {
 
         for (const t of tenants) {
             await t.update({ status: 'payment_expired' });
+            await db.Bill.update(
+                {
+                    status: BILL_STATUS.EXPIRED,
+                    paymentFailureReason: 'Payment window expired before completion'
+                },
+                {
+                    where: {
+                        tenantId: t.id,
+                        status: {
+                            [db.Sequelize.Op.in]: PAYABLE_BILL_STATUSES
+                        }
+                    }
+                }
+            );
             sendPaymentExpiredEmail(t).catch(err => console.error('[Cron] Payment expired email failed:', err.message));
         }
         if (remindersSent > 0) {

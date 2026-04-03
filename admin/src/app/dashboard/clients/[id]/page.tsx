@@ -108,9 +108,12 @@ interface Bill {
 }
 
 const BILL_STATUS_BADGES: Record<string, { className: string; text: string }> = {
+  DRAFT: { className: "badge-info", text: "Draft" },
   UNPAID: { className: "badge-warning", text: "Unpaid" },
+  FAILED: { className: "badge-danger", text: "Failed" },
   PAID: { className: "badge-success", text: "Paid" },
   EXPIRED: { className: "badge-danger", text: "Expired" },
+  VOID: { className: "badge-info", text: "Void" },
 };
 
 const BILL_TYPE_LABELS: Record<string, string> = {
@@ -711,9 +714,11 @@ export default function ClientDetailsPage() {
                 <p className="text-2xl font-bold text-white mt-1">{tenantBills.length}</p>
               </div>
               <div className="card p-4 border border-warning/20">
-                <p className="text-dark-400 text-xs font-medium">Unpaid Amount</p>
+                <p className="text-dark-400 text-xs font-medium">Open / Failed Amount</p>
                 <p className="text-2xl font-bold text-warning mt-1">
-                  <Currency amount={billingSummary?.unpaidTotal || 0} />
+                  <Currency
+                    amount={(billingSummary?.unpaidTotal || 0) + (billingSummary?.failedTotal || 0)}
+                  />
                 </p>
               </div>
               <div className="card p-4 border border-success/20">
@@ -816,7 +821,7 @@ export default function ClientDetailsPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-3 mt-4">
-                          {bill.status === "UNPAID" && (
+                          {(bill.status === "UNPAID" || bill.status === "FAILED") && (
                             <button
                               type="button"
                               onClick={() => openReconcileModal(bill)}
@@ -1138,7 +1143,7 @@ export default function ClientDetailsPage() {
                         <div key={attempt.id} className="px-4 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className={`badge ${getBillStatusBadge(attempt.status === "succeeded" || attempt.status === "already_paid" ? "PAID" : attempt.status === "failed" ? "EXPIRED" : "UNPAID").className}`}>
+                              <span className={`badge ${getBillStatusBadge(attempt.status === "succeeded" || attempt.status === "already_paid" ? "PAID" : attempt.status === "failed" ? "FAILED" : attempt.status === "expired" ? "EXPIRED" : "UNPAID").className}`}>
                                 {humanizeValue(attempt.status)}
                               </span>
                               <p className="text-white font-semibold">
@@ -1171,7 +1176,7 @@ export default function ClientDetailsPage() {
                 </div>
 
                 <div className="flex flex-wrap justify-end gap-3">
-                  {selectedBill.status === "UNPAID" && (
+                  {(selectedBill.status === "UNPAID" || selectedBill.status === "FAILED") && (
                     <button
                       type="button"
                       onClick={() => openReconcileModal(selectedBill)}

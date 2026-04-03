@@ -6,6 +6,7 @@ const {
     ensureReceiptPdf
 } = require('../services/billDocumentService');
 const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
+const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
@@ -126,7 +127,7 @@ exports.getCurrentUnpaidBill = async (req, res) => {
         const bill = await db.Bill.findOne({
             where: {
                 tenantId,
-                status: 'UNPAID'
+                status: PAYABLE_BILL_STATUSES
             },
             order: [['createdAt', 'DESC']]
         });

@@ -10,6 +10,7 @@ const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
 const {
     settleBillPayment
 } = require('../services/billPaymentReconciliationService');
+const { createBillStatusSummarySeed } = require('../utils/billStatus');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
@@ -160,11 +161,7 @@ exports.listBills = async (req, res) => {
                 accumulator[statusKey].totalAmount += amount;
                 return accumulator;
             },
-            {
-                UNPAID: { count: 0, totalAmount: 0 },
-                PAID: { count: 0, totalAmount: 0 },
-                EXPIRED: { count: 0, totalAmount: 0 }
-            }
+            createBillStatusSummarySeed()
         );
 
         return res.json({
@@ -269,9 +266,18 @@ exports.getTenantBills = async (req, res) => {
                 } else if (bill.status === 'UNPAID') {
                     accumulator.unpaidCount += 1;
                     accumulator.unpaidTotal += amount;
+                } else if (bill.status === 'FAILED') {
+                    accumulator.failedCount += 1;
+                    accumulator.failedTotal += amount;
+                } else if (bill.status === 'DRAFT') {
+                    accumulator.draftCount += 1;
+                    accumulator.draftTotal += amount;
                 } else if (bill.status === 'EXPIRED') {
                     accumulator.expiredCount += 1;
                     accumulator.expiredTotal += amount;
+                } else if (bill.status === 'VOID') {
+                    accumulator.voidCount += 1;
+                    accumulator.voidTotal += amount;
                 }
                 accumulator.totalAmount += amount;
                 return accumulator;
@@ -281,8 +287,14 @@ exports.getTenantBills = async (req, res) => {
                 paidTotal: 0,
                 unpaidCount: 0,
                 unpaidTotal: 0,
+                failedCount: 0,
+                failedTotal: 0,
+                draftCount: 0,
+                draftTotal: 0,
                 expiredCount: 0,
                 expiredTotal: 0,
+                voidCount: 0,
+                voidTotal: 0,
                 totalAmount: 0
             }
         );

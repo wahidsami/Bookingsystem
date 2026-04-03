@@ -40,7 +40,7 @@ type InvoiceRow = {
   id: string;
   billNumber: string;
   type: string;
-  status: 'UNPAID' | 'PAID' | 'EXPIRED';
+  status: 'DRAFT' | 'UNPAID' | 'FAILED' | 'PAID' | 'EXPIRED' | 'VOID';
   amount: number;
   totalAmount?: number;
   dueDate?: string | null;
@@ -93,6 +93,15 @@ const formatBillingCycle = (value?: string) => {
   if (value === 'sixMonth') return '6 Months';
   if (value === 'annual') return 'Annual';
   return value || '-';
+};
+
+const INVOICE_STATUS_META: Record<InvoiceRow['status'], { label: string; badgeClass: string }> = {
+  DRAFT: { label: 'Draft', badgeClass: 'bg-slate-700 text-slate-200' },
+  UNPAID: { label: 'Unpaid', badgeClass: 'bg-amber-900/40 text-amber-300' },
+  FAILED: { label: 'Failed', badgeClass: 'bg-rose-900/40 text-rose-300' },
+  PAID: { label: 'Paid', badgeClass: 'bg-green-900/40 text-green-300' },
+  EXPIRED: { label: 'Expired', badgeClass: 'bg-gray-700 text-gray-300' },
+  VOID: { label: 'Void', badgeClass: 'bg-zinc-700 text-zinc-300' }
 };
 
 export default function FinancialOverviewPage() {
@@ -355,6 +364,20 @@ export default function FinancialOverviewPage() {
               <p className="mt-1 text-xl font-bold text-gray-400">{billsSummary.EXPIRED?.count ?? 0} bills</p>
               <p className="text-xs text-gray-400">SAR {(billsSummary.EXPIRED?.totalAmount ?? 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
             </div>
+            <div className="rounded-lg border border-rose-600/50 bg-rose-900/20 p-4">
+              <p className="text-sm font-medium text-rose-200">Failed</p>
+              <p className="mt-1 text-xl font-bold text-rose-400">{billsSummary.FAILED?.count ?? 0} bills</p>
+              <p className="text-xs text-rose-300">SAR {(billsSummary.FAILED?.totalAmount ?? 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-lg border border-slate-600 bg-slate-800/60 p-4">
+              <p className="text-sm font-medium text-slate-200">Draft / Void</p>
+              <p className="mt-1 text-xl font-bold text-slate-300">
+                {(billsSummary.DRAFT?.count ?? 0) + (billsSummary.VOID?.count ?? 0)} bills
+              </p>
+              <p className="text-xs text-slate-400">
+                {formatMoney((billsSummary.DRAFT?.totalAmount ?? 0) + (billsSummary.VOID?.totalAmount ?? 0))}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -386,9 +409,12 @@ export default function FinancialOverviewPage() {
               className="rounded-lg border border-dark-700 bg-dark-800 px-3 py-2 text-sm text-white"
             >
               <option value="ALL" className="bg-dark-900">All Statuses</option>
+              <option value="DRAFT" className="bg-dark-900">Draft</option>
               <option value="UNPAID" className="bg-dark-900">Unpaid</option>
+              <option value="FAILED" className="bg-dark-900">Failed</option>
               <option value="PAID" className="bg-dark-900">Paid</option>
               <option value="EXPIRED" className="bg-dark-900">Expired</option>
+              <option value="VOID" className="bg-dark-900">Void</option>
             </select>
             <select
               value={invoiceType}
@@ -412,7 +438,7 @@ export default function FinancialOverviewPage() {
 
         {invoiceSummary && (
           <div className="mb-6 grid gap-3 md:grid-cols-3">
-            {(['UNPAID', 'PAID', 'EXPIRED'] as const).map((statusKey) => (
+            {(['DRAFT', 'UNPAID', 'FAILED', 'PAID', 'EXPIRED', 'VOID'] as const).map((statusKey) => (
               <div
                 key={statusKey}
                 className="rounded-xl border border-dark-700 bg-dark-900/40 p-4"
@@ -493,15 +519,9 @@ export default function FinancialOverviewPage() {
                       </td>
                       <td>
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            invoice.status === 'PAID'
-                              ? 'bg-green-900/40 text-green-300'
-                              : invoice.status === 'EXPIRED'
-                                ? 'bg-gray-700 text-gray-300'
-                                : 'bg-amber-900/40 text-amber-300'
-                          }`}
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${INVOICE_STATUS_META[invoice.status]?.badgeClass || 'bg-slate-700 text-slate-200'}`}
                         >
-                          {invoice.status}
+                          {INVOICE_STATUS_META[invoice.status]?.label || invoice.status}
                         </span>
                       </td>
                       <td className="text-sm text-dark-200">

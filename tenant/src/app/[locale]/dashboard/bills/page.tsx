@@ -98,16 +98,27 @@ export default function BillsPage() {
 
   const statusLabel = (status: string) => {
     if (isArabic) {
+      if (status === 'DRAFT') return 'مسودة';
       if (status === 'UNPAID') return 'غير مدفوعة';
+      if (status === 'FAILED') return 'فشل الدفع';
       if (status === 'PAID') return 'مدفوعة';
       if (status === 'EXPIRED') return 'منتهية';
+      if (status === 'VOID') return 'ملغاة';
     }
+    if (status === 'DRAFT') return 'Draft';
+    if (status === 'UNPAID') return 'Unpaid';
+    if (status === 'FAILED') return 'Payment failed';
+    if (status === 'PAID') return 'Paid';
+    if (status === 'EXPIRED') return 'Expired';
+    if (status === 'VOID') return 'Void';
     return status;
   };
 
   const statusColor = (status: string) => {
     if (status === 'PAID') return 'bg-green-100 text-green-800';
-    if (status === 'EXPIRED') return 'bg-red-100 text-red-800';
+    if (status === 'FAILED') return 'bg-rose-100 text-rose-800';
+    if (status === 'EXPIRED' || status === 'VOID') return 'bg-red-100 text-red-800';
+    if (status === 'DRAFT') return 'bg-slate-100 text-slate-700';
     return 'bg-amber-100 text-amber-800';
   };
 
@@ -157,12 +168,12 @@ export default function BillsPage() {
   };
 
   const paidBillsCount = bills.filter((bill) => bill.status === 'PAID').length;
-  const unpaidBillsCount = bills.filter((bill) => bill.status === 'UNPAID').length;
+  const unpaidBillsCount = bills.filter((bill) => bill.status === 'UNPAID' || bill.status === 'FAILED').length;
   const paidTotal = bills
     .filter((bill) => bill.status === 'PAID')
     .reduce((sum, bill) => sum + Number(bill.totalAmount ?? bill.amount ?? 0), 0);
   const outstandingTotal = bills
-    .filter((bill) => bill.status === 'UNPAID')
+    .filter((bill) => bill.status === 'UNPAID' || bill.status === 'FAILED')
     .reduce((sum, bill) => sum + Number(bill.totalAmount ?? bill.amount ?? 0), 0);
 
   return (
@@ -188,7 +199,9 @@ export default function BillsPage() {
             <p className="text-2xl font-bold text-gray-900">{bills.length}</p>
           </div>
           <div className="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
-            <p className="text-sm text-amber-700 mb-1">{isArabic ? 'غير مدفوعة' : 'Unpaid'}</p>
+            <p className="text-sm text-amber-700 mb-1">
+              {isArabic ? 'قابلة للدفع / فشل الدفع' : 'Open / failed'}
+            </p>
             <p className="text-2xl font-bold text-amber-900">
               {unpaidBillsCount}
               <span className="ms-2 text-sm font-semibold text-amber-700">
@@ -240,7 +253,7 @@ export default function BillsPage() {
             {bills.map((bill) => {
               const totalAmount = bill.totalAmount ?? bill.amount;
               const canDownloadReceipt = bill.status === 'PAID';
-              const canPayNow = bill.status === 'UNPAID' && Boolean(bill.paymentToken);
+              const canPayNow = (bill.status === 'UNPAID' || bill.status === 'FAILED') && Boolean(bill.paymentToken);
               const invoiceLoading = documentLoading === `${bill.id}-invoice`;
               const receiptLoading = documentLoading === `${bill.id}-receipt`;
 
@@ -574,7 +587,7 @@ export default function BillsPage() {
                   </button>
                 )}
 
-                {selectedBill.status === 'UNPAID' && selectedBill.paymentToken && (
+                {(selectedBill.status === 'UNPAID' || selectedBill.status === 'FAILED') && selectedBill.paymentToken && (
                   <Link
                     href={`/${locale}/payment?token=${selectedBill.paymentToken}`}
                     className="inline-flex items-center rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-700"
