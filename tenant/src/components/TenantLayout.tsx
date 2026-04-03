@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useParams } from "next/navigation";
 import Link from "next/link";
 import { useTenantAuth } from "@/contexts/TenantAuthContext";
 import { useTranslations } from "next-intl";
-import { Currency } from "./Currency";
-import { getImageUrl } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
+import {
+  hasHotDealsEntitlement,
+  hasInternalMessagingEntitlement,
+  hasProductsAndOrdersEntitlement,
+  hasPushNotificationsEntitlement
+} from "@/lib/packageEntitlements";
 import { useRouter } from "next/navigation";
 
 interface TenantLayoutProps {
@@ -21,6 +26,36 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const isRTL = locale === 'ar';
   const { user, logout } = useTenantAuth();
   const t = useTranslations("Navigation");
+  const [entitlements, setEntitlements] = useState<Record<string, any> | null>(null);
+  const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
+  const [entitlementsLoadFailed, setEntitlementsLoadFailed] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    tenantApi
+      .getSubscriptionLimits()
+      .then((response) => {
+        if (response.success && response.limits) {
+          setEntitlements(response.limits);
+          setEntitlementsLoadFailed(false);
+        } else {
+          setEntitlements({});
+          setEntitlementsLoadFailed(false);
+        }
+      })
+      .catch(() => {
+        setEntitlements(null);
+        setEntitlementsLoadFailed(true);
+      })
+      .finally(() => setEntitlementsLoaded(true));
+  }, [user?.id, user?.status]);
+
+  const shouldBypassFeatureFiltering = !entitlementsLoaded || entitlementsLoadFailed || entitlements === null;
+  const hasProductsAndOrders = shouldBypassFeatureFiltering || hasProductsAndOrdersEntitlement(entitlements);
+  const hasInternalMessaging = shouldBypassFeatureFiltering || hasInternalMessagingEntitlement(entitlements);
+  const hasHotDeals = shouldBypassFeatureFiltering || hasHotDealsEntitlement(entitlements);
+  const hasPushNotifications = shouldBypassFeatureFiltering || hasPushNotificationsEntitlement(entitlements);
 
   useEffect(() => {
     if (!user) return;
@@ -31,17 +66,17 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     }
   }, [user?.status, pathname, locale, router]);
 
-  const navigation = [
+  const navigation = useMemo(() => [
     { name: t("dashboard"), href: `/${locale}/dashboard`, icon: "📊" },
     { name: t("services"), href: `/${locale}/dashboard/services`, icon: "✨" },
-    { name: t("products"), href: `/${locale}/dashboard/products`, icon: "🛍️" },
+    { name: t("products"), href: `/${locale}/dashboard/products`, icon: "🛍️", visible: hasProductsAndOrders },
     { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: "👥" },
     { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: "📅" },
     { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: "📅" },
-    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦" },
-    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥" },
-    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: "📬" },
-    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: "🔔" },
+    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦", visible: hasProductsAndOrders },
+    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥", visible: hasHotDeals },
+    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: "📬", visible: hasInternalMessaging },
+    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: "🔔", visible: hasPushNotifications },
     { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: "🤝" },
     { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: "🧾" },
     { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: "📋" },
@@ -51,7 +86,24 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈" },
     { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐" },
     { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: "⚙️" },
-  ];
+  ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasProductsAndOrders, hasPushNotifications, locale, t]);
+
+  useEffect(() => {
+    if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
+
+    const restrictedRoutes = [
+      { href: `/${locale}/dashboard/products`, allowed: hasProductsAndOrders },
+      { href: `/${locale}/dashboard/orders`, allowed: hasProductsAndOrders },
+      { href: `/${locale}/dashboard/hot-deals`, allowed: hasHotDeals },
+      { href: `/${locale}/dashboard/messages`, allowed: hasInternalMessaging },
+      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications }
+    ];
+
+    const blockedRoute = restrictedRoutes.find((route) => pathname.startsWith(route.href) && !route.allowed);
+    if (blockedRoute) {
+      router.replace(`/${locale}/dashboard/subscription`);
+    }
+  }, [entitlements, entitlementsLoadFailed, entitlementsLoaded, hasHotDeals, hasInternalMessaging, hasProductsAndOrders, hasPushNotifications, locale, pathname, router]);
 
   const isActive = (href: string) => {
     if (href === `/${locale}/dashboard`) {

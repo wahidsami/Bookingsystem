@@ -6,6 +6,7 @@ import { API_BASE_URL, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
+import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 
@@ -28,6 +29,7 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [translatingField, setTranslatingField] = useState<string | null>(null);
+  const [hasAIFeature, setHasAIFeature] = useState(false);
   const [aiMode, setAiMode] = useState<'search' | 'enhance'>('search');
   const [showNotFoundPopup, setShowNotFoundPopup] = useState(false);
   const [error, setError] = useState("");
@@ -63,7 +65,19 @@ export default function NewProductPage() {
 
   useEffect(() => {
     loadGlobalSettings();
+    checkSubscriptionLimits();
   }, []);
+
+  const checkSubscriptionLimits = async () => {
+    try {
+      const response = await tenantApi.getSubscriptionLimits();
+      if (response.success && response.limits) {
+        setHasAIFeature(hasAIAssistantEntitlement(response.limits));
+      }
+    } catch (err) {
+      console.error("Failed to fetch subscription limits:", err);
+    }
+  };
 
   const loadGlobalSettings = async () => {
     try {
@@ -193,6 +207,8 @@ export default function NewProductPage() {
   };
 
   const handleAIFill = async () => {
+    if (!hasAIFeature) return;
+
     const hasEnglish = formData.name_en.trim().length > 0;
     const hasArabic = formData.name_ar.trim().length > 0;
 
@@ -268,6 +284,8 @@ export default function NewProductPage() {
   };
 
   const handleTranslate = async (sourceField: string, targetField: string, targetLang: 'English' | 'Arabic') => {
+    if (!hasAIFeature) return;
+
     const sourceText = formData[sourceField as keyof typeof formData] as string;
     if (!sourceText) return;
 
@@ -374,24 +392,26 @@ export default function NewProductPage() {
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
                 </h3>
-                <button
-                  type="button"
-                  onClick={handleAIFill}
-                  disabled={isGeneratingAI || (!formData.name_en && !formData.name_ar)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${aiMode === 'enhance'
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
-                    : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
-                    }`}
-                  title={!formData.name_en && !formData.name_ar ? (locale === 'ar' ? 'أدخل اسم المنتج أولاً' : 'Enter product name first') : ''}
-                >
-                  <SparklesIcon className="w-4 h-4" />
-                  {isGeneratingAI
-                    ? (locale === 'ar' ? 'جاري البحث...' : 'Searching...')
-                    : aiMode === 'enhance'
-                      ? (locale === 'ar' ? '✨ تحسين المحتوى' : '✨ Enhance Content')
-                      : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
-                  }
-                </button>
+                {hasAIFeature && (
+                  <button
+                    type="button"
+                    onClick={handleAIFill}
+                    disabled={isGeneratingAI || (!formData.name_en && !formData.name_ar)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${aiMode === 'enhance'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                      : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
+                      }`}
+                    title={!formData.name_en && !formData.name_ar ? (locale === 'ar' ? 'أدخل اسم المنتج أولاً' : 'Enter product name first') : ''}
+                  >
+                    <SparklesIcon className="w-4 h-4" />
+                    {isGeneratingAI
+                      ? (locale === 'ar' ? 'جاري البحث...' : 'Searching...')
+                      : aiMode === 'enhance'
+                        ? (locale === 'ar' ? '✨ تحسين المحتوى' : '✨ Enhance Content')
+                        : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
+                    }
+                  </button>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -430,7 +450,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("descriptionEn")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.description_ar && !formData.description_en && (
+                    {hasAIFeature && formData.description_ar && !formData.description_en && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('description_ar', 'description_en', 'English')}
@@ -457,7 +477,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("descriptionAr")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.description_en && !formData.description_ar && (
+                    {hasAIFeature && formData.description_en && !formData.description_ar && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('description_en', 'description_ar', 'Arabic')}
@@ -571,7 +591,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("ingredientsEn")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.ingredients_ar && !formData.ingredients_en && (
+                    {hasAIFeature && formData.ingredients_ar && !formData.ingredients_en && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('ingredients_ar', 'ingredients_en', 'English')}
@@ -599,7 +619,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("ingredientsAr")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.ingredients_en && !formData.ingredients_ar && (
+                    {hasAIFeature && formData.ingredients_en && !formData.ingredients_ar && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('ingredients_en', 'ingredients_ar', 'Arabic')}
@@ -627,7 +647,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("howToUseEn")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.howToUse_ar && !formData.howToUse_en && (
+                    {hasAIFeature && formData.howToUse_ar && !formData.howToUse_en && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('howToUse_ar', 'howToUse_en', 'English')}
@@ -655,7 +675,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("howToUseAr")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.howToUse_en && !formData.howToUse_ar && (
+                    {hasAIFeature && formData.howToUse_en && !formData.howToUse_ar && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('howToUse_en', 'howToUse_ar', 'Arabic')}
@@ -683,7 +703,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("featuresEn")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.features_ar && !formData.features_en && (
+                    {hasAIFeature && formData.features_ar && !formData.features_en && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('features_ar', 'features_en', 'English')}
@@ -711,7 +731,7 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("featuresAr")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.features_en && !formData.features_ar && (
+                    {hasAIFeature && formData.features_en && !formData.features_ar && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('features_en', 'features_ar', 'Arabic')}
@@ -986,4 +1006,3 @@ export default function NewProductPage() {
     </TenantLayout>
   );
 }
-

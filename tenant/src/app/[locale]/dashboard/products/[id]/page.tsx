@@ -6,6 +6,7 @@ import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
+import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 
@@ -91,7 +92,7 @@ export default function EditProductPage() {
     try {
       const response = await tenantApi.getSubscriptionLimits();
       if (response.success && response.limits) {
-        setHasAIFeature(response.limits.hasAIContentAssistant || false);
+        setHasAIFeature(hasAIAssistantEntitlement(response.limits));
       }
     } catch (err) {
       console.error("Failed to fetch subscription limits:", err);
@@ -221,6 +222,8 @@ export default function EditProductPage() {
   };
 
   const handleAIFill = async () => {
+    if (!hasAIFeature) return;
+
     if (!formData.name_en) {
       setError(locale === 'ar' ? "يرجى إدخال اسم المنتج باللغة الإنجليزية أولاً لاستخدام الذكاء الاصطناعي." : "Please enter the English product name first to use AI fill.");
       return;
@@ -257,6 +260,8 @@ export default function EditProductPage() {
   };
 
   const handleTranslate = async (sourceField: string, targetField: string, targetLang: 'English' | 'Arabic') => {
+    if (!hasAIFeature) return;
+
     const sourceText = formData[sourceField as keyof typeof formData] as string;
     if (!sourceText) return;
 
@@ -834,4 +839,3 @@ export default function EditProductPage() {
     </TenantLayout>
   );
 }
-

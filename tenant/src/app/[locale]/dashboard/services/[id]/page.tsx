@@ -6,6 +6,7 @@ import { API_BASE_URL, getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
+import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 
@@ -98,7 +99,7 @@ export default function EditServicePage() {
     try {
       const response = await tenantApi.getSubscriptionLimits();
       if (response.success && response.limits) {
-        setHasAIFeature(response.limits.hasAIContentAssistant || false);
+        setHasAIFeature(hasAIAssistantEntitlement(response.limits));
       }
     } catch (err) {
       console.error("Failed to fetch subscription limits:", err);
@@ -376,6 +377,8 @@ export default function EditServicePage() {
   };
 
   const handleAIFill = async () => {
+    if (!hasAIFeature) return;
+
     const hasEnglish = formData.name_en.trim().length > 0;
     const hasArabic = formData.name_ar.trim().length > 0;
 
@@ -429,6 +432,8 @@ export default function EditServicePage() {
     targetField: "description_ar" | "description_en",
     targetLang: 'English' | 'Arabic'
   ) => {
+    if (!hasAIFeature) return;
+
     const sourceText = formData[sourceField];
     if (!sourceText) return;
 
@@ -463,6 +468,8 @@ export default function EditServicePage() {
     sourceLang: 'en' | 'ar',
     targetLangName: 'English' | 'Arabic'
   ) => {
+    if (!hasAIFeature) return;
+
     const item = formData[arrayName][index];
     const sourceText = item[sourceLang];
     if (!sourceText) return;
@@ -547,19 +554,21 @@ export default function EditServicePage() {
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
                 </h3>
-                <button
-                  type="button"
-                  onClick={handleAIFill}
-                  disabled={isGeneratingAI || (!formData.name_en && !formData.name_ar)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm font-medium hover:from-purple-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-                  title={!formData.name_en && !formData.name_ar ? (locale === 'ar' ? 'أدخل اسم الخدمة أولاً' : 'Enter service name first') : (locale === 'ar' ? 'تعبئة تلقائية بالذكاء الاصطناعي' : 'Auto-fill with AI')}
-                >
-                  <SparklesIcon className="w-4 h-4" />
-                  {isGeneratingAI
-                    ? (locale === 'ar' ? 'جاري التوليد...' : 'Generating...')
-                    : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
-                  }
-                </button>
+                {hasAIFeature && (
+                  <button
+                    type="button"
+                    onClick={handleAIFill}
+                    disabled={isGeneratingAI || (!formData.name_en && !formData.name_ar)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm font-medium hover:from-purple-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                    title={!formData.name_en && !formData.name_ar ? (locale === 'ar' ? 'أدخل اسم الخدمة أولاً' : 'Enter service name first') : (locale === 'ar' ? 'تعبئة تلقائية بالذكاء الاصطناعي' : 'Auto-fill with AI')}
+                  >
+                    <SparklesIcon className="w-4 h-4" />
+                    {isGeneratingAI
+                      ? (locale === 'ar' ? 'جاري التوليد...' : 'Generating...')
+                      : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
+                    }
+                  </button>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -598,7 +607,7 @@ export default function EditServicePage() {
                     <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {t("descriptionEn")} <span className="text-gray-400">({t("optional")})</span>
                     </label>
-                    {formData.description_ar && !formData.description_en && (
+                    {hasAIFeature && formData.description_ar && !formData.description_en && (
                       <button
                         type="button"
                         onClick={() => handleTranslate('description_ar', 'description_en', 'English')}
@@ -1278,4 +1287,3 @@ export default function EditServicePage() {
     </TenantLayout>
   );
 }
-

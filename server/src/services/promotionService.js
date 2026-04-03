@@ -4,6 +4,12 @@
  */
 
 const db = require('../models');
+const { getActiveSubscriptionForTenant } = require('./tenantSubscriptionService');
+const {
+    isFeatureEnabled,
+    normalizePackageEntitlements,
+    toNumericEntitlement
+} = require('../utils/packageEntitlements');
 
 /**
  * Get tenant's active subscription with package details
@@ -11,19 +17,8 @@ const db = require('../models');
  * @returns {Promise<Object|null>} Subscription with package or null
  */
 const getTenantSubscription = async (tenantId) => {
-    const subscription = await db.TenantSubscription.findOne({
-        where: {
-            tenantId,
-            status: 'active'
-        },
-        include: [{
-            model: db.SubscriptionPackage,
-            as: 'package',
-            where: { isActive: true }
-        }]
-    });
-
-    return subscription;
+    const result = await getActiveSubscriptionForTenant(tenantId);
+    return result?.subscription || null;
 };
 
 /**
@@ -38,7 +33,7 @@ const canBeFeatured = async (tenantId) => {
         return { allowed: false, priority: null };
     }
 
-    const limits = subscription.package.limits || {};
+    const limits = normalizePackageEntitlements(subscription.package.limits || {});
     const allowed = limits.featuredCarousel === true;
     const priority = limits.carouselPriority || 'low';
 
@@ -63,8 +58,8 @@ const canCreateHotDeal = async (tenantId) => {
         };
     }
 
-    const limits = subscription.package.limits || {};
-    const maxDeals = limits.maxHotDeals || 0;
+    const limits = normalizePackageEntitlements(subscription.package.limits || {});
+    const maxDeals = toNumericEntitlement(limits.maxHotDeals, 0);
 
     if (maxDeals === 0) {
         return {
@@ -115,7 +110,7 @@ const getSearchRankingBoost = async (tenantId) => {
         return 'standard';
     }
 
-    const limits = subscription.package.limits || {};
+    const limits = normalizePackageEntitlements(subscription.package.limits || {});
     return limits.searchRankingBoost || 'standard';
 };
 
@@ -132,8 +127,8 @@ const hasFeature = async (tenantId, featureName) => {
         return false;
     }
 
-    const limits = subscription.package.limits || {};
-    return limits[featureName] === true;
+    const limits = normalizePackageEntitlements(subscription.package.limits || {});
+    return isFeatureEnabled(limits[featureName]);
 };
 
 /**
@@ -161,7 +156,7 @@ const getTenantFeatures = async (tenantId) => {
         };
     }
 
-    const limits = subscription.package.limits || {};
+    const limits = normalizePackageEntitlements(subscription.package.limits || {});
 
     return {
         packageName: subscription.package.name,

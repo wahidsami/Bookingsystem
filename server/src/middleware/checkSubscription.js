@@ -1,5 +1,36 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const {
+    getFeatureKeys,
+    isFeatureEnabled,
+    normalizePackageEntitlements
+} = require('../utils/packageEntitlements');
+
+const loadSubscriptionContext = async (req) => {
+    if (req.subscription && req.packageLimits) {
+        return {
+            subscription: req.subscription,
+            packageLimits: req.packageLimits
+        };
+    }
+
+    const result = await getActiveSubscriptionForTenant(req.tenantId, {
+        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+    });
+
+    if (!result?.subscription || !result?.package) {
+        return null;
+    }
+
+    req.subscription = result.subscription;
+    req.packageLimits = normalizePackageEntitlements(result.package.limits || {});
+
+    return {
+        subscription: req.subscription,
+        packageLimits: req.packageLimits
+    };
+};
 
 /**
  * Middleware to check if tenant has active subscription
@@ -15,27 +46,17 @@ exports.requireActiveSubscription = async (req, res, next) => {
             });
         }
         
-        // Get tenant's subscription
-        const subscription = await db.TenantSubscription.findOne({
-            where: {
-                tenantId,
-                status: { [Op.in]: ['trial', 'active'] }
-            },
-            include: [
-                {
-                    model: db.SubscriptionPackage,
-                    as: 'package'
-                }
-            ]
-        });
-        
-        if (!subscription) {
+        const context = await loadSubscriptionContext(req);
+
+        if (!context) {
             return res.status(403).json({
                 success: false,
                 message: 'No active subscription found. Please subscribe to continue.',
                 code: 'SUBSCRIPTION_REQUIRED'
             });
         }
+
+        const { subscription } = context;
         
         // Check if subscription has expired
         if (new Date() > subscription.currentPeriodEnd) {
@@ -48,10 +69,6 @@ exports.requireActiveSubscription = async (req, res, next) => {
                 });
             }
         }
-        
-        // Attach subscription to request
-        req.subscription = subscription;
-        req.packageLimits = subscription.package.limits;
         
         next();
     } catch (error) {
@@ -69,22 +86,26 @@ exports.requireActiveSubscription = async (req, res, next) => {
 exports.requireFeature = (featureName) => {
     return async (req, res, next) => {
         try {
-            const { packageLimits } = req;
-            
-            if (!packageLimits) {
+            const context = await loadSubscriptionContext(req);
+
+            if (!context?.packageLimits) {
                 return res.status(403).json({
                     success: false,
-                    message: 'Subscription information not found'
+                    message: 'Subscription information not found',
+                    code: 'SUBSCRIPTION_REQUIRED'
                 });
             }
-            
-            // Check if feature is enabled
-            if (!packageLimits[featureName]) {
+
+            const normalizedPackageLimits = normalizePackageEntitlements(context.packageLimits || {});
+            const featureKeys = getFeatureKeys(featureName);
+
+            if (!featureKeys.some((featureKey) => isFeatureEnabled(normalizedPackageLimits[featureKey]))) {
                 return res.status(403).json({
                     success: false,
                     message: `This feature (${featureName}) is not included in your current plan. Please upgrade to access it.`,
                     code: 'FEATURE_NOT_AVAILABLE',
-                    feature: featureName
+                    feature: featureName,
+                    upgradeRequired: true
                 });
             }
             
@@ -105,45 +126,47 @@ exports.requireFeature = (featureName) => {
 exports.checkResourceLimit = (resourceType) => {
     return async (req, res, next) => {
         try {
-            const { tenantId, packageLimits } = req;
-            
-            if (!packageLimits) {
+            const { tenantId } = req;
+            const context = await loadSubscriptionContext(req);
+
+            if (!context?.packageLimits) {
                 return res.status(403).json({
                     success: false,
-                    message: 'Subscription information not found'
+                    message: 'Subscription information not found',
+                    code: 'SUBSCRIPTION_REQUIRED'
                 });
             }
-            
-            // Get or create usage record
-            let usage = await db.TenantUsage.findOne({ where: { tenantId } });
-            if (!usage) {
-                usage = await db.TenantUsage.create({
-                    tenantId,
-                    currentPeriod: new Date().toISOString().substring(0, 7)
-                });
-            }
-            
+
+            const { packageLimits } = context;
+
             // Define limit mapping
             const limitMap = {
                 'booking': {
-                    usageField: 'bookingsThisMonth',
                     limitField: 'maxBookingsPerMonth',
-                    displayName: 'Bookings'
+                    displayName: 'Bookings',
+                    getCurrentUsage: () => db.Appointment.count({
+                        where: {
+                            tenantId,
+                            createdAt: {
+                                [Op.gte]: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+                            }
+                        }
+                    })
                 },
                 'staff': {
-                    usageField: 'activeStaff',
                     limitField: 'maxStaff',
-                    displayName: 'Staff Members'
+                    displayName: 'Staff Members',
+                    getCurrentUsage: () => db.Staff.count({ where: { tenantId } })
                 },
                 'service': {
-                    usageField: 'activeServices',
                     limitField: 'maxServices',
-                    displayName: 'Services'
+                    displayName: 'Services',
+                    getCurrentUsage: () => db.Service.count({ where: { tenantId } })
                 },
                 'product': {
-                    usageField: 'activeProducts',
                     limitField: 'maxProducts',
-                    displayName: 'Products'
+                    displayName: 'Products',
+                    getCurrentUsage: () => db.Product.count({ where: { tenantId } })
                 }
             };
             
@@ -153,14 +176,24 @@ exports.checkResourceLimit = (resourceType) => {
             }
             
             const limit = packageLimits[config.limitField];
-            
+
             // -1 means unlimited
             if (limit === -1) {
                 return next();
             }
+
+            if (limit === undefined || limit === null) {
+                return res.status(403).json({
+                    success: false,
+                    message: `${config.displayName} limit is not configured for your current plan. Please contact support or upgrade your plan.`,
+                    code: 'LIMIT_NOT_CONFIGURED',
+                    resource: resourceType,
+                    upgradeRequired: true
+                });
+            }
             
             // Check if limit reached
-            const currentUsage = usage[config.usageField] || 0;
+            const currentUsage = await config.getCurrentUsage();
             if (currentUsage >= limit) {
                 // Send alert if not already sent
                 await sendLimitAlert(tenantId, resourceType, currentUsage, limit);

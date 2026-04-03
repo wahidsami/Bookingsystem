@@ -7,36 +7,7 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const { checkResourceLimit } = require('../utils/tenantLimitsUtil');
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
-const { isFeatureEnabled } = require('../middleware/authTenant');
-
-const normalizeFeatureAliases = (features = {}) => {
-    const normalized = { ...features };
-
-    const aiQuota = normalized.aiContentAssistant ?? normalized.hasAIContentAssistant ?? 0;
-    const internalMessaging = normalized.hasInternalMessaging ?? normalized.internalMessaging;
-    const productsAndOrders = normalized.hasProductsAndOrders ?? normalized.productsAndOrders;
-    const hotDeals = normalized.maxHotDeals ?? normalized.hotDeals;
-
-    normalized.aiContentAssistant = typeof aiQuota === 'number' ? aiQuota : Number(aiQuota) || 0;
-    normalized.hasAIContentAssistant = isFeatureEnabled(aiQuota);
-
-    if (internalMessaging !== undefined) {
-        normalized.hasInternalMessaging = isFeatureEnabled(internalMessaging);
-        normalized.internalMessaging = internalMessaging;
-    }
-
-    if (productsAndOrders !== undefined) {
-        normalized.hasProductsAndOrders = isFeatureEnabled(productsAndOrders);
-        normalized.productsAndOrders = productsAndOrders;
-    }
-
-    if (hotDeals !== undefined) {
-        normalized.maxHotDeals = typeof hotDeals === 'number' ? hotDeals : Number(hotDeals) || 0;
-        normalized.hotDeals = normalized.maxHotDeals;
-    }
-
-    return normalized;
-};
+const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 
 /**
  * Get subscription limits and current usage for the tenant.
@@ -55,7 +26,7 @@ exports.getSubscriptionLimits = async (req, res) => {
             statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
         });
         const packageLimits = subResult?.package?.limits || {};
-        const mergedFeatures = normalizeFeatureAliases({ ...packageLimits, ...tenantFeatures });
+        const mergedFeatures = normalizePackageEntitlements(packageLimits, tenantFeatures);
 
         const [staff, services, products, bookings] = await Promise.all([
             checkResourceLimit(tenantId, 'maxStaff', async () => db.Staff.count({ where: { tenantId } })),

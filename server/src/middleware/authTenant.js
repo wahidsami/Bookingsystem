@@ -7,27 +7,11 @@
 const jwt = require('jsonwebtoken');
 const db = require('../models');
 const JWT_SECRET = process.env.JWT_SECRET;
-
-const FEATURE_ALIASES = {
-  hasAIContentAssistant: ['hasAIContentAssistant', 'aiContentAssistant'],
-  hasInternalMessaging: ['hasInternalMessaging', 'internalMessaging'],
-  hasProductsAndOrders: ['hasProductsAndOrders', 'productsAndOrders'],
-  maxHotDeals: ['maxHotDeals', 'hotDeals']
-};
-
-const isFeatureEnabled = (value) => {
-  if (value === true) return true;
-  if (typeof value === 'number') return value === -1 || value > 0;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true') return true;
-    const numericValue = Number(normalized);
-    return Number.isFinite(numericValue) && (numericValue === -1 || numericValue > 0);
-  }
-  return false;
-};
-
-const getFeatureKeys = (feature) => FEATURE_ALIASES[feature] || [feature];
+const {
+  getFeatureKeys,
+  isFeatureEnabled,
+  normalizePackageEntitlements
+} = require('../utils/packageEntitlements');
 
 /**
  * Authenticate Tenant User (Required Auth)
@@ -165,7 +149,7 @@ const checkTenantFeature = (feature) => {
       const featureKeys = getFeatureKeys(feature);
 
       const settings = await db.TenantSettings.findOne({ where: { tenantId } });
-      const tenantFeatures = settings?.features || {};
+      const tenantFeatures = normalizePackageEntitlements(settings?.features || {});
       if (featureKeys.some((key) => isFeatureEnabled(tenantFeatures[key]))) {
         return next();
       }
@@ -174,7 +158,8 @@ const checkTenantFeature = (feature) => {
       const subResult = await getActiveSubscriptionForTenant(tenantId, {
         statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
       });
-      if (featureKeys.some((key) => isFeatureEnabled(subResult?.package?.limits?.[key]))) {
+      const packageFeatures = normalizePackageEntitlements(subResult?.package?.limits || {});
+      if (featureKeys.some((key) => isFeatureEnabled(packageFeatures[key]))) {
         return next();
       }
 
@@ -191,7 +176,8 @@ const checkTenantFeature = (feature) => {
         }
       });
 
-      if (featureKeys.some((key) => isFeatureEnabled(planPackage?.limits?.[key]))) {
+      const fallbackPackageFeatures = normalizePackageEntitlements(planPackage?.limits || {});
+      if (featureKeys.some((key) => isFeatureEnabled(fallbackPackageFeatures[key]))) {
         return next();
       }
 

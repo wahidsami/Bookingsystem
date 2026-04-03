@@ -25,6 +25,10 @@ const tenantPayrollController = require('../controllers/tenantPayrollController'
 const tenantNotificationController = require('../controllers/tenantNotificationController');
 const aiController = require('../controllers/tenant/aiController');
 const { authenticateTenant, checkTenantFeature } = require('../middleware/authTenant');
+const {
+    requireActiveSubscription,
+    checkResourceLimit
+} = require('../middleware/checkSubscription');
 const multer = require('multer');
 const path = require('path');
 
@@ -59,7 +63,13 @@ router.get('/dashboard/revenue-chart', tenantDashboardController.getRevenueChart
 router.get('/employees', tenantEmployeeController.getEmployees);
 router.get('/employees/:id', tenantEmployeeController.getEmployee);
 router.get('/employees/:id/permissions', tenantEmployeeController.getEmployeePermissions);
-router.post('/employees', tenantEmployeeController.uploadPhoto, tenantEmployeeController.createEmployee);
+router.post(
+    '/employees',
+    requireActiveSubscription,
+    checkResourceLimit('staff'),
+    tenantEmployeeController.uploadPhoto,
+    tenantEmployeeController.createEmployee
+);
 router.put('/employees/:id', tenantEmployeeController.uploadPhoto, tenantEmployeeController.updateEmployee);
 router.put('/employees/:id/permissions', tenantEmployeeController.updateEmployeePermissions);
 router.put('/employees/:id/app-access', tenantEmployeeController.updateEmployeeAppAccess);
@@ -68,17 +78,30 @@ router.post('/employees/:id/reset-password', tenantEmployeeController.resetEmplo
 router.delete('/employees/:id', tenantEmployeeController.deleteEmployee);
 
 // Product management
-router.get('/products', tenantProductController.getProducts);
-router.get('/products/:id', tenantProductController.getProduct);
-router.post('/products', tenantProductController.uploadImages, tenantProductController.createProduct);
-router.put('/products/:id', tenantProductController.uploadImages, tenantProductController.updateProduct);
-router.delete('/products/:id', tenantProductController.deleteProduct);
+router.get('/products', checkTenantFeature('hasProductsAndOrders'), tenantProductController.getProducts);
+router.get('/products/:id', checkTenantFeature('hasProductsAndOrders'), tenantProductController.getProduct);
+router.post(
+    '/products',
+    checkTenantFeature('hasProductsAndOrders'),
+    requireActiveSubscription,
+    checkResourceLimit('product'),
+    tenantProductController.uploadImages,
+    tenantProductController.createProduct
+);
+router.put('/products/:id', checkTenantFeature('hasProductsAndOrders'), tenantProductController.uploadImages, tenantProductController.updateProduct);
+router.delete('/products/:id', checkTenantFeature('hasProductsAndOrders'), tenantProductController.deleteProduct);
 
 // Service management
 router.get('/services', tenantServiceController.getServices);
 router.get('/services/categories', tenantServiceController.getServiceCategories);
 router.get('/services/:id', tenantServiceController.getService);
-router.post('/services', tenantServiceController.uploadImage, tenantServiceController.createService);
+router.post(
+    '/services',
+    requireActiveSubscription,
+    checkResourceLimit('service'),
+    tenantServiceController.uploadImage,
+    tenantServiceController.createService
+);
 router.put('/services/:id', tenantServiceController.uploadImage, tenantServiceController.updateService);
 router.delete('/services/:id', tenantServiceController.deleteService);
 
@@ -108,19 +131,19 @@ router.get('/customers/:id/history', tenantCustomerController.getCustomerHistory
 router.patch('/customers/:id/notes', tenantCustomerController.updateCustomerNotes);
 
 // Order management
-router.get('/orders', tenantOrderController.getOrders);
-router.get('/orders/:id', tenantOrderController.getOrder);
-router.patch('/orders/:id/status', tenantOrderController.updateOrderStatus);
-router.patch('/orders/:id/payment', tenantOrderController.updatePaymentStatus);
+router.get('/orders', checkTenantFeature('hasProductsAndOrders'), tenantOrderController.getOrders);
+router.get('/orders/:id', checkTenantFeature('hasProductsAndOrders'), tenantOrderController.getOrder);
+router.patch('/orders/:id/status', checkTenantFeature('hasProductsAndOrders'), tenantOrderController.updateOrderStatus);
+router.patch('/orders/:id/payment', checkTenantFeature('hasProductsAndOrders'), tenantOrderController.updatePaymentStatus);
 
 // Billing
 router.get('/bills/current-unpaid', tenantBillsController.getCurrentUnpaidBill);
 router.get('/bills', tenantBillsController.getBills);
 
 // Messaging
-router.get('/messages', tenantMessagesController.getMessages);
-router.post('/messages', tenantMessagesController.sendMessage);
-router.delete('/messages/:id', tenantMessagesController.deleteMessage);
+router.get('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.getMessages);
+router.post('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.sendMessage);
+router.delete('/messages/:id', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.deleteMessage);
 
 // Payroll
 router.get('/payroll', tenantPayrollController.getPayrollRecords);
@@ -132,11 +155,11 @@ router.get('/reviews', tenantPayrollController.getAllReviews);
 router.patch('/reviews/:id', tenantPayrollController.updateReview);
 
 // Customer push notifications
-router.get('/notifications/usage', tenantNotificationController.getPushUsage);
-router.post('/notifications/send', tenantNotificationController.sendMarketingPush);
-router.get('/notifications/history', tenantNotificationController.getPushHistory);
-router.get('/notifications/history/:id', tenantNotificationController.getPushHistoryDetail);
-router.get('/notifications/history/:id/recipients', tenantNotificationController.getPushHistoryRecipients);
+router.get('/notifications/usage', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushUsage);
+router.post('/notifications/send', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.sendMarketingPush);
+router.get('/notifications/history', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistory);
+router.get('/notifications/history/:id', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryDetail);
+router.get('/notifications/history/:id/recipients', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryRecipients);
 
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);
