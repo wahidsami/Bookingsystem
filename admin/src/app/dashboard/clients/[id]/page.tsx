@@ -59,14 +59,61 @@ interface Activity {
   details: any;
 }
 
+interface Bill {
+  id: string;
+  billNumber: string;
+  type: string;
+  status: string;
+  amount: number | string;
+  subtotalAmount?: number | string | null;
+  vatAmount?: number | string | null;
+  totalAmount?: number | string | null;
+  currency?: string;
+  dueDate?: string | null;
+  paidAt?: string | null;
+  invoiceIssuedAt?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  paymentProvider?: string | null;
+  paymentCapturedAmount?: number | string | null;
+  planSnapshot?: {
+    packageName?: string;
+    packageNameAr?: string;
+    billingCycle?: string;
+  };
+  lineItemsSnapshot?: Array<{
+    labelAr?: string;
+    labelEn?: string;
+    quantity?: number;
+    total?: number;
+  }>;
+}
+
+const BILL_STATUS_BADGES: Record<string, { className: string; text: string }> = {
+  UNPAID: { className: "badge-warning", text: "Unpaid" },
+  PAID: { className: "badge-success", text: "Paid" },
+  EXPIRED: { className: "badge-danger", text: "Expired" },
+};
+
+const BILL_TYPE_LABELS: Record<string, string> = {
+  initial: "Initial Subscription Invoice",
+  renewal: "Renewal Invoice",
+  upgrade: "Upgrade Invoice",
+  subscription: "Subscription Invoice",
+};
+
 export default function ClientDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [tenantBills, setTenantBills] = useState<Bill[]>([]);
+  const [billingSummary, setBillingSummary] = useState<any>(null);
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [billDocumentLoading, setBillDocumentLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "activity" | "settings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "billing" | "documents" | "activity" | "settings">("overview");
   const [suspendModal, setSuspendModal] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
 
@@ -78,10 +125,18 @@ export default function ClientDetailsPage() {
 
   const loadTenantDetails = async () => {
     try {
-      const response = await adminApi.getTenantDetails(params.id as string);
+      const tenantId = params.id as string;
+      const [response, billsResponse] = await Promise.all([
+        adminApi.getTenantDetails(tenantId),
+        adminApi.getTenantBills(tenantId),
+      ]);
       if (response.success) {
         setTenant(response.tenant);
         setActivities(response.activities || []);
+      }
+      if (billsResponse.success) {
+        setTenantBills(billsResponse.bills || []);
+        setBillingSummary(billsResponse.summary || null);
       }
     } catch (error) {
       console.error("Failed to load tenant details:", error);
@@ -171,6 +226,40 @@ export default function ClientDetailsPage() {
       day: "numeric",
     });
   };
+
+  const formatBillingCycle = (billingCycle?: string) => {
+    if (!billingCycle) return "—";
+    if (billingCycle === "sixMonth") return "6 Months";
+    return billingCycle.charAt(0).toUpperCase() + billingCycle.slice(1);
+  };
+
+  const formatBillType = (type?: string) => {
+    if (!type) return "—";
+    return BILL_TYPE_LABELS[type] || humanizeValue(type);
+  };
+
+  const getBillStatusBadge = (status: string) => (
+    BILL_STATUS_BADGES[status] || { className: "badge-info", text: status || "—" }
+  );
+
+  const openBillDocument = async (bill: Bill, type: "invoice" | "receipt") => {
+    setBillDocumentLoading(`${bill.id}-${type}`);
+    try {
+      const response = type === "invoice"
+        ? await adminApi.downloadBillInvoicePdf(bill.id)
+        : await adminApi.downloadBillReceiptPdf(bill.id);
+      const fileUrl = URL.createObjectURL(response.blob);
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 30000);
+    } catch (error) {
+      console.error(`Failed to open ${type} PDF:`, error);
+      alert(error instanceof Error ? error.message : `Failed to open ${type} PDF`);
+    } finally {
+      setBillDocumentLoading(null);
+    }
+  };
+
+  const latestBill = tenantBills[0];
 
   // Removed formatCurrency - now using Currency component
 
@@ -294,6 +383,7 @@ export default function ClientDetailsPage() {
           <div className="flex gap-6">
             {[
               { id: "overview", label: "Overview" },
+              { id: "billing", label: "Billing" },
               { id: "documents", label: "Documents" },
               { id: "activity", label: "Activity Log" },
               { id: "settings", label: "Settings" },
@@ -525,7 +615,163 @@ export default function ClientDetailsPage() {
                     <p className="text-dark-400 text-xs">Approved</p>
                     <p className="text-white mt-1">{formatDate(tenant.approvedAt)}</p>
                   </div>
+                  <div>
+                    <p className="text-dark-400 text-xs">Latest Invoice</p>
+                    <p className="text-white mt-1">{latestBill?.billNumber || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-dark-400 text-xs">Latest Payment</p>
+                    <p className="text-white mt-1">{latestBill?.paidAt ? formatDate(latestBill.paidAt) : "—"}</p>
+                  </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "billing" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="card p-4">
+                <p className="text-dark-400 text-xs font-medium">Total Invoices</p>
+                <p className="text-2xl font-bold text-white mt-1">{tenantBills.length}</p>
+              </div>
+              <div className="card p-4 border border-warning/20">
+                <p className="text-dark-400 text-xs font-medium">Unpaid Amount</p>
+                <p className="text-2xl font-bold text-warning mt-1">
+                  <Currency amount={billingSummary?.unpaidTotal || 0} />
+                </p>
+              </div>
+              <div className="card p-4 border border-success/20">
+                <p className="text-dark-400 text-xs font-medium">Paid Amount</p>
+                <p className="text-2xl font-bold text-success mt-1">
+                  <Currency amount={billingSummary?.paidTotal || 0} />
+                </p>
+              </div>
+              <div className="card p-4">
+                <p className="text-dark-400 text-xs font-medium">Latest Invoice Status</p>
+                <div className="mt-2">
+                  {latestBill ? (
+                    <span className={`badge ${getBillStatusBadge(latestBill.status).className}`}>
+                      {getBillStatusBadge(latestBill.status).text}
+                    </span>
+                  ) : (
+                    <span className="text-white">—</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header flex items-center justify-between">
+                <h3 className="font-semibold text-white">Tenant Invoices</h3>
+                {latestBill?.status === "PAID" && (
+                  <span className="badge badge-success">Latest bill paid</span>
+                )}
+              </div>
+              <div className="card-body space-y-4">
+                {tenantBills.length === 0 ? (
+                  <div className="text-center py-12 text-dark-400">No invoices generated yet.</div>
+                ) : (
+                  tenantBills.map((bill) => {
+                    const billStatusBadge = getBillStatusBadge(bill.status);
+                    const totalAmount = bill.totalAmount ?? bill.amount;
+                    const invoiceLoading = billDocumentLoading === `${bill.id}-invoice`;
+                    const receiptLoading = billDocumentLoading === `${bill.id}-receipt`;
+
+                    return (
+                      <div
+                        key={bill.id}
+                        className="rounded-2xl bg-dark-700/40 border border-dark-700 p-5"
+                      >
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <h4 className="text-lg font-bold text-white">{bill.billNumber}</h4>
+                              <span className={`badge ${billStatusBadge.className}`}>
+                                {billStatusBadge.text}
+                              </span>
+                            </div>
+                            <p className="text-sm text-primary-300 mt-2">
+                              {formatBillType(bill.type)}
+                            </p>
+                            <p className="text-white font-medium mt-1">
+                              {bill.planSnapshot?.packageName || bill.planSnapshot?.packageNameAr || "—"}
+                              {bill.planSnapshot?.billingCycle
+                                ? ` • ${formatBillingCycle(bill.planSnapshot.billingCycle)}`
+                                : ""}
+                            </p>
+                            <p className="text-dark-300 text-sm mt-2">
+                              Payment: {[bill.paymentProvider, bill.paymentMethod, bill.paymentReference]
+                                .filter(Boolean)
+                                .join(" • ") || "—"}
+                            </p>
+                          </div>
+
+                          <div className="lg:text-right">
+                            <p className="text-dark-400 text-xs">Grand Total</p>
+                            <p className="text-2xl font-bold text-white mt-1">
+                              <Currency amount={Number(totalAmount) || 0} />
+                            </p>
+                            <p className="text-dark-300 text-xs mt-1">
+                              Subtotal <Currency amount={Number(bill.subtotalAmount) || 0} /> • VAT{" "}
+                              <Currency amount={Number(bill.vatAmount) || 0} />
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                          <div className="rounded-xl bg-dark-800/50 p-3">
+                            <p className="text-dark-400 text-xs">Issued</p>
+                            <p className="text-white text-sm mt-1">
+                              {formatDate(bill.invoiceIssuedAt || "")}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-dark-800/50 p-3">
+                            <p className="text-dark-400 text-xs">Due Date</p>
+                            <p className="text-white text-sm mt-1">
+                              {formatDate(bill.dueDate || "")}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-dark-800/50 p-3">
+                            <p className="text-dark-400 text-xs">Paid Date</p>
+                            <p className="text-white text-sm mt-1">
+                              {formatDate(bill.paidAt || "")}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 mt-4">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBill(bill)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            View Details
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openBillDocument(bill, "invoice")}
+                            disabled={invoiceLoading}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            {invoiceLoading ? "Opening Invoice..." : "Open Invoice PDF"}
+                          </button>
+                          {bill.status === "PAID" && (
+                            <button
+                              type="button"
+                              onClick={() => openBillDocument(bill, "receipt")}
+                              disabled={receiptLoading}
+                              className="btn btn-success btn-sm"
+                            >
+                              {receiptLoading ? "Opening Receipt..." : "Open Paid Receipt"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -638,6 +884,181 @@ export default function ClientDetailsPage() {
               <pre className="bg-dark-700/50 rounded-lg p-4 text-sm text-dark-200 overflow-x-auto">
                 {JSON.stringify(tenant.settings, null, 2)}
               </pre>
+            </div>
+          </div>
+        )}
+
+        {selectedBill && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="card w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="card-header flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-primary-300 text-sm font-medium">Invoice Details</p>
+                  <h3 className="font-semibold text-white text-xl mt-1">{selectedBill.billNumber}</h3>
+                  <p className="text-dark-400 text-sm mt-1">
+                    {formatBillType(selectedBill.type)} •{" "}
+                    {selectedBill.planSnapshot?.packageName ||
+                      selectedBill.planSnapshot?.packageNameAr ||
+                      "—"}{" "}
+                    • {formatBillingCycle(selectedBill.planSnapshot?.billingCycle)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBill(null)}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="card-body space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="rounded-xl bg-dark-700/40 p-4">
+                    <p className="text-dark-400 text-xs">Status</p>
+                    <p className="text-white font-semibold mt-1">
+                      {getBillStatusBadge(selectedBill.status).text}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-dark-700/40 p-4">
+                    <p className="text-dark-400 text-xs">Issued</p>
+                    <p className="text-white font-semibold mt-1">
+                      {formatDate(selectedBill.invoiceIssuedAt || "")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-dark-700/40 p-4">
+                    <p className="text-dark-400 text-xs">Due Date</p>
+                    <p className="text-white font-semibold mt-1">
+                      {formatDate(selectedBill.dueDate || "")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-dark-700/40 p-4">
+                    <p className="text-dark-400 text-xs">Paid Date</p>
+                    <p className="text-white font-semibold mt-1">
+                      {formatDate(selectedBill.paidAt || "")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
+                  <div className="rounded-2xl bg-dark-700/40 border border-dark-700 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-dark-700">
+                      <h4 className="font-semibold text-white">Line Items</h4>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-dark-800/40">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-dark-400">
+                              Item
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-dark-400">
+                              Qty
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-dark-400">
+                              Total
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(selectedBill.lineItemsSnapshot || []).length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="px-4 py-5 text-center text-dark-400">
+                                No invoice line items found.
+                              </td>
+                            </tr>
+                          ) : (
+                            selectedBill.lineItemsSnapshot?.map((item, index) => (
+                              <tr
+                                key={`${selectedBill.id}-${index}`}
+                                className="border-t border-dark-700"
+                              >
+                                <td className="px-4 py-3 text-white text-sm">
+                                  {item.labelEn || item.labelAr || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-dark-200 text-sm">
+                                  {item.quantity ?? 1}
+                                </td>
+                                <td className="px-4 py-3 text-white text-sm font-semibold">
+                                  <Currency amount={Number(item.total) || 0} />
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-dark-700/40 border border-dark-700 p-5 space-y-4">
+                    <div>
+                      <p className="text-dark-400 text-xs">Payment Provider</p>
+                      <p className="text-white font-semibold mt-1">
+                        {selectedBill.paymentProvider || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-dark-400 text-xs">Payment Method</p>
+                      <p className="text-white font-semibold mt-1">
+                        {selectedBill.paymentMethod || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-dark-400 text-xs">Payment Reference</p>
+                      <p className="text-white font-semibold mt-1 break-all">
+                        {selectedBill.paymentReference || "—"}
+                      </p>
+                    </div>
+                    <div className="border-t border-dark-700 pt-4 space-y-2">
+                      <div className="flex justify-between text-sm text-dark-300">
+                        <span>Subtotal</span>
+                        <span>
+                          <Currency amount={Number(selectedBill.subtotalAmount) || 0} />
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm text-dark-300">
+                        <span>VAT</span>
+                        <span>
+                          <Currency amount={Number(selectedBill.vatAmount) || 0} />
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-base text-white font-bold pt-2 border-t border-dark-700">
+                        <span>Grand Total</span>
+                        <span>
+                          <Currency
+                            amount={Number(selectedBill.totalAmount ?? selectedBill.amount) || 0}
+                          />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => openBillDocument(selectedBill, "invoice")}
+                    disabled={billDocumentLoading === `${selectedBill.id}-invoice`}
+                    className="btn btn-secondary"
+                  >
+                    {billDocumentLoading === `${selectedBill.id}-invoice`
+                      ? "Opening Invoice..."
+                      : "Open Invoice PDF"}
+                  </button>
+                  {selectedBill.status === "PAID" && (
+                    <button
+                      type="button"
+                      onClick={() => openBillDocument(selectedBill, "receipt")}
+                      disabled={billDocumentLoading === `${selectedBill.id}-receipt`}
+                      className="btn btn-success"
+                    >
+                      {billDocumentLoading === `${selectedBill.id}-receipt`
+                        ? "Opening Receipt..."
+                        : "Open Paid Receipt"}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

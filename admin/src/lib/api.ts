@@ -72,6 +72,37 @@ class AdminApi {
     return data;
   }
 
+  private async requestBlob(endpoint: string): Promise<{ blob: Blob; filename: string }> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to download document');
+      }
+      throw new Error(`Failed to download document: ${response.status}`);
+    }
+
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+
+    return {
+      blob: await response.blob(),
+      filename: filenameMatch?.[1] || 'document.pdf'
+    };
+  }
+
   // Auth
   async login(email: string, password: string) {
     return this.request<{
@@ -111,6 +142,22 @@ class AdminApi {
 
   async getTenantDetails(id: string) {
     return this.request<{ success: boolean; tenant: any; activities: any[]; bookingStats: any }>(`/admin/tenants/${id}`);
+  }
+
+  async getTenantBills(id: string) {
+    return this.request<{ success: boolean; bills: any[]; summary: any }>(`/admin/tenants/${id}/bills`);
+  }
+
+  async getBillDetails(id: string) {
+    return this.request<{ success: boolean; bill: any }>(`/admin/bills/${id}`);
+  }
+
+  async downloadBillInvoicePdf(id: string) {
+    return this.requestBlob(`/admin/bills/${id}/invoice-pdf`);
+  }
+
+  async downloadBillReceiptPdf(id: string) {
+    return this.requestBlob(`/admin/bills/${id}/receipt-pdf`);
   }
 
   async approveTenant(id: string, notes?: string) {
@@ -359,4 +406,3 @@ class AdminApi {
 
 
 export const adminApi = new AdminApi();
-
