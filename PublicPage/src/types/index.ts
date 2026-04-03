@@ -40,7 +40,6 @@ export interface BookingData {
   specialRequests?: string;
   location?: string;
   bookingReference?: string;
-  bookingQrUrl?: string;
 }
 
 export interface Product {

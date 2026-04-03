@@ -386,7 +386,6 @@ class PublicAPI {
     data: {
       bookingId: string;
       bookingReference: string;
-      bookingQrUrl?: string;
       totalAmount: number;
       bookingFee: number;
     };
