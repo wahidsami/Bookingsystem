@@ -1,11 +1,17 @@
 const { Op } = require('sequelize');
+const fs = require('fs');
+const path = require('path');
+const PDFDocument = require('pdfkit');
 const db = require('../models');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const { ACTIVE_APPOINTMENT_STATUSES } = require('../utils/appointmentStatus');
 
 const POS_QUEUE_LIMIT = 100;
 const POS_TRANSACTION_LIMIT = 100;
+const POS_ALERT_LIMIT = 10;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
+const logoFallbackPath = path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
 
 const parseDateRange = (startDate, endDate) => {
     const range = {};
@@ -53,6 +59,18 @@ const getOrderLabel = (order) => {
         : 'Product order';
 };
 
+const formatDateTimeLabel = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return `${value || '-'}`;
+    }
+
+    return date.toLocaleString('en-GB', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+    });
+};
+
 const getAppointmentDueAmount = (appointment) => {
     if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
         const remainder = parseFloat(appointment.remainderAmount || 0);
@@ -77,6 +95,113 @@ const formatPaymentMethodLabel = (paymentMethod) => ({
     pay_on_visit: 'Pay on visit',
     cash_on_delivery: 'Cash on delivery'
 }[paymentMethod] || paymentMethod || 'Not set');
+
+const formatMoney = (amount, currency = 'SAR') => {
+    const numericAmount = Number.parseFloat(amount || 0);
+    const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
+    return `${safeAmount.toFixed(2)} ${currency}`;
+};
+
+const escapeCsvField = (value) => {
+    const stringValue = `${value ?? ''}`;
+    return `"${stringValue.replace(/"/g, '""')}"`;
+};
+
+const getTransactionIncludes = ({ includeTenantOnlyFields = true } = {}) => ([
+    {
+        model: db.Appointment,
+        as: 'appointment',
+        attributes: includeTenantOnlyFields
+            ? ['id', 'bookingNumber', 'tenantId', 'startTime', 'paymentStatus', 'status']
+            : ['id', 'bookingNumber', 'tenantId', 'startTime', 'paymentStatus', 'status', 'price'],
+        required: false,
+        include: [
+            {
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar'],
+                required: false
+            },
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            }
+        ]
+    },
+    {
+        model: db.Order,
+        as: 'order',
+        attributes: includeTenantOnlyFields
+            ? ['id', 'tenantId', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod']
+            : ['id', 'tenantId', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount'],
+        required: false,
+        include: [
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            },
+            {
+                model: db.OrderItem,
+                as: 'items',
+                include: [
+                    {
+                        model: db.Product,
+                        as: 'product',
+                        attributes: ['id', 'name_en', 'name_ar'],
+                        required: false
+                    }
+                ],
+                required: false
+            }
+        ]
+    },
+    {
+        model: db.Staff,
+        as: 'processor',
+        attributes: ['id', 'name'],
+        required: false
+    }
+]);
+
+const buildTenantScopedTransactionWhere = (tenantId, filters = {}) => {
+    const where = {
+        [Op.or]: [
+            { '$appointment.tenantId$': tenantId },
+            { '$order.tenantId$': tenantId }
+        ]
+    };
+
+    if (filters.processedAt) {
+        where.processedAt = filters.processedAt;
+    }
+
+    if (filters.id) {
+        where.id = filters.id;
+    }
+
+    const trimmedSearch = `${filters.search || ''}`.trim();
+    if (trimmedSearch) {
+        where[Op.and] = [{
+            [Op.or]: [
+                { transactionRef: { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$appointment.bookingNumber$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$order.orderNumber$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$appointment.user.firstName$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$appointment.user.lastName$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$appointment.user.phone$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$order.user.firstName$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$order.user.lastName$': { [Op.iLike]: `%${trimmedSearch}%` } },
+                { '$order.user.phone$': { [Op.iLike]: `%${trimmedSearch}%` } }
+            ]
+        }];
+    }
+
+    return where;
+};
 
 const mapAppointmentQueueItem = (appointment) => ({
     id: `appointment-${appointment.id}`,
@@ -125,6 +250,55 @@ const mapOrderQueueItem = (order) => ({
     dueAmount: parseFloat(order.totalAmount || 0),
     detailPath: `/dashboard/orders/${order.id}`
 });
+
+const mapPosAlertFromQueueItem = (item) => {
+    if (item.entityType === 'appointment') {
+        const isCheckedInDue = item.status === 'checked_in';
+        const isDepositRemainder = item.paymentIntent === 'deposit_remainder_due';
+
+        return {
+            id: `${item.entityId}:${item.paymentIntent}:${item.status}`,
+            entityType: 'appointment',
+            entityId: item.entityId,
+            reference: item.reference,
+            severity: isCheckedInDue ? 'high' : 'medium',
+            title: isDepositRemainder
+                ? `Remainder due for booking ${item.reference}`
+                : `Payment due for booking ${item.reference}`,
+            title_ar: isDepositRemainder
+                ? `متبقي مستحق للحجز ${item.reference}`
+                : `دفعة مستحقة للحجز ${item.reference}`,
+            message: `${item.customerName} has ${item.dueAmount.toFixed(2)} SAR due for ${item.title}.`,
+            message_ar: `${item.customerName} لديه مبلغ مستحق ${item.dueAmount.toFixed(2)} ر.س مقابل ${item.title}.`,
+            amountDue: item.dueAmount,
+            paymentIntent: item.paymentIntent,
+            scheduledAt: item.scheduledAt,
+            detailPath: item.detailPath
+        };
+    }
+
+    const isCod = item.paymentIntent === 'cash_on_delivery';
+
+    return {
+        id: `${item.entityId}:${item.paymentIntent}:${item.status}`,
+        entityType: 'order',
+        entityId: item.entityId,
+        reference: item.reference,
+        severity: isCod ? 'medium' : 'low',
+        title: isCod
+            ? `COD payment pending for order ${item.reference}`
+            : `Pickup payment pending for order ${item.reference}`,
+        title_ar: isCod
+            ? `دفع عند التوصيل مستحق للطلب ${item.reference}`
+            : `دفع عند الاستلام مستحق للطلب ${item.reference}`,
+        message: `${item.customerName} has ${item.dueAmount.toFixed(2)} SAR due for ${item.title}.`,
+        message_ar: `${item.customerName} لديه مبلغ مستحق ${item.dueAmount.toFixed(2)} ر.س للطلب ${item.title}.`,
+        amountDue: item.dueAmount,
+        paymentIntent: item.paymentIntent,
+        scheduledAt: item.scheduledAt,
+        detailPath: item.detailPath
+    };
+};
 
 const mapPaymentTransaction = (transaction) => {
     const appointment = transaction.appointment;
@@ -219,94 +393,367 @@ const buildOrderSearchWhere = (tenantId, search) => {
     return where;
 };
 
-exports.getCollectionQueue = async (req, res) => {
-    try {
-        const tenantId = req.tenantId;
-        const search = `${req.query.search || ''}`.trim();
-        const limit = Math.min(parseInt(req.query.limit || POS_QUEUE_LIMIT, 10), POS_QUEUE_LIMIT);
+const fetchQueueData = async (tenantId, search = '', limit = POS_QUEUE_LIMIT) => {
+    const [appointments, orders] = await Promise.all([
+        db.Appointment.findAll({
+            where: buildAppointmentSearchWhere(tenantId, search),
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar']
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
+            order: [['startTime', 'ASC']],
+            limit
+        }),
+        db.Order.findAll({
+            where: buildOrderSearchWhere(tenantId, search),
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                },
+                {
+                    model: db.OrderItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: db.Product,
+                            as: 'product',
+                            attributes: ['id', 'name_en', 'name_ar'],
+                            required: false
+                        }
+                    ],
+                    required: false
+                }
+            ],
+            order: [['createdAt', 'ASC']],
+            limit
+        })
+    ]);
 
-        const [appointments, orders] = await Promise.all([
-            db.Appointment.findAll({
-                where: buildAppointmentSearchWhere(tenantId, search),
-                include: [
-                    {
-                        model: db.Service,
-                        as: 'service',
-                        attributes: ['id', 'name_en', 'name_ar']
-                    },
-                    {
-                        model: db.Staff,
-                        as: 'staff',
-                        attributes: ['id', 'name'],
-                        required: false
-                    },
-                    {
-                        model: db.PlatformUser,
-                        as: 'user',
-                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                        required: false
-                    }
-                ],
-                order: [['startTime', 'ASC']],
-                limit
-            }),
-            db.Order.findAll({
-                where: buildOrderSearchWhere(tenantId, search),
-                include: [
-                    {
-                        model: db.PlatformUser,
-                        as: 'user',
-                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                        required: false
-                    },
-                    {
-                        model: db.OrderItem,
-                        as: 'items',
-                        include: [
-                            {
-                                model: db.Product,
-                                as: 'product',
-                                attributes: ['id', 'name_en', 'name_ar'],
-                                required: false
-                            }
-                        ],
-                        required: false
-                    }
-                ],
-                order: [['createdAt', 'ASC']],
-                limit
-            })
-        ]);
+    const queue = [
+        ...appointments.map(mapAppointmentQueueItem),
+        ...orders.map(mapOrderQueueItem)
+    ]
+        .filter((item) => item.dueAmount > 0)
+        .sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime())
+        .slice(0, limit);
 
-        const queue = [
-            ...appointments.map(mapAppointmentQueueItem),
-            ...orders.map(mapOrderQueueItem)
-        ]
-            .filter((item) => item.dueAmount > 0)
-            .sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime())
-            .slice(0, limit);
+    const totalDueAmount = queue.reduce((sum, item) => sum + item.dueAmount, 0);
+    const appointmentDueCount = queue.filter((item) => item.entityType === 'appointment').length;
+    const orderDueCount = queue.filter((item) => item.entityType === 'order').length;
 
-        const totalDueAmount = queue.reduce((sum, item) => sum + item.dueAmount, 0);
-        const appointmentDueCount = queue.filter((item) => item.entityType === 'appointment').length;
-        const orderDueCount = queue.filter((item) => item.entityType === 'order').length;
-        const queueSummary = {
+    return {
+        queue,
+        summary: {
             totalDueCount: queue.length,
             appointmentDueCount,
             orderDueCount,
             totalDueAmount: parseFloat(totalDueAmount.toFixed(2)),
             checkedInDueCount: queue.filter((item) => item.entityType === 'appointment' && item.status === 'checked_in').length
+        }
+    };
+};
+
+const fetchClosingSummaryData = async (tenantId, selectedDate) => {
+    const dateRange = parseDateRange(selectedDate, selectedDate);
+
+    const transactions = await db.PaymentTransaction.findAll({
+        where: buildTenantScopedTransactionWhere(tenantId, { processedAt: dateRange }),
+        include: getTransactionIncludes(),
+        order: [['processedAt', 'DESC']],
+        subQuery: false
+    });
+
+    const totalsByMethod = {};
+    const totalsBySource = {
+        appointments: 0,
+        orders: 0,
+        refunds: 0
+    };
+
+    let grossCollected = 0;
+    let refundsTotal = 0;
+
+    transactions.forEach((transaction) => {
+        const amount = parseFloat(transaction.amount || 0);
+        const method = transaction.paymentMethod || 'cash';
+
+        if (!totalsByMethod[method]) {
+            totalsByMethod[method] = {
+                paymentMethod: method,
+                paymentMethodLabel: formatPaymentMethodLabel(method),
+                collected: 0,
+                refunded: 0,
+                transactionCount: 0
+            };
+        }
+
+        totalsByMethod[method].transactionCount += 1;
+
+        if (transaction.status === 'refunded' || transaction.type === 'refund') {
+            refundsTotal += amount;
+            totalsByMethod[method].refunded += amount;
+            totalsBySource.refunds += amount;
+            return;
+        }
+
+        if (transaction.status === 'completed') {
+            grossCollected += amount;
+            totalsByMethod[method].collected += amount;
+
+            if (transaction.appointment) {
+                totalsBySource.appointments += amount;
+            } else if (transaction.order) {
+                totalsBySource.orders += amount;
+            }
+        }
+    });
+
+    const cashierBreakdownMap = new Map();
+    transactions.forEach((transaction) => {
+        if (transaction.status !== 'completed') return;
+
+        const processorName = transaction.processor?.name || 'Tenant Dashboard';
+        const existing = cashierBreakdownMap.get(processorName) || {
+            processorName,
+            transactionCount: 0,
+            collected: 0
         };
+
+        existing.transactionCount += 1;
+        existing.collected += parseFloat(transaction.amount || 0);
+        cashierBreakdownMap.set(processorName, existing);
+    });
+
+    return {
+        summary: {
+            date: selectedDate,
+            grossCollected: parseFloat(grossCollected.toFixed(2)),
+            refundsTotal: parseFloat(refundsTotal.toFixed(2)),
+            netCollected: parseFloat((grossCollected - refundsTotal).toFixed(2)),
+            transactionCount: transactions.length,
+            totalsByMethod: Object.values(totalsByMethod).map((entry) => ({
+                ...entry,
+                collected: parseFloat(entry.collected.toFixed(2)),
+                refunded: parseFloat(entry.refunded.toFixed(2))
+            })),
+            totalsBySource: {
+                appointments: parseFloat(totalsBySource.appointments.toFixed(2)),
+                orders: parseFloat(totalsBySource.orders.toFixed(2)),
+                refunds: parseFloat(totalsBySource.refunds.toFixed(2))
+            },
+            cashierBreakdown: Array.from(cashierBreakdownMap.values()).map((entry) => ({
+                ...entry,
+                collected: parseFloat(entry.collected.toFixed(2))
+            }))
+        },
+        transactions
+    };
+};
+
+const renderTransactionReceiptPdf = (res, transaction) => {
+    const mappedTransaction = mapPaymentTransaction(transaction);
+    const appointment = transaction.appointment;
+    const order = transaction.order;
+    const filename = `receipt-${mappedTransaction.transactionRef || mappedTransaction.reference || transaction.id}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    if (fs.existsSync(cairoFontPath)) {
+        doc.registerFont('Cairo', cairoFontPath);
+        doc.font('Cairo');
+    }
+
+    doc.pipe(res);
+
+    doc.rect(0, 0, 595.28, 120).fill('#7C3AED');
+    if (fs.existsSync(logoFallbackPath)) {
+        try {
+            doc.image(logoFallbackPath, 40, 32, { fit: [92, 48] });
+        } catch (error) {
+            // Skip logo if the image cannot be decoded by PDFKit.
+        }
+    }
+
+    doc.fillColor('#FFFFFF')
+        .fontSize(20)
+        .text('Refah Payment Receipt | سند قبض رفاه', 160, 42, {
+            width: 360,
+            align: 'right'
+        });
+    doc.fontSize(10).text(mappedTransaction.reference || '-', 160, 74, {
+        width: 360,
+        align: 'right'
+    });
+
+    doc.roundedRect(40, 150, 515, 230, 16).fillAndStroke('#FFFFFF', '#E2E8F0');
+    doc.fillColor('#7C3AED').fontSize(12).text('Transaction Details | تفاصيل العملية', 56, 170, {
+        width: 483,
+        align: 'right'
+    });
+
+    const rows = [
+        ['Customer | العميل', mappedTransaction.customerName],
+        ['Item | البند', mappedTransaction.title],
+        ['Reference | المرجع', mappedTransaction.reference],
+        ['Payment Method | طريقة الدفع', mappedTransaction.paymentMethodLabel],
+        ['Transaction Ref | رقم العملية', mappedTransaction.transactionRef || '-'],
+        ['Processed At | وقت التحصيل', formatDateTimeLabel(mappedTransaction.processedAt)],
+        ['Cashier | الكاشير', mappedTransaction.processorName || 'Tenant Dashboard'],
+        ['Status | الحالة', mappedTransaction.status]
+    ];
+
+    let y = 198;
+    rows.forEach(([label, value]) => {
+        doc.fillColor('#64748B').fontSize(9).text(label, 56, y, { width: 170, align: 'left' });
+        doc.fillColor('#0F172A').fontSize(10).text(`${value || '-'}`, 220, y - 1, { width: 320, align: 'right' });
+        y += 20;
+    });
+
+    doc.roundedRect(40, 410, 515, 104, 16).fill('#F8FAFC').stroke('#E2E8F0');
+    doc.fillColor('#EC4899').fontSize(12).text('Paid Amount | المبلغ المحصل', 56, 432, {
+        width: 483,
+        align: 'right'
+    });
+    doc.fillColor('#0F172A').fontSize(28).text(formatMoney(mappedTransaction.amount), 56, 458, {
+        width: 483,
+        align: 'right'
+    });
+
+    if (mappedTransaction.notes) {
+        doc.roundedRect(40, 540, 515, 84, 16).fillAndStroke('#FFFFFF', '#E2E8F0');
+        doc.fillColor('#7C3AED').fontSize(11).text('Notes | ملاحظات', 56, 558, {
+            width: 483,
+            align: 'right'
+        });
+        doc.fillColor('#334155').fontSize(10).text(mappedTransaction.notes, 56, 580, {
+            width: 483,
+            align: 'right'
+        });
+    }
+
+    const footerText = appointment
+        ? 'تم تحصيل هذه الدفعة لحجز خدمة عبر منصة رفاه | This payment was collected for a service booking via Refah.'
+        : order
+            ? 'تم تحصيل هذه الدفعة لطلب منتجات عبر منصة رفاه | This payment was collected for a product order via Refah.'
+            : 'شكراً لاستخدام رفاه | Thank you for using Refah.';
+
+    doc.fillColor('#64748B').fontSize(9).text(footerText, 40, 790, {
+        width: 515,
+        align: 'center'
+    });
+
+    doc.end();
+};
+
+const renderClosingSummaryCsv = (res, selectedDate, summary, transactions) => {
+    const lines = [
+        [
+            'Date',
+            'Transaction Ref',
+            'Entity Type',
+            'Reference',
+            'Customer',
+            'Item',
+            'Type',
+            'Method',
+            'Status',
+            'Amount',
+            'Processed At',
+            'Cashier'
+        ].map(escapeCsvField).join(',')
+    ];
+
+    transactions.forEach((transaction) => {
+        const mapped = mapPaymentTransaction(transaction);
+        lines.push([
+            selectedDate,
+            mapped.transactionRef || '',
+            mapped.entityType,
+            mapped.reference,
+            mapped.customerName,
+            mapped.title,
+            mapped.type,
+            mapped.paymentMethodLabel,
+            mapped.status,
+            mapped.amount,
+            formatDateTimeLabel(mapped.processedAt),
+            mapped.processorName || 'Tenant Dashboard'
+        ].map(escapeCsvField).join(','));
+    });
+
+    lines.push('');
+    lines.push(['Summary', 'Value'].map(escapeCsvField).join(','));
+    lines.push(['Gross Collected', summary.grossCollected].map(escapeCsvField).join(','));
+    lines.push(['Refunds Total', summary.refundsTotal].map(escapeCsvField).join(','));
+    lines.push(['Net Collected', summary.netCollected].map(escapeCsvField).join(','));
+    lines.push(['Transactions', summary.transactionCount].map(escapeCsvField).join(','));
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="pos-closing-${selectedDate}.csv"`);
+    res.send(`\uFEFF${lines.join('\n')}`);
+};
+
+exports.getCollectionQueue = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const search = `${req.query.search || ''}`.trim();
+        const limit = Math.min(parseInt(req.query.limit || POS_QUEUE_LIMIT, 10), POS_QUEUE_LIMIT);
+        const { queue, summary } = await fetchQueueData(tenantId, search, limit);
 
         res.json({
             success: true,
             queue,
-            summary: queueSummary
+            summary
         });
     } catch (error) {
         console.error('Get POS collection queue error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to load POS collection queue',
+            error: error.message
+        });
+    }
+};
+
+exports.getOperationalAlerts = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const limit = Math.min(parseInt(req.query.limit || POS_ALERT_LIMIT, 10), POS_ALERT_LIMIT);
+        const { queue, summary } = await fetchQueueData(tenantId, '', POS_QUEUE_LIMIT);
+        const alerts = queue
+            .map(mapPosAlertFromQueueItem)
+            .slice(0, limit);
+
+        res.json({
+            success: true,
+            alerts,
+            summary
+        });
+    } catch (error) {
+        console.error('Get POS operational alerts error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load POS alerts',
             error: error.message
         });
     }
@@ -328,90 +775,12 @@ exports.getTransactions = async (req, res) => {
         const offset = (safePage - 1) * safeLimit;
         const dateRange = parseDateRange(startDate, endDate);
 
-        const where = {
-            [Op.or]: [
-                { '$appointment.tenantId$': tenantId },
-                { '$order.tenantId$': tenantId }
-            ]
-        };
-
-        if (dateRange) {
-            where.processedAt = dateRange;
-        }
-
-        const trimmedSearch = `${search || ''}`.trim();
-        if (trimmedSearch) {
-            where[Op.and] = [{
-                [Op.or]: [
-                    { transactionRef: { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$order.orderNumber$': { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$appointment.user.firstName$': { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$appointment.user.lastName$': { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$appointment.user.phone$': { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$order.user.firstName$': { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$order.user.lastName$': { [Op.iLike]: `%${trimmedSearch}%` } },
-                    { '$order.user.phone$': { [Op.iLike]: `%${trimmedSearch}%` } }
-                ]
-            }];
-        }
-
         const { rows, count } = await db.PaymentTransaction.findAndCountAll({
-            where,
-            include: [
-                {
-                    model: db.Appointment,
-                    as: 'appointment',
-                    attributes: ['id', 'bookingNumber', 'tenantId', 'startTime', 'paymentStatus', 'status'],
-                    required: false,
-                    include: [
-                        {
-                            model: db.Service,
-                            as: 'service',
-                            attributes: ['id', 'name_en', 'name_ar'],
-                            required: false
-                        },
-                        {
-                            model: db.PlatformUser,
-                            as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                            required: false
-                        }
-                    ]
-                },
-                {
-                    model: db.Order,
-                    as: 'order',
-                    attributes: ['id', 'tenantId', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod'],
-                    required: false,
-                    include: [
-                        {
-                            model: db.PlatformUser,
-                            as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                            required: false
-                        },
-                        {
-                            model: db.OrderItem,
-                            as: 'items',
-                            include: [
-                                {
-                                    model: db.Product,
-                                    as: 'product',
-                                    attributes: ['id', 'name_en', 'name_ar'],
-                                    required: false
-                                }
-                            ],
-                            required: false
-                        }
-                    ]
-                },
-                {
-                    model: db.Staff,
-                    as: 'processor',
-                    attributes: ['id', 'name'],
-                    required: false
-                }
-            ],
+            where: buildTenantScopedTransactionWhere(tenantId, {
+                search,
+                processedAt: dateRange
+            }),
+            include: getTransactionIncludes(),
             order: [['processedAt', 'DESC']],
             distinct: true,
             subQuery: false,
@@ -443,130 +812,61 @@ exports.getClosingSummary = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const selectedDate = req.query.date || new Date().toISOString().split('T')[0];
-        const dateRange = parseDateRange(selectedDate, selectedDate);
-
-        const transactions = await db.PaymentTransaction.findAll({
-            where: {
-                processedAt: dateRange,
-                [Op.or]: [
-                    { '$appointment.tenantId$': tenantId },
-                    { '$order.tenantId$': tenantId }
-                ]
-            },
-            include: [
-                {
-                    model: db.Appointment,
-                    as: 'appointment',
-                    attributes: ['id', 'tenantId'],
-                    required: false
-                },
-                {
-                    model: db.Order,
-                    as: 'order',
-                    attributes: ['id', 'tenantId'],
-                    required: false
-                },
-                {
-                    model: db.Staff,
-                    as: 'processor',
-                    attributes: ['id', 'name'],
-                    required: false
-                }
-            ],
-            order: [['processedAt', 'DESC']],
-            subQuery: false
-        });
-
-        const totalsByMethod = {};
-        const totalsBySource = {
-            appointments: 0,
-            orders: 0,
-            refunds: 0
-        };
-
-        let grossCollected = 0;
-        let refundsTotal = 0;
-
-        transactions.forEach((transaction) => {
-            const amount = parseFloat(transaction.amount || 0);
-            const method = transaction.paymentMethod || 'cash';
-
-            if (!totalsByMethod[method]) {
-                totalsByMethod[method] = {
-                    paymentMethod: method,
-                    paymentMethodLabel: formatPaymentMethodLabel(method),
-                    collected: 0,
-                    refunded: 0,
-                    transactionCount: 0
-                };
-            }
-
-            totalsByMethod[method].transactionCount += 1;
-
-            if (transaction.status === 'refunded' || transaction.type === 'refund') {
-                refundsTotal += amount;
-                totalsByMethod[method].refunded += amount;
-                totalsBySource.refunds += amount;
-                return;
-            }
-
-            if (transaction.status === 'completed') {
-                grossCollected += amount;
-                totalsByMethod[method].collected += amount;
-
-                if (transaction.appointment) {
-                    totalsBySource.appointments += amount;
-                } else if (transaction.order) {
-                    totalsBySource.orders += amount;
-                }
-            }
-        });
-
-        const cashierBreakdownMap = new Map();
-        transactions.forEach((transaction) => {
-            if (transaction.status !== 'completed') return;
-
-            const processorName = transaction.processor?.name || 'Tenant Dashboard';
-            const existing = cashierBreakdownMap.get(processorName) || {
-                processorName,
-                transactionCount: 0,
-                collected: 0
-            };
-
-            existing.transactionCount += 1;
-            existing.collected += parseFloat(transaction.amount || 0);
-            cashierBreakdownMap.set(processorName, existing);
-        });
+        const { summary } = await fetchClosingSummaryData(tenantId, selectedDate);
 
         res.json({
             success: true,
-            summary: {
-                date: selectedDate,
-                grossCollected: parseFloat(grossCollected.toFixed(2)),
-                refundsTotal: parseFloat(refundsTotal.toFixed(2)),
-                netCollected: parseFloat((grossCollected - refundsTotal).toFixed(2)),
-                transactionCount: transactions.length,
-                totalsByMethod: Object.values(totalsByMethod).map((entry) => ({
-                    ...entry,
-                    collected: parseFloat(entry.collected.toFixed(2)),
-                    refunded: parseFloat(entry.refunded.toFixed(2))
-                })),
-                totalsBySource: {
-                    appointments: parseFloat(totalsBySource.appointments.toFixed(2)),
-                    orders: parseFloat(totalsBySource.orders.toFixed(2)),
-                    refunds: parseFloat(totalsBySource.refunds.toFixed(2))
-                },
-                cashierBreakdown: Array.from(cashierBreakdownMap.values()).map((entry) => ({
-                    ...entry,
-                    collected: parseFloat(entry.collected.toFixed(2))
-                }))
-            }
+            summary
         });
     } catch (error) {
         console.error('Get POS closing summary error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to load POS closing summary',
+            error: error.message
+        });
+    }
+};
+
+exports.downloadTransactionReceiptPdf = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const transaction = await db.PaymentTransaction.findOne({
+            where: buildTenantScopedTransactionWhere(tenantId, { id: req.params.id }),
+            include: getTransactionIncludes({ includeTenantOnlyFields: false }),
+            subQuery: false
+        });
+
+        if (!transaction) {
+            return res.status(404).json({
+                success: false,
+                message: 'Payment transaction not found'
+            });
+        }
+
+        renderTransactionReceiptPdf(res, transaction);
+    } catch (error) {
+        console.error('Download POS transaction receipt error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate POS receipt',
+            error: error.message
+        });
+    }
+};
+
+exports.exportClosingSummaryCsv = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const selectedDate = req.query.date || new Date().toISOString().split('T')[0];
+        const { summary, transactions } = await fetchClosingSummaryData(tenantId, selectedDate);
+
+        renderClosingSummaryCsv(res, selectedDate, summary, transactions);
+    } catch (error) {
+        console.error('Export POS closing summary CSV error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to export POS closing summary',
             error: error.message
         });
     }

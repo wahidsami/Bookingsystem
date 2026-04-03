@@ -146,8 +146,11 @@ router.get('/bills/:id/receipt-pdf', tenantBillsController.getReceiptPdf);
 
 // POS / Collections
 router.get('/pos/queue', tenantPosController.getCollectionQueue);
+router.get('/pos/alerts', tenantPosController.getOperationalAlerts);
 router.get('/pos/transactions', tenantPosController.getTransactions);
+router.get('/pos/transactions/:id/receipt-pdf', tenantPosController.downloadTransactionReceiptPdf);
 router.get('/pos/closing', tenantPosController.getClosingSummary);
+router.get('/pos/closing/export', tenantPosController.exportClosingSummaryCsv);
 
 // Messaging
 router.get('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.getMessages);

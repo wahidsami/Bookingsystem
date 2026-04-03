@@ -1132,6 +1132,13 @@ class TenantApiClient {
     return this.get(`/tenant/pos/queue${query ? `?${query}` : ''}`);
   }
 
+  async getPosAlerts(params?: { limit?: number }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString();
+    return this.get(`/tenant/pos/alerts${query ? `?${query}` : ''}`);
+  }
+
   async getPosTransactions(params?: {
     search?: string;
     startDate?: string;
@@ -1156,6 +1163,19 @@ class TenantApiClient {
     if (params?.date) queryParams.append('date', params.date);
     const query = queryParams.toString();
     return this.get(`/tenant/pos/closing${query ? `?${query}` : ''}`);
+  }
+
+  async downloadPosTransactionReceiptPdf(id: string): Promise<{ blob: Blob; filename: string }> {
+    return this.requestBlob(`/tenant/pos/transactions/${id}/receipt-pdf`);
+  }
+
+  async downloadPosClosingSummaryCsv(params?: {
+    date?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    const queryParams = new URLSearchParams();
+    if (params?.date) queryParams.append('date', params.date);
+    const query = queryParams.toString();
+    return this.requestBlob(`/tenant/pos/closing/export${query ? `?${query}` : ''}`);
   }
 
   /**

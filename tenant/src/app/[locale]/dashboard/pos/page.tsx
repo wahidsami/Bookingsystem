@@ -77,6 +77,16 @@ interface PosClosingSummary {
   }>;
 }
 
+interface PosAlert {
+  id: string;
+  title: string;
+  title_ar?: string;
+  message: string;
+  message_ar?: string;
+  severity: "low" | "medium" | "high";
+  detailPath?: string;
+}
+
 const todayKey = () => new Date().toISOString().split("T")[0];
 
 const formatDateTime = (value: string, locale: string) => {
@@ -119,6 +129,17 @@ const normalizeCollectionMethod = (paymentMethod?: string | null) => {
   return "cash";
 };
 
+const downloadBlobFile = ({ blob, filename }: { blob: Blob; filename: string }) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
 export default function TenantPosPage() {
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
@@ -134,6 +155,7 @@ export default function TenantPosPage() {
   });
   const [transactions, setTransactions] = useState<PosTransaction[]>([]);
   const [closingSummary, setClosingSummary] = useState<PosClosingSummary | null>(null);
+  const [posAlerts, setPosAlerts] = useState<PosAlert[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [closingDate, setClosingDate] = useState(todayKey());
@@ -183,13 +205,16 @@ export default function TenantPosPage() {
     methodBreakdown: locale === "ar" ? "حسب طريقة الدفع" : "By payment method",
     cashierBreakdown: locale === "ar" ? "حسب الكاشير / الموظف" : "By cashier / staff",
     refresh: locale === "ar" ? "تحديث" : "Refresh",
+    exportClosing: locale === "ar" ? "تصدير الإغلاق CSV" : "Export Closing CSV",
+    downloadReceipt: locale === "ar" ? "تحميل السند" : "Receipt PDF",
+    liveAlerts: locale === "ar" ? "تنبيهات التحصيل المباشرة" : "Live Collection Alerts",
   }), [locale]);
 
   const loadPosData = async () => {
     setLoading(true);
     setError("");
     try {
-      const [queueResponse, transactionsResponse, closingResponse] = await Promise.all([
+      const [queueResponse, transactionsResponse, closingResponse, alertsResponse] = await Promise.all([
         tenantApi.getPosQueue({ search: searchQuery, limit: 100 }),
         tenantApi.getPosTransactions({
           search: searchQuery,
@@ -199,6 +224,7 @@ export default function TenantPosPage() {
           limit: 20,
         }),
         tenantApi.getPosClosingSummary({ date: closingDate }),
+        tenantApi.getPosAlerts({ limit: 5 }).catch(() => null),
       ]);
 
       setQueue(queueResponse.queue || []);
@@ -211,13 +237,37 @@ export default function TenantPosPage() {
       });
       setTransactions(transactionsResponse.transactions || []);
       setClosingSummary(closingResponse.summary || null);
+      setPosAlerts(alertsResponse?.success && Array.isArray(alertsResponse.alerts)
+        ? alertsResponse.alerts
+        : []);
     } catch (err: any) {
       setError(err.message || (locale === "ar" ? "تعذر تحميل بيانات نقطة البيع" : "Failed to load POS data"));
       setQueue([]);
       setTransactions([]);
       setClosingSummary(null);
+      setPosAlerts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadReceipt = async (transactionId: string) => {
+    setError("");
+    try {
+      const file = await tenantApi.downloadPosTransactionReceiptPdf(transactionId);
+      downloadBlobFile(file);
+    } catch (err: any) {
+      setError(err.message || (locale === "ar" ? "تعذر تحميل سند القبض" : "Failed to download receipt"));
+    }
+  };
+
+  const handleExportClosing = async () => {
+    setError("");
+    try {
+      const file = await tenantApi.downloadPosClosingSummaryCsv({ date: closingDate });
+      downloadBlobFile(file);
+    } catch (err: any) {
+      setError(err.message || (locale === "ar" ? "تعذر تصدير الإغلاق" : "Failed to export closing summary"));
     }
   };
 
@@ -294,6 +344,35 @@ export default function TenantPosPage() {
       {error && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
           {error}
+        </div>
+      )}
+
+      {posAlerts.length > 0 && (
+        <div className="mb-6 card">
+          <h3 className="text-xl font-bold text-gray-900" style={{ textAlign: isRTL ? "right" : "left" }}>
+            {copy.liveAlerts}
+          </h3>
+          <div className="mt-4 space-y-3">
+            {posAlerts.map((alert) => (
+              <Link
+                key={alert.id}
+                href={`/${locale}${alert.detailPath || "/dashboard/pos"}`}
+                className={`block rounded-2xl border px-4 py-3 text-sm transition-colors ${
+                  alert.severity === "high"
+                    ? "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100"
+                    : "border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100"
+                }`}
+                style={{ textAlign: isRTL ? "right" : "left" }}
+              >
+                <p className="font-bold">
+                  {locale === "ar" ? (alert.title_ar || alert.title) : alert.title}
+                </p>
+                <p className="mt-1 text-xs opacity-90">
+                  {locale === "ar" ? (alert.message_ar || alert.message) : alert.message}
+                </p>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -416,14 +495,23 @@ export default function TenantPosPage() {
 
         <div className="space-y-6">
           <div className="card">
-            <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+            <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${isRTL ? "sm:flex-row-reverse" : ""}`}>
               <h3 className="text-xl font-bold text-gray-900">{copy.dailyClosing}</h3>
-              <input
-                type="date"
-                value={closingDate}
-                onChange={(event) => setClosingDate(event.target.value)}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
-              />
+              <div className={`flex gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <input
+                  type="date"
+                  value={closingDate}
+                  onChange={(event) => setClosingDate(event.target.value)}
+                  className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleExportClosing}
+                  className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20"
+                >
+                  {copy.exportClosing}
+                </button>
+              </div>
             </div>
 
             {closingSummary ? (
@@ -515,6 +603,23 @@ export default function TenantPosPage() {
                         <span className="mt-2 inline-block rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700">
                           {transaction.status}
                         </span>
+                        <div className={`mt-3 flex gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadReceipt(transaction.id)}
+                            className="rounded-xl border border-primary/20 bg-white px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10"
+                          >
+                            {copy.downloadReceipt}
+                          </button>
+                          {transaction.detailPath ? (
+                            <Link
+                              href={`/${locale}${transaction.detailPath}`}
+                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                            >
+                              {copy.viewDetails}
+                            </Link>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>

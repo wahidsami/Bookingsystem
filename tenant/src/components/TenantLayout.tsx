@@ -33,6 +33,8 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
   const [entitlementsLoadFailed, setEntitlementsLoadFailed] = useState(false);
   const [usageAlerts, setUsageAlerts] = useState<any[]>([]);
+  const [posAlerts, setPosAlerts] = useState<any[]>([]);
+  const [posDueCount, setPosDueCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -40,9 +42,10 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     Promise.all([
       tenantApi.getSubscriptionLimits(),
       tenantApi.getSubscriptionConsumption().catch(() => null),
-      tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null)
+      tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null),
+      tenantApi.getPosAlerts({ limit: 3 }).catch(() => null)
     ])
-      .then(([limitsResponse, consumptionResponse, alertsResponse]) => {
+      .then(([limitsResponse, consumptionResponse, alertsResponse, posResponse]) => {
         const resolvedLimits = limitsResponse?.success && limitsResponse?.limits
           ? limitsResponse.limits
           : consumptionResponse?.data?.limits;
@@ -54,10 +57,20 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           ? alertsResponse.alerts
           : consumptionResponse?.data?.alerts || [];
         setUsageAlerts(alerts.filter((alert: any) => !alert?.acknowledged).slice(0, 3));
+
+        if (posResponse?.success) {
+          setPosAlerts(Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 3) : []);
+          setPosDueCount(posResponse.summary?.totalDueCount || 0);
+        } else {
+          setPosAlerts([]);
+          setPosDueCount(0);
+        }
       })
       .catch(() => {
         setEntitlements(null);
         setEntitlementsLoadFailed(true);
+        setPosAlerts([]);
+        setPosDueCount(0);
       })
       .finally(() => setEntitlementsLoaded(true));
   }, [user?.id, user?.status]);
@@ -69,6 +82,10 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     } catch (error) {
       console.error('Failed to acknowledge usage alert:', error);
     }
+  };
+
+  const dismissPosAlert = (alertId: string) => {
+    setPosAlerts((current) => current.filter((alert) => alert.id !== alertId));
   };
 
   const shouldBypassFeatureFiltering = !entitlementsLoaded || entitlementsLoadFailed || entitlements === null;
@@ -96,7 +113,12 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: "👥" },
     { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: "📅" },
     { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: "📅" },
-    { name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections', href: `/${locale}/dashboard/pos`, icon: "🏷️" },
+    {
+      name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections',
+      href: `/${locale}/dashboard/pos`,
+      icon: "🏷️",
+      badgeCount: posDueCount,
+    },
     { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦", visible: hasProductsAndOrders },
     { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥", visible: hasHotDeals },
     { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: "📬", visible: hasInternalMessaging },
@@ -110,7 +132,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈", visible: hasReports },
     { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐", visible: hasPublicPageCustomization },
     { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: "⚙️" },
-  ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, t]);
+  ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
 
   useEffect(() => {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
@@ -228,7 +250,16 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                   style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                 >
                   <span className="text-xl">{item.icon}</span>
-                  <span className="font-medium">{item.name}</span>
+                  <span className="flex-1 font-medium">{item.name}</span>
+                  {item.badgeCount ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        active ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+                      }`}
+                    >
+                      {item.badgeCount > 99 ? '99+' : item.badgeCount}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
@@ -268,8 +299,41 @@ export function TenantLayout({ children }: TenantLayoutProps) {
 
           {/* Page Content */}
           <div className="p-4 lg:p-8">
-            {usageAlerts.length > 0 && (
+            {(posAlerts.length > 0 || usageAlerts.length > 0) && (
               <div className="mb-4 space-y-2">
+                {posAlerts.map((alert) => (
+                  <div
+                    key={`pos-${alert.id}`}
+                    className={`rounded-2xl border px-4 py-3 flex items-start justify-between gap-3 ${
+                      alert.severity === 'high'
+                        ? 'bg-rose-50 border-rose-200 text-rose-900'
+                        : 'bg-sky-50 border-sky-200 text-sky-900'
+                    }`}
+                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                  >
+                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <p className="text-sm font-bold">
+                        {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
+                      </p>
+                      <p className="text-xs mt-1 opacity-90">
+                        {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
+                      </p>
+                      <Link
+                        href={`/${locale}${alert.detailPath || '/dashboard/pos'}`}
+                        className="mt-2 inline-flex text-xs font-semibold underline"
+                      >
+                        {locale === 'ar' ? 'فتح التحصيل' : 'Open collection'}
+                      </Link>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => dismissPosAlert(alert.id)}
+                      className="text-xs font-semibold px-3 py-1 rounded-full bg-white/80 hover:bg-white"
+                    >
+                      {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
+                    </button>
+                  </div>
+                ))}
                 {usageAlerts.map((alert) => (
                   <div
                     key={alert.id}
@@ -313,13 +377,18 @@ export function TenantLayout({ children }: TenantLayoutProps) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${active ? "bg-primary/10 text-primary" : "text-gray-600"
+                className={`relative flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${active ? "bg-primary/10 text-primary" : "text-gray-600"
                   }`}
               >
                 <span className="text-xl">{item.icon}</span>
                 <span className="text-xs font-medium truncate w-full text-center">
                   {item.name}
                 </span>
+                {item.badgeCount ? (
+                  <span className="absolute -top-1 right-3 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {item.badgeCount > 99 ? '99+' : item.badgeCount}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
