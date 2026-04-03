@@ -70,7 +70,7 @@ const sendEmail = async (options) => {
             attachments.push({
                 filename: 'logo.png',
                 content: logoBuffer.toString('base64'),
-                contentId: 'logo'
+                inlineContentId: 'logo'
             });
         }
 

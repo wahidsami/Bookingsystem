@@ -15,6 +15,7 @@
             margin: 0;
             padding: 0;
             direction: rtl;
+            text-align: right;
         }
 
         .container {
@@ -58,6 +59,8 @@
 
         .content {
             padding: 40px 30px;
+            direction: rtl;
+            text-align: right;
         }
 
         .greeting {
@@ -77,10 +80,16 @@
 
         .message-ar {
             font-family: 'Cairo', sans-serif;
+            direction: rtl;
+            text-align: right;
+            unicode-bidi: plaintext;
         }
 
         .message-en {
             font-family: 'Poppins', sans-serif;
+            direction: ltr;
+            text-align: left;
+            unicode-bidi: plaintext;
         }
 
         .highlight-box {
@@ -89,6 +98,8 @@
             padding: 20px;
             margin: 30px 0;
             border-radius: 8px;
+            direction: rtl;
+            text-align: right;
         }
 
         .highlight-box h3 {
@@ -108,6 +119,7 @@
         .info-row {
             display: flex;
             justify-content: space-between;
+            flex-direction: row-reverse;
             padding: 10px 0;
             border-bottom: 1px solid #e5e7eb;
         }
@@ -147,71 +159,79 @@
 <body>
     <div class="container">
         <!-- Header -->
-        <div class="header">
-            <img src="RifahNewLogoWhite.png" alt="Rifah Platform Logo" class="logo">
+        <div class="header" dir="rtl" style="direction: rtl; text-align: center;">
+            <img src="RifahNewLogoWhite.png" alt="Rifah Platform Logo" class="logo" style="display: block; margin: 0 auto 15px; max-width: 200px; height: auto;">
             <div class="icon">🎉</div>
             <h1>مرحباً بك في رفاه</h1>
             <p>Welcome to Rifah Platform</p>
         </div>
 
         <!-- Content -->
-        <div class="content">
-            <p class="greeting">مرحباً {{tenantNameAr}} | Hello {{tenantName}}! 👋</p>
+        <div class="content" dir="rtl" style="direction: rtl; text-align: right;">
+            <p class="greeting message-ar" dir="rtl" style="direction: rtl; text-align: right;">
+                مرحباً {{tenantNameAr}} 👋
+            </p>
+            <p class="message message-en" dir="ltr" style="direction: ltr; text-align: left;">
+                Hello {{tenantName}}!
+            </p>
 
-            <p class="message message-ar">
+            <p class="message message-ar" dir="rtl" style="direction: rtl; text-align: right;">
                 شكراً لتسجيلك في منصة رفاه! نحن سعداء بانضمامك إلينا.
             </p>
 
-            <p class="message message-en">
+            <p class="message message-en" dir="ltr" style="direction: ltr; text-align: left;">
                 Thank you for registering with Rifah Platform! We're excited to have you on board.
             </p>
 
-            <div class="highlight-box">
-                <h3>✅ تم استلام طلبك بنجاح | Application Received</h3>
-                <p>
+            <div class="highlight-box" dir="rtl" style="direction: rtl; text-align: right;">
+                <h3 dir="rtl" style="direction: rtl; text-align: right;">✅ تم استلام طلبك بنجاح</h3>
+                <p class="message-ar" dir="rtl" style="direction: rtl; text-align: right;">
                     تم استلام طلب التسجيل الخاص بك بنجاح وهو الآن قيد المراجعة من قبل فريقنا.
                 </p>
-                <p class="message-en">
+                <h3 class="message-en" dir="ltr" style="direction: ltr; text-align: left; margin-top: 16px;">Application Received</h3>
+                <p class="message-en" dir="ltr" style="direction: ltr; text-align: left;">
                     Your registration request has been successfully received and is now under review by our team.
                 </p>
-                <div class="info-row">
-                    <span class="info-label">البريد الإلكتروني | Email:</span>
-                    <span class="info-value">{{email}}</span>
+                <div class="info-row" dir="rtl" style="direction: rtl; text-align: right;">
+                    <span class="info-label message-ar" dir="rtl" style="direction: rtl; text-align: right;">البريد الإلكتروني</span>
+                    <span class="info-value message-en" dir="ltr" style="direction: ltr; text-align: left;">{{email}}</span>
                 </div>
             </div>
 
-            <div class="highlight-box">
-                <h3>📋 الخطوات التالية | Next Steps</h3>
-                <p class="message-ar">
+            <div class="highlight-box" dir="rtl" style="direction: rtl; text-align: right;">
+                <h3 dir="rtl" style="direction: rtl; text-align: right;">📋 الخطوات التالية</h3>
+                <p class="message-ar" dir="rtl" style="direction: rtl; text-align: right;">
                     <strong>1.</strong> سنقوم بمراجعة المستندات والمعلومات الخاصة بك<br>
                     <strong>2.</strong> ستتلقى إشعاراً بالبريد الإلكتروني بمجرد اكتمال المراجعة<br>
                     <strong>3.</strong> بعد الموافقة، يمكنك تسجيل الدخول والبدء في استخدام المنصة
                 </p>
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 15px 0;">
-                <p class="message-en">
+                <h3 class="message-en" dir="ltr" style="direction: ltr; text-align: left;">Next Steps</h3>
+                <p class="message-en" dir="ltr" style="direction: ltr; text-align: left;">
                     <strong>1.</strong> We will review your documents and information<br>
                     <strong>2.</strong> You'll receive an email notification once the review is complete<br>
                     <strong>3.</strong> After approval, you can login and start using the platform
                 </p>
             </div>
 
-            <p class="message message-ar">
+            <p class="message message-ar" dir="rtl" style="direction: rtl; text-align: right;">
                 عادة ما تستغرق عملية المراجعة من 24 إلى 48 ساعة. سنتواصل معك قريباً!
             </p>
 
-            <p class="message message-en">
+            <p class="message message-en" dir="ltr" style="direction: ltr; text-align: left;">
                 The review process typically takes 24-48 hours. We'll be in touch soon!
             </p>
 
-            <p class="message message-ar" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p class="message message-ar" dir="rtl" style="direction: rtl; text-align: right; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
                 إذا كان لديك أي أسئلة، لا تتردد في التواصل معنا.<br>
-                <span class="message-en">If you have any questions, feel free to reach out to us.</span>
+                <span class="message-en" dir="ltr" style="direction: ltr; text-align: left; display: block; margin-top: 8px;">If you have any questions, feel free to reach out to us.</span>
             </p>
         </div>
 
         <!-- Footer -->
-        <div class="footer">
-            <p><strong>منصة رفاه | Rifah Platform</strong></p>
+        <div class="footer" dir="rtl" style="direction: rtl; text-align: center;">
+            <p><strong>منصة رفاه</strong></p>
+            <p class="message-en" dir="ltr" style="direction: ltr; text-align: center;"><strong>Rifah Platform</strong></p>
             <p>Email: <a href="mailto:support@rifah.sa">support@rifah.sa</a></p>
             <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
                 © 2024-2026 Rifah Platform. All rights reserved.
