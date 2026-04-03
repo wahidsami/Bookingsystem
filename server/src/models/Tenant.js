@@ -64,8 +64,9 @@ module.exports = (sequelize, DataTypes) => {
         },
         // Business Type
         businessType: {
-            type: DataTypes.ENUM('salon', 'spa', 'barbershop', 'beauty_center', 'clinic', 'nail_studio', 'other'),
-            defaultValue: 'salon'
+            type: DataTypes.JSONB,
+            defaultValue: ['salon'],
+            comment: 'Array of business types, e.g. ["salon", "spa"]'
         },
         // Authentication
         password: {

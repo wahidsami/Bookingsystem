@@ -26,19 +26,31 @@ const listTenants = async (req, res) => {
 
         // Apply filters
         if (status) where.status = status;
-        if (businessType) where.businessType = businessType;
+        if (businessType) {
+            where[Op.or] = [
+                { businessType },
+                { businessType: { [Op.contains]: [businessType] } }
+            ];
+        }
         if (plan) where.plan = plan;
         if (city) where.city = city;
 
         // Search by name, email, phone
         if (search) {
-            where[Op.or] = [
+            const searchConditions = [
                 { name: { [Op.iLike]: `%${search}%` } },
                 { email: { [Op.iLike]: `%${search}%` } },
                 { phone: { [Op.iLike]: `%${search}%` } },
                 { ownerName: { [Op.iLike]: `%${search}%` } },
                 { ownerEmail: { [Op.iLike]: `%${search}%` } }
             ];
+
+            if (where[Op.or]) {
+                where[Op.and] = [{ [Op.or]: where[Op.or] }, { [Op.or]: searchConditions }];
+                delete where[Op.or];
+            } else {
+                where[Op.or] = searchConditions;
+            }
         }
 
         const { count, rows: tenants } = await db.Tenant.findAndCountAll({

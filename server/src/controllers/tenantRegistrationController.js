@@ -270,7 +270,7 @@ exports.register = async (req, res) => {
             nameAr: name_ar, // Legacy field
             slug: finalSlug,
             dbSchema,
-            businessType: primaryBusinessType,
+            businessType: normalizedBusinessTypes,
             password,
 
             // Contact Info
