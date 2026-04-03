@@ -8,6 +8,7 @@ const {
     serializeBill,
     toNumber
 } = require('../utils/invoiceSnapshotBuilder');
+const { ensureInvoicePdf } = require('../services/billDocumentService');
 const fs = require('fs');
 const path = require('path');
 
@@ -357,6 +358,9 @@ const approveTenant = async (req, res) => {
         });
 
         const { sendApprovalEmail } = require('../utils/emailService');
+        ensureInvoicePdf(bill).catch(err => {
+            console.error('[Approval] Failed to generate invoice PDF:', err.message);
+        });
         sendApprovalEmail(tenant, { paymentUrl, paymentDueAt }).catch(err => {
             console.error('[Approval] Failed to send approval email:', err.message);
         });

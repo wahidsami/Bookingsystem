@@ -1,4 +1,8 @@
 const db = require('../models');
+const {
+    ensureInvoicePdf,
+    ensureReceiptPdf
+} = require('../services/billDocumentService');
 const { serializeBill, toNumber } = require('../utils/invoiceSnapshotBuilder');
 
 function getEffectiveExpiry(bill) {
@@ -57,6 +61,9 @@ exports.getBillByToken = async (req, res) => {
         }
 
         if (bill.status === 'PAID') {
+            ensureReceiptPdf(bill).catch(err => {
+                console.error('[BillPayment] Failed to generate receipt PDF:', err.message);
+            });
             return res.json({
                 success: true,
                 alreadyPaid: true,
@@ -98,6 +105,10 @@ exports.getBillByToken = async (req, res) => {
                 tenantName: bill.tenant?.name_ar || bill.tenant?.name_en || bill.tenant?.name || '',
                 subscriptionId: bill.tenantSubscriptionId
             }
+        });
+
+        ensureInvoicePdf(bill).catch(err => {
+            console.error('[BillPayment] Failed to generate invoice PDF:', err.message);
         });
     } catch (error) {
         console.error('getBillByToken error:', error);
@@ -285,6 +296,18 @@ exports.payBillByToken = async (req, res) => {
                 console.error('[BillPayment] Success email failed:', err.message);
             });
         }
+
+        ensureReceiptPdf({
+            ...bill.toJSON(),
+            status: 'PAID',
+            paidAt: now,
+            paymentProvider: resolvedPaymentProvider,
+            paymentReference: resolvedPaymentReference,
+            paymentMethod: resolvedPaymentMethod,
+            paymentCapturedAmount: targetAmount
+        }).catch(err => {
+            console.error('[BillPayment] Failed to generate receipt PDF:', err.message);
+        });
 
         res.json({
             success: true,

@@ -9,6 +9,7 @@ const {
     toNumber
 } = require('../utils/invoiceSnapshotBuilder');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
+const { ensureInvoicePdf } = require('../services/billDocumentService');
 const {
     getActiveSubscriptionForTenant,
     ACTIVE_SUBSCRIPTION_STATUSES
@@ -350,6 +351,10 @@ exports.requestSubscriptionChange = async (req, res) => {
                 requestedPackageId: newPackage.id,
                 requestedBillingCycle: billingCycle
             }
+        });
+
+        ensureInvoicePdf(bill).catch(err => {
+            console.error('[SubscriptionChange] Failed to generate invoice PDF:', err.message);
         });
         
         res.json({

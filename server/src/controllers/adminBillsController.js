@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../models');
+const {
+    ensureInvoicePdf,
+    ensureReceiptPdf
+} = require('../services/billDocumentService');
 const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
@@ -60,14 +64,22 @@ async function serveBillDocument(req, res, documentField) {
         }
 
         const absolutePath = resolveBillDocumentPath(bill[documentField]);
-        if (!absolutePath || !fs.existsSync(absolutePath)) {
+        if (absolutePath && fs.existsSync(absolutePath)) {
+            return res.sendFile(absolutePath);
+        }
+
+        const generatedDocument = documentField === 'receiptPdfPath'
+            ? await ensureReceiptPdf(bill)
+            : await ensureInvoicePdf(bill);
+
+        if (!generatedDocument?.absolutePath || !fs.existsSync(generatedDocument.absolutePath)) {
             return res.status(404).json({
                 success: false,
                 message: 'Document not generated yet'
             });
         }
 
-        return res.sendFile(absolutePath);
+        return res.sendFile(generatedDocument.absolutePath);
     } catch (error) {
         console.error(`serveBillDocument ${documentField} error:`, error);
         return res.status(500).json({
