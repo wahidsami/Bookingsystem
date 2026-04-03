@@ -6,6 +6,10 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const {
+    ACTIVE_APPOINTMENT_STATUSES,
+    REVENUE_TRACKED_APPOINTMENT_STATUSES
+} = require('../utils/appointmentStatus');
 
 /**
  * Get Dashboard Statistics
@@ -28,9 +32,9 @@ const getDashboardStats = async (req, res) => {
             INNER JOIN staff s ON a."staffId" = s.id
             WHERE s."tenantId" = :tenantId
             AND DATE(a."startTime") = CURRENT_DATE
-            AND a.status IN ('pending', 'confirmed')
+            AND a.status IN (:activeStatuses)
         `, {
-            replacements: { tenantId },
+            replacements: { tenantId, activeStatuses: ACTIVE_APPOINTMENT_STATUSES },
             type: db.sequelize.QueryTypes.SELECT,
             raw: true
         });
@@ -45,9 +49,9 @@ const getDashboardStats = async (req, res) => {
             FROM appointments a
             INNER JOIN staff s ON a."staffId" = s.id
             WHERE s."tenantId" = :tenantId
-            AND a.status IN ('completed', 'confirmed')
+            AND a.status IN (:revenueStatuses)
         `, {
-            replacements: { tenantId },
+            replacements: { tenantId, revenueStatuses: REVENUE_TRACKED_APPOINTMENT_STATUSES },
             type: db.sequelize.QueryTypes.SELECT,
             raw: true
         });

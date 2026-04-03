@@ -35,7 +35,7 @@ interface Appointment {
   id: string;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'paid' | 'refunded' | 'partially_refunded';
   price: number;
   rawPrice?: number;
@@ -176,6 +176,8 @@ export default function AppointmentsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'checked_in': return 'bg-sky-100 text-sky-800';
+      case 'in_service': return 'bg-purple-100 text-purple-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-blue-100 text-blue-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
@@ -200,6 +202,8 @@ export default function AppointmentsPage() {
     switch (status) {
       case 'pending': return t("pending");
       case 'confirmed': return t("confirmed");
+      case 'checked_in': return t("checkedIn");
+      case 'in_service': return t("inProgress");
       case 'completed': return t("completed");
       case 'cancelled': return t("cancelled");
       case 'no_show': return t("noShow");
@@ -344,6 +348,8 @@ export default function AppointmentsPage() {
               <option value="">{t("allStatuses")}</option>
               <option value="pending">{t("pending")}</option>
               <option value="confirmed">{t("confirmed")}</option>
+              <option value="checked_in">{t("checkedIn")}</option>
+              <option value="in_service">{t("inProgress")}</option>
               <option value="completed">{t("completed")}</option>
               <option value="cancelled">{t("cancelled")}</option>
               <option value="no_show">{t("noShow")}</option>
@@ -468,6 +474,30 @@ export default function AppointmentsPage() {
                           {t("confirm")}
                         </button>
                       )}
+                      {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+                        <button
+                          onClick={() => handleStatusUpdate(appointment.id, 'checked_in')}
+                          className="btn btn-sm btn-secondary"
+                        >
+                          {t("checkIn")}
+                        </button>
+                      )}
+                      {appointment.status === 'checked_in' && (
+                        <button
+                          onClick={() => handleStatusUpdate(appointment.id, 'in_service')}
+                          className="btn btn-sm btn-secondary"
+                        >
+                          {t("startService")}
+                        </button>
+                      )}
+                      {appointment.status === 'in_service' && (
+                        <button
+                          onClick={() => handleStatusUpdate(appointment.id, 'completed')}
+                          className="btn btn-sm btn-primary"
+                        >
+                          {t("markCompleted")}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -490,4 +520,3 @@ export default function AppointmentsPage() {
     </TenantLayout>
   );
 }
-

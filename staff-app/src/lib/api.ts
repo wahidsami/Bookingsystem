@@ -30,9 +30,18 @@ export interface StaffProfile {
   } | null;
 }
 
+export type StaffAppointmentStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'checked_in'
+  | 'in_service'
+  | 'completed'
+  | 'no_show'
+  | 'cancelled';
+
 export interface StaffAppointment {
   id: string;
-  status: string;
+  status: StaffAppointmentStatus;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   startTime: string;
@@ -247,7 +256,7 @@ export async function fetchStaffSchedule(session: StaffSession, date: string): P
 export async function updateStaffAppointmentStatus(
   session: StaffSession,
   appointmentId: string,
-  payload: { status: 'confirmed' | 'completed' | 'no_show' | 'cancelled'; notes?: string }
+  payload: { status: StaffAppointmentStatus; notes?: string }
 ): Promise<StaffAppointment> {
   const data = await authorizedRequest<{ appointment: StaffAppointment }>(
     `/staff/appointments/${encodeURIComponent(appointmentId)}/status`,

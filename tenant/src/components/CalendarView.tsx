@@ -9,7 +9,7 @@ interface Appointment {
   id: string;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus:
     | 'pending'
     | 'deposit_paid'
@@ -161,6 +161,10 @@ export function CalendarView({
     switch (appointment.status) {
       case 'confirmed':
         return 'bg-purple-500';
+      case 'checked_in':
+        return 'bg-sky-500';
+      case 'in_service':
+        return 'bg-indigo-600';
       case 'pending':
         return 'bg-yellow-500';
       case 'completed':
@@ -171,6 +175,27 @@ export function CalendarView({
         return 'bg-gray-500';
       default:
         return 'bg-blue-500';
+    }
+  };
+
+  const getStatusLabel = (status: Appointment['status']) => {
+    switch (status) {
+      case 'pending':
+        return t("pending");
+      case 'confirmed':
+        return t("confirmed");
+      case 'checked_in':
+        return t("checkedIn");
+      case 'in_service':
+        return t("inProgress");
+      case 'completed':
+        return t("completed");
+      case 'cancelled':
+        return t("cancelled");
+      case 'no_show':
+        return t("noShow");
+      default:
+        return status;
     }
   };
 
@@ -526,7 +551,9 @@ export function CalendarView({
                               {/* Status indicator dot */}
                               <div className="mt-auto pt-1 flex items-center gap-1">
                                 <div className="w-1.5 h-1.5 rounded-full bg-white/60"></div>
-                                <span className="text-xs opacity-75 capitalize">{appointment.status}</span>
+                                <span className="text-xs opacity-75 capitalize">
+                                  {getStatusLabel(appointment.status)}
+                                </span>
                               </div>
                             </div>
                           </div>

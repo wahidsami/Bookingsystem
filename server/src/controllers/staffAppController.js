@@ -2,6 +2,12 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const db = require('../models');
 const pushNotificationService = require('../services/pushNotificationService');
+const {
+    STAFF_APPOINTMENT_TRANSITIONS,
+    canTransitionAppointmentStatus,
+    isValidAppointmentStatus,
+    normalizeAppointmentStatus
+} = require('../utils/appointmentStatus');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -365,9 +371,9 @@ const updateAppointmentStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, notes } = req.body;
+        const normalizedStatus = normalizeAppointmentStatus(status);
 
-        const allowedStatuses = ['confirmed', 'completed', 'no_show', 'cancelled'];
-        if (!status || !allowedStatuses.includes(status)) {
+        if (!status || !isValidAppointmentStatus(normalizedStatus)) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -406,26 +412,23 @@ const updateAppointmentStatus = async (req, res) => {
             });
         }
 
-        const transitionMap = {
-            pending: ['confirmed', 'cancelled', 'no_show'],
-            confirmed: ['completed', 'cancelled', 'no_show'],
-            completed: [],
-            cancelled: [],
-            no_show: []
-        };
-
         const currentStatus = appointment.status;
-        const allowedNextStatuses = transitionMap[currentStatus] || [];
-
-        if (!allowedNextStatuses.includes(status)) {
+        if (
+            currentStatus !== normalizedStatus &&
+            !canTransitionAppointmentStatus(
+                currentStatus,
+                normalizedStatus,
+                STAFF_APPOINTMENT_TRANSITIONS
+            )
+        ) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: `Cannot change appointment from ${currentStatus} to ${status}`
+                message: `Cannot change appointment from ${currentStatus} to ${normalizedStatus}`
             });
         }
 
-        appointment.status = status;
+        appointment.status = normalizedStatus;
         if (notes !== undefined) {
             appointment.notes = notes;
         }
@@ -436,11 +439,11 @@ const updateAppointmentStatus = async (req, res) => {
         try {
             await pushNotificationService.sendToUser(appointment.platformUserId, {
                 title: 'Booking updated',
-                body: `Your appointment is now ${status.replace(/_/g, ' ')}.`,
+                body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
                 data: {
                     type: 'booking_status_updated',
                     appointmentId: appointment.id,
-                    status
+                    status: normalizedStatus
                 }
             });
         } catch (notificationError) {

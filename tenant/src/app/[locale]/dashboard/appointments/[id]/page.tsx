@@ -69,7 +69,7 @@ interface Appointment {
   staffId?: string;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'confirmed' | 'started' | 'completed' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'paid' | 'refunded' | 'partially_refunded';
   paymentMethod?: string;
   paidAt?: string;
@@ -291,7 +291,8 @@ export default function AppointmentDetailsPage() {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800 border-green-300';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'started': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'checked_in': return 'bg-sky-100 text-sky-800 border-sky-300';
+      case 'in_service': return 'bg-purple-100 text-purple-800 border-purple-300';
       case 'completed': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'cancelled': return 'bg-red-100 text-red-800 border-red-300';
       case 'no_show': return 'bg-gray-100 text-gray-800 border-gray-300';
@@ -315,7 +316,8 @@ export default function AppointmentDetailsPage() {
     switch (status) {
       case 'pending': return t("pending");
       case 'confirmed': return t("confirmed");
-      case 'started': return t("inProgress");
+      case 'checked_in': return t("checkedIn");
+      case 'in_service': return t("inProgress");
       case 'completed': return t("completed");
       case 'cancelled': return t("cancelled");
       case 'no_show': return t("noShow");
@@ -721,7 +723,25 @@ export default function AppointmentDetailsPage() {
                   {t("confirm")}
                 </button>
               )}
-              {(appointment.status === 'confirmed' || appointment.status === 'started') && (
+              {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+                <button
+                  onClick={() => handleStatusUpdate('checked_in')}
+                  disabled={updating}
+                  className="w-full btn btn-secondary"
+                >
+                  {t("checkIn")}
+                </button>
+              )}
+              {appointment.status === 'checked_in' && (
+                <button
+                  onClick={() => handleStatusUpdate('in_service')}
+                  disabled={updating}
+                  className="w-full btn btn-primary"
+                >
+                  {t("startService")}
+                </button>
+              )}
+              {(appointment.status === 'checked_in' || appointment.status === 'in_service') && (
                 <button
                   onClick={() => handleStatusUpdate('completed')}
                   disabled={updating}
@@ -751,7 +771,7 @@ export default function AppointmentDetailsPage() {
                   {t("reschedule") || "Reschedule"}
                 </button>
               )}
-              {(appointment.status === 'pending' || appointment.status === 'confirmed' || appointment.status === 'started') && (
+              {(appointment.status === 'pending' || appointment.status === 'confirmed' || appointment.status === 'checked_in' || appointment.status === 'in_service') && (
                 <button
                   onClick={() => handleStatusUpdate('cancelled')}
                   disabled={updating}

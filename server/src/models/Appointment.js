@@ -122,7 +122,15 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false
         },
         status: {
-            type: DataTypes.ENUM('pending', 'confirmed', 'completed', 'cancelled', 'no_show'),
+            type: DataTypes.ENUM(
+                'pending',
+                'confirmed',
+                'checked_in',
+                'in_service',
+                'completed',
+                'cancelled',
+                'no_show'
+            ),
             defaultValue: 'pending'
         },
         price: {
@@ -232,7 +240,7 @@ module.exports = (sequelize, DataTypes) => {
                 fields: ['staffId', 'startTime', 'endTime', 'status'],
                 name: 'idx_staff_time_status',
                 where: {
-                    status: ['pending', 'confirmed', 'completed']
+                    status: ['pending', 'confirmed', 'checked_in', 'in_service', 'completed']
                 }
             },
             // Index for date range queries

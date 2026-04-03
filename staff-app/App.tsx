@@ -21,6 +21,7 @@ import {
   logoutStaff,
   readStoredSession,
   StaffAppointment,
+  StaffAppointmentStatus,
   StaffSchedule,
   StaffSession,
   updateStaffAppointmentStatus,
@@ -67,6 +68,16 @@ const getCustomerName = (appointment: StaffAppointment) => {
 
 const getServiceName = (appointment: StaffAppointment) =>
   appointment.service?.name_en || appointment.service?.name_ar || 'Service';
+
+const formatAppointmentStatus = (status: StaffAppointment['status']) => ({
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked In',
+  in_service: 'In Service',
+  completed: 'Completed',
+  no_show: 'No Show',
+  cancelled: 'Cancelled',
+}[status] || status);
 
 export default function App() {
   const apiUrl = getApiUrl();
@@ -216,7 +227,7 @@ export default function App() {
 
   const handleAppointmentAction = async (
     appointment: StaffAppointment,
-    status: 'confirmed' | 'completed' | 'no_show' | 'cancelled'
+    status: StaffAppointmentStatus
   ) => {
     if (!session) return;
 
@@ -231,10 +242,13 @@ export default function App() {
       );
 
       const messageMap = {
-        confirmed: 'Customer checked in successfully.',
+        checked_in: 'Customer checked in successfully.',
+        in_service: 'Service started successfully.',
+        confirmed: 'Appointment confirmed successfully.',
         completed: 'Appointment marked as completed.',
         no_show: 'Appointment marked as no-show.',
         cancelled: 'Appointment cancelled successfully.',
+        pending: 'Appointment updated successfully.',
       };
 
       setActionMessage(messageMap[status]);
@@ -251,15 +265,21 @@ export default function App() {
   const getAvailableActions = (appointment: StaffAppointment) => {
     switch (appointment.status) {
       case 'pending':
+      case 'confirmed':
         return [
-          { label: 'Check In', status: 'confirmed' as const },
+          { label: 'Check In', status: 'checked_in' as const },
           { label: 'No Show', status: 'no_show' as const },
           { label: 'Cancel', status: 'cancelled' as const },
         ];
-      case 'confirmed':
+      case 'checked_in':
+        return [
+          { label: 'Start Service', status: 'in_service' as const },
+          { label: 'No Show', status: 'no_show' as const },
+          { label: 'Cancel', status: 'cancelled' as const },
+        ];
+      case 'in_service':
         return [
           { label: 'Complete', status: 'completed' as const },
-          { label: 'No Show', status: 'no_show' as const },
           { label: 'Cancel', status: 'cancelled' as const },
         ];
       default:
@@ -375,7 +395,7 @@ export default function App() {
 
   const completedCount = appointments.filter((appointment) => appointment.status === 'completed').length;
   const confirmedCount = appointments.filter((appointment) =>
-    ['confirmed', 'pending'].includes(appointment.status)
+    ['pending', 'confirmed', 'checked_in', 'in_service'].includes(appointment.status)
   ).length;
   const nextAppointment =
     appointments.find((appointment) => new Date(appointment.startTime).getTime() >= Date.now()) || appointments[0] || null;
@@ -436,7 +456,7 @@ export default function App() {
                   <Text style={styles.panelPrimary}>{getCustomerName(nextAppointment)}</Text>
                   <Text style={styles.panelSecondary}>{getServiceName(nextAppointment)}</Text>
                   <Text style={styles.panelMeta}>
-                    {formatTime(nextAppointment.startTime)} - {formatTime(nextAppointment.endTime)} • {nextAppointment.status}
+                    {formatTime(nextAppointment.startTime)} - {formatTime(nextAppointment.endTime)} • {formatAppointmentStatus(nextAppointment.status)}
                   </Text>
                 </>
               ) : (
@@ -477,7 +497,9 @@ export default function App() {
                     >
                       <View style={styles.listItemHeader}>
                         <Text style={styles.listItemTitle}>{getCustomerName(appointment)}</Text>
-                        <Text style={styles.listItemBadge}>{appointment.status}</Text>
+                        <Text style={styles.listItemBadge}>
+                          {formatAppointmentStatus(appointment.status)}
+                        </Text>
                       </View>
                       <Text style={styles.listItemText}>{getServiceName(appointment)}</Text>
                       <Text style={styles.listItemText}>
@@ -501,7 +523,9 @@ export default function App() {
                 <Text style={styles.profileLine}>
                   Time: {formatTime(selectedAppointment.startTime)} - {formatTime(selectedAppointment.endTime)}
                 </Text>
-                <Text style={styles.profileLine}>Status: {selectedAppointment.status}</Text>
+                <Text style={styles.profileLine}>
+                  Status: {formatAppointmentStatus(selectedAppointment.status)}
+                </Text>
                 <Text style={styles.profileLine}>
                   Payment: {selectedAppointment.paymentStatus || 'pending'} ({formatMoney(selectedAppointment.price || selectedAppointment.service?.finalPrice || selectedAppointment.service?.rawPrice)})
                 </Text>

@@ -1,0 +1,114 @@
+const APPOINTMENT_STATUS = Object.freeze({
+    PENDING: 'pending',
+    CONFIRMED: 'confirmed',
+    CHECKED_IN: 'checked_in',
+    IN_SERVICE: 'in_service',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled',
+    NO_SHOW: 'no_show'
+});
+
+const APPOINTMENT_STATUS_VALUES = Object.freeze(Object.values(APPOINTMENT_STATUS));
+
+const APPOINTMENT_STATUS_ALIASES = Object.freeze({
+    started: APPOINTMENT_STATUS.IN_SERVICE
+});
+
+const ACTIVE_APPOINTMENT_STATUSES = Object.freeze([
+    APPOINTMENT_STATUS.PENDING,
+    APPOINTMENT_STATUS.CONFIRMED,
+    APPOINTMENT_STATUS.CHECKED_IN,
+    APPOINTMENT_STATUS.IN_SERVICE
+]);
+
+const REVENUE_TRACKED_APPOINTMENT_STATUSES = Object.freeze([
+    APPOINTMENT_STATUS.CONFIRMED,
+    APPOINTMENT_STATUS.CHECKED_IN,
+    APPOINTMENT_STATUS.IN_SERVICE,
+    APPOINTMENT_STATUS.COMPLETED
+]);
+
+const TENANT_APPOINTMENT_TRANSITIONS = Object.freeze({
+    [APPOINTMENT_STATUS.PENDING]: [
+        APPOINTMENT_STATUS.CONFIRMED,
+        APPOINTMENT_STATUS.CHECKED_IN,
+        APPOINTMENT_STATUS.CANCELLED,
+        APPOINTMENT_STATUS.NO_SHOW
+    ],
+    [APPOINTMENT_STATUS.CONFIRMED]: [
+        APPOINTMENT_STATUS.CHECKED_IN,
+        APPOINTMENT_STATUS.IN_SERVICE,
+        APPOINTMENT_STATUS.COMPLETED,
+        APPOINTMENT_STATUS.CANCELLED,
+        APPOINTMENT_STATUS.NO_SHOW
+    ],
+    [APPOINTMENT_STATUS.CHECKED_IN]: [
+        APPOINTMENT_STATUS.IN_SERVICE,
+        APPOINTMENT_STATUS.COMPLETED,
+        APPOINTMENT_STATUS.CANCELLED
+    ],
+    [APPOINTMENT_STATUS.IN_SERVICE]: [
+        APPOINTMENT_STATUS.COMPLETED,
+        APPOINTMENT_STATUS.CANCELLED
+    ],
+    [APPOINTMENT_STATUS.COMPLETED]: [],
+    [APPOINTMENT_STATUS.CANCELLED]: [],
+    [APPOINTMENT_STATUS.NO_SHOW]: []
+});
+
+const STAFF_APPOINTMENT_TRANSITIONS = Object.freeze({
+    [APPOINTMENT_STATUS.PENDING]: [
+        APPOINTMENT_STATUS.CONFIRMED,
+        APPOINTMENT_STATUS.CHECKED_IN,
+        APPOINTMENT_STATUS.CANCELLED,
+        APPOINTMENT_STATUS.NO_SHOW
+    ],
+    [APPOINTMENT_STATUS.CONFIRMED]: [
+        APPOINTMENT_STATUS.CHECKED_IN,
+        APPOINTMENT_STATUS.COMPLETED,
+        APPOINTMENT_STATUS.CANCELLED,
+        APPOINTMENT_STATUS.NO_SHOW
+    ],
+    [APPOINTMENT_STATUS.CHECKED_IN]: [
+        APPOINTMENT_STATUS.IN_SERVICE,
+        APPOINTMENT_STATUS.CANCELLED
+    ],
+    [APPOINTMENT_STATUS.IN_SERVICE]: [
+        APPOINTMENT_STATUS.COMPLETED,
+        APPOINTMENT_STATUS.CANCELLED
+    ],
+    [APPOINTMENT_STATUS.COMPLETED]: [],
+    [APPOINTMENT_STATUS.CANCELLED]: [],
+    [APPOINTMENT_STATUS.NO_SHOW]: []
+});
+
+const normalizeAppointmentStatus = (status) => (
+    APPOINTMENT_STATUS_ALIASES[status] || status
+);
+
+const isValidAppointmentStatus = (status) => (
+    APPOINTMENT_STATUS_VALUES.includes(normalizeAppointmentStatus(status))
+);
+
+const canTransitionAppointmentStatus = (
+    currentStatus,
+    nextStatus,
+    transitionMap = TENANT_APPOINTMENT_TRANSITIONS
+) => {
+    const normalizedCurrentStatus = normalizeAppointmentStatus(currentStatus);
+    const normalizedNextStatus = normalizeAppointmentStatus(nextStatus);
+
+    return (transitionMap[normalizedCurrentStatus] || []).includes(normalizedNextStatus);
+};
+
+module.exports = {
+    APPOINTMENT_STATUS,
+    APPOINTMENT_STATUS_VALUES,
+    ACTIVE_APPOINTMENT_STATUSES,
+    REVENUE_TRACKED_APPOINTMENT_STATUSES,
+    STAFF_APPOINTMENT_TRANSITIONS,
+    TENANT_APPOINTMENT_TRANSITIONS,
+    canTransitionAppointmentStatus,
+    isValidAppointmentStatus,
+    normalizeAppointmentStatus
+};

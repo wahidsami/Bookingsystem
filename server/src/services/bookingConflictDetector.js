@@ -6,7 +6,8 @@
 
 const db = require('../models');
 const { Op, sequelize } = require('sequelize');
-const logger = require('./productionLogger');
+const logger = require('../utils/productionLogger');
+const { ACTIVE_APPOINTMENT_STATUSES } = require('../utils/appointmentStatus');
 
 class BookingConflictDetector {
     /**
@@ -17,7 +18,7 @@ class BookingConflictDetector {
         try {
             const where = {
                 staffId,
-                status: { [Op.in]: ['confirmed', 'tentative', 'in_progress'] },
+                status: { [Op.in]: ACTIVE_APPOINTMENT_STATUSES },
                 [Op.or]: [
                     // New appointment starts during existing appointment
                     {
@@ -47,7 +48,7 @@ class BookingConflictDetector {
                 `SELECT id, "startTime", "endTime", status 
                  FROM "appointments" 
                  WHERE "staffId" = :staffId 
-                 AND status IN ('confirmed', 'tentative', 'in_progress')
+                 AND status IN (:activeStatuses)
                  AND (
                     ("startTime" <= :startTime AND "endTime" > :startTime) OR
                     ("startTime" < :endTime AND "endTime" >= :endTime) OR
@@ -59,6 +60,7 @@ class BookingConflictDetector {
                 {
                     replacements: {
                         staffId,
+                        activeStatuses: ACTIVE_APPOINTMENT_STATUSES,
                         startTime,
                         endTime,
                         ...(excludeAppointmentId && { excludeId: excludeAppointmentId })

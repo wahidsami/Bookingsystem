@@ -40,6 +40,47 @@ export default function DashboardPage() {
   });
   const [todaysAppointments, setTodaysAppointments] = useState<Appointment[]>([]);
 
+  const getAppointmentStatusMeta = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return {
+          label: locale === 'ar' ? 'مؤكد' : 'Confirmed',
+          badgeClass: 'badge-success',
+        };
+      case 'checked_in':
+        return {
+          label: locale === 'ar' ? 'تم تسجيل الوصول' : 'Checked In',
+          badgeClass: 'badge-success',
+        };
+      case 'in_service':
+        return {
+          label: locale === 'ar' ? 'جاري التنفيذ' : 'In Service',
+          badgeClass: 'badge-info',
+        };
+      case 'completed':
+        return {
+          label: locale === 'ar' ? 'مكتمل' : 'Completed',
+          badgeClass: 'badge-info',
+        };
+      case 'cancelled':
+        return {
+          label: locale === 'ar' ? 'ملغي' : 'Cancelled',
+          badgeClass: 'badge-error',
+        };
+      case 'no_show':
+        return {
+          label: locale === 'ar' ? 'لم يحضر' : 'No Show',
+          badgeClass: 'badge-warning',
+        };
+      case 'pending':
+      default:
+        return {
+          label: locale === 'ar' ? 'قيد الانتظار' : 'Pending',
+          badgeClass: 'badge-warning',
+        };
+    }
+  };
+
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -193,6 +234,10 @@ export default function DashboardPage() {
                 key={appointment.id}
                 className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
+                {(() => {
+                  const statusMeta = getAppointmentStatusMeta(appointment.status);
+
+                  return (
                 <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <div className={`flex-1 ${isRTL ? 'text-end' : ''}`}>
                     <h4 className="font-bold text-gray-900">{appointment.customerName}</h4>
@@ -202,20 +247,16 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <span
-                      className={`badge ${
-                        appointment.status === 'confirmed' ? 'badge-success' : 'badge-warning'
-                      }`}
-                    >
-                      {appointment.status === 'confirmed'
-                        ? locale === 'ar' ? 'مؤكد' : 'Confirmed'
-                        : locale === 'ar' ? 'قيد الانتظار' : 'Pending'}
+                    <span className={`badge ${statusMeta.badgeClass}`}>
+                      {statusMeta.label}
                     </span>
                     <span className="text-lg font-bold text-primary">
                       <Currency amount={appointment.price} locale={locale === 'ar' ? 'ar-SA' : 'en-SA'} />
                     </span>
                   </div>
                 </div>
+                  );
+                })()}
               </div>
             ))}
           </div>

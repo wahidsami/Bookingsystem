@@ -14,6 +14,12 @@ const {
     createAppointmentTransaction,
     resolveLedgerPaymentMethod
 } = require('../services/paymentTransactionLedgerService');
+const {
+    TENANT_APPOINTMENT_TRANSITIONS,
+    canTransitionAppointmentStatus,
+    isValidAppointmentStatus,
+    normalizeAppointmentStatus
+} = require('../utils/appointmentStatus');
 
 /**
  * Get all appointments for the authenticated tenant
@@ -275,9 +281,9 @@ exports.updateAppointmentStatus = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { status, notes } = req.body;
+        const normalizedStatus = normalizeAppointmentStatus(status);
 
-        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'no_show'];
-        if (!validStatuses.includes(status)) {
+        if (!isValidAppointmentStatus(normalizedStatus)) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -306,7 +312,22 @@ exports.updateAppointmentStatus = async (req, res) => {
             });
         }
 
-        appointment.status = status;
+        if (
+            appointment.status !== normalizedStatus &&
+            !canTransitionAppointmentStatus(
+                appointment.status,
+                normalizedStatus,
+                TENANT_APPOINTMENT_TRANSITIONS
+            )
+        ) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Cannot change appointment from ${appointment.status} to ${normalizedStatus}`
+            });
+        }
+
+        appointment.status = normalizedStatus;
         if (notes !== undefined) {
             appointment.notes = notes;
         }
@@ -317,11 +338,11 @@ exports.updateAppointmentStatus = async (req, res) => {
         try {
             await pushNotificationService.sendToUser(appointment.platformUserId, {
                 title: 'Booking updated',
-                body: `Your appointment is now ${status.replace(/_/g, ' ')}.`,
+                body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
                 data: {
                     type: 'booking_status_updated',
                     appointmentId: appointment.id,
-                    status
+                    status: normalizedStatus
                 }
             });
         } catch (notificationError) {
@@ -703,6 +724,8 @@ exports.getAppointmentStats = async (req, res) => {
             byStatus: {
                 pending: 0,
                 confirmed: 0,
+                checked_in: 0,
+                in_service: 0,
                 completed: 0,
                 cancelled: 0,
                 no_show: 0
