@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { useTenantAuth } from "@/contexts/TenantAuthContext";
 import { useTranslations } from "next-intl";
@@ -191,26 +192,10 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           className={`hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:bg-white/90 lg:backdrop-blur-lg lg:shadow-xl ${isRTL ? 'lg:right-0 lg:border-l lg:border-gray-200' : 'lg:left-0 lg:border-r lg:border-gray-200'
             }`}
         >
-          {/* Sidebar Header */}
-          <div
-            className="flex items-center gap-3 px-6 py-6 border-b border-gray-200"
-            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-          >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl">ر</span>
-            </div>
-            <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              <h2 className="text-lg font-bold text-gray-900">رفاه</h2>
-              <p className="text-xs text-gray-500">
-                {locale === 'ar' ? 'لوحة تحكم الصالون' : 'Salon Dashboard'}
-              </p>
-            </div>
-          </div>
-
           {/* Business Info */}
-          <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary/5 to-secondary/5">
+          <div className="px-6 py-6 border-b border-gray-200 bg-gradient-to-r from-primary/5 to-secondary/5">
             <div
-              className="flex items-center gap-3"
+              className="flex items-start gap-3"
               style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
             >
               {(user?.logo || user?.profileImage) ? (
@@ -222,15 +207,24 @@ export function TenantLayout({ children }: TenantLayoutProps) {
               ) : (
                 <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
                   <span className="text-primary font-semibold text-xl">
-                    {user?.businessName?.[0] || "S"}
+                    {user?.businessName?.[0] || (locale === 'ar' ? 'م' : 'B')}
                   </span>
                 </div>
               )}
               <div className="flex-1 min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                <p className="text-sm font-bold text-gray-900 truncate">
-                  {user?.businessName || "صالون رفاه"}
+                <p className="text-base font-bold text-gray-900 truncate">
+                  {user?.businessName || (locale === 'ar' ? 'اسم المركز' : 'Business name')}
                 </p>
                 <p className="text-xs text-gray-600">{Array.isArray(user?.businessType) ? user.businessType.map((t: string) => t.replace('_', ' ')).join(', ') : user?.businessType || "Salon"}</p>
+                <div
+                  className="mt-3 flex items-center gap-2"
+                  style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                >
+                  <Image src="/refahlogo.svg" alt="Rifah" width={22} height={22} />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                    {locale === 'ar' ? 'منصة رفاه' : 'Rifah Platform'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

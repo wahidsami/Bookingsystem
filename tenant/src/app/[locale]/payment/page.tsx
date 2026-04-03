@@ -37,6 +37,7 @@ export default function UnifiedPaymentPage() {
   const locale = (params?.locale as string) || "ar";
   const token = searchParams?.get("token") || "";
   const isJwtToken = Boolean(token && token.includes("."));
+  const isPublicBillLink = Boolean(token && !isJwtToken);
 
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -153,7 +154,12 @@ export default function UnifiedPaymentPage() {
           return;
         }
 
-        router.push(`/${locale}/dashboard/subscription`);
+        const hasActiveTenantSession = typeof window !== "undefined"
+          && Boolean(sessionStorage.getItem("rifah_tenant_access_token"));
+
+        router.push(hasActiveTenantSession
+          ? `/${locale}/dashboard/subscription`
+          : `/${locale}/login`);
         return;
       }
 
@@ -185,7 +191,7 @@ export default function UnifiedPaymentPage() {
   const currency = mode === "bill" ? billSession?.currency : registrationSession?.currency;
   const dueDate = mode === "bill" ? billSession?.dueDate : registrationSession?.paymentDueAt;
   const backHref = mode === "bill"
-    ? `/${locale}/dashboard/bills`
+    ? (isPublicBillLink ? `/${locale}/login` : `/${locale}/dashboard/bills`)
     : (token ? `/${locale}/login` : `/${locale}`);
 
   if (loading) {
@@ -265,10 +271,12 @@ export default function UnifiedPaymentPage() {
               {locale === "ar" ? "هذه الفاتورة مدفوعة بالفعل" : "This invoice has already been paid"}
             </p>
             <Link
-              href={`/${locale}/dashboard/subscription`}
+              href={isPublicBillLink ? `/${locale}/login` : `/${locale}/dashboard/subscription`}
               className="inline-block mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
-              {locale === "ar" ? "العودة للاشتراك" : "Back to subscription"}
+              {isPublicBillLink
+                ? (locale === "ar" ? "الذهاب لتسجيل الدخول" : "Go to login")
+                : (locale === "ar" ? "العودة للاشتراك" : "Back to subscription")}
             </Link>
           </div>
         ) : (
@@ -299,11 +307,19 @@ export default function UnifiedPaymentPage() {
             </div>
 
             <p className="text-center mt-6 text-sm text-gray-500">
-              <Link href={backHref} className="text-purple-600 hover:underline">
-                {mode === "bill"
-                  ? (locale === "ar" ? "العودة للفواتير" : "Back to bills")
-                  : (locale === "ar" ? "العودة" : "Back")}
-              </Link>
+              {mode === "bill" && isPublicBillLink ? (
+                <span className="text-gray-500">
+                  {locale === "ar"
+                    ? "تم فتح هذه الصفحة من رابط الدفع المرسل بالبريد الإلكتروني."
+                    : "This page was opened from the payment link sent by email."}
+                </span>
+              ) : (
+                <Link href={backHref} className="text-purple-600 hover:underline">
+                  {mode === "bill"
+                    ? (locale === "ar" ? "العودة للفواتير" : "Back to bills")
+                    : (locale === "ar" ? "العودة" : "Back")}
+                </Link>
+              )}
             </p>
           </>
         )}

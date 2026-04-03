@@ -101,7 +101,12 @@ async function loadBill(where, transaction = null, lock = false) {
         where,
         include: BILL_PAYMENT_INCLUDE,
         transaction,
-        lock: lock && transaction ? transaction.LOCK.UPDATE : undefined
+        lock: lock && transaction
+            ? {
+                level: transaction.LOCK.UPDATE,
+                of: db.Bill
+            }
+            : undefined
     });
 }
 
