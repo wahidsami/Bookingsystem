@@ -10,6 +10,7 @@ const POS_QUEUE_LIMIT = 100;
 const POS_TRANSACTION_LIMIT = 100;
 const POS_ALERT_LIMIT = 10;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
 const logoFallbackPath = path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
 
@@ -167,11 +168,38 @@ const getTransactionIncludes = ({ includeTenantOnlyFields = true } = {}) => ([
     }
 ]);
 
-const buildTenantScopedTransactionWhere = (tenantId, filters = {}) => {
+const fetchTenantPaymentEntityScope = async (tenantId) => {
+    const [appointmentRows, orderRows] = await Promise.all([
+        db.Appointment.findAll({
+            where: { tenantId },
+            attributes: ['id'],
+            raw: true
+        }),
+        db.Order.findAll({
+            where: { tenantId },
+            attributes: ['id'],
+            raw: true
+        })
+    ]);
+
+    return {
+        appointmentIds: appointmentRows.map((row) => row.id),
+        orderIds: orderRows.map((row) => row.id)
+    };
+};
+
+const buildTenantScopedTransactionWhere = (entityScope, filters = {}) => {
+    const appointmentIds = entityScope?.appointmentIds?.length
+        ? entityScope.appointmentIds
+        : [NO_MATCH_UUID];
+    const orderIds = entityScope?.orderIds?.length
+        ? entityScope.orderIds
+        : [NO_MATCH_UUID];
+
     const where = {
         [Op.or]: [
-            { '$appointment.tenantId$': tenantId },
-            { '$order.tenantId$': tenantId }
+            { appointmentId: { [Op.in]: appointmentIds } },
+            { orderId: { [Op.in]: orderIds } }
         ]
     };
 
@@ -473,9 +501,10 @@ const fetchQueueData = async (tenantId, search = '', limit = POS_QUEUE_LIMIT) =>
 
 const fetchClosingSummaryData = async (tenantId, selectedDate) => {
     const dateRange = parseDateRange(selectedDate, selectedDate);
+    const entityScope = await fetchTenantPaymentEntityScope(tenantId);
 
     const transactions = await db.PaymentTransaction.findAll({
-        where: buildTenantScopedTransactionWhere(tenantId, { processedAt: dateRange }),
+        where: buildTenantScopedTransactionWhere(entityScope, { processedAt: dateRange }),
         include: getTransactionIncludes(),
         order: [['processedAt', 'DESC']],
         subQuery: false
@@ -774,9 +803,10 @@ exports.getTransactions = async (req, res) => {
         const safePage = Math.max(parseInt(page, 10) || 1, 1);
         const offset = (safePage - 1) * safeLimit;
         const dateRange = parseDateRange(startDate, endDate);
+        const entityScope = await fetchTenantPaymentEntityScope(tenantId);
 
         const { rows, count } = await db.PaymentTransaction.findAndCountAll({
-            where: buildTenantScopedTransactionWhere(tenantId, {
+            where: buildTenantScopedTransactionWhere(entityScope, {
                 search,
                 processedAt: dateRange
             }),
@@ -831,8 +861,9 @@ exports.getClosingSummary = async (req, res) => {
 exports.downloadTransactionReceiptPdf = async (req, res) => {
     try {
         const tenantId = req.tenantId;
+        const entityScope = await fetchTenantPaymentEntityScope(tenantId);
         const transaction = await db.PaymentTransaction.findOne({
-            where: buildTenantScopedTransactionWhere(tenantId, { id: req.params.id }),
+            where: buildTenantScopedTransactionWhere(entityScope, { id: req.params.id }),
             include: getTransactionIncludes({ includeTenantOnlyFields: false }),
             subQuery: false
         });
