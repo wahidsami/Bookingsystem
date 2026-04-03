@@ -374,7 +374,7 @@ exports.updatePaymentStatus = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { paymentStatus, paymentMethod } = req.body;
+        const { paymentStatus, paymentMethod, transactionRef, notes } = req.body;
 
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
@@ -466,11 +466,12 @@ exports.updatePaymentStatus = async (req, res) => {
                         : 'cash'
                 ),
                 status: 'completed',
+                transactionRef: transactionRef || `APT-PAY-${appointment.id.slice(0, 8).toUpperCase()}`,
                 processedBy: null,
                 processedAt: appointment.paidAt || new Date(),
-                notes: paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
                     ? 'Deposit collected from tenant dashboard'
-                    : 'Full payment collected from tenant dashboard',
+                    : 'Full payment collected from tenant dashboard'),
                 metadata: {
                     source: 'tenant_appointment_payment_status_update',
                     previousTotalPaid,

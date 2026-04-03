@@ -54,7 +54,7 @@ const recordPayment = async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.tenantId;
-        const { amount, paymentMethod, notes } = req.body;
+        const { amount, paymentMethod, notes, transactionRef } = req.body;
 
         // Verify appointment belongs to tenant
         const appointment = await db.Appointment.findByPk(id, {
@@ -73,7 +73,7 @@ const recordPayment = async (req, res) => {
         }
 
         // Validate payment method
-        const validMethods = ['cash', 'card_pos', 'wallet'];
+        const validMethods = ['cash', 'card_pos', 'wallet', 'bank_transfer'];
         if (!validMethods.includes(paymentMethod)) {
             return res.status(400).json({
                 success: false,
@@ -86,7 +86,8 @@ const recordPayment = async (req, res) => {
             amount: parseFloat(amount),
             paymentMethod,
             processedBy: null,
-            notes
+            notes,
+            transactionRef
         });
 
         // Get updated payment summary

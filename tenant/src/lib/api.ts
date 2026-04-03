@@ -1083,10 +1083,20 @@ class TenantApiClient {
     });
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: string, paymentMethod?: string): Promise<any> {
+  async updatePaymentStatus(
+    id: string,
+    paymentStatus: string,
+    paymentMethod?: string,
+    paymentData?: { transactionRef?: string; notes?: string }
+  ): Promise<any> {
     return this.request(`/tenant/appointments/${id}/payment`, {
       method: 'PATCH',
-      body: JSON.stringify({ paymentStatus, paymentMethod })
+      body: JSON.stringify({
+        paymentStatus,
+        paymentMethod,
+        transactionRef: paymentData?.transactionRef,
+        notes: paymentData?.notes
+      })
     });
   }
 
@@ -1095,12 +1105,57 @@ class TenantApiClient {
    */
   async recordRemainderPayment(
     id: string,
-    data: { amount: number; paymentMethod: string; notes?: string }
+    data: {
+      amount: number;
+      paymentMethod: string;
+      notes?: string;
+      transactionRef?: string;
+    }
   ): Promise<any> {
     return this.request(`/tenant/appointments/${id}/record-payment`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  }
+
+  /**
+   * POS / Collections
+   */
+  async getPosQueue(params?: {
+    search?: string;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString();
+    return this.get(`/tenant/pos/queue${query ? `?${query}` : ''}`);
+  }
+
+  async getPosTransactions(params?: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString();
+    return this.get(`/tenant/pos/transactions${query ? `?${query}` : ''}`);
+  }
+
+  async getPosClosingSummary(params?: {
+    date?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.date) queryParams.append('date', params.date);
+    const query = queryParams.toString();
+    return this.get(`/tenant/pos/closing${query ? `?${query}` : ''}`);
   }
 
   /**

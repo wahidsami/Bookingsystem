@@ -96,6 +96,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: "👥" },
     { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: "📅" },
     { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: "📅" },
+    { name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections', href: `/${locale}/dashboard/pos`, icon: "🏷️" },
     { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦", visible: hasProductsAndOrders },
     { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥", visible: hasHotDeals },
     { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: "📬", visible: hasInternalMessaging },

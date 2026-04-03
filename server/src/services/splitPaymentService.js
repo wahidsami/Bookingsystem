@@ -28,11 +28,11 @@ const calculateSplitPayment = async (tenantId, totalPrice) => {
 /**
  * Record remainder payment (at salon)
  * @param {string} appointmentId - Appointment UUID
- * @param {Object} paymentData - { amount, paymentMethod, processedBy, notes }
+ * @param {Object} paymentData - { amount, paymentMethod, processedBy, notes, transactionRef }
  * @returns {Promise<Object>} Updated appointment
  */
 const recordRemainderPayment = async (appointmentId, paymentData) => {
-    const { amount, paymentMethod, processedBy, notes } = paymentData;
+    const { amount, paymentMethod, processedBy, notes, transactionRef } = paymentData;
 
     const appointment = await db.Appointment.findByPk(appointmentId);
     if (!appointment) {
@@ -54,6 +54,7 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
         amount,
         paymentMethod,
         status: 'completed',
+        transactionRef: transactionRef || `APT-REMAINDER-${appointment.id.slice(0, 8).toUpperCase()}`,
         processedBy,
         processedAt: new Date(),
         notes,
@@ -121,7 +122,7 @@ const getPaymentSummary = async (appointmentId) => {
  * @returns {Promise<Object>} Refund transaction
  */
 const refundPayment = async (appointmentId, refundData) => {
-    const { amount, reason, processedBy } = refundData;
+    const { amount, reason, processedBy, transactionRef } = refundData;
 
     const appointment = await db.Appointment.findByPk(appointmentId);
     if (!appointment) {
@@ -139,6 +140,7 @@ const refundPayment = async (appointmentId, refundData) => {
         amount,
         paymentMethod: resolveLedgerPaymentMethod(appointment.paymentMethod, 'online'),
         status: 'refunded',
+        transactionRef: transactionRef || `APT-REFUND-${appointment.id.slice(0, 8).toUpperCase()}`,
         processedBy,
         processedAt: new Date(),
         notes: reason,
