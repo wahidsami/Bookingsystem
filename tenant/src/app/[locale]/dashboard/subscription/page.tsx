@@ -168,6 +168,7 @@ export default function SubscriptionPage() {
   const { user } = useTenantAuth();
   const [subscription, setSubscription] = useState<any>(null);
   const [limitsResponse, setLimitsResponse] = useState<any>(null);
+  const [consumptionData, setConsumptionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,9 +177,10 @@ export default function SubscriptionPage() {
 
     Promise.all([
       tenantApi.getCurrentSubscription(),
-      tenantApi.getSubscriptionLimits()
+      tenantApi.getSubscriptionLimits(),
+      tenantApi.getSubscriptionConsumption().catch(() => null)
     ])
-      .then(([subscriptionRes, limitsRes]) => {
+      .then(([subscriptionRes, limitsRes, consumptionRes]) => {
         if (!isMounted) return;
 
         if (subscriptionRes.success && subscriptionRes.subscription) {
@@ -189,6 +191,10 @@ export default function SubscriptionPage() {
 
         if (limitsRes.success) {
           setLimitsResponse(limitsRes);
+        }
+
+        if (consumptionRes?.success && consumptionRes.data) {
+          setConsumptionData(consumptionRes.data);
         }
       })
       .catch(() => {
@@ -253,6 +259,51 @@ export default function SubscriptionPage() {
     return String(value);
   };
 
+  const statusBadge = (status?: string) => {
+    const map: Record<string, { className: string; label: string }> = {
+      healthy: {
+        className: 'bg-emerald-100 text-emerald-700',
+        label: locale === 'ar' ? 'جيد' : 'Healthy'
+      },
+      near_limit: {
+        className: 'bg-amber-100 text-amber-700',
+        label: locale === 'ar' ? 'قريب من الحد' : 'Near limit'
+      },
+      critical: {
+        className: 'bg-orange-100 text-orange-700',
+        label: locale === 'ar' ? 'مرتفع جداً' : 'Critical'
+      },
+      limit_reached: {
+        className: 'bg-rose-100 text-rose-700',
+        label: locale === 'ar' ? 'تم الوصول للحد' : 'Limit reached'
+      },
+      disabled: {
+        className: 'bg-gray-100 text-gray-600',
+        label: locale === 'ar' ? 'غير مفعّل' : 'Disabled'
+      }
+    };
+
+    return map[status || 'healthy'] || map.healthy;
+  };
+
+  const formatUsageCellValue = (row: any, value: unknown) => {
+    if (row?.metricType === 'feature') {
+      return row.enabled
+        ? (locale === 'ar' ? 'متاح' : 'Included')
+        : (locale === 'ar' ? 'غير متاح' : 'Not included');
+    }
+
+    if (row?.unlimited && value === row?.total) {
+      return locale === 'ar' ? 'غير محدود' : 'Unlimited';
+    }
+
+    if (value === null || value === undefined) return '—';
+
+    const baseValue = String(value);
+    const unit = locale === 'ar' ? row?.unitAr : row?.unitEn;
+    return unit ? `${baseValue} ${unit}` : baseValue;
+  };
+
   const getPlanAmount = () => {
     const pkg = subscription?.package;
     if (!pkg) return null;
@@ -268,6 +319,10 @@ export default function SubscriptionPage() {
   const lockedFeature = searchParams?.get('lockedFeature');
   const limits = limitsResponse?.limits || subscription?.package?.limits || {};
   const usageData = limitsResponse?.data || {};
+  const consumptionRows = Array.isArray(consumptionData?.rows) ? consumptionData.rows : [];
+  const liveAlerts = Array.isArray(consumptionData?.alerts)
+    ? consumptionData.alerts.filter((alert: any) => !alert?.acknowledged).slice(0, 5)
+    : [];
   const lockedFeatures = FEATURE_DEFINITIONS.filter((feature) => !feature.isEnabled(limits));
   const lockedFeatureTitle = FEATURE_DEFINITIONS.find((feature) => feature.key === lockedFeature)?.label[locale === 'ar' ? 'ar' : 'en'];
 
@@ -395,6 +450,114 @@ export default function SubscriptionPage() {
                 </div>
               )}
             </div>
+
+            {consumptionRows.length > 0 && (
+              <section className="bg-white rounded-[28px] border border-gray-200 shadow-sm p-6 lg:p-8">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <div>
+                    <p className="text-sm font-semibold text-primary mb-1">
+                      {locale === 'ar' ? 'متابعة الاستهلاك' : 'Consumption tracker'}
+                    </p>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {locale === 'ar' ? 'استهلاك مزايا وحدود باقتك' : 'Your package usage and remaining balance'}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {locale === 'ar'
+                        ? `فترة القياس الحالية: ${consumptionData?.currentMonth || '—'}`
+                        : `Current usage period: ${consumptionData?.currentMonth || '—'}`}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/${locale}/dashboard/subscription/upgrade`}
+                    className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-2xl font-semibold hover:bg-primary/90"
+                  >
+                    {locale === 'ar' ? 'ترقية الباقة' : 'Upgrade plan'}
+                  </Link>
+                </div>
+
+                {liveAlerts.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
+                    {liveAlerts.map((alert: any) => (
+                      <div
+                        key={alert.id}
+                        className="rounded-3xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4"
+                      >
+                        <p className="text-sm font-bold text-gray-900">
+                          {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
+                        </p>
+                        <p className="text-xs text-gray-700 mt-1">
+                          {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px]">
+                    <thead>
+                      <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                        <th className="py-3 px-3" style={{ textAlign: locale === 'ar' ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'الخدمة / الميزة' : 'Service / Feature'}
+                        </th>
+                        <th className="py-3 px-3" style={{ textAlign: locale === 'ar' ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'الإجمالي' : 'Total'}
+                        </th>
+                        <th className="py-3 px-3" style={{ textAlign: locale === 'ar' ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'المستخدم' : 'Consumed'}
+                        </th>
+                        <th className="py-3 px-3" style={{ textAlign: locale === 'ar' ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'المتبقي' : 'Left'}
+                        </th>
+                        <th className="py-3 px-3" style={{ textAlign: locale === 'ar' ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'الحالة' : 'Status'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {consumptionRows.map((row: any) => {
+                        const badge = statusBadge(row.status);
+                        return (
+                          <tr key={row.key} className="border-b border-gray-100 last:border-b-0">
+                            <td className="py-4 px-3">
+                              <div className="font-semibold text-gray-900">
+                                {locale === 'ar' ? (row.labelAr || row.key) : (row.labelEn || row.key)}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {row.metricType === 'resource'
+                                  ? (locale === 'ar' ? 'مورد تشغيلي' : 'Operational resource')
+                                  : row.metricType === 'quota'
+                                    ? (locale === 'ar' ? 'رصيد شهري' : 'Monthly quota')
+                                    : (locale === 'ar' ? 'ميزة ضمن الباقة' : 'Plan feature')}
+                              </div>
+                            </td>
+                            <td className="py-4 px-3 text-sm text-gray-700">
+                              {formatUsageCellValue(row, row.total)}
+                            </td>
+                            <td className="py-4 px-3 text-sm text-gray-700">
+                              {row.metricType === 'feature' ? '—' : formatUsageCellValue(row, row.consumed)}
+                            </td>
+                            <td className="py-4 px-3 text-sm text-gray-700">
+                              {row.metricType === 'feature' || row.unlimited ? '—' : formatUsageCellValue(row, row.left)}
+                            </td>
+                            <td className="py-4 px-3">
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${badge.className}`}>
+                                  {badge.label}
+                                </span>
+                                {row.metricType !== 'feature' && !row.unlimited && row.enabled && (
+                                  <span className="text-xs text-gray-500">{row.percentage}%</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <section className="bg-white rounded-[28px] border border-gray-200 shadow-sm p-6">

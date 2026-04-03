@@ -312,6 +312,7 @@ const startServer = async () => {
         await db.TenantUsage.sync({ force: false }); // Usage tracking
         await db.UsageAlert.sync({ force: false }); // Usage alerts
         await db.TenantPushUsage.sync({ force: false }); // Marketing push quota usage
+        await db.TenantFeatureUsage.sync({ force: false }); // Monthly feature quota usage such as AI
         await db.TenantPushCampaign.sync({ force: false }); // Marketing push campaign history
         await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
 

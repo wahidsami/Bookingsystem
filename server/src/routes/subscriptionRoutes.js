@@ -16,6 +16,9 @@ router.get('/current', subscriptionController.getCurrentSubscription);
 // Get usage statistics
 router.get('/usage', subscriptionController.getUsageStats);
 
+// Get package consumption table and near-limit alerts
+router.get('/consumption', subscriptionController.getConsumption);
+
 // Get usage alerts
 router.get('/alerts', subscriptionController.getUsageAlerts);
 

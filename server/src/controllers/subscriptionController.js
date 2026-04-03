@@ -17,6 +17,9 @@ const {
 const {
     notifyTenantSubscriptionChangeRequested
 } = require('../services/adminNotificationService');
+const {
+    buildSubscriptionConsumption
+} = require('../services/subscriptionConsumptionService');
 
 const BILLING_CYCLES = ['monthly', 'sixMonth', 'annual'];
 
@@ -386,6 +389,33 @@ exports.requestSubscriptionChange = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to process subscription change request'
+        });
+    }
+};
+
+/**
+ * Get package consumption snapshot for the current tenant.
+ */
+exports.getConsumption = async (req, res) => {
+    try {
+        const consumption = await buildSubscriptionConsumption(getTenantId(req));
+
+        if (!consumption) {
+            return res.status(404).json({
+                success: false,
+                message: 'No active subscription found'
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: consumption
+        });
+    } catch (error) {
+        console.error('Get subscription consumption error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch package consumption'
         });
     }
 };

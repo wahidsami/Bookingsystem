@@ -343,6 +343,36 @@ class TenantApiClient {
     return this.get('/subscription/current');
   }
 
+  async getSubscriptionConsumption(): Promise<{
+    success: boolean;
+    data?: {
+      subscription: any;
+      currentMonth: string;
+      limits: Record<string, any>;
+      rows: any[];
+      alerts: any[];
+    };
+  }> {
+    return this.get('/subscription/consumption');
+  }
+
+  async getSubscriptionAlerts(params?: {
+    limit?: number;
+    unacknowledgedOnly?: boolean;
+  }): Promise<{ success: boolean; alerts?: any[] }> {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.unacknowledgedOnly !== undefined) {
+      queryParams.append('unacknowledgedOnly', String(params.unacknowledgedOnly));
+    }
+    const query = queryParams.toString();
+    return this.get(`/subscription/alerts${query ? `?${query}` : ''}`);
+  }
+
+  async acknowledgeSubscriptionAlert(alertId: string): Promise<{ success: boolean; message?: string }> {
+    return this.patch(`/subscription/alerts/${alertId}/acknowledge`, {});
+  }
+
   async requestUpgrade(newPackageId: string, billingCycle: string): Promise<{ success: boolean; paymentUrl?: string; billNumber?: string; amount?: number; dueDate?: string }> {
     return this.post('/subscription/request-upgrade', { packageId: newPackageId, billingCycle });
   }

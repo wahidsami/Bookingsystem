@@ -32,20 +32,28 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const [entitlements, setEntitlements] = useState<Record<string, any> | null>(null);
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
   const [entitlementsLoadFailed, setEntitlementsLoadFailed] = useState(false);
+  const [usageAlerts, setUsageAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
 
-    tenantApi
-      .getSubscriptionLimits()
-      .then((response) => {
-        if (response.success && response.limits) {
-          setEntitlements(response.limits);
-          setEntitlementsLoadFailed(false);
-        } else {
-          setEntitlements({});
-          setEntitlementsLoadFailed(false);
-        }
+    Promise.all([
+      tenantApi.getSubscriptionLimits(),
+      tenantApi.getSubscriptionConsumption().catch(() => null),
+      tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null)
+    ])
+      .then(([limitsResponse, consumptionResponse, alertsResponse]) => {
+        const resolvedLimits = limitsResponse?.success && limitsResponse?.limits
+          ? limitsResponse.limits
+          : consumptionResponse?.data?.limits;
+
+        setEntitlements(resolvedLimits || {});
+        setEntitlementsLoadFailed(false);
+
+        const alerts = alertsResponse?.success && Array.isArray(alertsResponse.alerts)
+          ? alertsResponse.alerts
+          : consumptionResponse?.data?.alerts || [];
+        setUsageAlerts(alerts.filter((alert: any) => !alert?.acknowledged).slice(0, 3));
       })
       .catch(() => {
         setEntitlements(null);
@@ -53,6 +61,15 @@ export function TenantLayout({ children }: TenantLayoutProps) {
       })
       .finally(() => setEntitlementsLoaded(true));
   }, [user?.id, user?.status]);
+
+  const dismissAlert = async (alertId: string) => {
+    setUsageAlerts((current) => current.filter((alert) => alert.id !== alertId));
+    try {
+      await tenantApi.acknowledgeSubscriptionAlert(alertId);
+    } catch (error) {
+      console.error('Failed to acknowledge usage alert:', error);
+    }
+  };
 
   const shouldBypassFeatureFiltering = !entitlementsLoaded || entitlementsLoadFailed || entitlements === null;
   const hasProductsAndOrders = shouldBypassFeatureFiltering || hasProductsAndOrdersEntitlement(entitlements);
@@ -249,7 +266,40 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           </header>
 
           {/* Page Content */}
-          <div className="p-4 lg:p-8">{children}</div>
+          <div className="p-4 lg:p-8">
+            {usageAlerts.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {usageAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={`rounded-2xl border px-4 py-3 flex items-start justify-between gap-3 ${
+                      alert.priority === 'high' || alert.priority === 'critical'
+                        ? 'bg-rose-50 border-rose-200 text-rose-900'
+                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}
+                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                  >
+                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <p className="text-sm font-bold">
+                        {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
+                      </p>
+                      <p className="text-xs mt-1 opacity-90">
+                        {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => dismissAlert(alert.id)}
+                      className="text-xs font-semibold px-3 py-1 rounded-full bg-white/80 hover:bg-white"
+                    >
+                      {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {children}
+          </div>
         </main>
       </div>
 

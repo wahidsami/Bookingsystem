@@ -1,7 +1,40 @@
 const aiService = require('../../services/aiService');
+const {
+    assertFeatureQuotaAvailable,
+    incrementMonthlyFeatureUsage
+} = require('../../services/subscriptionConsumptionService');
+
+const AI_FEATURE_KEY = 'aiContentAssistant';
+
+async function requireAiQuota(req, res) {
+    const tenantId = req.tenantId || req.tenant?.id;
+    const quotaCheck = await assertFeatureQuotaAvailable(tenantId, AI_FEATURE_KEY, 1);
+
+    if (!quotaCheck.allowed) {
+        res.status(quotaCheck.statusCode || 403).json({
+            success: false,
+            message: quotaCheck.message,
+            limit: quotaCheck.limit,
+            consumed: quotaCheck.consumed,
+            remaining: quotaCheck.remaining,
+            code: 'AI_QUOTA_REACHED'
+        });
+        return false;
+    }
+
+    return true;
+}
+
+async function recordAiUsage(req) {
+    const tenantId = req.tenantId || req.tenant?.id;
+    if (!tenantId) return;
+    await incrementMonthlyFeatureUsage(tenantId, AI_FEATURE_KEY, 1);
+}
 
 exports.generateProduct = async (req, res) => {
     try {
+        if (!(await requireAiQuota(req, res))) return;
+
         const { name_en, name_ar, brand, category, inputLanguage, mode, existingData } = req.body;
         const productName = name_en || name_ar;
 
@@ -22,6 +55,8 @@ exports.generateProduct = async (req, res) => {
             existingData || {}
         );
 
+        await recordAiUsage(req);
+
         return res.status(200).json({
             success: true,
             data: generatedData
@@ -38,6 +73,8 @@ exports.generateProduct = async (req, res) => {
 
 exports.generateService = async (req, res) => {
     try {
+        if (!(await requireAiQuota(req, res))) return;
+
         const { name_en, name_ar, category, inputLanguage } = req.body;
         const serviceName = name_en || name_ar;
 
@@ -50,6 +87,8 @@ exports.generateService = async (req, res) => {
 
         const lang = inputLanguage || (name_en ? 'English' : 'Arabic');
         const generatedData = await aiService.generateServiceContent(serviceName, category, lang);
+
+        await recordAiUsage(req);
 
         return res.status(200).json({
             success: true,
@@ -67,6 +106,8 @@ exports.generateService = async (req, res) => {
 
 exports.generateAboutUs = async (req, res) => {
     try {
+        if (!(await requireAiQuota(req, res))) return;
+
         const { storyText, facilitiesText, inputLanguage } = req.body;
 
         if (!storyText || storyText.trim().length < 10) {
@@ -81,6 +122,8 @@ exports.generateAboutUs = async (req, res) => {
             facilitiesText || '',
             inputLanguage || 'English'
         );
+
+        await recordAiUsage(req);
 
         return res.status(200).json({
             success: true,
@@ -98,6 +141,8 @@ exports.generateAboutUs = async (req, res) => {
 
 exports.translateText = async (req, res) => {
     try {
+        if (!(await requireAiQuota(req, res))) return;
+
         const { text, targetLanguage } = req.body;
 
         if (!text || !targetLanguage) {
@@ -115,6 +160,8 @@ exports.translateText = async (req, res) => {
         }
 
         const translatedText = await aiService.translateText(text, targetLanguage);
+
+        await recordAiUsage(req);
 
         return res.status(200).json({
             success: true,
