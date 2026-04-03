@@ -97,16 +97,28 @@ function sanitizeOptionalText(value) {
 }
 
 async function loadBill(where, transaction = null, lock = false) {
+    if (lock && transaction) {
+        const lockedBill = await db.Bill.findOne({
+            where,
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        });
+
+        if (!lockedBill) {
+            return null;
+        }
+
+        return db.Bill.findOne({
+            where: { id: lockedBill.id },
+            include: BILL_PAYMENT_INCLUDE,
+            transaction
+        });
+    }
+
     return db.Bill.findOne({
         where,
         include: BILL_PAYMENT_INCLUDE,
-        transaction,
-        lock: lock && transaction
-            ? {
-                level: transaction.LOCK.UPDATE,
-                of: db.Bill
-            }
-            : undefined
+        transaction
     });
 }
 
