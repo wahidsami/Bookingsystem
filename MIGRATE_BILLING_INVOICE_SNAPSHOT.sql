@@ -17,6 +17,7 @@ ALTER TABLE bills
     ADD COLUMN IF NOT EXISTS "sellerSnapshot" JSONB NOT NULL DEFAULT '{}'::jsonb,
     ADD COLUMN IF NOT EXISTS "buyerSnapshot" JSONB NOT NULL DEFAULT '{}'::jsonb,
     ADD COLUMN IF NOT EXISTS "lineItemsSnapshot" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS "planSnapshot" JSONB DEFAULT '{}'::jsonb,
     ADD COLUMN IF NOT EXISTS "invoicePdfPath" VARCHAR(255),
     ADD COLUMN IF NOT EXISTS "receiptPdfPath" VARCHAR(255),
     ADD COLUMN IF NOT EXISTS "paymentProvider" VARCHAR(64),
@@ -34,11 +35,13 @@ SET
     "sellerSnapshot" = COALESCE("sellerSnapshot", '{}'::jsonb),
     "buyerSnapshot" = COALESCE("buyerSnapshot", '{}'::jsonb),
     "lineItemsSnapshot" = COALESCE("lineItemsSnapshot", '[]'::jsonb),
+    "planSnapshot" = COALESCE("planSnapshot", '{}'::jsonb),
     "paymentCapturedAmount" = COALESCE("paymentCapturedAmount", amount)
 WHERE "totalAmount" IS NULL
    OR "subtotalAmount" IS NULL
    OR "invoiceIssuedAt" IS NULL
    OR "invoiceTitle" IS NULL
+   OR "planSnapshot" IS NULL
    OR "paymentCapturedAmount" IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_bills_invoice_issued_at ON bills ("invoiceIssuedAt");
@@ -78,6 +81,7 @@ COMMENT ON COLUMN bills."invoiceTemplateMode" IS 'Invoice document rendering mod
 COMMENT ON COLUMN bills."sellerSnapshot" IS 'Frozen Refah seller snapshot used for invoice generation';
 COMMENT ON COLUMN bills."buyerSnapshot" IS 'Frozen tenant buyer snapshot used for invoice generation';
 COMMENT ON COLUMN bills."lineItemsSnapshot" IS 'Frozen invoice line items and period details';
+COMMENT ON COLUMN bills."planSnapshot" IS 'Frozen subscription package and billing-cycle snapshot used for invoice display';
 COMMENT ON COLUMN global_settings."invoiceSellerNameAr" IS 'Refah Arabic legal/business name for invoice rendering';
 COMMENT ON COLUMN global_settings."invoiceSellerNameEn" IS 'Refah English legal/business name for invoice rendering';
 COMMENT ON COLUMN global_settings."invoiceVatNumber" IS 'Refah VAT number for official invoices';
