@@ -183,6 +183,59 @@ class TenantApiClient {
     return data;
   }
 
+  private async requestBlob(endpoint: string): Promise<{ blob: Blob; filename: string }> {
+    const headers: Record<string, string> = {};
+    const accessToken = this.getAccessToken();
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    let response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.status === 401) {
+      const refreshed = await this.refreshAccessToken();
+
+      if (refreshed) {
+        const newAccessToken = this.getAccessToken();
+        if (newAccessToken) {
+          headers['Authorization'] = `Bearer ${newAccessToken}`;
+        }
+
+        response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method: 'GET',
+          headers
+        });
+      } else {
+        this.clearTokens();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/ar/login';
+        }
+        throw new Error('Authentication failed. Please login again.');
+      }
+    }
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to download document');
+      }
+      throw new Error(`Failed to download document: ${response.status}`);
+    }
+
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+
+    return {
+      blob: await response.blob(),
+      filename: filenameMatch?.[1] || 'invoice.pdf'
+    };
+  }
+
   /**
    * GET request
    */
@@ -270,8 +323,20 @@ class TenantApiClient {
     return this.get('/tenant/bills');
   }
 
+  async getBillDetails(id: string): Promise<{ success: boolean; bill: any }> {
+    return this.get(`/tenant/bills/${id}`);
+  }
+
   async getCurrentUnpaidBill(): Promise<any> {
     return this.get('/tenant/bills/current-unpaid');
+  }
+
+  async downloadBillInvoicePdf(id: string): Promise<{ blob: Blob; filename: string }> {
+    return this.requestBlob(`/tenant/bills/${id}/invoice-pdf`);
+  }
+
+  async downloadBillReceiptPdf(id: string): Promise<{ blob: Blob; filename: string }> {
+    return this.requestBlob(`/tenant/bills/${id}/receipt-pdf`);
   }
 
   async getCurrentSubscription(): Promise<{ success: boolean; subscription: any }> {
