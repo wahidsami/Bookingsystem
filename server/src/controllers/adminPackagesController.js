@@ -1,5 +1,16 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
+
+const toPackageResponse = (packageRecord) => {
+    if (!packageRecord) return null;
+
+    const serialized = packageRecord.toJSON ? packageRecord.toJSON() : packageRecord;
+    return {
+        ...serialized,
+        limits: normalizePackageEntitlements(serialized.limits || {})
+    };
+};
 
 /**
  * Get all subscription packages
@@ -28,7 +39,7 @@ exports.listPackages = async (req, res) => {
         
         res.json({
             success: true,
-            packages
+            packages: packages.map(toPackageResponse)
         });
     } catch (error) {
         console.error('List packages error:', error);
@@ -67,7 +78,7 @@ exports.getPackage = async (req, res) => {
         
         res.json({
             success: true,
-            package
+            package: toPackageResponse(package)
         });
     } catch (error) {
         console.error('Get package error:', error);
@@ -128,7 +139,7 @@ exports.createPackage = async (req, res) => {
             monthlyPrice: monthlyPrice || 0,
             sixMonthPrice: sixMonthPrice || 0,
             annualPrice: annualPrice || 0,
-            limits: limits || {},
+            limits: normalizePackageEntitlements(limits || {}),
             platformCommission: platformCommission || 5.00,
             displayOrder: displayOrder || 0,
             isActive: isActive !== undefined ? isActive : true,
@@ -157,7 +168,7 @@ exports.createPackage = async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Package created successfully',
-            package
+            package: toPackageResponse(package)
         });
     } catch (error) {
         console.error('Create package error:', error);
@@ -221,7 +232,7 @@ exports.updatePackage = async (req, res) => {
             monthlyPrice: monthlyPrice !== undefined ? monthlyPrice : package.monthlyPrice,
             sixMonthPrice: sixMonthPrice !== undefined ? sixMonthPrice : package.sixMonthPrice,
             annualPrice: annualPrice !== undefined ? annualPrice : package.annualPrice,
-            limits: limits || package.limits,
+            limits: normalizePackageEntitlements(limits || package.limits || {}),
             platformCommission: platformCommission !== undefined ? platformCommission : package.platformCommission,
             displayOrder: displayOrder !== undefined ? displayOrder : package.displayOrder,
             isActive: isActive !== undefined ? isActive : package.isActive,
@@ -248,7 +259,7 @@ exports.updatePackage = async (req, res) => {
         res.json({
             success: true,
             message: 'Package updated successfully',
-            package
+            package: toPackageResponse(package)
         });
     } catch (error) {
         console.error('Update package error:', error);

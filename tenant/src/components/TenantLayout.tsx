@@ -9,8 +9,11 @@ import { getImageUrl, tenantApi } from "@/lib/api";
 import {
   hasHotDealsEntitlement,
   hasInternalMessagingEntitlement,
+  hasPayrollEntitlement,
   hasProductsAndOrdersEntitlement,
-  hasPushNotificationsEntitlement
+  hasPublicPageCustomizationEntitlement,
+  hasPushNotificationsEntitlement,
+  hasReportsEntitlement
 } from "@/lib/packageEntitlements";
 import { useRouter } from "next/navigation";
 
@@ -56,6 +59,9 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const hasInternalMessaging = shouldBypassFeatureFiltering || hasInternalMessagingEntitlement(entitlements);
   const hasHotDeals = shouldBypassFeatureFiltering || hasHotDealsEntitlement(entitlements);
   const hasPushNotifications = shouldBypassFeatureFiltering || hasPushNotificationsEntitlement(entitlements);
+  const hasPayroll = shouldBypassFeatureFiltering || hasPayrollEntitlement(entitlements);
+  const hasReports = shouldBypassFeatureFiltering || hasReportsEntitlement(entitlements);
+  const hasPublicPageCustomization = shouldBypassFeatureFiltering || hasPublicPageCustomizationEntitlement(entitlements);
 
   useEffect(() => {
     if (!user) return;
@@ -81,12 +87,12 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: "🧾" },
     { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: "📋" },
     { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: "💰" },
-    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: "💳" },
+    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: "💳", visible: hasPayroll },
     { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: "⭐" },
-    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈" },
-    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐" },
+    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈", visible: hasReports },
+    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐", visible: hasPublicPageCustomization },
     { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: "⚙️" },
-  ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasProductsAndOrders, hasPushNotifications, locale, t]);
+  ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, t]);
 
   useEffect(() => {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
@@ -96,14 +102,17 @@ export function TenantLayout({ children }: TenantLayoutProps) {
       { href: `/${locale}/dashboard/orders`, allowed: hasProductsAndOrders },
       { href: `/${locale}/dashboard/hot-deals`, allowed: hasHotDeals },
       { href: `/${locale}/dashboard/messages`, allowed: hasInternalMessaging },
-      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications }
+      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications },
+      { href: `/${locale}/dashboard/payroll`, allowed: hasPayroll },
+      { href: `/${locale}/dashboard/reports`, allowed: hasReports },
+      { href: `/${locale}/dashboard/mypage`, allowed: hasPublicPageCustomization }
     ];
 
     const blockedRoute = restrictedRoutes.find((route) => pathname.startsWith(route.href) && !route.allowed);
     if (blockedRoute) {
       router.replace(`/${locale}/dashboard/subscription`);
     }
-  }, [entitlements, entitlementsLoadFailed, entitlementsLoaded, hasHotDeals, hasInternalMessaging, hasProductsAndOrders, hasPushNotifications, locale, pathname, router]);
+  }, [entitlements, entitlementsLoadFailed, entitlementsLoaded, hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, pathname, router]);
 
   const isActive = (href: string) => {
     if (href === `/${locale}/dashboard`) {

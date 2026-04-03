@@ -65,3 +65,25 @@ export function hasPushNotificationsEntitlement(entitlements: PackageEntitlement
     ])
   );
 }
+
+export function hasReportsEntitlement(entitlements: PackageEntitlements): boolean {
+  return isEntitlementEnabled(
+    firstDefinedEntitlement(entitlements, ["reports", "hasAdvancedReports", "advancedAnalytics"])
+  );
+}
+
+export function hasPayrollEntitlement(entitlements: PackageEntitlements): boolean {
+  return isEntitlementEnabled(
+    firstDefinedEntitlement(entitlements, ["payroll", "hasPayroll"])
+  );
+}
+
+export function hasPublicPageCustomizationEntitlement(entitlements: PackageEntitlements): boolean {
+  return isEntitlementEnabled(
+    firstDefinedEntitlement(entitlements, [
+      "publicPageCustomization",
+      "hasCustomBranding",
+      "whiteLabel"
+    ])
+  );
+}

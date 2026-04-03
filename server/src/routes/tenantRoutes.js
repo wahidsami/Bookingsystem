@@ -146,9 +146,9 @@ router.post('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessa
 router.delete('/messages/:id', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.deleteMessage);
 
 // Payroll
-router.get('/payroll', tenantPayrollController.getPayrollRecords);
-router.post('/payroll/generate', tenantPayrollController.generatePayroll);
-router.put('/payroll/:id/status', tenantPayrollController.updatePayrollStatus);
+router.get('/payroll', checkTenantFeature('payroll'), tenantPayrollController.getPayrollRecords);
+router.post('/payroll/generate', checkTenantFeature('payroll'), tenantPayrollController.generatePayroll);
+router.put('/payroll/:id/status', checkTenantFeature('payroll'), tenantPayrollController.updatePayrollStatus);
 
 // Reviews
 router.get('/reviews', tenantPayrollController.getAllReviews);
@@ -175,18 +175,18 @@ router.post('/settings/logo', settingsUpload.single('logo'), tenantSettingsContr
 router.post('/settings/cover', settingsUpload.single('coverImage'), tenantSettingsController.uploadCoverImage);
 
 // Reports and analytics
-router.get('/reports/summary', tenantReportsController.getDashboardSummary);
-router.get('/reports/full', tenantReportsController.getFullReport);
-router.get('/reports/booking-trends', tenantReportsController.getBookingTrends);
-router.get('/reports/service-performance', tenantReportsController.getServicePerformance);
-router.get('/reports/employee-performance', tenantReportsController.getEmployeePerformance);
-router.get('/reports/peak-hours', tenantReportsController.getPeakHoursAnalysis);
-router.get('/reports/customer-analytics', tenantReportsController.getCustomerAnalytics);
+router.get('/reports/summary', checkTenantFeature('reports'), tenantReportsController.getDashboardSummary);
+router.get('/reports/full', checkTenantFeature('reports'), tenantReportsController.getFullReport);
+router.get('/reports/booking-trends', checkTenantFeature('reports'), tenantReportsController.getBookingTrends);
+router.get('/reports/service-performance', checkTenantFeature('reports'), tenantReportsController.getServicePerformance);
+router.get('/reports/employee-performance', checkTenantFeature('reports'), tenantReportsController.getEmployeePerformance);
+router.get('/reports/peak-hours', checkTenantFeature('reports'), tenantReportsController.getPeakHoursAnalysis);
+router.get('/reports/customer-analytics', checkTenantFeature('reports'), tenantReportsController.getCustomerAnalytics);
 
 // Public Page Data
-router.get('/public-page', tenantPublicPageController.getPublicPageData);
-router.put('/public-page', tenantPublicPageController.uploadMiddleware, tenantPublicPageController.updatePublicPageData);
-router.put('/public-page/hero-slider', tenantPublicPageController.uploadMiddleware, tenantPublicPageController.updateHeroSlider);
+router.get('/public-page', checkTenantFeature('publicPageCustomization'), tenantPublicPageController.getPublicPageData);
+router.put('/public-page', checkTenantFeature('publicPageCustomization'), tenantPublicPageController.uploadMiddleware, tenantPublicPageController.updatePublicPageData);
+router.put('/public-page/hero-slider', checkTenantFeature('publicPageCustomization'), tenantPublicPageController.uploadMiddleware, tenantPublicPageController.updateHeroSlider);
 
 // Schedule Management (Phase 3)
 // Shifts

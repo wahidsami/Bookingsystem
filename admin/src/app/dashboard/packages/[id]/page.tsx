@@ -18,6 +18,9 @@ const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boole
     hasSubscriptionFee: { featureKey: 'subscriptionFee', isBoolean: true },
     hasProductsAndOrders: { featureKey: 'productsAndOrders', isBoolean: true },
     hasInternalMessaging: { featureKey: 'internalMessaging', isBoolean: true },
+    reports: { featureKey: 'reports', isBoolean: true },
+    payroll: { featureKey: 'payroll', isBoolean: true },
+    publicPageCustomization: { featureKey: 'publicPageCustomization', isBoolean: true },
     whatsappNotifications: { featureKey: 'whatsappNotifications' },
     inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
     aiContentAssistant: { featureKey: 'aiContentAssistant' },
@@ -45,6 +48,9 @@ const defaultFormData = {
     hasSubscriptionFee: true,
     hasProductsAndOrders: false,
     hasInternalMessaging: false,
+    reports: false,
+    payroll: false,
+    publicPageCustomization: false,
     whatsappNotifications: '0',
     inAppMarketingNotifications: '0',
     aiContentAssistant: '0',
@@ -111,6 +117,9 @@ export default function EditPackagePage() {
                 hasSubscriptionFee: toBool(limits.hasSubscriptionFee, true),
                 hasProductsAndOrders: toBool(limits.hasProductsAndOrders, false),
                 hasInternalMessaging: toBool(limits.hasInternalMessaging, false),
+                reports: toBool(limits.reports ?? limits.hasAdvancedReports ?? limits.advancedAnalytics, false),
+                payroll: toBool(limits.payroll ?? limits.hasPayroll, false),
+                publicPageCustomization: toBool(limits.publicPageCustomization ?? limits.hasCustomBranding ?? limits.whiteLabel, false),
                 whatsappNotifications: toStr(limits.whatsappNotifications, '0'),
                 inAppMarketingNotifications: toStr(limits.inAppMarketingNotifications, '0'),
                 aiContentAssistant: toStr(limits.aiContentAssistant, '0'),
@@ -176,11 +185,16 @@ export default function EditPackagePage() {
                 maxBookingsPerMonth: formData.maxBookingsPerMonth === '-1' ? -1 : parseInt(formData.maxBookingsPerMonth),
                 maxStaff: formData.maxStaff === '-1' ? -1 : parseInt(formData.maxStaff),
                 maxServices: formData.maxServices === '-1' ? -1 : parseInt(formData.maxServices),
-                maxProducts: formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts),
+                maxProducts: formData.hasProductsAndOrders
+                    ? (formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts))
+                    : 0,
                 storageGB: parseInt(formData.storageGB),
                 hasSubscriptionFee: formData.hasSubscriptionFee,
                 hasProductsAndOrders: formData.hasProductsAndOrders,
                 hasInternalMessaging: formData.hasInternalMessaging,
+                reports: formData.reports,
+                payroll: formData.payroll,
+                publicPageCustomization: formData.publicPageCustomization,
                 whatsappNotifications: parseInt(formData.whatsappNotifications) || 0,
                 inAppMarketingNotifications: parseInt(formData.inAppMarketingNotifications) || 0,
                 aiContentAssistant: parseInt(formData.aiContentAssistant) || 0,
@@ -404,14 +418,16 @@ export default function EditPackagePage() {
                                     const qty = parseInt((formData as any)[field.key] || '0');
                                     const cost = getFieldCost(field.key);
                                     const isUnlimited = qty === -1;
+                                    const isDisabled = field.key === 'maxProducts' && !formData.hasProductsAndOrders;
                                     return (
                                         <div key={field.key}>
                                             <label className="block text-sm font-medium text-dark-300 mb-1">{field.label}</label>
                                             <input
                                                 type="number"
-                                                value={(formData as any)[field.key]}
+                                                value={isDisabled ? '0' : (formData as any)[field.key]}
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                                                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                disabled={isDisabled}
+                                                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <div className="mt-1 text-xs">
                                                 {isUnlimited ? <span className="text-yellow-400">∞ Unlimited</span> : cost > 0 ? <span className="text-green-400">SAR {cost.toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
@@ -434,6 +450,9 @@ export default function EditPackagePage() {
                                     { key: 'hasSubscriptionFee', label: 'Subscription Fee' },
                                     { key: 'hasProductsAndOrders', label: 'Products & Orders (E-commerce)' },
                                     { key: 'hasInternalMessaging', label: 'Internal Messaging' },
+                                    { key: 'reports', label: 'Reports & Analytics' },
+                                    { key: 'payroll', label: 'Payroll Management' },
+                                    { key: 'publicPageCustomization', label: 'Public Page Customization' },
                                 ].map((feature) => {
                                     const cost = getFeatureItemCost(feature.key);
                                     return (
