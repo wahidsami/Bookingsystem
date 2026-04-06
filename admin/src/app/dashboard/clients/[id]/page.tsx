@@ -306,7 +306,7 @@ export default function ClientDetailsPage() {
 
   const handleReconcilePayment = async () => {
     if (!reconcileModalBill) return;
-    if (!reconcileForm.paymentProvider.trim() || !reconcileForm.paymentReference.trim() || !reconcileForm.paymentMethod.trim())) {
+    if (!reconcileForm.paymentProvider.trim() || !reconcileForm.paymentReference.trim() || !reconcileForm.paymentMethod.trim()) {
       alert("Payment provider, reference, and method are required.");
       return;
     }

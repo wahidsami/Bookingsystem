@@ -13,8 +13,37 @@ const {
     notifyTenantApprovedFreeActive,
     notifyTenantApprovedInvoiceCreated
 } = require('../services/adminNotificationService');
+const {
+    ACTIVE_SUBSCRIPTION_STATUSES
+} = require('../services/tenantSubscriptionService');
 const fs = require('fs');
 const path = require('path');
+
+function normalizePlanCode(value) {
+    return (value || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
+}
+
+function buildTenantPlanSnapshot(tenant, subscriptionRecord) {
+    if (subscriptionRecord?.package) {
+        return {
+            plan: normalizePlanCode(subscriptionRecord.package.slug || subscriptionRecord.package.name || tenant.plan),
+            planDisplay: subscriptionRecord.package.name || subscriptionRecord.package.slug || tenant.plan,
+            subscriptionStatus: subscriptionRecord.status || null,
+            billingCycle: subscriptionRecord.billingCycle || null
+        };
+    }
+
+    return {
+        plan: tenant.plan,
+        planDisplay: tenant.plan,
+        subscriptionStatus: null,
+        billingCycle: null
+    };
+}
 
 /**
  * Get all tenants with filters and pagination
@@ -44,7 +73,6 @@ const listTenants = async (req, res) => {
                 { businessType: { [Op.contains]: [businessType] } }
             ];
         }
-        if (plan) where.plan = plan;
         if (city) where.city = city;
 
         // Search by name, email, phone
@@ -65,6 +93,46 @@ const listTenants = async (req, res) => {
             }
         }
 
+        if (plan) {
+            const normalizedPlan = normalizePlanCode(plan);
+            const planLike = plan.toString().trim().replace(/_/g, ' ');
+
+            const matchingSubscriptions = await db.TenantSubscription.findAll({
+                attributes: ['tenantId'],
+                where: {
+                    status: { [Op.in]: ACTIVE_SUBSCRIPTION_STATUSES }
+                },
+                include: [{
+                    model: db.SubscriptionPackage,
+                    as: 'package',
+                    attributes: [],
+                    required: true,
+                    where: {
+                        [Op.or]: [
+                            { slug: { [Op.iLike]: normalizedPlan.replace(/_/g, '-') } },
+                            { slug: { [Op.iLike]: normalizedPlan } },
+                            { name: { [Op.iLike]: `%${planLike}%` } }
+                        ]
+                    }
+                }],
+                raw: true
+            });
+
+            const subscriptionTenantIds = [...new Set(
+                matchingSubscriptions
+                    .map((item) => item.tenantId)
+                    .filter(Boolean)
+            )];
+
+            const planConditions = [];
+            if (subscriptionTenantIds.length > 0) {
+                planConditions.push({ id: { [Op.in]: subscriptionTenantIds } });
+            }
+            planConditions.push({ plan: normalizedPlan });
+
+            where[Op.and] = [...(where[Op.and] || []), { [Op.or]: planConditions }];
+        }
+
         const { count, rows: tenants } = await db.Tenant.findAndCountAll({
             where,
             order: [[sortBy, sortOrder]],
@@ -72,9 +140,41 @@ const listTenants = async (req, res) => {
             offset: parseInt(offset)
         });
 
+        const tenantIds = tenants.map((tenant) => tenant.id);
+        const activeSubscriptions = tenantIds.length > 0
+            ? await db.TenantSubscription.findAll({
+                where: {
+                    tenantId: { [Op.in]: tenantIds },
+                    status: { [Op.in]: ACTIVE_SUBSCRIPTION_STATUSES }
+                },
+                include: [{ model: db.SubscriptionPackage, as: 'package' }],
+                order: [
+                    ['tenantId', 'ASC'],
+                    ['currentPeriodEnd', 'DESC'],
+                    ['updatedAt', 'DESC']
+                ]
+            })
+            : [];
+
+        const subscriptionByTenantId = new Map();
+        for (const subscription of activeSubscriptions) {
+            if (!subscriptionByTenantId.has(subscription.tenantId)) {
+                subscriptionByTenantId.set(subscription.tenantId, subscription);
+            }
+        }
+
+        const serializedTenants = tenants.map((tenant) => {
+            const tenantJson = tenant.toJSON();
+            const subscriptionRecord = subscriptionByTenantId.get(tenant.id);
+            return {
+                ...tenantJson,
+                ...buildTenantPlanSnapshot(tenantJson, subscriptionRecord)
+            };
+        });
+
         res.json({
             success: true,
-            tenants,
+            tenants: serializedTenants,
             pagination: {
                 total: count,
                 page: parseInt(page),

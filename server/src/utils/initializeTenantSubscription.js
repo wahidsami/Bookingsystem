@@ -19,6 +19,17 @@ function getPeriodEndForBillingCycle(startDate, billingCycle = 'monthly') {
     return periodEnd;
 }
 
+function mapPackageSlugToLegacyTenantPlan(packageSlug) {
+    const normalizedSlug = (packageSlug || '').toString().trim().toLowerCase();
+
+    if (normalizedSlug === 'free-trial' || normalizedSlug === 'free_trial') return 'free_trial';
+    if (normalizedSlug === 'basic') return 'basic';
+    if (['pro', 'professional', 'standard', 'premium'].includes(normalizedSlug)) return 'pro';
+    if (normalizedSlug === 'enterprise') return 'enterprise';
+
+    return null;
+}
+
 /**
  * Initialize subscription and usage for a newly approved tenant
  * This is called when a tenant is approved by the admin
@@ -209,6 +220,11 @@ async function activateTenantAfterPayment(tenantId) {
         where: { tenantId },
         include: [{ model: db.SubscriptionPackage, as: 'package' }]
     });
+
+    let currentPeriodStart = now;
+    let currentPeriodEnd = now;
+    let legacyPlan = null;
+
     if (subscription) {
         const periodEnd = getPeriodEndForBillingCycle(now, subscription.billingCycle);
         await subscription.update({
@@ -217,8 +233,15 @@ async function activateTenantAfterPayment(tenantId) {
             currentPeriodEnd: periodEnd,
             nextBillingDate: periodEnd
         });
+
+        currentPeriodStart = now;
+        currentPeriodEnd = periodEnd;
+        legacyPlan = mapPackageSlugToLegacyTenantPlan(subscription.package?.slug);
     } else {
-        await initializeTenantSubscription(tenantId, 'free-trial');
+        const initializedSubscription = await initializeTenantSubscription(tenantId, 'free-trial');
+        currentPeriodStart = initializedSubscription.currentPeriodStart || now;
+        currentPeriodEnd = initializedSubscription.currentPeriodEnd || now;
+        legacyPlan = mapPackageSlugToLegacyTenantPlan('free-trial');
     }
     let usage = await db.TenantUsage.findOne({ where: { tenantId } });
     if (!usage) {
@@ -237,8 +260,19 @@ async function activateTenantAfterPayment(tenantId) {
             lastResetDate: now
         });
     }
-    await tenant.update({ status: 'active' });
-    console.log(`✅ Activated tenant ${tenantId} after payment`);
+
+    const tenantUpdates = {
+        status: 'active',
+        planStartDate: currentPeriodStart,
+        planEndDate: currentPeriodEnd
+    };
+
+    if (legacyPlan) {
+        tenantUpdates.plan = legacyPlan;
+    }
+
+    await tenant.update(tenantUpdates);
+    console.log(`[Subscription] Activated tenant ${tenantId} after payment`);
 }
 
 /**

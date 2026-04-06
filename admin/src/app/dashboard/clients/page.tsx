@@ -17,6 +17,7 @@ interface Tenant {
   city: string;
   status: string;
   plan: string;
+  planDisplay?: string;
   ownerName: string;
   createdAt: string;
   stats?: {
@@ -89,6 +90,8 @@ export default function ClientsPage() {
       basic: "badge-primary",
       pro: "badge-success",
       enterprise: "badge-warning",
+      standard: "badge-success",
+      premium: "badge-warning",
     };
     return badges[plan] || "badge-info";
   };
@@ -352,7 +355,7 @@ export default function ClientsPage() {
                         </td>
                         <td>
                           <span className={`badge ${getPlanBadge(tenant.plan)}`}>
-                            {humanizeValue(tenant.plan)}
+                            {tenant.planDisplay || humanizeValue(tenant.plan)}
                           </span>
                         </td>
                         <td className="text-dark-400 text-sm">
