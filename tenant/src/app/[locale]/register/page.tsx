@@ -1200,7 +1200,7 @@ export default function RegisterPage() {
                 {/* Form */}
                 <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl p-8 border border-white/20">
                     {isSuccess ? (
-                        <div className="text-center py-12 animate-in fade-in zoom-in duration-500">
+                        <div className="mx-auto flex max-w-2xl flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in duration-500">
                             <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border-4 border-white">
                                 <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -1212,7 +1212,7 @@ export default function RegisterPage() {
                             </p>
                             <Link
                                 href={`/${locale}/dashboard`}
-                                className="inline-block px-8 py-4 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition shadow-lg hover:shadow-xl w-full sm:w-auto"
+                                className="inline-flex w-full items-center justify-center rounded-lg bg-purple-600 px-8 py-4 text-center font-semibold text-white shadow-lg transition hover:bg-purple-700 hover:shadow-xl sm:w-auto"
                             >
                                 {t('success.goToDashboard')}
                             </Link>

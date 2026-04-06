@@ -1084,6 +1084,11 @@
       "submit": "Create My Account",
       "submitting": "Creating..."
     },
+    "success": {
+      "title": "Registration completed successfully!",
+      "message": "Thank you for registering your business with Rifah. We've sent you a confirmation email, and your account is now under review by our team.",
+      "goToDashboard": "Go to Dashboard"
+    },
     "step1": {
       "title": "Entity Details",
       "description": "Fill in your business basic information",
