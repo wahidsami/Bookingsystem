@@ -216,7 +216,7 @@ export function HeroSliderTab() {
         if (!backgroundImageFile && formData.backgroundImage) {
           // Extract just the path part (remove API origin prefix if present)
           let imagePath = formData.backgroundImage;
-          if (imagePath.includes('/uploads/'))) {
+          if (imagePath.includes('/uploads/')) {
             imagePath = imagePath.split('/uploads/')[1] ? `uploads/${imagePath.split('/uploads/')[1]}` : imagePath;
           } else if (imagePath.startsWith(API_ORIGIN)) {
             imagePath = imagePath.replace(API_ORIGIN, '').replace(/^\//, '');
@@ -741,4 +741,3 @@ export function HeroSliderTab() {
     </div>
   );
 }
-
