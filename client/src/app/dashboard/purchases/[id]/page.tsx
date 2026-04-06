@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { toAbsoluteMediaUrl } from "@/lib/runtime";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface OrderItem {
     id: string;
@@ -52,6 +53,7 @@ interface Order {
 }
 
 function OrderDetailsContent({ params }: { params: { id: string } }) {
+    const dialog = useAppDialog();
     const router = useRouter();
     const { user } = useAuth();
     const { t, locale, isRTL } = useLanguage();
@@ -138,7 +140,7 @@ function OrderDetailsContent({ params }: { params: { id: string } }) {
 
     const handleCancel = async () => {
         if (!order) return;
-        if (!confirm("Are you sure you want to cancel this order?")) return;
+        if (!(await dialog.confirm("Are you sure you want to cancel this order?"))) return;
 
         try {
             const response = await api.patch<{ success: boolean }>(`/orders/${order.id}/cancel`, {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { tenantApi } from "@/lib/api";
 import { TenantLayout } from "@/components/TenantLayout";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface StaffMessage {
     id: string;
@@ -23,6 +24,7 @@ interface Employee {
 }
 
 export default function MessagesPage() {
+    const dialog = useAppDialog();
     const params = useParams();
     const locale = (params?.locale as string) || "ar";
     const isRTL = locale === "ar";
@@ -161,7 +163,7 @@ export default function MessagesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm(t("confirmDelete"))) return;
+        if (!(await dialog.confirm(t("confirmDelete")))) return;
         try {
             setDeletingId(id);
             await tenantApi.deleteMessage(id);

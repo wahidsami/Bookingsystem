@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface Employee {
   id: string;
@@ -28,6 +29,7 @@ interface Employee {
 }
 
 export default function EmployeesPage() {
+    const dialog = useAppDialog();
   const t = useTranslations("Employees");
   const params = useParams();
   const router = useRouter();
@@ -97,9 +99,9 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(locale === 'ar'
+    if (!(await dialog.confirm(locale === 'ar'
       ? `هل أنت متأكد من حذف الموظف "${name}"؟`
-      : `Are you sure you want to delete employee "${name}"?`)) {
+      : `Are you sure you want to delete employee "${name}"?`))) {
       return;
     }
 

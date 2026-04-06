@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface Product {
   id: string;
@@ -39,6 +40,7 @@ const CATEGORIES = [
 ];
 
 export default function ProductsPage() {
+    const dialog = useAppDialog();
   const t = useTranslations("Products");
   const params = useParams();
   const router = useRouter();
@@ -113,9 +115,9 @@ export default function ProductsPage() {
 
   const handleDelete = async (id: string, name: string) => {
     const productName = locale === 'ar' ? name : name;
-    if (!confirm(locale === 'ar'
+    if (!(await dialog.confirm(locale === 'ar'
       ? `هل أنت متأكد من حذف المنتج "${productName}"؟`
-      : `Are you sure you want to delete product "${productName}"?`)) {
+      : `Are you sure you want to delete product "${productName}"?`))) {
       return;
     }
 

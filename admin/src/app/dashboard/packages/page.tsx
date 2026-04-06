@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { adminApi } from '@/lib/api';
 import { Currency } from '@/components/Currency';
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface Package {
     id: string;
@@ -79,6 +80,7 @@ function getKeyLimitsList(limits: any): { label: string; value: string }[] {
 }
 
 export default function PackagesPage() {
+    const dialog = useAppDialog();
     const router = useRouter();
     const [packages, setPackages] = useState<Package[]>([]);
     const [loading, setLoading] = useState(true);
@@ -101,7 +103,7 @@ export default function PackagesPage() {
     };
 
     const handleDeletePackage = async (id: string, name: string) => {
-        if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+        if (!(await dialog.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`))) {
             return;
         }
 

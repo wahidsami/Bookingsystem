@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { toAbsoluteMediaUrl } from "@/lib/runtime";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface OrderItem {
     id: string;
@@ -40,6 +41,7 @@ interface Order {
 }
 
 function PurchasesContent() {
+    const dialog = useAppDialog();
     const router = useRouter();
     const { user } = useAuth();
     const { t, locale, isRTL } = useLanguage();
@@ -93,7 +95,7 @@ function PurchasesContent() {
     };
 
     const handleCancel = async (orderId: string) => {
-        if (!confirm(t("purchases.confirmCancel"))) {
+        if (!(await dialog.confirm(t("purchases.confirmCancel")))) {
             return;
         }
 

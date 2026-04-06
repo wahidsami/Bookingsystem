@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppDialogProvider } from "@/components/AppDialogProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 
@@ -21,7 +22,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <AuthProvider>
-          {children}
+          <AppDialogProvider>{children}</AppDialogProvider>
         </AuthProvider>
       </body>
     </html>

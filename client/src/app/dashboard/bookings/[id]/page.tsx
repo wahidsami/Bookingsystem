@@ -9,8 +9,10 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { api, Appointment } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 function BookingDetailsContent() {
+    const dialog = useAppDialog();
     const router = useRouter();
     const params = useParams();
     const { user } = useAuth();
@@ -49,7 +51,7 @@ function BookingDetailsContent() {
     };
 
     const handleCancel = async () => {
-        if (!confirm("Are you sure you want to cancel this booking?")) return;
+        if (!(await dialog.confirm("Are you sure you want to cancel this booking?"))) return;
 
         try {
             setCancelling(true);

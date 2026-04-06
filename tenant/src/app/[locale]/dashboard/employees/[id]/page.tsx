@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 const NATIONALITIES = [
   "Saudi", "Egyptian", "Filipino", "Indian", "Pakistani",
@@ -32,6 +33,7 @@ interface Employee {
 }
 
 export default function EditEmployeePage() {
+    const dialog = useAppDialog();
   const t = useTranslations("Employees");
   const params = useParams();
   const router = useRouter();
@@ -213,7 +215,7 @@ export default function EditEmployeePage() {
   };
 
   const handleResetPassword = async () => {
-    if (!confirm(locale === 'ar' ? 'هل أنت متأكد من إعادة تعيين كلمة المرور لهذا الموظف؟' : 'Are you sure you want to reset password for this employee?')) return;
+    if (!(await dialog.confirm(locale === 'ar' ? 'هل أنت متأكد من إعادة تعيين كلمة المرور لهذا الموظف؟' : 'Are you sure you want to reset password for this employee?'))) return;
     setResetLoading(true);
     try {
       const response = await tenantApi.resetEmployeePassword(id as string);

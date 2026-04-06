@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { AppDialogProvider } from "@/components/AppDialogProvider";
 import { BRANDING } from "@/config/branding";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -70,7 +71,7 @@ export default function RootLayout({
             <body className="font-sans antialiased">
                 <LanguageProvider>
                     <AuthProvider>
-                        {children}
+                        <AppDialogProvider>{children}</AppDialogProvider>
                         <PWAInstaller />
                     </AuthProvider>
                 </LanguageProvider>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface ServiceCategory {
     id: string;
@@ -84,6 +85,7 @@ export default function ClientsControlPage() {
 // Categories Tab Component
 // ===============================
 function CategoriesTab() {
+    const dialog = useAppDialog();
     const [categories, setCategories] = useState<ServiceCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -170,7 +172,7 @@ function CategoriesTab() {
     };
 
     const handleDelete = async (category: ServiceCategory) => {
-        if (!confirm(`Are you sure you want to permanently delete "${category.name_en}"?`)) return;
+        if (!(await dialog.confirm(`Are you sure you want to permanently delete "${category.name_en}"?`))) return;
 
         try {
             await adminApi.deleteCategory(category.id, true);

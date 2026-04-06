@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
 import { humanizeValue } from "@/lib/display";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface Tenant {
   id: string;
@@ -32,6 +33,7 @@ interface Pagination {
 }
 
 export default function ClientsPage() {
+    const dialog = useAppDialog();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +119,18 @@ export default function ClientsPage() {
   };
 
   const handleSuspendTenant = async (tenant: Tenant) => {
-    const reason = window.prompt(`Suspend ${(tenant as any).name_en || tenant.name}? Enter a reason:`, "Admin cleanup");
+    const tenantName = (tenant as any).name_en || tenant.name;
+    const reason = await dialog.prompt(
+      {
+        title: "Suspend Client",
+        message: `Enter the reason for suspending ${tenantName}.`,
+        confirmText: "Suspend",
+        cancelText: "Cancel",
+        tone: "danger",
+        defaultValue: "Admin cleanup",
+        placeholder: "Suspension reason",
+      }
+    );
     if (!reason || !reason.trim()) return;
 
     try {
@@ -458,4 +471,3 @@ export default function ClientsPage() {
     </AdminLayout>
   );
 }
-

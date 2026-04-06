@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
 import { humanizeValue } from "@/lib/display";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface Tenant {
   id: string;
@@ -26,6 +27,7 @@ interface Tenant {
 }
 
 export default function PendingClientsPage() {
+    const dialog = useAppDialog();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function PendingClientsPage() {
   };
 
   const handleApprove = async (id: string) => {
-    if (!confirm("Are you sure you want to approve this client?")) return;
+    if (!(await dialog.confirm("Are you sure you want to approve this client?"))) return;
 
     setActionLoading(id);
     try {

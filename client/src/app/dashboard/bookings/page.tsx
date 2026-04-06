@@ -8,10 +8,12 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { api, Appointment } from "@/lib/api";
 import { Currency } from "@/components/Currency";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 type BookingTab = 'upcoming' | 'completed' | 'cancelled';
 
 function BookingsContent() {
+    const dialog = useAppDialog();
     const router = useRouter();
     const { user } = useAuth();
     const { t, locale, isRTL } = useLanguage();
@@ -123,7 +125,7 @@ function BookingsContent() {
     };
 
     const handleCancel = async (bookingId: string) => {
-        if (!confirm("Are you sure you want to cancel this booking?")) return;
+        if (!(await dialog.confirm("Are you sure you want to cancel this booking?"))) return;
 
         try {
             await api.patch(`/bookings/${bookingId}/cancel`);

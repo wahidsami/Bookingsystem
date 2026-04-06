@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface PaymentMethod {
     id: string;
@@ -18,6 +19,7 @@ interface PaymentMethod {
 }
 
 function PaymentMethodsContent() {
+    const dialog = useAppDialog();
     const { user } = useAuth();
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ function PaymentMethodsContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this payment method?")) return;
+        if (!(await dialog.confirm("Are you sure you want to delete this payment method?"))) return;
 
         try {
             await api.delete(`/users/payment-methods/${id}`);
@@ -106,7 +108,7 @@ function PaymentMethodsContent() {
     };
 
     const getCardBrandIcon = (brand: string) => {
-        switch (brand.toLowerCase()) {
+        switch (brand.toLowerCase())) {
             case "visa":
                 return "💳";
             case "mastercard":

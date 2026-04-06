@@ -6,6 +6,7 @@ import { tenantApi } from "@/lib/api";
 // import { useTranslations } from "next-intl"; // Not used for now
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import {
   CalendarIcon,
   ClockIcon,
@@ -72,6 +73,7 @@ interface Override {
 type TabType = 'shifts' | 'breaks' | 'timeoff' | 'overrides';
 
 export default function SchedulesPage() {
+    const dialog = useAppDialog();
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
@@ -177,7 +179,7 @@ export default function SchedulesPage() {
 
   const handleDeleteShift = async (shiftId: string) => {
     if (!selectedEmployeeId) return;
-    if (!confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الوردية؟' : 'Are you sure you want to delete this shift?')) return;
+    if (!(await dialog.confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الوردية؟' : 'Are you sure you want to delete this shift?'))) return;
 
     try {
       const response = await tenantApi.deleteEmployeeShift(selectedEmployeeId, shiftId);
@@ -191,7 +193,7 @@ export default function SchedulesPage() {
 
   const handleDeleteBreak = async (breakId: string) => {
     if (!selectedEmployeeId) return;
-    if (!confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الاستراحة؟' : 'Are you sure you want to delete this break?')) return;
+    if (!(await dialog.confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الاستراحة؟' : 'Are you sure you want to delete this break?'))) return;
 
     try {
       const response = await tenantApi.deleteEmployeeBreak(selectedEmployeeId, breakId);
@@ -205,7 +207,7 @@ export default function SchedulesPage() {
 
   const handleDeleteTimeOff = async (timeOffId: string) => {
     if (!selectedEmployeeId) return;
-    if (!confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الإجازة؟' : 'Are you sure you want to delete this time off?')) return;
+    if (!(await dialog.confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الإجازة؟' : 'Are you sure you want to delete this time off?'))) return;
 
     try {
       const response = await tenantApi.deleteEmployeeTimeOff(selectedEmployeeId, timeOffId);
@@ -219,7 +221,7 @@ export default function SchedulesPage() {
 
   const handleDeleteOverride = async (overrideId: string) => {
     if (!selectedEmployeeId) return;
-    if (!confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الاستثناء؟' : 'Are you sure you want to delete this override?')) return;
+    if (!(await dialog.confirm(locale === 'ar' ? 'هل أنت متأكد من حذف هذا الاستثناء؟' : 'Are you sure you want to delete this override?'))) return;
 
     try {
       const response = await tenantApi.deleteEmployeeOverride(selectedEmployeeId, overrideId);

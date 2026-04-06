@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { PhotoIcon, XMarkIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { API_ORIGIN, getImageUrl, tenantApi } from '@/lib/api';
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface HeroSlider {
   id: string;
@@ -25,6 +26,7 @@ interface HeroSlider {
 }
 
 export function HeroSliderTab() {
+    const dialog = useAppDialog();
   const t = useTranslations('MyPage.HeroSlider');
   const locale = useLocale();
   const isRTL = locale === 'ar';
@@ -169,7 +171,7 @@ export function HeroSliderTab() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('confirmDelete'))) return;
+    if (!(await dialog.confirm(t('confirmDelete')))) return;
     
     const updatedSliders = sliders.filter(s => s.id !== id);
     await saveSliders(updatedSliders);
@@ -214,7 +216,7 @@ export function HeroSliderTab() {
         if (!backgroundImageFile && formData.backgroundImage) {
           // Extract just the path part (remove API origin prefix if present)
           let imagePath = formData.backgroundImage;
-          if (imagePath.includes('/uploads/')) {
+          if (imagePath.includes('/uploads/'))) {
             imagePath = imagePath.split('/uploads/')[1] ? `uploads/${imagePath.split('/uploads/')[1]}` : imagePath;
           } else if (imagePath.startsWith(API_ORIGIN)) {
             imagePath = imagePath.replace(API_ORIGIN, '').replace(/^\//, '');

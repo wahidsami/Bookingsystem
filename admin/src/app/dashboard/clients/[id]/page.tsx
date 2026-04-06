@@ -7,6 +7,7 @@ import { Currency } from "@/components/Currency";
 import { humanizeValue } from "@/lib/display";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface Tenant {
   id: string;
@@ -124,6 +125,7 @@ const BILL_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function ClientDetailsPage() {
+    const dialog = useAppDialog();
   const params = useParams();
   const router = useRouter();
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -177,7 +179,7 @@ export default function ClientDetailsPage() {
   };
 
   const handleApprove = async () => {
-    if (!confirm("Are you sure you want to approve this client?")) return;
+    if (!(await dialog.confirm("Are you sure you want to approve this client?"))) return;
 
     setActionLoading(true);
     try {
@@ -215,7 +217,7 @@ export default function ClientDetailsPage() {
   };
 
   const handleActivate = async () => {
-    if (!confirm("Are you sure you want to reactivate this client?")) return;
+    if (!(await dialog.confirm("Are you sure you want to reactivate this client?"))) return;
 
     setActionLoading(true);
     try {
@@ -304,7 +306,7 @@ export default function ClientDetailsPage() {
 
   const handleReconcilePayment = async () => {
     if (!reconcileModalBill) return;
-    if (!reconcileForm.paymentProvider.trim() || !reconcileForm.paymentReference.trim() || !reconcileForm.paymentMethod.trim()) {
+    if (!reconcileForm.paymentProvider.trim() || !reconcileForm.paymentReference.trim() || !reconcileForm.paymentMethod.trim())) {
       alert("Payment provider, reference, and method are required.");
       return;
     }

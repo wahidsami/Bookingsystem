@@ -9,8 +9,10 @@ import { api, Appointment, Tenant } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 function DashboardContent() {
+    const dialog = useAppDialog();
     const { user } = useAuth();
     const { t, locale, isRTL } = useLanguage();
     const router = useRouter();
@@ -280,7 +282,7 @@ function DashboardContent() {
                                                 <button
                                                     onClick={async (e) => {
                                                         e.stopPropagation(); // Prevent card click
-                                                        if (!confirm("Are you sure you want to cancel this booking?")) return;
+                                                        if (!(await dialog.confirm("Are you sure you want to cancel this booking?"))) return;
                                                         try {
                                                             await api.patch(`/bookings/${booking.id}/cancel`);
                                                             loadBookings();

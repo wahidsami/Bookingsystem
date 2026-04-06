@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppDialogProvider } from '@/components/AppDialogProvider';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -41,7 +42,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
           <TenantAuthProvider>
-            {children}
+            <AppDialogProvider>{children}</AppDialogProvider>
           </TenantAuthProvider>
         </NextIntlClientProvider>
       </body>
