@@ -89,14 +89,14 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     setPosAlerts((current) => current.filter((alert) => alert.id !== alertId));
   };
 
-  const shouldBypassFeatureFiltering = !entitlementsLoaded || entitlementsLoadFailed || entitlements === null;
-  const hasProductsAndOrders = shouldBypassFeatureFiltering || hasProductsAndOrdersEntitlement(entitlements);
-  const hasInternalMessaging = shouldBypassFeatureFiltering || hasInternalMessagingEntitlement(entitlements);
-  const hasHotDeals = shouldBypassFeatureFiltering || hasHotDealsEntitlement(entitlements);
-  const hasPushNotifications = shouldBypassFeatureFiltering || hasPushNotificationsEntitlement(entitlements);
-  const hasPayroll = shouldBypassFeatureFiltering || hasPayrollEntitlement(entitlements);
-  const hasReports = shouldBypassFeatureFiltering || hasReportsEntitlement(entitlements);
-  const hasPublicPageCustomization = shouldBypassFeatureFiltering || hasPublicPageCustomizationEntitlement(entitlements);
+  const canEvaluateEntitlements = entitlementsLoaded && !entitlementsLoadFailed && entitlements !== null;
+  const hasProductsAndOrders = canEvaluateEntitlements && hasProductsAndOrdersEntitlement(entitlements);
+  const hasInternalMessaging = canEvaluateEntitlements && hasInternalMessagingEntitlement(entitlements);
+  const hasHotDeals = canEvaluateEntitlements && hasHotDealsEntitlement(entitlements);
+  const hasPushNotifications = canEvaluateEntitlements && hasPushNotificationsEntitlement(entitlements);
+  const hasPayroll = canEvaluateEntitlements && hasPayrollEntitlement(entitlements);
+  const hasReports = canEvaluateEntitlements && hasReportsEntitlement(entitlements);
+  const hasPublicPageCustomization = canEvaluateEntitlements && hasPublicPageCustomizationEntitlement(entitlements);
 
   useEffect(() => {
     if (!user) return;
