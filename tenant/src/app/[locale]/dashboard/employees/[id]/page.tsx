@@ -60,6 +60,7 @@ export default function EditEmployeePage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [existingPhoto, setExistingPhoto] = useState<string | null>(null);
+  const [savedEmail, setSavedEmail] = useState("");
 
   // App Access State
   const [appEnabled, setAppEnabled] = useState(false);
@@ -106,6 +107,7 @@ export default function EditEmployeePage() {
         });
 
         setAppEnabled(emp.app_enabled || false);
+        setSavedEmail(emp.email || "");
 
         if (emp.photo) {
           setExistingPhoto(getImageUrl(emp.photo));
@@ -178,6 +180,14 @@ export default function EditEmployeePage() {
   };
 
   const handleToggleAppAccess = async () => {
+    if (!savedEmail) {
+      setError(
+        locale === 'ar'
+          ? 'احفظ بريد الموظف الإلكتروني أولاً قبل تفعيل وصول التطبيق.'
+          : 'Save the employee with an email address before enabling app access.'
+      );
+      return;
+    }
     setAppAccessLoading(true);
     try {
       const response = await tenantApi.updateEmployeeAppAccess(id as string, !appEnabled);
@@ -194,8 +204,12 @@ export default function EditEmployeePage() {
   };
 
   const handleSendInvite = async () => {
-    if (!formData.email) {
-      setError(locale === 'ar' ? 'الرجاء إضافة بريد إلكتروني للموظف لإرسال الدعوة' : 'Please add an email address for the employee to send an invite');
+    if (!savedEmail) {
+      setError(
+        locale === 'ar'
+          ? 'احفظ بريد الموظف الإلكتروني أولاً ثم أرسل الدعوة.'
+          : 'Save the employee with an email address before sending the invite.'
+      );
       return;
     }
     setInviteLoading(true);
@@ -276,6 +290,7 @@ export default function EditEmployeePage() {
       const response = await tenantApi.updateEmployee(id as string, submitData);
 
       if (response.success) {
+        setSavedEmail(formData.email.trim());
         router.push(`/${locale}/dashboard/employees`);
       } else {
         setError(response.message || t("updateError"));
@@ -620,7 +635,7 @@ export default function EditEmployeePage() {
                   <button
                     type="button"
                     onClick={handleSendInvite}
-                    disabled={inviteLoading || !formData.email}
+                    disabled={inviteLoading || !savedEmail}
                     className="w-full px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
                   >
                     {inviteLoading ? (
@@ -634,7 +649,7 @@ export default function EditEmployeePage() {
                     <button
                       type="button"
                       onClick={handleResetPassword}
-                      disabled={resetLoading || !formData.email}
+                      disabled={resetLoading || !savedEmail}
                       className="w-full px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
                     >
                       {resetLoading ? (
@@ -645,9 +660,11 @@ export default function EditEmployeePage() {
                     </button>
                   )}
 
-                  {!formData.email && (
+                  {!savedEmail && (
                     <p className="text-xs text-red-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {locale === 'ar' ? 'البريد الإلكتروني مطلوب لإرسال الدعوات.' : 'Email address is required to send invites.'}
+                      {locale === 'ar'
+                        ? 'احفظ الموظف بعنوان بريد إلكتروني أولاً لتفعيل التطبيق أو إرسال الدعوة.'
+                        : 'Save the employee with an email address first to enable app access or send invites.'}
                     </p>
                   )}
                 </div>
@@ -736,4 +753,3 @@ export default function EditEmployeePage() {
     </TenantLayout>
   );
 }
-
