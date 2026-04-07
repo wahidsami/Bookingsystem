@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
@@ -40,13 +40,80 @@ export default function ReportsPage() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  const visibleBookingTrends = dateRange === 'year' ? bookingTrends : bookingTrends.slice(-30);
   const bookingTrendRangeLabel = {
     week: t('week'),
     month: t('month'),
     quarter: t('quarter'),
     year: t('year'),
   }[dateRange] || t('month');
+
+  const visibleBookingTrends = useMemo(() => {
+    if (!startDate || !endDate) {
+      return [];
+    }
+
+    const totalsByKey = new Map<string, { bookings: number; revenue: number; completed: number }>();
+    bookingTrends.forEach((point) => {
+      if (!point?.date) {
+        return;
+      }
+
+      totalsByKey.set(point.date, {
+        bookings: safeNumber(point.bookings),
+        revenue: safeNumber(point.revenue),
+        completed: safeNumber(point.completed),
+      });
+    });
+
+    const rangeStart = new Date(startDate);
+    const rangeEnd = new Date(endDate);
+    if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+      return bookingTrends;
+    }
+
+    rangeStart.setHours(0, 0, 0, 0);
+    rangeEnd.setHours(0, 0, 0, 0);
+
+    const densePoints: Array<{ date: string; bookings: number; revenue: number; completed: number }> = [];
+
+    if (dateRange === 'year') {
+      const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+      const lastMonth = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1);
+
+      while (cursor <= lastMonth) {
+        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+        const existing = totalsByKey.get(key);
+
+        densePoints.push({
+          date: key,
+          bookings: existing?.bookings || 0,
+          revenue: existing?.revenue || 0,
+          completed: existing?.completed || 0,
+        });
+
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+
+      return densePoints;
+    }
+
+    const cursor = new Date(rangeStart);
+    while (cursor <= rangeEnd) {
+      const key = cursor.toISOString().split('T')[0];
+      const existing = totalsByKey.get(key);
+
+      densePoints.push({
+        date: key,
+        bookings: existing?.bookings || 0,
+        revenue: existing?.revenue || 0,
+        completed: existing?.completed || 0,
+      });
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return densePoints;
+  }, [bookingTrends, dateRange, endDate, startDate]);
 
   const setDateRangePreset = (preset: string) => {
     const now = new Date();
