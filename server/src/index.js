@@ -458,19 +458,11 @@ const startServer = async () => {
         await db.User.sync({ force: false });
         await db.Service.sync({ force: false });
         await db.Product.sync({ force: false }); // New: Product catalog
-        try {
-            await db.HotDeal.sync({ force: false });
-        } catch (err) {
-            console.warn('HotDeal sync warning:', err.message);
-        }
+        await db.HotDeal.sync({ force: false });
         await ensureHotDealImageSchema();
         await db.Customer.sync({ force: false });
         await db.Staff.sync({ force: false });
-        try {
-            await db.StaffPermission.sync({ force: false });
-        } catch (err) {
-            console.warn('StaffPermission sync warning:', err.message);
-        }
+        await db.StaffPermission.sync({ force: false });
         await ensureStaffPermissionSchema();
         await db.MobilePushToken.sync({ force: false });
         await db.ServiceEmployee.sync({ force: false }); // New: Service-Employee junction
