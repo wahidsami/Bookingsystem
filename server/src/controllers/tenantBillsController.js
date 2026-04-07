@@ -57,46 +57,78 @@ async function findTenantBill(tenantId, billId) {
 async function normalizePendingActivationBills(req) {
     try {
         const tenantId = req.tenantId || req.tenant?.id;
-        if (!tenantId || req.tenant?.status !== 'payment_pending') {
+        if (!tenantId) {
             return;
         }
 
-        const retriableBills = await db.Bill.findAll({
+        const candidateBills = await db.Bill.findAll({
             where: {
                 tenantId,
-                status: { [Op.in]: RETIRABLE_BILL_STATUSES },
                 type: { [Op.in]: ['initial', 'renewal', 'upgrade'] }
             },
             order: [['createdAt', 'DESC']]
         });
 
-        if (retriableBills.length <= 1) {
+        if (candidateBills.length <= 1) {
             return;
         }
 
-        const keepLatestBillBySubscription = new Map();
-
-        for (const bill of retriableBills) {
+        const groupedBills = new Map();
+        for (const bill of candidateBills) {
             const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
-            if (!keepLatestBillBySubscription.has(subscriptionKey)) {
-                keepLatestBillBySubscription.set(subscriptionKey, bill.id);
+            const group = groupedBills.get(subscriptionKey) || [];
+            group.push(bill);
+            groupedBills.set(subscriptionKey, group);
+        }
+
+        const billsToVoid = [];
+
+        for (const bills of groupedBills.values()) {
+            const paidBill = bills.find((bill) => bill.status === BILL_STATUS.PAID);
+
+            if (paidBill) {
+                billsToVoid.push(
+                    ...bills
+                        .filter((bill) =>
+                            bill.id !== paidBill.id &&
+                            RETIRABLE_BILL_STATUSES.includes(bill.status)
+                        )
+                        .map((bill) => ({
+                            bill,
+                            reason: 'superseded_by_paid_subscription_invoice',
+                            message: 'Superseded by a paid invoice for the same subscription'
+                        }))
+                );
+                continue;
+            }
+
+            if (req.tenant?.status === 'payment_pending') {
+                const retriableBills = bills.filter((bill) => RETIRABLE_BILL_STATUSES.includes(bill.status));
+                if (retriableBills.length > 1) {
+                    const [latestBill, ...olderBills] = retriableBills;
+                    if (latestBill) {
+                        billsToVoid.push(...olderBills.map((bill) => ({
+                            bill,
+                            reason: 'superseded_by_newer_pending_activation_invoice',
+                            message: 'Superseded by a newer pending activation invoice'
+                        })));
+                    }
+                }
             }
         }
 
-        const billsToVoid = retriableBills.filter((bill) => {
-            const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
-            return keepLatestBillBySubscription.get(subscriptionKey) !== bill.id;
-        });
-
-        for (const bill of billsToVoid) {
+        for (const item of billsToVoid) {
             try {
+                const bill = item.bill;
+                const billMetadata = normalizeBillMetadata(bill.metadata);
+
                 await bill.update({
                     status: BILL_STATUS.VOID,
-                    paymentFailureReason: 'Superseded by a newer pending activation invoice',
+                    paymentFailureReason: item.message,
                     metadata: {
-                        ...normalizeBillMetadata(bill.metadata),
+                        ...billMetadata,
                         voidedAt: new Date().toISOString(),
-                        voidReason: 'superseded_by_newer_pending_activation_invoice'
+                        voidReason: item.reason
                     }
                 });
             } catch (billError) {

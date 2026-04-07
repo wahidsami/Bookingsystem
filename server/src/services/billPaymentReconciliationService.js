@@ -12,6 +12,7 @@ const {
 } = require('../utils/invoiceSnapshotBuilder');
 const {
     BILL_STATUS,
+    RETIRABLE_BILL_STATUSES,
     getBlockedPaymentStatusMessage
 } = require('../utils/billStatus');
 
@@ -587,6 +588,35 @@ async function settleBillPayment({
                 lastPaymentReference: resolvedPaymentReference
             }
         }, { transaction });
+
+        const siblingBills = await db.Bill.findAll({
+            where: {
+                id: { [db.Sequelize.Op.ne]: bill.id },
+                tenantId: bill.tenantId,
+                tenantSubscriptionId: bill.tenantSubscriptionId,
+                status: { [db.Sequelize.Op.in]: RETIRABLE_BILL_STATUSES },
+                type: { [db.Sequelize.Op.in]: ['initial', 'renewal', 'upgrade'] }
+            },
+            transaction
+        });
+
+        for (const siblingBill of siblingBills) {
+            const siblingMetadata = siblingBill.metadata && typeof siblingBill.metadata === 'object' && !Array.isArray(siblingBill.metadata)
+                ? siblingBill.metadata
+                : {};
+
+            await siblingBill.update({
+                status: BILL_STATUS.VOID,
+                paymentFailureReason: 'Superseded by a paid invoice for the same subscription',
+                metadata: {
+                    ...siblingMetadata,
+                    voidedAt: now.toISOString(),
+                    voidReason: 'superseded_by_paid_subscription_invoice',
+                    voidedByBillId: bill.id,
+                    voidedByBillNumber: bill.billNumber
+                }
+            }, { transaction });
+        }
 
         if (shouldActivateTenant) {
             await bill.tenant.update({
