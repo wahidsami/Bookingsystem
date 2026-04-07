@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL, adminApi } from "@/lib/api";
 
@@ -45,6 +45,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const notificationPollTimeoutRef = useRef<number | null>(null);
+  const notificationRequestInFlightRef = useRef(false);
+  const notificationFailureCountRef = useRef(0);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -81,24 +84,51 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
     let isMounted = true;
 
+    const scheduleNotificationPoll = (delayMs: number) => {
+      if (!isMounted) return;
+      if (notificationPollTimeoutRef.current) {
+        window.clearTimeout(notificationPollTimeoutRef.current);
+      }
+      notificationPollTimeoutRef.current = window.setTimeout(fetchNotifications, delayMs);
+    };
+
     const fetchNotifications = async () => {
+      if (notificationRequestInFlightRef.current) {
+        scheduleNotificationPoll(30000);
+        return;
+      }
+
+      notificationRequestInFlightRef.current = true;
       try {
         const response = await adminApi.getAdminNotifications({ page: 1, limit: 6 });
         if (isMounted && response.success) {
           setNotifications(response.notifications || []);
           setUnreadCount(response.unreadCount || 0);
         }
+        notificationFailureCountRef.current = 0;
       } catch (error) {
-        console.error("Failed to fetch admin notifications:", error);
+        notificationFailureCountRef.current += 1;
+        if (
+          notificationFailureCountRef.current === 1 ||
+          notificationFailureCountRef.current % 5 === 0
+        ) {
+          console.warn("Admin notifications polling failed:", error);
+        }
+      } finally {
+        notificationRequestInFlightRef.current = false;
+        scheduleNotificationPoll(notificationFailureCountRef.current > 0 ? 60000 : 30000);
       }
     };
 
     fetchNotifications();
-    const interval = window.setInterval(fetchNotifications, 30000);
 
     return () => {
       isMounted = false;
-      window.clearInterval(interval);
+      if (notificationPollTimeoutRef.current) {
+        window.clearTimeout(notificationPollTimeoutRef.current);
+        notificationPollTimeoutRef.current = null;
+      }
+      notificationRequestInFlightRef.current = false;
     };
   }, [isAuthenticated]);
 
