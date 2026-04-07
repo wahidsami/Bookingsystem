@@ -330,7 +330,7 @@ const ensureBillStatusSchema = async () => {
         console.log('Bill status schema verified.');
     } catch (error) {
         console.error('Failed to ensure bill status schema:', error);
-        throw error;
+        console.warn('Continuing startup without bill status schema repair.');
     }
 };
 
@@ -395,7 +395,7 @@ const ensureStaffPermissionSchema = async () => {
         console.log('Staff permission schema verified.');
     } catch (error) {
         console.error('Failed to ensure staff permission schema:', error);
-        throw error;
+        console.warn('Continuing startup without staff permission schema repair.');
     }
 };
 
@@ -418,7 +418,7 @@ const ensureHotDealImageSchema = async () => {
         console.log('Hot deal image schema verified.');
     } catch (error) {
         console.error('Failed to ensure hot deal image schema:', error);
-        throw error;
+        console.warn('Continuing startup without hot deal image schema repair.');
     }
 };
 
