@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantAuth } from '@/contexts/TenantAuthContext';
@@ -29,34 +29,46 @@ export default function ReportPreviewPage() {
   const startDate = searchParams.get('startDate') || '';
   const endDate = searchParams.get('endDate') || '';
   const sectionsParam = searchParams.get('sections') || 'overview';
-  const sections = sectionsParam.split(',').filter(Boolean) as ReportSectionId[];
+  const sections = useMemo(
+    () => sectionsParam.split(',').filter(Boolean) as ReportSectionId[],
+    [sectionsParam]
+  );
   const reportTitle = searchParams.get('title') || '';
   const notes = searchParams.get('notes') || '';
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Record<string, any>>({});
 
-  const fetchData = useCallback(async () => {
-    if (!startDate || !endDate) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const r = await tenantApi.getFullReport({ startDate, endDate, sections });
-      if (r?.success && r?.data) {
-        setData(r.data);
-      }
-    } catch (err) {
-      console.error('Report fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate, sections]);
-
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      if (!startDate || !endDate) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const r = await tenantApi.getFullReport({ startDate, endDate, sections });
+        if (isMounted && r?.success && r?.data) {
+          setData(r.data);
+        }
+      } catch (err) {
+        console.error('Report fetch error:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchData();
-  }, [fetchData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [endDate, sections, startDate]);
 
   const handlePrint = () => {
     window.print();
