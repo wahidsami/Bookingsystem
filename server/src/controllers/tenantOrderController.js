@@ -70,7 +70,7 @@ exports.getOrders = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 },
                 {
@@ -145,7 +145,7 @@ exports.getOrder = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 },
                 {
@@ -252,7 +252,7 @@ exports.updateOrderStatus = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 },
                 {
@@ -325,7 +325,7 @@ exports.updatePaymentStatus = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 },
                 {
