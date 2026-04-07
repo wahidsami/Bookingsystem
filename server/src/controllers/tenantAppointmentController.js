@@ -34,6 +34,7 @@ exports.getAppointments = async (req, res) => {
             staffId, 
             serviceId, 
             status,
+            paymentStatus,
             platformUserId,
             page = 1,
             limit = 50
@@ -66,6 +67,10 @@ exports.getAppointments = async (req, res) => {
 
         if (status) {
             where.status = status;
+        }
+
+        if (paymentStatus) {
+            where.paymentStatus = paymentStatus;
         }
 
         if (platformUserId) {

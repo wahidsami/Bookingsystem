@@ -120,28 +120,63 @@ export default function FinancialPage() {
     try {
       const params = { startDate, endDate };
       
-      const [overviewRes, employeesRes, servicesRes, productsRes, dailyRes] = await Promise.all([
+      const [overviewRes, employeesRes, servicesRes, productsRes, dailyRes] = await Promise.allSettled([
         tenantApi.getFinancialOverview(params),
         tenantApi.getEmployeeRevenue(params),
         tenantApi.getServiceRevenue(params),
         tenantApi.getProductRevenue(params),
         tenantApi.getDailyRevenue(params)
       ]);
+      const failedSections: string[] = [];
 
-      if (overviewRes.success) setOverview(overviewRes.overview);
-      if (employeesRes.success) {
-        setEmployees(employeesRes.employees);
-        setEmployeeTotals(employeesRes.totals);
+      if (overviewRes.status === 'fulfilled' && overviewRes.value.success) {
+        setOverview(overviewRes.value.overview);
+      } else {
+        setOverview(null);
+        failedSections.push(t("overview"));
       }
-      if (servicesRes.success) {
-        setServices(servicesRes.services);
-        setServiceTotals(servicesRes.totals);
+
+      if (employeesRes.status === 'fulfilled' && employeesRes.value.success) {
+        setEmployees(employeesRes.value.employees || []);
+        setEmployeeTotals(employeesRes.value.totals || null);
+      } else {
+        setEmployees([]);
+        setEmployeeTotals(null);
+        failedSections.push(t("employees"));
       }
-      if (productsRes.success) {
-        setProducts(productsRes.products);
-        setProductTotals(productsRes.totals);
+
+      if (servicesRes.status === 'fulfilled' && servicesRes.value.success) {
+        setServices(servicesRes.value.services || []);
+        setServiceTotals(servicesRes.value.totals || null);
+      } else {
+        setServices([]);
+        setServiceTotals(null);
+        failedSections.push(t("services"));
       }
-      if (dailyRes.success) setDailyRevenue(dailyRes.dailyRevenue);
+
+      if (productsRes.status === 'fulfilled' && productsRes.value.success) {
+        setProducts(productsRes.value.products || []);
+        setProductTotals(productsRes.value.totals || null);
+      } else {
+        setProducts([]);
+        setProductTotals(null);
+        failedSections.push(t("products"));
+      }
+
+      if (dailyRes.status === 'fulfilled' && dailyRes.value.success) {
+        setDailyRevenue(dailyRes.value.dailyRevenue || []);
+      } else {
+        setDailyRevenue([]);
+        failedSections.push(t("dailyRevenue") || "daily revenue");
+      }
+
+      if (failedSections.length > 0) {
+        setError(
+          locale === 'ar'
+            ? `تعذر تحميل بعض أقسام المالية: ${failedSections.join('، ')}`
+            : `Some financial sections failed to load: ${failedSections.join(', ')}`
+        );
+      }
     } catch (err: any) {
       console.error("Failed to load financial data:", err);
       setError(err.message || t("loadError"));

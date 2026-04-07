@@ -12,7 +12,7 @@ const { buildPublicAssetUrl } = require('../utils/url');
  */
 exports.getCustomers = async (req, res) => {
     try {
-        const tenantId = req.tenant.id;
+        const tenantId = req.tenantId;
         const {
             page = 1,
             limit = 20,
@@ -24,7 +24,9 @@ exports.getCustomers = async (req, res) => {
             minSpent = 0
         } = req.query;
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const safePage = Math.max(parseInt(page, 10) || 1, 1);
+        const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
+        const offset = (safePage - 1) * safeLimit;
         const customerType = req.query.customerType || ''; // 'service_only', 'product_only', 'both', or ''
 
         // Find all platform users who have appointments OR orders with this tenant
@@ -132,18 +134,16 @@ exports.getCustomers = async (req, res) => {
             allCustomers = allCustomers.filter(c => c.appointments.length > 0 && c.orders.length > 0);
         }
 
-        // Apply pagination
-        const total = allCustomers.length;
-        const paginatedCustomers = allCustomers.slice(offset, offset + parseInt(limit));
-
         // Enrich with customer insights
-        const customerIds = paginatedCustomers.map(c => c.id);
-        const insights = await db.CustomerInsight.findAll({
-            where: {
-                platformUserId: { [Op.in]: customerIds },
-                tenantId
-            }
-        });
+        const customerIds = allCustomers.map(c => c.id);
+        const insights = customerIds.length > 0
+            ? await db.CustomerInsight.findAll({
+                where: {
+                    platformUserId: { [Op.in]: customerIds },
+                    tenantId
+                }
+            })
+            : [];
 
         const insightsMap = {};
         insights.forEach(i => {
@@ -151,10 +151,19 @@ exports.getCustomers = async (req, res) => {
         });
 
         // Calculate stats for each customer
-        const enrichedCustomers = paginatedCustomers.map(customer => {
+        const enrichedCustomers = allCustomers.map(customer => {
             const appointments = customer.appointments || [];
             const orders = customer.orders || [];
             const insight = insightsMap[customer.id];
+
+            const appointmentDates = appointments
+                .map(a => a.startTime)
+                .filter(Boolean)
+                .sort((a, b) => new Date(a) - new Date(b));
+            const orderDates = orders
+                .map(o => o.createdAt)
+                .filter(Boolean)
+                .sort((a, b) => new Date(a) - new Date(b));
 
             // Calculate from appointments
             const completedAppointments = appointments.filter(a => a.status === 'completed');
@@ -170,13 +179,15 @@ exports.getCustomers = async (req, res) => {
 
             // Combined totals
             const totalSpent = appointmentSpending + orderSpending;
+            const firstAppointment = appointmentDates.length > 0 ? appointmentDates[0] : null;
+            const firstOrder = orderDates.length > 0 ? orderDates[0] : null;
             
             // Determine last visit (most recent of appointment or order)
-            const lastAppointment = appointments.length > 0 
-                ? appointments.sort((a, b) => new Date(b.startTime) - new Date(a.startTime))[0]?.startTime 
+            const lastAppointment = appointmentDates.length > 0
+                ? appointmentDates[appointmentDates.length - 1]
                 : null;
-            const lastOrder = orders.length > 0
-                ? orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]?.createdAt
+            const lastOrder = orderDates.length > 0
+                ? orderDates[orderDates.length - 1]
                 : null;
             const lastVisit = lastAppointment && lastOrder
                 ? (new Date(lastAppointment) > new Date(lastOrder) ? lastAppointment : lastOrder)
@@ -208,9 +219,9 @@ exports.getCustomers = async (req, res) => {
                 totalProductsPurchased: totalProductsPurchased,
                 totalSpent: insight?.totalSpent || totalSpent,
                 lastVisit: insight?.lastVisit || lastVisit,
-                firstVisit: insight?.firstVisit || (appointments.length > 0 
-                    ? appointments.sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0].startTime 
-                    : (orders.length > 0 ? orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0].createdAt : null)),
+                firstVisit: insight?.firstVisit || (firstAppointment && firstOrder
+                    ? (new Date(firstAppointment) < new Date(firstOrder) ? firstAppointment : firstOrder)
+                    : (firstAppointment || firstOrder || null)),
                 loyaltyTier: insight?.loyaltyTier || 'bronze',
                 loyaltyPoints: insight?.tenantLoyaltyPoints || 0,
                 noShowCount: insight?.noShowCount || appointments.filter(a => a.status === 'no_show').length,
@@ -263,9 +274,9 @@ exports.getCustomers = async (req, res) => {
                 customers: paginatedFiltered,
                 pagination: {
                     total: filteredTotal,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    totalPages: Math.ceil(filteredTotal / parseInt(limit))
+                    page: safePage,
+                    limit: safeLimit,
+                    totalPages: Math.ceil(filteredTotal / safeLimit)
                 }
             }
         });

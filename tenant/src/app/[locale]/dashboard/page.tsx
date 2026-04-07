@@ -56,6 +56,7 @@ export default function DashboardPage() {
     totalDueAmount: 0,
   });
   const [paymentAlerts, setPaymentAlerts] = useState<PosAlert[]>([]);
+  const [notice, setNotice] = useState("");
 
   const getAppointmentStatusMeta = (status: string) => {
     switch (status) {
@@ -105,27 +106,31 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setNotice("");
       
       // Fetch dashboard stats and today's appointments in parallel
-      const [statsResponse, appointmentsResponse, posAlertsResponse] = await Promise.all([
+      const [statsResponse, appointmentsResponse, posAlertsResponse] = await Promise.allSettled([
         tenantApi.getDashboardStats(),
         tenantApi.getTodaysAppointments(),
         tenantApi.getPosAlerts({ limit: 3 }).catch(() => null),
       ]);
+      const failedSections: string[] = [];
 
       // Update stats
-      if (statsResponse.success && statsResponse.stats) {
+      if (statsResponse.status === 'fulfilled' && statsResponse.value.success && statsResponse.value.stats) {
         setStats({
-          todaysBookings: statsResponse.stats.todaysBookings || 0,
-          totalRevenue: statsResponse.stats.totalRevenue || 0,
-          activeEmployees: statsResponse.stats.activeEmployees || 0,
-          totalCustomers: statsResponse.stats.totalCustomers || 0,
+          todaysBookings: statsResponse.value.stats.todaysBookings || 0,
+          totalRevenue: statsResponse.value.stats.totalRevenue || 0,
+          activeEmployees: statsResponse.value.stats.activeEmployees || 0,
+          totalCustomers: statsResponse.value.stats.totalCustomers || 0,
         });
+      } else {
+        failedSections.push(locale === 'ar' ? 'الإحصاءات' : 'stats');
       }
 
       // Update today's appointments
-      if (appointmentsResponse.success && appointmentsResponse.appointments) {
-        const formattedAppointments = appointmentsResponse.appointments.map((apt: any) => ({
+      if (appointmentsResponse.status === 'fulfilled' && appointmentsResponse.value.success && appointmentsResponse.value.appointments) {
+        const formattedAppointments = appointmentsResponse.value.appointments.map((apt: any) => ({
           id: apt.id,
           customerName: apt.customerName || 'Unknown Customer',
           serviceName: locale === 'ar' ? (apt.serviceName_ar || apt.serviceName) : apt.serviceName,
@@ -137,15 +142,16 @@ export default function DashboardPage() {
         setTodaysAppointments(formattedAppointments);
       } else {
         setTodaysAppointments([]);
+        failedSections.push(locale === 'ar' ? 'مواعيد اليوم' : "today's appointments");
       }
 
-      if (posAlertsResponse?.success) {
+      if (posAlertsResponse.status === 'fulfilled' && posAlertsResponse.value?.success) {
         setPaymentDueSummary({
-          totalDueCount: posAlertsResponse.summary?.totalDueCount || 0,
-          checkedInDueCount: posAlertsResponse.summary?.checkedInDueCount || 0,
-          totalDueAmount: posAlertsResponse.summary?.totalDueAmount || 0,
+          totalDueCount: posAlertsResponse.value.summary?.totalDueCount || 0,
+          checkedInDueCount: posAlertsResponse.value.summary?.checkedInDueCount || 0,
+          totalDueAmount: posAlertsResponse.value.summary?.totalDueAmount || 0,
         });
-        setPaymentAlerts(Array.isArray(posAlertsResponse.alerts) ? posAlertsResponse.alerts : []);
+        setPaymentAlerts(Array.isArray(posAlertsResponse.value.alerts) ? posAlertsResponse.value.alerts : []);
       } else {
         setPaymentDueSummary({
           totalDueCount: 0,
@@ -153,6 +159,15 @@ export default function DashboardPage() {
           totalDueAmount: 0,
         });
         setPaymentAlerts([]);
+        failedSections.push(locale === 'ar' ? 'تنبيهات التحصيل' : 'collections alerts');
+      }
+
+      if (failedSections.length > 0) {
+        setNotice(
+          locale === 'ar'
+            ? `تعذر تحميل بعض أقسام اللوحة: ${failedSections.join('، ')}`
+            : `Some dashboard sections failed to load: ${failedSections.join(', ')}`
+        );
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -196,6 +211,12 @@ export default function DashboardPage() {
           {locale === 'ar' ? 'نظرة عامة على أداء صالونك اليوم' : "Here's an overview of your salon's performance today"}
         </p>
       </div>
+
+      {notice && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+          {notice}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

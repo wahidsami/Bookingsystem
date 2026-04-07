@@ -68,9 +68,9 @@ export default function ReportsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = { startDate, endDate };
-
-      const [summaryRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes] = await Promise.all([
+      const [summaryRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
         tenantApi.getBookingTrends({ ...params, groupBy: dateRange === 'year' ? 'month' : 'day' }),
         tenantApi.getServicePerformance(params),
@@ -78,13 +78,57 @@ export default function ReportsPage() {
         tenantApi.getPeakHoursAnalysis(params),
         tenantApi.getCustomerAnalytics(params),
       ]);
+      const failedSections: string[] = [];
 
-      if (summaryRes.success) setSummary(summaryRes.data);
-      if (trendsRes.success) setBookingTrends(trendsRes.data);
-      if (servicesRes.success) setServicePerformance(servicesRes.data);
-      if (employeesRes.success) setEmployeePerformance(employeesRes.data);
-      if (peakRes.success) setPeakHours(peakRes.data);
-      if (customerRes.success) setCustomerAnalytics(customerRes.data);
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.success) {
+        setSummary(summaryRes.value.data);
+      } else {
+        setSummary(null);
+        failedSections.push(t('overview'));
+      }
+
+      if (trendsRes.status === 'fulfilled' && trendsRes.value.success) {
+        setBookingTrends(trendsRes.value.data || []);
+      } else {
+        setBookingTrends([]);
+        failedSections.push(t('bookingTrends'));
+      }
+
+      if (servicesRes.status === 'fulfilled' && servicesRes.value.success) {
+        setServicePerformance(servicesRes.value.data || []);
+      } else {
+        setServicePerformance([]);
+        failedSections.push(t('services'));
+      }
+
+      if (employeesRes.status === 'fulfilled' && employeesRes.value.success) {
+        setEmployeePerformance(employeesRes.value.data || []);
+      } else {
+        setEmployeePerformance([]);
+        failedSections.push(t('employees'));
+      }
+
+      if (peakRes.status === 'fulfilled' && peakRes.value.success) {
+        setPeakHours(peakRes.value.data || null);
+      } else {
+        setPeakHours(null);
+        failedSections.push(t('peakHours'));
+      }
+
+      if (customerRes.status === 'fulfilled' && customerRes.value.success) {
+        setCustomerAnalytics(customerRes.value.data || null);
+      } else {
+        setCustomerAnalytics(null);
+        failedSections.push(t('customers'));
+      }
+
+      if (failedSections.length > 0) {
+        setError(
+          locale === 'ar'
+            ? `تعذر تحميل بعض أقسام التقارير: ${failedSections.join('، ')}`
+            : `Some report sections failed to load: ${failedSections.join(', ')}`
+        );
+      }
 
     } catch (err: any) {
       console.error('Failed to load reports:', err);
@@ -98,7 +142,7 @@ export default function ReportsPage() {
     if (startDate && endDate) {
       loadData();
     }
-  }, [startDate, endDate]);
+  }, [dateRange, endDate, startDate]);
 
   const tabs = [
     { id: 'overview', icon: ChartBarIcon, label: t('overview') },

@@ -24,6 +24,28 @@ type AdminSettingsState = {
   invoiceLogoPath: string;
 };
 
+type SubscriptionPackage = {
+  id: string;
+  name: string;
+  name_ar?: string | null;
+  description?: string | null;
+  description_ar?: string | null;
+  monthlyPrice?: number | string | null;
+  sixMonthPrice?: number | string | null;
+  annualPrice?: number | string | null;
+  isActive?: boolean;
+  isFeatured?: boolean;
+};
+
+type AdminProfile = {
+  id: string;
+  name?: string | null;
+  email: string;
+  role?: string | null;
+  isActive?: boolean;
+  lastLoginAt?: string | null;
+};
+
 const DEFAULT_SETTINGS: AdminSettingsState = {
   serviceCommissionRate: 10,
   productCommissionRate: 10,
@@ -50,6 +72,8 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [settings, setSettings] = useState<AdminSettingsState>(DEFAULT_SETTINGS);
+  const [packages, setPackages] = useState<SubscriptionPackage[]>([]);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -58,8 +82,16 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await adminApi.getSettings();
-      if (response.success) {
+      setError("");
+
+      const [settingsResponse, packagesResponse, profileResponse] = await Promise.allSettled([
+        adminApi.getSettings(),
+        adminApi.getPackages(true),
+        adminApi.getProfile()
+      ]);
+
+      if (settingsResponse.status === "fulfilled" && settingsResponse.value.success) {
+        const response = settingsResponse.value;
         setSettings({
           ...DEFAULT_SETTINGS,
           ...(response.settings || {}),
@@ -78,6 +110,23 @@ export default function SettingsPage() {
           invoiceFooterNoteEn: response.settings?.invoiceFooterNoteEn || "",
           invoiceLogoPath: response.settings?.invoiceLogoPath || "",
         });
+      } else {
+        const message = settingsResponse.status === "rejected"
+          ? settingsResponse.reason?.message
+          : "Failed to load settings";
+        setError(message || "Failed to load settings");
+      }
+
+      if (packagesResponse.status === "fulfilled" && packagesResponse.value.success) {
+        setPackages(packagesResponse.value.packages || []);
+      } else {
+        setPackages([]);
+      }
+
+      if (profileResponse.status === "fulfilled" && profileResponse.value.success) {
+        setCurrentAdmin(profileResponse.value.admin || null);
+      } else {
+        setCurrentAdmin(null);
       }
     } catch (err: any) {
       console.error("Failed to load settings:", err);
@@ -93,6 +142,27 @@ export default function SettingsPage() {
       ...prev,
       [name]: type === "number" ? Number.parseFloat(value) || 0 : value,
     }));
+  };
+
+  const formatMoney = (value?: number | string | null) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return "—";
+    return new Intl.NumberFormat("en-SA", {
+      style: "currency",
+      currency: "SAR",
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return "Never";
+    return new Date(value).toLocaleString("en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,33 +217,33 @@ export default function SettingsPage() {
             <div className="card-body space-y-4">
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-2">
-                  Platform Name
+                  Invoice Seller Name
                 </label>
                 <input
                   type="text"
-                  value="Rifah"
+                  value={settings.invoiceSellerNameEn || "Refah"}
                   disabled
                   className="input opacity-60"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-2">
-                  Default Currency
+                  Invoice Prefix
                 </label>
                 <input
                   type="text"
-                  value="SAR (Saudi Riyal)"
+                  value={settings.invoicePrefix || "INV"}
                   disabled
                   className="input opacity-60"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-2">
-                  Default Timezone
+                  Invoice Country
                 </label>
                 <input
                   type="text"
-                  value="Asia/Riyadh"
+                  value={settings.invoiceCountry || "Saudi Arabia"}
                   disabled
                   className="input opacity-60"
                 />
@@ -471,29 +541,47 @@ export default function SettingsPage() {
               <h3 className="font-semibold text-white">Subscription Plans</h3>
             </div>
             <div className="card-body">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {[
-                  { name: "Free Trial", price: "0", duration: "30 days", features: ["Basic features", "Up to 50 bookings"] },
-                  { name: "Basic", price: "199", duration: "month", features: ["All basic features", "Up to 200 bookings", "Email support"] },
-                  { name: "Pro", price: "499", duration: "month", features: ["All features", "Unlimited bookings", "Priority support", "Analytics"] },
-                  { name: "Enterprise", price: "Custom", duration: "Custom", features: ["Custom solutions", "Dedicated support", "API access", "White label"] },
-                ].map((plan) => (
-                  <div key={plan.name} className="bg-dark-700/50 rounded-lg p-4">
-                    <h4 className="font-semibold text-white">{plan.name}</h4>
-                    <p className="text-2xl font-bold text-primary-400 mt-2">
-                      {plan.price === "Custom" ? plan.price : `${plan.price} SAR`}
-                    </p>
-                    <p className="text-dark-500 text-xs">per {plan.duration}</p>
-                    <ul className="mt-4 space-y-2">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="text-dark-300 text-sm flex items-center gap-2">
-                          <span className="text-success">✓</span> {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+              {packages.length === 0 ? (
+                <div className="rounded-lg border border-dark-700 bg-dark-800/60 p-6 text-dark-300">
+                  No subscription packages were returned from the API.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {packages.map((plan) => (
+                    <div key={plan.id} className="bg-dark-700/50 rounded-lg p-4 border border-dark-700">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-semibold text-white">{plan.name}</h4>
+                          <p className="text-dark-400 text-xs mt-1">{plan.description || plan.description_ar || "No description"}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {plan.isFeatured && (
+                            <span className="badge badge-primary">Featured</span>
+                          )}
+                          <span className={`badge ${plan.isActive ? "badge-success" : "badge-warning"}`}>
+                            {plan.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-dark-400">Monthly</span>
+                          <span className="text-white font-medium">{formatMoney(plan.monthlyPrice)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-dark-400">6 Months</span>
+                          <span className="text-white font-medium">{formatMoney(plan.sixMonthPrice)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-dark-400">Annual</span>
+                          <span className="text-white font-medium">{formatMoney(plan.annualPrice)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -518,17 +606,27 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="text-white">Super Admin</td>
-                      <td className="text-dark-300">admin@rifah.sa</td>
-                      <td>
-                        <span className="badge badge-primary">Super Admin</span>
-                      </td>
-                      <td>
-                        <span className="badge badge-success">Active</span>
-                      </td>
-                      <td className="text-dark-400">Just now</td>
-                    </tr>
+                    {currentAdmin ? (
+                      <tr>
+                        <td className="text-white">{currentAdmin.name || "Admin"}</td>
+                        <td className="text-dark-300">{currentAdmin.email}</td>
+                        <td>
+                          <span className="badge badge-primary">{currentAdmin.role || "super_admin"}</span>
+                        </td>
+                        <td>
+                          <span className={`badge ${currentAdmin.isActive === false ? "badge-warning" : "badge-success"}`}>
+                            {currentAdmin.isActive === false ? "Inactive" : "Active"}
+                          </span>
+                        </td>
+                        <td className="text-dark-400">{formatDateTime(currentAdmin.lastLoginAt)}</td>
+                      </tr>
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="text-dark-400 text-center py-6">
+                          Current admin profile could not be loaded.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -543,10 +641,9 @@ export default function SettingsPage() {
               <span className="text-xl">🚀</span>
             </div>
             <div>
-              <h4 className="text-white font-semibold">Settings Management Coming Soon</h4>
+              <h4 className="text-white font-semibold">Settings rollout status</h4>
               <p className="text-dark-400 text-sm mt-1">
-                Full settings management including pricing plans, commission rates, admin user
-                management, and platform configuration is being rolled out progressively. Invoice identity and VAT fields are now configurable for new invoice snapshots.
+                Commission, VAT, invoice identity, live package cards, and the current admin profile are now loaded from the API. Broader multi-admin management still needs dedicated backend support before this page can manage every administrator account.
               </p>
             </div>
           </div>

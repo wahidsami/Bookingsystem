@@ -20,8 +20,6 @@ interface ServiceCategory {
 const TABS = [
     { id: "categories", label: "Service Categories", icon: "🏷️", active: true },
     { id: "feature-pricing", label: "Features Pricing", icon: "💰", active: true },
-    { id: "coming-3", label: "Booking Rules", icon: "📋", active: false },
-    { id: "coming-4", label: "Display Settings", icon: "🎨", active: false },
 ];
 
 export default function ClientsControlPage() {
@@ -68,15 +66,19 @@ export default function ClientsControlPage() {
             {/* Tab Content */}
             {activeTab === "categories" && <CategoriesTab />}
             {activeTab === "feature-pricing" && <FeaturePricingTab />}
-            {activeTab !== "categories" && activeTab !== "feature-pricing" && (
-                <div className="card flex flex-col items-center justify-center py-20">
-                    <span className="text-6xl mb-4">🔒</span>
-                    <h3 className="text-xl font-semibold text-white mb-2">Coming Soon</h3>
-                    <p className="text-dark-400 text-center max-w-md">
-                        This section is under development. It will give you more control over how tenants manage their dashboard.
-                    </p>
+            <div className="card border-primary-500/20">
+                <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center text-xl">
+                        🚧
+                    </div>
+                    <div>
+                        <h3 className="text-white font-semibold">Next in Clients Control</h3>
+                        <p className="text-dark-400 text-sm mt-1">
+                            Booking rules and storefront display controls are not exposed here yet, so the page now only shows the sections that are actually live and editable.
+                        </p>
+                    </div>
                 </div>
-            )}
+            </div>
         </AdminLayout>
     );
 }
