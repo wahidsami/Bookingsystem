@@ -185,7 +185,12 @@ exports.getBills = async (req, res) => {
         await normalizePendingActivationBills(req);
 
         const bills = await db.Bill.findAll({
-            where: { tenantId },
+            where: {
+                tenantId,
+                status: {
+                    [Op.ne]: BILL_STATUS.VOID
+                }
+            },
             order: [['createdAt', 'DESC']],
             include: [{
                 model: db.TenantSubscription,

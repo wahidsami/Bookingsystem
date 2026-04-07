@@ -22,6 +22,7 @@ router.get('/financial/invoices', requirePermission('financial', 'view'), adminB
 router.get('/bills/:id/invoice-pdf', requirePermission('financial', 'view'), adminBillsController.getInvoicePdf);
 router.get('/bills/:id/receipt-pdf', requirePermission('financial', 'view'), adminBillsController.getReceiptPdf);
 router.post('/bills/:id/reconcile-payment', requirePermission('financial', 'refund'), adminBillsController.reconcileBillPayment);
+router.post('/bills/:id/void', requirePermission('financial', 'refund'), adminBillsController.voidBill);
 router.get('/financial/dashboard', adminFinancialController.getDashboardOverview);
 router.get('/financial/summary', adminFinancialController.getPlatformSummary);
 router.get('/financial/tenants', adminFinancialController.getTenantFinancials);

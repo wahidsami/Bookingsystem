@@ -134,6 +134,7 @@ export default function ClientDetailsPage() {
   const [billingSummary, setBillingSummary] = useState<any>(null);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [billDocumentLoading, setBillDocumentLoading] = useState<string | null>(null);
+  const [voidingBillId, setVoidingBillId] = useState<string | null>(null);
   const [reconcileModalBill, setReconcileModalBill] = useState<Bill | null>(null);
   const [reconcileForm, setReconcileForm] = useState({
     paymentProvider: "manual_bank_transfer",
@@ -275,6 +276,12 @@ export default function ClientDetailsPage() {
     BILL_STATUS_BADGES[status] || { className: "badge-info", text: status || "—" }
   );
 
+  const canVoidBill = (bill: Bill) =>
+    bill.status === "DRAFT" ||
+    bill.status === "UNPAID" ||
+    bill.status === "FAILED" ||
+    bill.status === "EXPIRED";
+
   const openBillDocument = async (bill: Bill, type: "invoice" | "receipt") => {
     setBillDocumentLoading(`${bill.id}-${type}`);
     try {
@@ -335,6 +342,40 @@ export default function ClientDetailsPage() {
       alert(error instanceof Error ? error.message : "Failed to reconcile payment");
     } finally {
       setReconcileLoading(false);
+    }
+  };
+
+  const handleVoidBill = async (bill: Bill) => {
+    const reason = await dialog.prompt({
+      title: "Void Invoice",
+      message: `This will mark ${bill.billNumber} as void and remove it from the tenant's active bills list. Add an optional reason for the audit trail.`,
+      confirmText: "Void Invoice",
+      cancelText: "Cancel",
+      tone: "danger",
+      defaultValue:
+        bill.status === "UNPAID" ? "Superseded by a newer invoice" : "Admin cleanup",
+      placeholder: "Reason for voiding this invoice",
+    });
+
+    if (reason === null) return;
+
+    setVoidingBillId(bill.id);
+    try {
+      const response = await adminApi.voidBill(bill.id, {
+        reason: reason.trim() || undefined,
+      });
+
+      if (response.success) {
+        if (selectedBill?.id === bill.id && response.bill) {
+          setSelectedBill(response.bill as Bill);
+        }
+        await loadTenantDetails();
+      }
+    } catch (error) {
+      console.error("Failed to void invoice:", error);
+      alert(error instanceof Error ? error.message : "Failed to void invoice");
+    } finally {
+      setVoidingBillId(null);
     }
   };
 
@@ -759,6 +800,7 @@ export default function ClientDetailsPage() {
                     const totalAmount = bill.totalAmount ?? bill.amount;
                     const invoiceLoading = billDocumentLoading === `${bill.id}-invoice`;
                     const receiptLoading = billDocumentLoading === `${bill.id}-receipt`;
+                    const isVoiding = voidingBillId === bill.id;
 
                     return (
                       <div
@@ -830,6 +872,16 @@ export default function ClientDetailsPage() {
                               className="btn btn-primary btn-sm"
                             >
                               Reconcile Payment
+                            </button>
+                          )}
+                          {canVoidBill(bill) && (
+                            <button
+                              type="button"
+                              onClick={() => handleVoidBill(bill)}
+                              disabled={isVoiding}
+                              className="btn btn-danger btn-sm"
+                            >
+                              {isVoiding ? "Voiding..." : "Void Invoice"}
                             </button>
                           )}
                           <button
@@ -1185,6 +1237,16 @@ export default function ClientDetailsPage() {
                       className="btn btn-primary"
                     >
                       Reconcile Payment
+                    </button>
+                  )}
+                  {canVoidBill(selectedBill) && (
+                    <button
+                      type="button"
+                      onClick={() => handleVoidBill(selectedBill)}
+                      disabled={voidingBillId === selectedBill.id}
+                      className="btn btn-danger"
+                    >
+                      {voidingBillId === selectedBill.id ? "Voiding..." : "Void Invoice"}
                     </button>
                   )}
                   <button

@@ -10,7 +10,7 @@ const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
 const {
     settleBillPayment
 } = require('../services/billPaymentReconciliationService');
-const { createBillStatusSummarySeed } = require('../utils/billStatus');
+const { BILL_STATUS, createBillStatusSummarySeed } = require('../utils/billStatus');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
@@ -424,6 +424,88 @@ exports.reconcileBillPayment = async (req, res) => {
         res.status(error.statusCode || 500).json({
             success: false,
             message: error.message || 'Failed to reconcile invoice payment'
+        });
+    }
+};
+
+exports.voidBill = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reason = (req.body?.reason || '').toString().trim();
+        const bill = await findBillById(id);
+
+        if (!bill) {
+            return res.status(404).json({
+                success: false,
+                message: 'Bill not found'
+            });
+        }
+
+        if (bill.status === BILL_STATUS.PAID) {
+            return res.status(400).json({
+                success: false,
+                message: 'Paid invoices cannot be voided'
+            });
+        }
+
+        if (bill.status === BILL_STATUS.VOID) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invoice is already voided'
+            });
+        }
+
+        const previousStatus = bill.status;
+        const currentMetadata = bill.metadata && typeof bill.metadata === 'object' && !Array.isArray(bill.metadata)
+            ? bill.metadata
+            : {};
+        const now = new Date();
+        const voidMessage = reason || 'Voided by admin';
+
+        await bill.update({
+            status: BILL_STATUS.VOID,
+            paymentFailureReason: voidMessage,
+            metadata: {
+                ...currentMetadata,
+                voidedAt: now.toISOString(),
+                voidReason: 'voided_by_admin',
+                voidNotes: reason || null,
+                voidedByAdminId: req.adminId || null,
+                voidedByAdminName: req.adminName || 'super-admin'
+            }
+        });
+
+        await db.ActivityLog.create({
+            entityType: 'tenant',
+            entityId: bill.tenantId,
+            action: 'updated',
+            performedByType: 'super_admin',
+            performedById: req.adminId || null,
+            performedByName: req.adminName || 'super-admin',
+            details: {
+                event: 'invoice_voided',
+                billId: bill.id,
+                billNumber: bill.billNumber,
+                previousStatus,
+                reason: reason || null
+            }
+        });
+
+        const updatedBill = await findBillById(id);
+
+        return res.json({
+            success: true,
+            message: 'Invoice voided successfully',
+            bill: serializeBill(updatedBill, {
+                includePaymentToken: true,
+                includePaymentAttempts: true
+            })
+        });
+    } catch (error) {
+        console.error('voidBill error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to void invoice'
         });
     }
 };

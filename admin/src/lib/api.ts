@@ -211,6 +211,14 @@ class AdminApi {
     }>(`/admin/bills/${id}/reconcile-payment`, 'POST', { body: payload });
   }
 
+  async voidBill(id: string, payload?: { reason?: string }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      bill?: any;
+    }>(`/admin/bills/${id}/void`, 'POST', { body: payload || {} });
+  }
+
   async approveTenant(id: string, notes?: string) {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/approve`, 'POST', { body: { notes } });
   }
