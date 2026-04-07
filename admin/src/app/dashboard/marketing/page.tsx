@@ -44,6 +44,11 @@ const STATUS_META: Record<string, { label: string; badgeClass: string }> = {
     paused: { label: 'Paused', badgeClass: 'bg-slate-500/20 border-slate-500/40 text-slate-300' },
 };
 
+const toNumber = (value: unknown) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export default function MarketingPage() {
     const [deals, setDeals] = useState<HotDeal[]>([]);
     const [loading, setLoading] = useState(true);
@@ -125,9 +130,9 @@ export default function MarketingPage() {
     };
 
     const savings = (deal: HotDeal) =>
-        deal.originalPrice > 0
-            ? Math.round(((deal.originalPrice - deal.discountedPrice) / deal.originalPrice) * 100)
-            : deal.discountValue;
+        toNumber(deal.originalPrice) > 0
+            ? Math.round(((toNumber(deal.originalPrice) - toNumber(deal.discountedPrice)) / toNumber(deal.originalPrice)) * 100)
+            : toNumber(deal.discountValue);
 
     const pendingCount = summary.pending || deals.filter((deal) => deal.status === 'pending').length;
 
@@ -253,13 +258,13 @@ export default function MarketingPage() {
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-dark-400">Original Price</span>
                                             <span className="text-sm text-dark-300 line-through">
-                                                {deal.originalPrice?.toFixed(2)} SAR
+                                                {toNumber(deal.originalPrice).toFixed(2)} SAR
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between border-t border-dark-700 pt-1 mt-1">
                                             <span className="text-xs text-dark-400">Discounted Price</span>
                                             <span className="text-base font-bold text-green-400">
-                                                {deal.discountedPrice?.toFixed(2)} SAR
+                                                {toNumber(deal.discountedPrice).toFixed(2)} SAR
                                             </span>
                                         </div>
                                     </div>
