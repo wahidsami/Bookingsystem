@@ -16,11 +16,8 @@ const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
 const parsedTrustProxy = Number.parseInt(process.env.TRUST_PROXY || '1', 10);
 const trustProxyValue = Number.isNaN(parsedTrustProxy) ? process.env.TRUST_PROXY : parsedTrustProxy;
-const dbRetryDelayMs = Math.max(Number.parseInt(process.env.DB_RETRY_DELAY_MS || '5000', 10) || 5000, 1000);
 let server = null;
 let expiryInterval = null;
-let databaseReady = false;
-let startupMaintenanceStarted = false;
 
 app.disable('x-powered-by');
 app.set('trust proxy', trustProxyValue);
@@ -203,10 +200,7 @@ app.get('/api/v1/categories', publicTenantController.getPublicCategories);
 // Cleanup routes removed - one-time operations completed
 // Health Check
 app.get('/', (req, res) => {
-    res.json({
-        message: 'Rifah API is running',
-        databaseReady
-    });
+    res.json({ message: 'Rifah API is running' });
 });
 
 if (!isProduction && process.env.ENABLE_DIAGNOSTIC_ROUTES === 'true') {
@@ -428,8 +422,13 @@ const ensureHotDealImageSchema = async () => {
     }
 };
 
-const runStartupMaintenance = async () => {
-    // Sync models in dependency order
+// Database Connection and Server Start
+const startServer = async () => {
+    try {
+        await db.sequelize.authenticate();
+        console.log('Database connection established successfully.');
+
+        // Sync models in dependency order
         await db.SuperAdmin.sync({ force: false });
         await db.ActivityLog.sync({ force: false });
         await db.AdminNotification.sync({ force: false });
@@ -523,68 +522,15 @@ const runStartupMaintenance = async () => {
         if (isProduction && !getTenantDashboardBaseUrl()) {
             console.warn('⚠️  Tenant dashboard base URL is not configured. Email-generated links may be incomplete.');
         }
-};
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const startExpiryInterval = () => {
-    if (expiryInterval) {
-        return;
-    }
-
-    const { expirePaymentPendingTenants } = require('./utils/initializeTenantSubscription');
-    expiryInterval = setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
-};
-
-const connectDatabaseWithRetry = async () => {
-    while (true) {
-        try {
-            await db.sequelize.authenticate();
-
-            if (!databaseReady) {
-                console.log('Database connection established successfully.');
-            }
-
-            databaseReady = true;
-            startExpiryInterval();
-
-            if (!startupMaintenanceStarted) {
-                startupMaintenanceStarted = true;
-                runStartupMaintenance()
-                    .then(() => {
-                        console.log('Startup maintenance completed.');
-                    })
-                    .catch((error) => {
-                        console.error('Startup maintenance failed:', error);
-                    });
-            }
-
-            return;
-        } catch (error) {
-            databaseReady = false;
-            console.error(`Database connection failed. Retrying in ${dbRetryDelayMs / 1000}s...`, error.message || error);
-            await delay(dbRetryDelayMs);
-        }
-    }
-};
-
-// Database Connection and Server Start
-const startServer = async () => {
-    try {
         server = app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
-
-        server.on('error', (error) => {
-            console.error('Server failed to start:', error);
-            process.exit(1);
-        });
-
-        connectDatabaseWithRetry().catch((error) => {
-            console.error('Database retry loop stopped unexpectedly:', error);
+            console.log(`🚀 Server is running on port ${PORT}`);
+            // Expire payment_pending tenants every hour (48h window)
+            const { expirePaymentPendingTenants } = require('./utils/initializeTenantSubscription');
+            expiryInterval = setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
         });
     } catch (error) {
-        console.error('Unable to start the server:', error);
+        console.error('Unable to connect to the database:', error);
         process.exit(1);
     }
 };
@@ -623,4 +569,3 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 startServer();
-
