@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
                 otherKey: 'staffId',
                 as: 'legacyStaff'
             });
+
+            Service.hasMany(models.Appointment, {
+                foreignKey: 'serviceId',
+                as: 'appointments'
+            });
         }
 
         /**
