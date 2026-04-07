@@ -90,7 +90,16 @@ exports.sendMarketingPush = async (req, res) => {
             return res.json({
                 success: true,
                 message: 'No customers to send to',
-                data: { sent: 0 }
+                data: { sent: 0 },
+                debug: {
+                    requestedRecipients: 0,
+                    attemptedRecipients: 0,
+                    sentRecipients: 0,
+                    skippedRecipients: 0,
+                    failedRecipients: 0,
+                    skippedReasons: {},
+                    recipientResults: []
+                }
             });
         }
 
@@ -105,14 +114,16 @@ exports.sendMarketingPush = async (req, res) => {
         if (result.limitReached) {
             return res.status(403).json({
                 success: false,
-                message: 'Monthly push limit reached. Upgrade your plan for more.'
+                message: 'Monthly push limit reached. Upgrade your plan for more.',
+                debug: result.debug || null
             });
         }
 
         return res.json({
             success: true,
             message: `Push sent to ${result.sent} customer(s)`,
-            data: { sent: result.sent }
+            data: { sent: result.sent },
+            debug: result.debug || null
         });
     } catch (error) {
         console.error('Send marketing push error:', error);

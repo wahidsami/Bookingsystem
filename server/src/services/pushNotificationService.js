@@ -149,11 +149,11 @@ class PushNotificationService {
         });
 
         if (!platformUser) {
-            return { success: false, skipped: true, reason: 'user_not_found' };
+            return { success: false, skipped: true, reason: 'user_not_found', deviceCount: 0, tokenCount: 0, invalidTokenCount: 0 };
         }
 
         if (platformUser.notificationPreferences?.push === false) {
-            return { success: false, skipped: true, reason: 'push_disabled' };
+            return { success: false, skipped: true, reason: 'push_disabled', deviceCount: 0, tokenCount: 0, invalidTokenCount: 0 };
         }
 
         const devices = await db.MobilePushToken.findAll({
@@ -185,7 +185,14 @@ class PushNotificationService {
             .filter((token) => this.isValidExpoPushToken(token));
 
         if (tokens.length === 0) {
-            return { success: false, skipped: true, reason: 'no_active_tokens' };
+            return {
+                success: false,
+                skipped: true,
+                reason: 'no_active_tokens',
+                deviceCount: devices.length,
+                tokenCount: 0,
+                invalidTokenCount: 0
+            };
         }
 
         const messages = tokens.map((to) => ({
@@ -200,6 +207,7 @@ class PushNotificationService {
         try {
             const response = await this._postJson(EXPO_PUSH_HOST, EXPO_PUSH_PATH, messages);
             const parsed = JSON.parse(response.body || '{}');
+            let invalidTokenCount = 0;
 
             if (Array.isArray(parsed.data)) {
                 const invalidTokens = [];
@@ -209,6 +217,8 @@ class PushNotificationService {
                         invalidTokens.push(tokens[index]);
                     }
                 });
+
+                 invalidTokenCount = invalidTokens.length;
 
                 if (invalidTokens.length > 0) {
                     await db.MobilePushToken.update({
@@ -223,6 +233,9 @@ class PushNotificationService {
 
             return {
                 success: response.statusCode >= 200 && response.statusCode < 300,
+                deviceCount: devices.length,
+                tokenCount: tokens.length,
+                invalidTokenCount,
                 response: parsed
             };
         } catch (error) {
@@ -236,7 +249,10 @@ class PushNotificationService {
                 success: false,
                 skipped: true,
                 reason: 'send_failed',
-                error: error.message
+                error: error.message,
+                deviceCount: devices.length,
+                tokenCount: tokens.length,
+                invalidTokenCount: 0
             };
         }
     }
@@ -277,3 +293,4 @@ class PushNotificationService {
 }
 
 module.exports = new PushNotificationService();
+

@@ -1753,8 +1753,92 @@ class TenantApiClient {
     body: string;
     linkType?: 'none' | 'tenant' | 'service';
     serviceId?: string;
-  }): Promise<{ success: boolean; message?: string; data?: { sent: number } }> {
-    return this.post('/tenant/notifications/send', data);
+  }): Promise<{
+    success: boolean;
+    message?: string;
+    data?: { sent: number };
+    debug?: {
+      requestedRecipients: number;
+      attemptedRecipients: number;
+      sentRecipients: number;
+      skippedRecipients: number;
+      failedRecipients: number;
+      skippedReasons: Record<string, number>;
+      usageBeforeSend?: number;
+      usageLimit?: number;
+      recipientResults: Array<{
+        platformUserId: string;
+        success: boolean;
+        skipped: boolean;
+        reason?: string | null;
+        error?: string | null;
+        deviceCount: number;
+        tokenCount: number;
+        invalidTokenCount: number;
+        expoStatuses: string[];
+      }>;
+    };
+    status?: number;
+  }> {
+    const accessToken = this.getAccessToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    let response = await fetch(`${this.baseUrl}/tenant/notifications/send`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (response.status === 401) {
+      const refreshed = await this.refreshAccessToken();
+
+      if (refreshed) {
+        const newAccessToken = this.getAccessToken();
+        if (newAccessToken) {
+          headers['Authorization'] = `Bearer ${newAccessToken}`;
+        }
+
+        response = await fetch(`${this.baseUrl}/tenant/notifications/send`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(data),
+        });
+      } else {
+        this.clearTokens();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/ar/login';
+        }
+        return {
+          success: false,
+          message: 'Authentication failed. Please login again.',
+          status: 401
+        };
+      }
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return {
+        success: false,
+        message: response.ok
+          ? 'Server returned non-JSON response'
+          : `Server returned ${response.status}: ${response.statusText}`,
+        status: response.status
+      };
+    }
+
+    const result = await response.json();
+    return {
+      ...result,
+      success: !!result.success && response.ok,
+      status: response.status
+    };
   }
 
   /** Get push notification send history (paginated) */

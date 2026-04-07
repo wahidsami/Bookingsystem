@@ -29,16 +29,14 @@ function resolvePushLimit(limits) {
 
 async function sendToCustomer(platformUserId, title, body, data = {}) {
     if (!platformUserId) {
-        return false;
+        return { success: false, skipped: true, reason: 'missing_user_id' };
     }
 
-    const response = await pushNotificationService.sendToUser(platformUserId, {
+    return pushNotificationService.sendToUser(platformUserId, {
         title,
         body,
         data
     });
-
-    return !!response?.success;
 }
 
 async function getTenantPushUsage(tenantId) {
@@ -90,7 +88,21 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
         });
 
         if ((usage.count || 0) + uniqueUserIds.length > limit) {
-            return { sent: 0, limitReached: true };
+            return {
+                sent: 0,
+                limitReached: true,
+                debug: {
+                    requestedRecipients: uniqueUserIds.length,
+                    attemptedRecipients: 0,
+                    sentRecipients: 0,
+                    skippedRecipients: 0,
+                    failedRecipients: 0,
+                    skippedReasons: {},
+                    usageBeforeSend: usage.count || 0,
+                    usageLimit: limit,
+                    recipientResults: []
+                }
+            };
         }
     }
 
@@ -123,14 +135,40 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
     }
 
     const sentToIds = [];
+    const recipientResults = [];
+    const skippedReasons = {};
+
     for (const platformUserId of uniqueUserIds) {
-        const sent = await sendToCustomer(platformUserId, title, body, payload);
-        if (sent) {
+        const result = await sendToCustomer(platformUserId, title, body, payload);
+        const success = !!result?.success;
+        const reason = result?.reason || null;
+
+        if (reason) {
+            skippedReasons[reason] = (skippedReasons[reason] || 0) + 1;
+        }
+
+        recipientResults.push({
+            platformUserId,
+            success,
+            skipped: !!result?.skipped,
+            reason,
+            error: result?.error || null,
+            deviceCount: typeof result?.deviceCount === 'number' ? result.deviceCount : 0,
+            tokenCount: typeof result?.tokenCount === 'number' ? result.tokenCount : 0,
+            invalidTokenCount: typeof result?.invalidTokenCount === 'number' ? result.invalidTokenCount : 0,
+            expoStatuses: Array.isArray(result?.response?.data)
+                ? result.response.data.map((item) => item?.status).filter(Boolean)
+                : []
+        });
+
+        if (success) {
             sentToIds.push(platformUserId);
         }
     }
 
     const sent = sentToIds.length;
+    const skippedRecipients = recipientResults.filter((item) => item.skipped).length;
+    const failedRecipients = recipientResults.filter((item) => !item.success && !item.skipped).length;
 
     if (limit !== -1 && sent > 0) {
         const [usage] = await db.TenantPushUsage.findOrCreate({
@@ -165,7 +203,19 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
         }
     }
 
-    return { sent };
+    return {
+        sent,
+        debug: {
+            requestedRecipients: uniqueUserIds.length,
+            attemptedRecipients: recipientResults.length,
+            sentRecipients: sent,
+            skippedRecipients,
+            failedRecipients,
+            skippedReasons,
+            usageLimit: limit,
+            recipientResults
+        }
+    };
 }
 
 module.exports = {
