@@ -95,7 +95,7 @@ exports.getAppointments = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 }
             ],
@@ -170,7 +170,7 @@ exports.getCalendarAppointments = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 }
             ],
@@ -231,7 +231,7 @@ exports.getAppointment = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'photo'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
                     required: false
                 },
                 {
