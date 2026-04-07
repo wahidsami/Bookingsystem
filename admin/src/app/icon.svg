@@ -1,0 +1,15 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="adminGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="adminAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#adminGlow)" />
+  <rect x="34" y="34" width="188" height="188" rx="44" fill="none" stroke="url(#adminAccent)" stroke-width="10" />
+  <path d="M83 177V79h32c18.667 0 31.667 3.667 39 11 7.333 7.333 11 16.667 11 28 0 8-1.867 14.667-5.6 20-3.6 5.2-8.933 9.2-16 12l27.6 27h-28.6l-22.2-22H109v22H83zm26-44h13c11.333 0 17-4.867 17-14.6 0-9.6-5.667-14.4-17-14.4h-13v29z" fill="#f8fafc" />
+</svg>
