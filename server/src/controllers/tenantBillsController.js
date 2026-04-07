@@ -11,6 +11,12 @@ const { PAYABLE_BILL_STATUSES, RETIRABLE_BILL_STATUSES, BILL_STATUS } = require(
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
+function normalizeBillMetadata(metadata) {
+    return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+        ? metadata
+        : {};
+}
+
 function resolveBillDocumentPath(relativePath) {
     if (!relativePath) return null;
 
@@ -49,48 +55,56 @@ async function findTenantBill(tenantId, billId) {
 }
 
 async function normalizePendingActivationBills(req) {
-    const tenantId = req.tenantId || req.tenant?.id;
-    if (!tenantId || req.tenant?.status !== 'payment_pending') {
-        return;
-    }
-
-    const retriableBills = await db.Bill.findAll({
-        where: {
-            tenantId,
-            status: { [Op.in]: RETIRABLE_BILL_STATUSES },
-            type: { [Op.in]: ['initial', 'renewal', 'upgrade'] }
-        },
-        order: [['createdAt', 'DESC']]
-    });
-
-    if (retriableBills.length <= 1) {
-        return;
-    }
-
-    const keepLatestBillBySubscription = new Map();
-
-    for (const bill of retriableBills) {
-        const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
-        if (!keepLatestBillBySubscription.has(subscriptionKey)) {
-            keepLatestBillBySubscription.set(subscriptionKey, bill.id);
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        if (!tenantId || req.tenant?.status !== 'payment_pending') {
+            return;
         }
-    }
 
-    const billsToVoid = retriableBills.filter((bill) => {
-        const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
-        return keepLatestBillBySubscription.get(subscriptionKey) !== bill.id;
-    });
-
-    for (const bill of billsToVoid) {
-        await bill.update({
-            status: BILL_STATUS.VOID,
-            paymentFailureReason: 'Superseded by a newer pending activation invoice',
-            metadata: {
-                ...(bill.metadata || {}),
-                voidedAt: new Date().toISOString(),
-                voidReason: 'superseded_by_newer_pending_activation_invoice'
-            }
+        const retriableBills = await db.Bill.findAll({
+            where: {
+                tenantId,
+                status: { [Op.in]: RETIRABLE_BILL_STATUSES },
+                type: { [Op.in]: ['initial', 'renewal', 'upgrade'] }
+            },
+            order: [['createdAt', 'DESC']]
         });
+
+        if (retriableBills.length <= 1) {
+            return;
+        }
+
+        const keepLatestBillBySubscription = new Map();
+
+        for (const bill of retriableBills) {
+            const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
+            if (!keepLatestBillBySubscription.has(subscriptionKey)) {
+                keepLatestBillBySubscription.set(subscriptionKey, bill.id);
+            }
+        }
+
+        const billsToVoid = retriableBills.filter((bill) => {
+            const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
+            return keepLatestBillBySubscription.get(subscriptionKey) !== bill.id;
+        });
+
+        for (const bill of billsToVoid) {
+            try {
+                await bill.update({
+                    status: BILL_STATUS.VOID,
+                    paymentFailureReason: 'Superseded by a newer pending activation invoice',
+                    metadata: {
+                        ...normalizeBillMetadata(bill.metadata),
+                        voidedAt: new Date().toISOString(),
+                        voidReason: 'superseded_by_newer_pending_activation_invoice'
+                    }
+                });
+            } catch (billError) {
+                console.error(`[Bills] Failed to void superseded bill ${bill.id}:`, billError);
+            }
+        }
+    } catch (error) {
+        console.error('[Bills] normalizePendingActivationBills failed:', error);
     }
 }
 
