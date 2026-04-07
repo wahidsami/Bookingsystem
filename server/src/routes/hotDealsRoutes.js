@@ -15,8 +15,8 @@ router.get('/hot-deals', hotDealsController.getActiveHotDeals);
 router.get('/tenant/hot-deals/limits', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.getHotDealsLimits);
 router.get('/tenant/hot-deals', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.getTenantHotDeals);
 router.get('/tenant/hot-deals/:id', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.getTenantHotDealById);
-router.post('/tenant/hot-deals', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.createHotDeal);
-router.put('/tenant/hot-deals/:id', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.updateHotDeal);
+router.post('/tenant/hot-deals', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.uploadImage, hotDealsController.createHotDeal);
+router.put('/tenant/hot-deals/:id', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.uploadImage, hotDealsController.updateHotDeal);
 router.delete('/tenant/hot-deals/:id', authenticateTenant, checkTenantFeature('maxHotDeals'), hotDealsController.deleteHotDeal);
 
 // Admin routes
