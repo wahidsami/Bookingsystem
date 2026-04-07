@@ -18,8 +18,9 @@ interface HotDeal {
     validUntil: string;
     maxRedemptions: number;
     currentRedemptions: number;
-    status: 'pending' | 'active' | 'rejected' | 'expired';
+    status: 'pending' | 'approved' | 'active' | 'rejected' | 'expired' | 'paused';
     createdAt: string;
+    rejectionReason?: string;
     tenant?: {
         id: string;
         businessNameEn: string;
@@ -34,35 +35,45 @@ interface HotDeal {
     };
 }
 
+const STATUS_META: Record<string, { label: string; badgeClass: string }> = {
+    pending: { label: 'Pending Review', badgeClass: 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' },
+    approved: { label: 'Approved', badgeClass: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' },
+    active: { label: 'Active', badgeClass: 'bg-green-500/20 border-green-500/40 text-green-400' },
+    rejected: { label: 'Rejected', badgeClass: 'bg-red-500/20 border-red-500/40 text-red-400' },
+    expired: { label: 'Expired', badgeClass: 'bg-gray-500/20 border-gray-500/40 text-gray-300' },
+    paused: { label: 'Paused', badgeClass: 'bg-slate-500/20 border-slate-500/40 text-slate-300' },
+};
+
 export default function MarketingPage() {
     const [deals, setDeals] = useState<HotDeal[]>([]);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'pending' | 'active' | 'rejected' | 'expired' | 'paused'>('ALL');
+    const [summary, setSummary] = useState<Record<string, number>>({});
 
-    // Reject modal state
     const [rejectModal, setRejectModal] = useState<{ open: boolean; dealId: string | null; reason: string }>({
         open: false,
         dealId: null,
         reason: '',
     });
 
-    // Toast notification
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
         loadDeals();
-    }, []);
+    }, [statusFilter]);
 
     const loadDeals = async () => {
         setLoading(true);
         try {
-            const response = await adminApi.getPendingHotDeals();
+            const response = await adminApi.getHotDeals(statusFilter);
             if (response.success) {
                 setDeals(response.deals || []);
+                setSummary(response.summary || {});
             }
         } catch (error) {
-            console.error('Failed to load pending hot deals:', error);
-            showToast('Failed to load pending deals', 'error');
+            console.error('Failed to load hot deals:', error);
+            showToast('Failed to load hot deals', 'error');
         } finally {
             setLoading(false);
         }
@@ -77,8 +88,8 @@ export default function MarketingPage() {
         setProcessing(id);
         try {
             await adminApi.approveHotDeal(id);
-            setDeals(prev => prev.filter(d => d.id !== id));
-            showToast('Deal approved — it is now live on the mobile app! 🎉', 'success');
+            showToast('Deal approved and now visible in active campaigns.', 'success');
+            await loadDeals();
         } catch (error: any) {
             showToast(error.message || 'Failed to approve deal', 'error');
         } finally {
@@ -95,9 +106,9 @@ export default function MarketingPage() {
         setProcessing(rejectModal.dealId);
         try {
             await adminApi.rejectHotDeal(rejectModal.dealId, rejectModal.reason.trim());
-            setDeals(prev => prev.filter(d => d.id !== rejectModal.dealId));
             setRejectModal({ open: false, dealId: null, reason: '' });
             showToast('Deal rejected and tenant has been notified.', 'success');
+            await loadDeals();
         } catch (error: any) {
             showToast(error.message || 'Failed to reject deal', 'error');
         } finally {
@@ -118,41 +129,51 @@ export default function MarketingPage() {
             ? Math.round(((deal.originalPrice - deal.discountedPrice) / deal.originalPrice) * 100)
             : deal.discountValue;
 
+    const pendingCount = summary.pending || deals.filter((deal) => deal.status === 'pending').length;
+
     return (
         <AdminLayout>
             <div className="space-y-6 animate-fade-in">
-
-                {/* Toast */}
                 {toast && (
                     <div className={`fixed top-6 right-6 z-50 px-5 py-4 rounded-lg shadow-xl text-sm font-medium transition-all ${toast.type === 'success'
-                            ? 'bg-green-500/20 border border-green-500/40 text-green-300'
-                            : 'bg-red-500/20 border border-red-500/40 text-red-300'
+                        ? 'bg-green-500/20 border border-green-500/40 text-green-300'
+                        : 'bg-red-500/20 border border-red-500/40 text-red-300'
                         }`}>
-                        {toast.type === 'success' ? '✓ ' : '✕ '}{toast.message}
+                        {toast.type === 'success' ? 'Success: ' : 'Error: '}{toast.message}
                     </div>
                 )}
 
-                {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">🔥 Hot Deals Moderation</h1>
+                        <h1 className="text-2xl font-bold text-white">Hot Deals Marketing</h1>
                         <p className="text-dark-400 text-sm mt-1">
-                            Review and approve promotional deals submitted by tenants
+                            Review pending submissions and monitor all tenant hot deals.
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        {deals.length > 0 && (
+                        {pendingCount > 0 && (
                             <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-sm rounded-full font-medium">
-                                {deals.length} pending {deals.length === 1 ? 'review' : 'reviews'}
+                                {pendingCount} pending {pendingCount === 1 ? 'review' : 'reviews'}
                             </span>
                         )}
+                        <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                            className="rounded-lg border border-dark-700 bg-dark-800 px-3 py-2 text-sm text-white"
+                        >
+                            <option value="ALL">All Deals</option>
+                            <option value="pending">Pending</option>
+                            <option value="active">Active</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="expired">Expired</option>
+                            <option value="paused">Paused</option>
+                        </select>
                         <button onClick={loadDeals} className="btn btn-secondary btn-sm">
-                            ↻ Refresh
+                            Refresh
                         </button>
                     </div>
                 </div>
 
-                {/* Loading */}
                 {loading && (
                     <div className="card">
                         <div className="card-body flex items-center justify-center py-16">
@@ -161,27 +182,25 @@ export default function MarketingPage() {
                     </div>
                 )}
 
-                {/* Empty State */}
                 {!loading && deals.length === 0 && (
                     <div className="card">
                         <div className="card-body text-center py-20">
-                            <div className="text-6xl mb-4">🎉</div>
-                            <h3 className="text-xl font-semibold text-white mb-2">All caught up!</h3>
+                            <div className="text-6xl mb-4">Campaigns</div>
+                            <h3 className="text-xl font-semibold text-white mb-2">Nothing to show</h3>
                             <p className="text-dark-400 text-sm max-w-sm mx-auto">
-                                No hot deals are waiting for review right now. New submissions will appear here.
+                                {statusFilter === 'ALL'
+                                    ? 'No hot deals have been submitted yet. New tenant deals will appear here.'
+                                    : `No ${statusFilter} hot deals found right now.`}
                             </p>
                         </div>
                     </div>
                 )}
 
-                {/* Deal Cards Grid */}
                 {!loading && deals.length > 0 && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                         {deals.map((deal) => (
                             <div key={deal.id} className="card border border-dark-700 hover:border-yellow-500/40 transition-colors">
                                 <div className="card-body space-y-4">
-
-                                    {/* Deal Header */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
                                             <h3 className="font-semibold text-white text-base leading-tight truncate">
@@ -193,13 +212,20 @@ export default function MarketingPage() {
                                                 </p>
                                             )}
                                         </div>
-                                        {/* Savings badge */}
                                         <span className="flex-shrink-0 px-2 py-1 bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-bold rounded-md">
                                             Save {savings(deal)}%
                                         </span>
                                     </div>
 
-                                    {/* Tenant & Service */}
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${STATUS_META[deal.status]?.badgeClass || STATUS_META.pending.badgeClass}`}>
+                                            {STATUS_META[deal.status]?.label || deal.status}
+                                        </span>
+                                        {deal.currentRedemptions > 0 && (
+                                            <span className="text-xs text-dark-400">Redeemed: {deal.currentRedemptions}</span>
+                                        )}
+                                    </div>
+
                                     <div className="space-y-1.5">
                                         <div className="flex items-center gap-2 text-sm">
                                             <span className="text-dark-400">By:</span>
@@ -215,7 +241,6 @@ export default function MarketingPage() {
                                         )}
                                     </div>
 
-                                    {/* Pricing */}
                                     <div className="bg-dark-900 rounded-lg p-3 space-y-1">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-dark-400">Discount</span>
@@ -239,7 +264,6 @@ export default function MarketingPage() {
                                         </div>
                                     </div>
 
-                                    {/* Validity & Redemptions */}
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div>
                                             <p className="text-dark-400 mb-0.5">Valid From</p>
@@ -261,33 +285,41 @@ export default function MarketingPage() {
                                         </div>
                                     </div>
 
-                                    {/* Description */}
                                     {deal.description_en && (
                                         <p className="text-xs text-dark-400 italic leading-relaxed line-clamp-2">
                                             {deal.description_en}
                                         </p>
                                     )}
 
-                                    {/* Actions */}
+                                    {deal.status === 'rejected' && deal.rejectionReason && (
+                                        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+                                            {deal.rejectionReason}
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-2 pt-1 border-t border-dark-700">
-                                        <button
-                                            onClick={() => handleApprove(deal.id)}
-                                            disabled={processing === deal.id}
-                                            className="flex-1 btn btn-success btn-sm disabled:opacity-50"
-                                        >
-                                            {processing === deal.id ? (
-                                                <span className="flex items-center justify-center gap-1">
-                                                    <div className="spinner w-3 h-3" /> Wait...
-                                                </span>
-                                            ) : '✓ Approve'}
-                                        </button>
-                                        <button
-                                            onClick={() => openRejectModal(deal.id)}
-                                            disabled={processing === deal.id}
-                                            className="flex-1 btn btn-danger btn-sm disabled:opacity-50"
-                                        >
-                                            ✕ Reject
-                                        </button>
+                                        {deal.status === 'pending' ? (
+                                            <>
+                                                <button
+                                                    onClick={() => handleApprove(deal.id)}
+                                                    disabled={processing === deal.id}
+                                                    className="flex-1 btn btn-success btn-sm disabled:opacity-50"
+                                                >
+                                                    {processing === deal.id ? 'Please wait...' : 'Approve'}
+                                                </button>
+                                                <button
+                                                    onClick={() => openRejectModal(deal.id)}
+                                                    disabled={processing === deal.id}
+                                                    className="flex-1 btn btn-danger btn-sm disabled:opacity-50"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <div className="flex-1 rounded-lg border border-dark-700 bg-dark-900/60 px-3 py-2 text-center text-xs text-dark-300">
+                                                Review actions are available for pending deals only.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -295,14 +327,13 @@ export default function MarketingPage() {
                     </div>
                 )}
 
-                {/* Reject Modal */}
                 {rejectModal.open && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                         <div className="bg-dark-800 border border-dark-600 rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5">
                             <div>
                                 <h2 className="text-lg font-semibold text-white">Reject Hot Deal</h2>
                                 <p className="text-sm text-dark-400 mt-1">
-                                    A mandatory rejection reason will be sent to the tenant.
+                                    A rejection reason will be sent to the tenant.
                                 </p>
                             </div>
 
@@ -314,39 +345,30 @@ export default function MarketingPage() {
                                     rows={4}
                                     value={rejectModal.reason}
                                     onChange={e => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
-                                    placeholder="e.g. The original price appears inflated. Please resubmit with accurate pricing."
+                                    placeholder="Explain why this deal is being rejected."
                                     className="input w-full resize-none text-sm"
                                     autoFocus
                                 />
-                                <p className="text-xs text-dark-500 mt-1">
-                                    {rejectModal.reason.trim().length}/250 characters
-                                </p>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     onClick={() => setRejectModal({ open: false, dealId: null, reason: '' })}
-                                    className="flex-1 btn btn-secondary"
-                                    disabled={processing !== null}
+                                    className="btn btn-secondary btn-sm"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleReject}
-                                    disabled={!rejectModal.reason.trim() || processing !== null}
-                                    className="flex-1 btn btn-danger disabled:opacity-50"
+                                    disabled={!rejectModal.reason.trim() || !!processing}
+                                    className="btn btn-danger btn-sm disabled:opacity-50"
                                 >
-                                    {processing ? (
-                                        <span className="flex items-center justify-center gap-1">
-                                            <div className="spinner w-3 h-3" /> Rejecting...
-                                        </span>
-                                    ) : 'Confirm Rejection'}
+                                    {processing ? 'Rejecting...' : 'Confirm Rejection'}
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
-
             </div>
         </AdminLayout>
     );

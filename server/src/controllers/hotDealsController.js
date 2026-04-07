@@ -398,13 +398,21 @@ const deleteHotDeal = async (req, res) => {
 // ============================================
 
 /**
- * Get all hot deals pending approval
- * GET /api/v1/admin/hot-deals/pending
+ * Get hot deals for admin marketing dashboard
+ * GET /api/v1/admin/hot-deals
  */
-const getPendingHotDeals = async (req, res) => {
+const getAdminHotDeals = async (req, res) => {
     try {
+        const status = typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : 'all';
+        const allowedStatuses = new Set(['all', 'pending', 'approved', 'active', 'expired', 'rejected', 'paused']);
+        const where = {};
+
+        if (allowedStatuses.has(status) && status !== 'all') {
+            where.status = status;
+        }
+
         const deals = await db.HotDeal.findAll({
-            where: { status: 'pending' },
+            where,
             include: [
                 {
                     model: db.Tenant,
@@ -417,20 +425,36 @@ const getPendingHotDeals = async (req, res) => {
                     attributes: ['id', 'name_en', 'name_ar', 'rawPrice', 'finalPrice', 'image']
                 }
             ],
-            order: [['createdAt', 'ASC']]
+            order: [['createdAt', 'DESC']]
         });
+
+        const summary = deals.reduce((acc, deal) => {
+            const key = deal.status || 'unknown';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
 
         res.json({
             success: true,
-            deals: deals.map(serializeHotDeal)
+            deals: deals.map(serializeHotDeal),
+            summary
         });
     } catch (error) {
-        console.error('Get pending hot deals error:', error);
+        console.error('Get admin hot deals error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch pending hot deals'
+            message: 'Failed to fetch hot deals'
         });
     }
+};
+
+/**
+ * Get all hot deals pending approval
+ * GET /api/v1/admin/hot-deals/pending
+ */
+const getPendingHotDeals = async (req, res) => {
+    req.query.status = 'pending';
+    return getAdminHotDeals(req, res);
 };
 
 /**
@@ -576,6 +600,7 @@ module.exports = {
     deleteHotDeal,
 
     // Admin endpoints
+    getAdminHotDeals,
     getPendingHotDeals,
     approveHotDeal,
     rejectHotDeal,

@@ -451,6 +451,11 @@ class AdminApi {
   }
 
   // Hot Deals Management
+  async getHotDeals(status: string = 'ALL') {
+    const query = status && status !== 'ALL' ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request<{ success: boolean; deals: any[]; summary?: Record<string, number> }>(`/admin/hot-deals${query}`);
+  }
+
   async getPendingHotDeals() {
     return this.request<{ success: boolean; deals: any[] }>('/admin/hot-deals/pending');
   }
