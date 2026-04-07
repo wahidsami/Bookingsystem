@@ -100,7 +100,17 @@ export function TenantLayout({ children }: TenantLayoutProps) {
 
   useEffect(() => {
     if (!user) return;
-    if (user.status === 'payment_pending' && !pathname?.includes('/payment') && !pathname?.includes('/subscription/pay')) {
+
+    const pendingPaymentAllowedRoutes = [
+      `/${locale}/payment`,
+      `/${locale}/subscription/pay`,
+      `/${locale}/dashboard/bills`,
+      `/${locale}/dashboard/subscription`
+    ];
+
+    const isPendingPaymentAllowedRoute = pendingPaymentAllowedRoutes.some((route) => pathname?.startsWith(route));
+
+    if (user.status === 'payment_pending' && !isPendingPaymentAllowedRoute) {
       router.replace(`/${locale}/payment`);
     } else if (user.status === 'more_info_required' && !pathname?.includes('/onboarding/more-info')) {
       router.replace(`/${locale}/onboarding/more-info`);
