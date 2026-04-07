@@ -475,21 +475,33 @@ exports.voidBill = async (req, res) => {
             }
         });
 
-        await db.ActivityLog.create({
-            entityType: 'tenant',
-            entityId: bill.tenantId,
-            action: 'updated',
-            performedByType: 'super_admin',
-            performedById: req.adminId || null,
-            performedByName: req.adminName || 'super-admin',
-            details: {
-                event: 'invoice_voided',
-                billId: bill.id,
-                billNumber: bill.billNumber,
-                previousStatus,
-                reason: reason || null
-            }
-        });
+        try {
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: bill.tenantId,
+                action: 'updated',
+                performedByType: 'super_admin',
+                performedById: req.adminId || null,
+                performedByName: req.adminName || 'super-admin',
+                details: {
+                    event: 'invoice_voided',
+                    billId: bill.id,
+                    billNumber: bill.billNumber,
+                    previousStatus,
+                    reason: reason || null
+                },
+                previousValue: {
+                    status: previousStatus
+                },
+                newValue: {
+                    status: BILL_STATUS.VOID
+                },
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
+            });
+        } catch (activityLogError) {
+            console.error('voidBill activity log error:', activityLogError);
+        }
 
         const updatedBill = await findBillById(id);
 
@@ -505,7 +517,7 @@ exports.voidBill = async (req, res) => {
         console.error('voidBill error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to void invoice'
+            message: error.message || 'Failed to void invoice'
         });
     }
 };
