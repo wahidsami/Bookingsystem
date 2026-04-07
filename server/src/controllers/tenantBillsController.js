@@ -1,12 +1,13 @@
 const db = require('../models');
 const fs = require('fs');
 const path = require('path');
+const { Op } = require('sequelize');
 const {
     ensureInvoicePdf,
     ensureReceiptPdf
 } = require('../services/billDocumentService');
 const { serializeBill } = require('../utils/invoiceSnapshotBuilder');
-const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
+const { PAYABLE_BILL_STATUSES, RETIRABLE_BILL_STATUSES, BILL_STATUS } = require('../utils/billStatus');
 
 const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 
@@ -45,6 +46,52 @@ async function findTenantBill(tenantId, billId) {
             attributes: ['id', 'name', 'name_ar', 'name_en', 'email', 'phone']
         }]
     });
+}
+
+async function normalizePendingActivationBills(req) {
+    const tenantId = req.tenantId || req.tenant?.id;
+    if (!tenantId || req.tenant?.status !== 'payment_pending') {
+        return;
+    }
+
+    const retriableBills = await db.Bill.findAll({
+        where: {
+            tenantId,
+            status: { [Op.in]: RETIRABLE_BILL_STATUSES },
+            type: { [Op.in]: ['initial', 'renewal', 'upgrade'] }
+        },
+        order: [['createdAt', 'DESC']]
+    });
+
+    if (retriableBills.length <= 1) {
+        return;
+    }
+
+    const keepLatestBillBySubscription = new Map();
+
+    for (const bill of retriableBills) {
+        const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
+        if (!keepLatestBillBySubscription.has(subscriptionKey)) {
+            keepLatestBillBySubscription.set(subscriptionKey, bill.id);
+        }
+    }
+
+    const billsToVoid = retriableBills.filter((bill) => {
+        const subscriptionKey = bill.tenantSubscriptionId || `tenant:${tenantId}`;
+        return keepLatestBillBySubscription.get(subscriptionKey) !== bill.id;
+    });
+
+    for (const bill of billsToVoid) {
+        await bill.update({
+            status: BILL_STATUS.VOID,
+            paymentFailureReason: 'Superseded by a newer pending activation invoice',
+            metadata: {
+                ...(bill.metadata || {}),
+                voidedAt: new Date().toISOString(),
+                voidReason: 'superseded_by_newer_pending_activation_invoice'
+            }
+        });
+    }
 }
 
 async function serveTenantBillDocument(req, res, documentField) {
@@ -89,6 +136,7 @@ async function serveTenantBillDocument(req, res, documentField) {
 exports.getBills = async (req, res) => {
     try {
         const tenantId = req.tenantId || req.tenant?.id;
+        await normalizePendingActivationBills(req);
 
         const bills = await db.Bill.findAll({
             where: { tenantId },
@@ -123,6 +171,7 @@ exports.getBills = async (req, res) => {
 exports.getCurrentUnpaidBill = async (req, res) => {
     try {
         const tenantId = req.tenantId || req.tenant?.id;
+        await normalizePendingActivationBills(req);
 
         const bill = await db.Bill.findOne({
             where: {

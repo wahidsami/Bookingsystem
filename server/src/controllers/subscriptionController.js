@@ -31,6 +31,20 @@ function getTenantId(req) {
     return req.tenantId || req.tenant?.id;
 }
 
+function getPeriodEndForBillingCycle(startDate, billingCycle = 'monthly') {
+    const periodEnd = new Date(startDate);
+
+    if (billingCycle === 'annual') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else if (billingCycle === 'sixMonth') {
+        periodEnd.setMonth(periodEnd.getMonth() + 6);
+    } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    return periodEnd;
+}
+
 /**
  * Get available packages (public endpoint for registration/browsing)
  */
@@ -307,11 +321,25 @@ exports.requestSubscriptionChange = async (req, res) => {
         const paymentUrl = baseUrl
             ? `${baseUrl}/${locale}/payment?token=${paymentToken}`
             : `/${locale}/payment?token=${paymentToken}`;
-        const type = currentSubscription.packageId === requestedPackageId ? 'renewal' : 'upgrade';
+        const isPendingInitialActivation = tenant?.status === 'payment_pending';
+        const previousPackageId = currentSubscription.packageId;
+        const previousBillingCycle = currentSubscription.billingCycle;
+        const nextPeriodEnd = getPeriodEndForBillingCycle(now, billingCycle);
+        const type = isPendingInitialActivation
+            ? 'initial'
+            : currentSubscription.packageId === requestedPackageId ? 'renewal' : 'upgrade';
+        const snapshotSubscription = isPendingInitialActivation
+            ? {
+                ...currentSubscription.toJSON(),
+                billingCycle,
+                currentPeriodStart: now,
+                currentPeriodEnd: nextPeriodEnd
+            }
+            : currentSubscription;
         const invoiceSnapshot = await buildSubscriptionInvoiceSnapshot({
             tenant,
             subscriptionPackage: newPackage,
-            subscription: currentSubscription,
+            subscription: snapshotSubscription,
             billingCycle,
             billType: type,
             dueDate,
@@ -320,6 +348,22 @@ exports.requestSubscriptionChange = async (req, res) => {
         });
 
         const bill = await db.sequelize.transaction(async (transaction) => {
+            if (isPendingInitialActivation) {
+                await currentSubscription.update({
+                    packageId: newPackage.id,
+                    billingCycle,
+                    amount,
+                    status: 'trial',
+                    currentPeriodStart: now,
+                    currentPeriodEnd: nextPeriodEnd,
+                    nextBillingDate: nextPeriodEnd
+                }, { transaction });
+
+                await tenant.update({
+                    paymentDueAt: expiresAt
+                }, { transaction });
+            }
+
             const createdBill = await db.Bill.create({
                 tenantId,
                 tenantSubscriptionId: currentSubscription.id,
@@ -334,11 +378,12 @@ exports.requestSubscriptionChange = async (req, res) => {
                 type,
                 metadata: {
                     ...(invoiceSnapshot.metadata || {}),
-                    currentPackageId: currentSubscription.packageId,
-                    currentBillingCycle: currentSubscription.billingCycle,
+                    currentPackageId: previousPackageId,
+                    currentBillingCycle: previousBillingCycle,
                     requestedPackageId: newPackage.id,
                     requestedBillingCycle: billingCycle,
-                    requestedAmount: amount
+                    requestedAmount: amount,
+                    replacesPendingActivationInvoice: isPendingInitialActivation
                 }
             }, { transaction });
 
@@ -362,7 +407,11 @@ exports.requestSubscriptionChange = async (req, res) => {
                         tenantId,
                         tenantSubscriptionId: currentSubscription.id,
                         status: { [Op.in]: RETIRABLE_BILL_STATUSES },
-                        type: { [Op.in]: ['renewal', 'upgrade'] }
+                        type: {
+                            [Op.in]: isPendingInitialActivation
+                                ? ['initial', 'renewal', 'upgrade']
+                                : ['renewal', 'upgrade']
+                        }
                     },
                     transaction
                 }
@@ -379,12 +428,14 @@ exports.requestSubscriptionChange = async (req, res) => {
                     event: 'invoice_created',
                     billId: createdBill.id,
                     billNumber,
-                    requestAction: type === 'renewal' ? 'subscription_renewal_requested' : 'subscription_change_requested',
+                    requestAction: isPendingInitialActivation
+                        ? 'subscription_activation_invoice_updated'
+                        : type === 'renewal' ? 'subscription_renewal_requested' : 'subscription_change_requested',
                     billType: type,
                     status: createdBill.status,
                     amount: toNumber(createdBill.amount, 0),
                     totalAmount: toNumber(createdBill.totalAmount, toNumber(createdBill.amount, 0)),
-                    currentPackageId: currentSubscription.packageId,
+                    currentPackageId: previousPackageId,
                     requestedPackageId: newPackage.id,
                     requestedBillingCycle: billingCycle
                 }
@@ -406,9 +457,11 @@ exports.requestSubscriptionChange = async (req, res) => {
         
         res.json({
             success: true,
-            message: type === 'renewal'
-                ? 'Renewal invoice created. Complete payment to renew your subscription.'
-                : 'Upgrade invoice created. Complete payment to activate your new package.',
+            message: isPendingInitialActivation
+                ? 'Activation invoice updated. Complete payment to activate your selected package.'
+                : type === 'renewal'
+                    ? 'Renewal invoice created. Complete payment to renew your subscription.'
+                    : 'Upgrade invoice created. Complete payment to activate your new package.',
             estimatedAmount: amount,
             billId: bill.id,
             billNumber,
