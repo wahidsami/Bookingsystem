@@ -399,29 +399,6 @@ const ensureStaffPermissionSchema = async () => {
     }
 };
 
-const ensureHotDealImageSchema = async () => {
-    try {
-        await db.sequelize.query(`
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1
-                    FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = 'hot_deals'
-                ) THEN
-                    ALTER TABLE public.hot_deals
-                        ADD COLUMN IF NOT EXISTS image TEXT;
-                END IF;
-            END $$;
-        `);
-
-        console.log('Hot deal image schema verified.');
-    } catch (error) {
-        console.error('Failed to ensure hot deal image schema:', error);
-        throw error;
-    }
-};
-
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -458,8 +435,6 @@ const startServer = async () => {
         await db.User.sync({ force: false });
         await db.Service.sync({ force: false });
         await db.Product.sync({ force: false }); // New: Product catalog
-        await db.HotDeal.sync({ force: false });
-        await ensureHotDealImageSchema();
         await db.Customer.sync({ force: false });
         await db.Staff.sync({ force: false });
         await db.StaffPermission.sync({ force: false });

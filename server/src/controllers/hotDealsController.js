@@ -6,55 +6,6 @@
 const db = require('../models');
 const promotionService = require('../services/promotionService');
 const { Op } = require('sequelize');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-const hotDealUploadRoot = path.join(__dirname, '../../uploads/hot-deals');
-
-const hotDealImageStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        if (!fs.existsSync(hotDealUploadRoot)) {
-            fs.mkdirSync(hotDealUploadRoot, { recursive: true });
-        }
-        cb(null, hotDealUploadRoot);
-    },
-    filename: (req, file, cb) => {
-        const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
-        cb(null, `deal-${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`);
-    }
-});
-
-const hotDealImageUpload = multer({
-    storage: hotDealImageStorage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype && file.mimetype.startsWith('image/')) {
-            cb(null, true);
-            return;
-        }
-        cb(new Error('Only image files are allowed for hot deals'));
-    }
-});
-
-const toUploadRelativePath = (absolutePath) => {
-    if (!absolutePath) return null;
-    const normalized = absolutePath.replace(/\\/g, '/');
-    const marker = '/uploads/';
-    const markerIndex = normalized.lastIndexOf(marker);
-    if (markerIndex === -1) return null;
-    return normalized.slice(markerIndex + marker.length);
-};
-
-const removeUploadedFile = (relativePath) => {
-    if (!relativePath) return;
-    const fullPath = path.join(__dirname, '../../uploads', relativePath);
-    if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
-    }
-};
-
-exports.uploadImage = hotDealImageUpload.single('image');
 
 const serializeHotDeal = (deal) => {
     if (!deal) return null;
@@ -314,7 +265,6 @@ const createHotDeal = async (req, res) => {
             title_ar,
             description_en,
             description_ar,
-            image: toUploadRelativePath(req.file?.path),
             discountType,
             discountValue,
             originalPrice,
@@ -340,9 +290,6 @@ const createHotDeal = async (req, res) => {
             autoApproved: canCreate.autoApprove
         });
     } catch (error) {
-        if (req.file?.path && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
         console.error('Create hot deal error:', error);
         res.status(500).json({
             success: false,
@@ -359,7 +306,7 @@ const updateHotDeal = async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.tenantId;
-        const updates = { ...req.body };
+        const updates = req.body;
 
         const deal = await db.HotDeal.findByPk(id);
         if (!deal) {
@@ -384,14 +331,6 @@ const updateHotDeal = async (req, res) => {
             });
         }
 
-        if (req.file?.path) {
-            const nextImage = toUploadRelativePath(req.file.path);
-            if (nextImage) {
-                removeUploadedFile(deal.image);
-                updates.image = nextImage;
-            }
-        }
-
         await deal.update(updates);
 
         const hydratedDeal = await db.HotDeal.findByPk(id, {
@@ -407,9 +346,6 @@ const updateHotDeal = async (req, res) => {
             deal: serializeHotDeal(hydratedDeal || deal)
         });
     } catch (error) {
-        if (req.file?.path && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
         console.error('Update hot deal error:', error);
         res.status(500).json({
             success: false,
@@ -442,7 +378,6 @@ const deleteHotDeal = async (req, res) => {
             });
         }
 
-        removeUploadedFile(deal.image);
         await deal.destroy();
 
         res.json({
