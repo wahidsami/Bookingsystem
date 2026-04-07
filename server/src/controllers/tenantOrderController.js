@@ -7,6 +7,27 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const orderService = require('../services/orderService');
 
+function parseDateValue(value, endOfDay = false) {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        if (endOfDay) {
+            date.setHours(23, 59, 59, 999);
+        } else {
+            date.setHours(0, 0, 0, 0);
+        }
+    }
+
+    return date;
+}
+
 /**
  * Get all orders for tenant
  * GET /api/v1/tenant/orders
@@ -39,9 +60,14 @@ exports.getOrders = async (req, res) => {
 
         // Date filter
         if (startDate || endDate) {
+            const start = parseDateValue(startDate, false);
+            const end = parseDateValue(endDate, true);
             where.createdAt = {};
-            if (startDate) where.createdAt[Op.gte] = new Date(startDate);
-            if (endDate) where.createdAt[Op.lte] = new Date(endDate);
+            if (start) where.createdAt[Op.gte] = start;
+            if (end) where.createdAt[Op.lte] = end;
+            if (Object.keys(where.createdAt).length === 0) {
+                delete where.createdAt;
+            }
         }
 
         // Search filter (order number or customer name)

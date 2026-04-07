@@ -51,6 +51,7 @@ export default function DashboardPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -59,14 +60,33 @@ export default function DashboardPage() {
   const loadData = async () => {
     try {
       setError(null);
+      setNotice(null);
       setLoading(true);
-      const [statsRes, activitiesRes] = await Promise.all([
+      const [statsRes, activitiesRes] = await Promise.allSettled([
         adminApi.getDashboardStats(),
         adminApi.getRecentActivities(10),
       ]);
+      const failedSections: string[] = [];
 
-      if (statsRes.success) setStats(statsRes.stats);
-      if (activitiesRes.success) setActivities(activitiesRes.activities);
+      if (statsRes.status === 'fulfilled' && statsRes.value.success) {
+        setStats(statsRes.value.stats);
+      } else {
+        setStats(null);
+        failedSections.push('stats');
+      }
+
+      if (activitiesRes.status === 'fulfilled' && activitiesRes.value.success) {
+        setActivities(activitiesRes.value.activities || []);
+      } else {
+        setActivities([]);
+        failedSections.push('recent activities');
+      }
+
+      if (failedSections.length === 2) {
+        setError('Failed to load admin dashboard data.');
+      } else if (failedSections.length > 0) {
+        setNotice(`Some admin dashboard sections failed to load: ${failedSections.join(', ')}`);
+      }
     } catch (error: any) {
       console.error("Failed to load dashboard:", error);
       setError(
@@ -167,6 +187,12 @@ export default function DashboardPage() {
   return (
     <AdminLayout>
       <div className="space-y-6 animate-fade-in">
+        {notice && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {notice}
+          </div>
+        )}
+
         {/* Quick Alert for Pending */}
         {stats && stats.tenants.pending > 0 && (
           <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center justify-between">

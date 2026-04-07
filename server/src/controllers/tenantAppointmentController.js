@@ -21,6 +21,48 @@ const {
     normalizeAppointmentStatus
 } = require('../utils/appointmentStatus');
 
+function parseDateValue(value, endOfDay = false) {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        if (endOfDay) {
+            date.setHours(23, 59, 59, 999);
+        } else {
+            date.setHours(0, 0, 0, 0);
+        }
+    }
+
+    return date;
+}
+
+function buildDateRangeWhere(field, startDate, endDate) {
+    const start = parseDateValue(startDate, false);
+    const end = parseDateValue(endDate, true);
+
+    if (!start && !end) {
+        return {};
+    }
+
+    const filter = {};
+    if (start) {
+        filter[Op.gte] = start;
+    }
+    if (end) {
+        filter[Op.lte] = end;
+    }
+
+    return {
+        [field]: filter
+    };
+}
+
 /**
  * Get all appointments for the authenticated tenant
  * GET /api/v1/tenant/appointments
@@ -47,15 +89,7 @@ exports.getAppointments = async (req, res) => {
         // Since appointments link to services and staff, we'll filter through those
 
         // Build date range filter
-        if (startDate || endDate) {
-            where.startTime = {};
-            if (startDate) {
-                where.startTime[Op.gte] = new Date(startDate);
-            }
-            if (endDate) {
-                where.startTime[Op.lte] = new Date(endDate);
-            }
-        }
+        Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
 
         if (staffId) {
             where.staffId = staffId;
@@ -141,15 +175,7 @@ exports.getCalendarAppointments = async (req, res) => {
         const where = {};
         
         // Build date range filter
-        if (startDate || endDate) {
-            where.startTime = {};
-            if (startDate) {
-                where.startTime[Op.gte] = new Date(startDate);
-            }
-            if (endDate) {
-                where.startTime[Op.lte] = new Date(endDate);
-            }
-        }
+        Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
 
         if (staffId) {
             where.staffId = staffId;
@@ -700,15 +726,7 @@ exports.getAppointmentStats = async (req, res) => {
 
         const where = {};
         
-        if (startDate || endDate) {
-            where.startTime = {};
-            if (startDate) {
-                where.startTime[Op.gte] = new Date(startDate);
-            }
-            if (endDate) {
-                where.startTime[Op.lte] = new Date(endDate);
-            }
-        }
+        Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
 
         // Get appointments with service filter
         const appointments = await db.Appointment.findAll({

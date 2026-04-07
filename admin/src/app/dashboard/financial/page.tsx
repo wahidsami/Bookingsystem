@@ -127,6 +127,7 @@ export default function FinancialOverviewPage() {
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('30');
 
   useEffect(() => {
@@ -141,23 +142,60 @@ export default function FinancialOverviewPage() {
     try {
       setLoading(true);
       setError(null);
+      setNotice(null);
 
       const startDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
       const endDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
 
-      const [summaryRes, monthlyRes, commissionRes, revenueByTypeRes, billsRes] = await Promise.all([
+      const [summaryRes, monthlyRes, commissionRes, revenueByTypeRes, billsRes] = await Promise.allSettled([
         adminApi.getPlatformFinancialSummary(startDate, endDate),
         adminApi.getMonthlyComparison(12),
         adminApi.getCommissionByPackage(startDate, endDate),
         adminApi.getRevenueByType(startDate, endDate),
         adminApi.getBillsSummary(),
       ]);
+      const failedSections: string[] = [];
 
-      if (summaryRes.success) setSummary(summaryRes.data);
-      if (monthlyRes.success) setMonthly(monthlyRes.data);
-      if (commissionRes.success) setCommissionBreakdown(commissionRes.data);
-      if (revenueByTypeRes.success) setRevenueByType(revenueByTypeRes.data);
-      if (billsRes.success) setBillsSummary(billsRes.data);
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.success) {
+        setSummary(summaryRes.value.data);
+      } else {
+        setSummary(null);
+        failedSections.push('summary');
+      }
+
+      if (monthlyRes.status === 'fulfilled' && monthlyRes.value.success) {
+        setMonthly(monthlyRes.value.data || []);
+      } else {
+        setMonthly([]);
+        failedSections.push('monthly comparison');
+      }
+
+      if (commissionRes.status === 'fulfilled' && commissionRes.value.success) {
+        setCommissionBreakdown(commissionRes.value.data || []);
+      } else {
+        setCommissionBreakdown([]);
+        failedSections.push('commission breakdown');
+      }
+
+      if (revenueByTypeRes.status === 'fulfilled' && revenueByTypeRes.value.success) {
+        setRevenueByType(revenueByTypeRes.value.data || null);
+      } else {
+        setRevenueByType(null);
+        failedSections.push('revenue by type');
+      }
+
+      if (billsRes.status === 'fulfilled' && billsRes.value.success) {
+        setBillsSummary(billsRes.value.data || null);
+      } else {
+        setBillsSummary(null);
+        failedSections.push('bills summary');
+      }
+
+      if (failedSections.length === 5) {
+        setError('Failed to fetch financial dashboard data');
+      } else if (failedSections.length > 0) {
+        setNotice(`Some financial sections failed to load: ${failedSections.join(', ')}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
       console.error('Error:', err);
@@ -272,6 +310,12 @@ export default function FinancialOverviewPage() {
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {notice}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
           <div>

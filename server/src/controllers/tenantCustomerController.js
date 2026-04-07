@@ -7,6 +7,27 @@ const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { buildPublicAssetUrl } = require('../utils/url');
 
+function parseDateValue(value, endOfDay = false) {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        if (endOfDay) {
+            date.setHours(23, 59, 59, 999);
+        } else {
+            date.setHours(0, 0, 0, 0);
+        }
+    }
+
+    return date;
+}
+
 /**
  * Get all customers who have booked with this tenant
  */
@@ -699,8 +720,10 @@ exports.getCustomerHistory = async (req, res) => {
 
         // Get appointments
         const appointmentWhere = { platformUserId: id };
-        if (startDate) appointmentWhere.startTime = { [Op.gte]: new Date(startDate) };
-        if (endDate) appointmentWhere.startTime = { ...appointmentWhere.startTime, [Op.lte]: new Date(endDate) };
+        const appointmentStart = parseDateValue(startDate, false);
+        const appointmentEnd = parseDateValue(endDate, true);
+        if (appointmentStart) appointmentWhere.startTime = { [Op.gte]: appointmentStart };
+        if (appointmentEnd) appointmentWhere.startTime = { ...appointmentWhere.startTime, [Op.lte]: appointmentEnd };
 
         const appointments = await db.Appointment.findAll({
             where: appointmentWhere,
@@ -727,8 +750,10 @@ exports.getCustomerHistory = async (req, res) => {
             platformUserId: id,
             tenantId 
         };
-        if (startDate) orderWhere.createdAt = { [Op.gte]: new Date(startDate) };
-        if (endDate) orderWhere.createdAt = { ...orderWhere.createdAt, [Op.lte]: new Date(endDate) };
+        const orderStart = parseDateValue(startDate, false);
+        const orderEnd = parseDateValue(endDate, true);
+        if (orderStart) orderWhere.createdAt = { [Op.gte]: orderStart };
+        if (orderEnd) orderWhere.createdAt = { ...orderWhere.createdAt, [Op.lte]: orderEnd };
 
         const orders = await db.Order.findAll({
             where: orderWhere,

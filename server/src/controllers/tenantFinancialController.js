@@ -7,6 +7,48 @@ const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 
+function parseDateValue(value, endOfDay = false) {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        if (endOfDay) {
+            date.setHours(23, 59, 59, 999);
+        } else {
+            date.setHours(0, 0, 0, 0);
+        }
+    }
+
+    return date;
+}
+
+function buildDateRangeWhere(field, startDate, endDate) {
+    const start = parseDateValue(startDate, false);
+    const end = parseDateValue(endDate, true);
+
+    if (!start && !end) {
+        return {};
+    }
+
+    const filter = {};
+    if (start) {
+        filter[Op.gte] = start;
+    }
+    if (end) {
+        filter[Op.lte] = end;
+    }
+
+    return {
+        [field]: filter
+    };
+}
+
 /**
  * Get financial overview/summary
  * GET /api/v1/tenant/financial/overview
@@ -17,20 +59,10 @@ exports.getFinancialOverview = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         // Build date filter for appointments
-        const dateFilter = {};
-        if (startDate || endDate) {
-            dateFilter.startTime = {};
-            if (startDate) dateFilter.startTime[Op.gte] = new Date(startDate);
-            if (endDate) dateFilter.startTime[Op.lte] = new Date(endDate);
-        }
+        const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
 
         // Build date filter for orders
-        const orderDateFilter = {};
-        if (startDate || endDate) {
-            orderDateFilter.createdAt = {};
-            if (startDate) orderDateFilter.createdAt[Op.gte] = new Date(startDate);
-            if (endDate) orderDateFilter.createdAt[Op.lte] = new Date(endDate);
-        }
+        const orderDateFilter = buildDateRangeWhere('createdAt', startDate, endDate);
 
         // Get completed appointments with financials
         const appointments = await db.Appointment.findAll({
@@ -60,7 +92,7 @@ exports.getFinancialOverview = async (req, res) => {
         };
         
         // Add date filter if provided
-        if (orderDateFilter.createdAt && Object.keys(orderDateFilter.createdAt).length > 0) {
+        if (orderDateFilter.createdAt) {
             orderWhere.createdAt = orderDateFilter.createdAt;
         }
         
@@ -195,12 +227,7 @@ exports.getEmployeeRevenue = async (req, res) => {
         const { startDate, endDate, staffId } = req.query;
 
         // Build date filter
-        const dateFilter = {};
-        if (startDate || endDate) {
-            dateFilter.startTime = {};
-            if (startDate) dateFilter.startTime[Op.gte] = new Date(startDate);
-            if (endDate) dateFilter.startTime[Op.lte] = new Date(endDate);
-        }
+        const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
 
         // Get all staff for this tenant
         const staffWhere = { tenantId };
@@ -315,12 +342,7 @@ exports.getServiceRevenue = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         // Build date filter
-        const dateFilter = {};
-        if (startDate || endDate) {
-            dateFilter.startTime = {};
-            if (startDate) dateFilter.startTime[Op.gte] = new Date(startDate);
-            if (endDate) dateFilter.startTime[Op.lte] = new Date(endDate);
-        }
+        const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
 
         // Get all services for this tenant
         const services = await db.Service.findAll({
@@ -415,8 +437,12 @@ exports.getDailyRevenue = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         // Default to last 30 days
-        const end = endDate ? new Date(endDate) : new Date();
-        const start = startDate ? new Date(startDate) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const fallbackEnd = new Date();
+        fallbackEnd.setHours(23, 59, 59, 999);
+        const end = parseDateValue(endDate, true) || fallbackEnd;
+        const fallbackStart = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+        fallbackStart.setHours(0, 0, 0, 0);
+        const start = parseDateValue(startDate, false) || fallbackStart;
 
         const appointments = await db.Appointment.findAll({
             where: {
@@ -539,12 +565,7 @@ exports.getProductRevenue = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         // Build date filter for orders
-        const orderDateFilter = {};
-        if (startDate || endDate) {
-            orderDateFilter.createdAt = {};
-            if (startDate) orderDateFilter.createdAt[Op.gte] = new Date(startDate);
-            if (endDate) orderDateFilter.createdAt[Op.lte] = new Date(endDate);
-        }
+        const orderDateFilter = buildDateRangeWhere('createdAt', startDate, endDate);
 
         // Get all products for this tenant
         const products = await db.Product.findAll({
@@ -563,7 +584,7 @@ exports.getProductRevenue = async (req, res) => {
             };
             
             // Add date filter if provided
-            if (orderDateFilter.createdAt && Object.keys(orderDateFilter.createdAt).length > 0) {
+            if (orderDateFilter.createdAt) {
                 orderWhere.createdAt = orderDateFilter.createdAt;
             }
             
@@ -687,12 +708,7 @@ exports.getEmployeeFinancialDetails = async (req, res) => {
         }
 
         // Build date filter
-        const dateFilter = {};
-        if (startDate || endDate) {
-            dateFilter.startTime = {};
-            if (startDate) dateFilter.startTime[Op.gte] = new Date(startDate);
-            if (endDate) dateFilter.startTime[Op.lte] = new Date(endDate);
-        }
+        const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
 
         // Get appointments
         const appointments = await db.Appointment.findAll({

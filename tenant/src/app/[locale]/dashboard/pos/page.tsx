@@ -162,6 +162,7 @@ export default function TenantPosPage() {
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [selectedItem, setSelectedItem] = useState<PosQueueItem | null>(null);
   const [collectionMethod, setCollectionMethod] = useState("cash");
   const [transactionRef, setTransactionRef] = useState("");
@@ -213,8 +214,9 @@ export default function TenantPosPage() {
   const loadPosData = async () => {
     setLoading(true);
     setError("");
+    setNotice("");
     try {
-      const [queueResponse, transactionsResponse, closingResponse, alertsResponse] = await Promise.all([
+      const [queueResponse, transactionsResponse, closingResponse, alertsResponse] = await Promise.allSettled([
         tenantApi.getPosQueue({ search: searchQuery, limit: 100 }),
         tenantApi.getPosTransactions({
           search: searchQuery,
@@ -224,22 +226,59 @@ export default function TenantPosPage() {
           limit: 20,
         }),
         tenantApi.getPosClosingSummary({ date: closingDate }),
-        tenantApi.getPosAlerts({ limit: 5 }).catch(() => null),
+        tenantApi.getPosAlerts({ limit: 5 }),
       ]);
+      const failedSections: string[] = [];
 
-      setQueue(queueResponse.queue || []);
-      setQueueSummary(queueResponse.summary || {
-        totalDueCount: 0,
-        appointmentDueCount: 0,
-        orderDueCount: 0,
-        totalDueAmount: 0,
-        checkedInDueCount: 0,
-      });
-      setTransactions(transactionsResponse.transactions || []);
-      setClosingSummary(closingResponse.summary || null);
-      setPosAlerts(alertsResponse?.success && Array.isArray(alertsResponse.alerts)
-        ? alertsResponse.alerts
-        : []);
+      if (queueResponse.status === "fulfilled" && queueResponse.value?.success) {
+        setQueue(queueResponse.value.queue || []);
+        setQueueSummary(queueResponse.value.summary || {
+          totalDueCount: 0,
+          appointmentDueCount: 0,
+          orderDueCount: 0,
+          totalDueAmount: 0,
+          checkedInDueCount: 0,
+        });
+      } else {
+        setQueue([]);
+        setQueueSummary({
+          totalDueCount: 0,
+          appointmentDueCount: 0,
+          orderDueCount: 0,
+          totalDueAmount: 0,
+          checkedInDueCount: 0,
+        });
+        failedSections.push(locale === "ar" ? "قائمة التحصيل" : "collection queue");
+      }
+
+      if (transactionsResponse.status === "fulfilled" && transactionsResponse.value?.success) {
+        setTransactions(transactionsResponse.value.transactions || []);
+      } else {
+        setTransactions([]);
+        failedSections.push(locale === "ar" ? "المعاملات" : "transactions");
+      }
+
+      if (closingResponse.status === "fulfilled" && closingResponse.value?.success) {
+        setClosingSummary(closingResponse.value.summary || null);
+      } else {
+        setClosingSummary(null);
+        failedSections.push(locale === "ar" ? "الإغلاق اليومي" : "daily closing");
+      }
+
+      if (alertsResponse.status === "fulfilled" && alertsResponse.value?.success) {
+        setPosAlerts(Array.isArray(alertsResponse.value.alerts) ? alertsResponse.value.alerts : []);
+      } else {
+        setPosAlerts([]);
+        failedSections.push(locale === "ar" ? "التنبيهات" : "alerts");
+      }
+
+      if (failedSections.length > 0) {
+        setNotice(
+          locale === "ar"
+            ? `تعذر تحميل بعض أقسام نقطة البيع: ${failedSections.join("، ")}`
+            : `Some POS sections failed to load: ${failedSections.join(", ")}`
+        );
+      }
     } catch (err: any) {
       setError(err.message || (locale === "ar" ? "تعذر تحميل بيانات نقطة البيع" : "Failed to load POS data"));
       setQueue([]);
@@ -340,6 +379,12 @@ export default function TenantPosPage() {
           </button>
         </div>
       </div>
+
+      {notice && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          {notice}
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
