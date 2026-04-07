@@ -7,6 +7,75 @@ const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 
+function parseDateValue(value, endOfDay = false) {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        if (endOfDay) {
+            date.setHours(23, 59, 59, 999);
+        } else {
+            date.setHours(0, 0, 0, 0);
+        }
+    }
+
+    return date;
+}
+
+function buildDateRangeWhere(field, startDate, endDate) {
+    const start = parseDateValue(startDate, false);
+    const end = parseDateValue(endDate, true);
+
+    if (!start && !end) {
+        return {};
+    }
+
+    const filter = {};
+    if (start) {
+        filter[Op.gte] = start;
+    }
+    if (end) {
+        filter[Op.lte] = end;
+    }
+
+    return {
+        [field]: filter
+    };
+}
+
+function buildTenantAppointmentScope(tenantId) {
+    return {
+        [Op.or]: [
+            { tenantId },
+            { '$service.tenantId$': tenantId },
+            { '$staff.tenantId$': tenantId }
+        ]
+    };
+}
+
+function getTenantAppointmentIncludes() {
+    return [
+        {
+            model: db.Service,
+            as: 'service',
+            attributes: ['id', 'tenantId'],
+            required: false
+        },
+        {
+            model: db.Staff,
+            as: 'staff',
+            attributes: ['id', 'tenantId'],
+            required: false
+        }
+    ];
+}
+
 /**
  * Get dashboard summary report
  */
@@ -15,23 +84,15 @@ exports.getDashboardSummary = async (req, res) => {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
 
-        const dateFilter = {};
-        if (startDate) dateFilter[Op.gte] = new Date(startDate);
-        if (endDate) dateFilter[Op.lte] = new Date(endDate);
-
         // Get all appointments with services for this tenant
         const appointments = await db.Appointment.findAll({
             where: {
-                ...(startDate || endDate ? { startTime: dateFilter } : {})
+                ...buildTenantAppointmentScope(tenantId),
+                ...buildDateRangeWhere('startTime', startDate, endDate)
             },
-            include: [{
-                model: db.Service,
-                as: 'service',
-                where: { tenantId },
-                required: true,
-                attributes: ['id']
-            }],
-            attributes: ['id', 'status', 'price', 'paymentStatus', 'startTime', 'platformUserId']
+            include: getTenantAppointmentIncludes(),
+            attributes: ['id', 'status', 'price', 'paymentStatus', 'startTime', 'platformUserId', 'tenantId'],
+            subQuery: false
         });
 
         // Calculate metrics
@@ -89,25 +150,24 @@ exports.getBookingTrends = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate, groupBy = 'day' } = req.query;
-
-        const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const end = endDate ? new Date(endDate) : new Date();
+        const fallbackStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        fallbackStart.setHours(0, 0, 0, 0);
+        const fallbackEnd = new Date();
+        fallbackEnd.setHours(23, 59, 59, 999);
+        const start = parseDateValue(startDate, false) || fallbackStart;
+        const end = parseDateValue(endDate, true) || fallbackEnd;
 
         const appointments = await db.Appointment.findAll({
             where: {
+                ...buildTenantAppointmentScope(tenantId),
                 startTime: {
                     [Op.gte]: start,
                     [Op.lte]: end
                 }
             },
-            include: [{
-                model: db.Service,
-                as: 'service',
-                where: { tenantId },
-                required: true,
-                attributes: []
-            }],
-            attributes: ['startTime', 'status', 'price']
+            include: getTenantAppointmentIncludes(),
+            attributes: ['startTime', 'status', 'price', 'tenantId'],
+            subQuery: false
         });
 
         // Group by date
@@ -164,17 +224,13 @@ exports.getServicePerformance = async (req, res) => {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
 
-        const dateFilter = {};
-        if (startDate) dateFilter[Op.gte] = new Date(startDate);
-        if (endDate) dateFilter[Op.lte] = new Date(endDate);
-
         // Get services with their bookings
         const services = await db.Service.findAll({
             where: { tenantId },
             include: [{
                 model: db.Appointment,
                 as: 'appointments',
-                where: startDate || endDate ? { startTime: dateFilter } : {},
+                where: buildDateRangeWhere('startTime', startDate, endDate),
                 required: false,
                 attributes: ['id', 'status', 'price']
             }],
@@ -226,17 +282,13 @@ exports.getEmployeePerformance = async (req, res) => {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
 
-        const dateFilter = {};
-        if (startDate) dateFilter[Op.gte] = new Date(startDate);
-        if (endDate) dateFilter[Op.lte] = new Date(endDate);
-
         // Get employees with their appointments
         const employees = await db.Staff.findAll({
             where: { tenantId },
             include: [{
                 model: db.Appointment,
                 as: 'appointments',
-                where: startDate || endDate ? { startTime: dateFilter } : {},
+                where: buildDateRangeWhere('startTime', startDate, endDate),
                 required: false,
                 attributes: ['id', 'status', 'price', 'employeeCommission']
             }],
@@ -288,25 +340,24 @@ exports.getPeakHoursAnalysis = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
-
-        const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const end = endDate ? new Date(endDate) : new Date();
+        const fallbackStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        fallbackStart.setHours(0, 0, 0, 0);
+        const fallbackEnd = new Date();
+        fallbackEnd.setHours(23, 59, 59, 999);
+        const start = parseDateValue(startDate, false) || fallbackStart;
+        const end = parseDateValue(endDate, true) || fallbackEnd;
 
         const appointments = await db.Appointment.findAll({
             where: {
+                ...buildTenantAppointmentScope(tenantId),
                 startTime: {
                     [Op.gte]: start,
                     [Op.lte]: end
                 }
             },
-            include: [{
-                model: db.Service,
-                as: 'service',
-                where: { tenantId },
-                required: true,
-                attributes: []
-            }],
-            attributes: ['startTime', 'status']
+            include: getTenantAppointmentIncludes(),
+            attributes: ['startTime', 'status', 'tenantId'],
+            subQuery: false
         });
 
         // Group by hour and day of week
@@ -378,26 +429,25 @@ exports.getCustomerAnalytics = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
-
-        const start = startDate ? new Date(startDate) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const end = endDate ? new Date(endDate) : new Date();
+        const fallbackStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        fallbackStart.setHours(0, 0, 0, 0);
+        const fallbackEnd = new Date();
+        fallbackEnd.setHours(23, 59, 59, 999);
+        const start = parseDateValue(startDate, false) || fallbackStart;
+        const end = parseDateValue(endDate, true) || fallbackEnd;
 
         const appointments = await db.Appointment.findAll({
             where: {
+                ...buildTenantAppointmentScope(tenantId),
                 startTime: {
                     [Op.gte]: start,
                     [Op.lte]: end
                 },
                 platformUserId: { [Op.ne]: null }
             },
-            include: [{
-                model: db.Service,
-                as: 'service',
-                where: { tenantId },
-                required: true,
-                attributes: []
-            }],
-            attributes: ['platformUserId', 'status', 'price', 'startTime']
+            include: getTenantAppointmentIncludes(),
+            attributes: ['platformUserId', 'status', 'price', 'startTime', 'tenantId'],
+            subQuery: false
         });
 
         // Customer frequency analysis

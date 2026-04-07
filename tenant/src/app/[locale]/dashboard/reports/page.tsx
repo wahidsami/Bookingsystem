@@ -35,6 +35,19 @@ export default function ReportsPage() {
   const [peakHours, setPeakHours] = useState<any>(null);
   const [customerAnalytics, setCustomerAnalytics] = useState<any>(null);
 
+  const safeNumber = (value: any) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const visibleBookingTrends = dateRange === 'year' ? bookingTrends : bookingTrends.slice(-30);
+  const bookingTrendRangeLabel = {
+    week: t('week'),
+    month: t('month'),
+    quarter: t('quarter'),
+    year: t('year'),
+  }[dateRange] || t('month');
+
   const setDateRangePreset = (preset: string) => {
     const now = new Date();
     let start: Date;
@@ -249,8 +262,8 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">{t('totalRevenue')}</p>
-                  <Currency amount={summary.totalRevenue} className="text-2xl font-bold text-green-600" />
-                  <p className="text-xs text-gray-400">{t('avgBooking')}: <Currency amount={summary.avgBookingValue} /></p>
+                  <Currency amount={safeNumber(summary.totalRevenue)} className="text-2xl font-bold text-green-600" />
+                  <p className="text-xs text-gray-400">{t('avgBooking')}: <Currency amount={safeNumber(summary.avgBookingValue)} /></p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <CurrencyDollarIcon className="w-6 h-6 text-green-600" />
@@ -291,19 +304,19 @@ export default function ReportsPage() {
               {t('bookingTrends')}
             </h3>
             <div className="h-64 flex items-end gap-1">
-              {bookingTrends.slice(-30).map((day, index) => (
+              {visibleBookingTrends.map((day, index) => (
                 <div
                   key={index}
                   className="flex-1 bg-primary-200 hover:bg-primary-400 transition-colors rounded-t"
                   style={{
-                    height: `${(day.bookings / getMaxValue(bookingTrends.map(d => d.bookings))) * 100}%`,
+                    height: `${(safeNumber(day.bookings) / getMaxValue(visibleBookingTrends.map(d => safeNumber(d.bookings)))) * 100}%`,
                     minHeight: day.bookings > 0 ? '8px' : '2px'
                   }}
                   title={`${day.date}: ${day.bookings} ${t('bookings')}`}
                 />
               ))}
             </div>
-            <p className="text-center text-sm text-gray-500 mt-2">{t('last30Days')}</p>
+            <p className="text-center text-sm text-gray-500 mt-2">{bookingTrendRangeLabel}</p>
           </div>
         </div>
       )}
@@ -351,10 +364,10 @@ export default function ReportsPage() {
                       <span className="text-sm text-gray-500"> ({service.completedBookings} {t('completed')})</span>
                     </td>
                     <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={service.revenue} className="font-medium text-green-600" />
+                      <Currency amount={safeNumber(service.revenue)} className="font-medium text-green-600" />
                     </td>
                     <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={service.avgRevenue} />
+                      <Currency amount={safeNumber(service.avgRevenue)} />
                     </td>
                     <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       <span className={`font-medium ${parseFloat(service.completionRate) >= 80 ? 'text-green-600' : parseFloat(service.completionRate) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
@@ -418,10 +431,10 @@ export default function ReportsPage() {
                       <span className="text-sm text-gray-500"> ({employee.completedBookings} {t('completed')})</span>
                     </td>
                     <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={employee.revenue} className="font-medium text-green-600" />
+                      <Currency amount={safeNumber(employee.revenue)} className="font-medium text-green-600" />
                     </td>
                     <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={employee.commission} />
+                      <Currency amount={safeNumber(employee.commission)} />
                     </td>
                     <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       <span className={`font-medium ${parseFloat(employee.completionRate) >= 80 ? 'text-green-600' : parseFloat(employee.completionRate) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
@@ -541,22 +554,22 @@ export default function ReportsPage() {
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <p className="text-3xl font-bold text-gray-600">{customerAnalytics.segments.oneTime}</p>
                 <p className="text-sm text-gray-500">{t('oneTime')}</p>
-                <Currency amount={customerAnalytics.segmentRevenue.oneTime} className="text-xs text-gray-400" />
+                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.oneTime)} className="text-xs text-gray-400" />
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <p className="text-3xl font-bold text-blue-600">{customerAnalytics.segments.occasional}</p>
                 <p className="text-sm text-gray-500">{t('occasional')}</p>
-                <Currency amount={customerAnalytics.segmentRevenue.occasional} className="text-xs text-blue-400" />
+                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.occasional)} className="text-xs text-blue-400" />
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <p className="text-3xl font-bold text-green-600">{customerAnalytics.segments.regular}</p>
                 <p className="text-sm text-gray-500">{t('regular')}</p>
-                <Currency amount={customerAnalytics.segmentRevenue.regular} className="text-xs text-green-400" />
+                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.regular)} className="text-xs text-green-400" />
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <p className="text-3xl font-bold text-purple-600">{customerAnalytics.segments.loyal}</p>
                 <p className="text-sm text-gray-500">{t('loyal')}</p>
-                <Currency amount={customerAnalytics.segmentRevenue.loyal} className="text-xs text-purple-400" />
+                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.loyal)} className="text-xs text-purple-400" />
               </div>
             </div>
           </div>
