@@ -19,6 +19,7 @@ type BillSession = {
   billNumber: string;
   amount: number;
   currency: string;
+  paymentToken?: string;
   dueDate?: string;
   paidAt?: string;
   type?: string;
@@ -136,7 +137,12 @@ export default function UnifiedPaymentPage() {
 
     try {
       if (mode === "bill") {
-        await tenantApi.payBillByToken(token, {
+        const billPaymentToken = token || billSession?.paymentToken || "";
+        if (!billPaymentToken) {
+          throw new Error(locale === "ar" ? "تعذر العثور على رابط الدفع لهذه الفاتورة" : "Could not find a payment token for this invoice");
+        }
+
+        await tenantApi.payBillByToken(billPaymentToken, {
           success,
           paymentProvider: "refah_test_gateway",
           paymentMethod: "test_card",
@@ -148,8 +154,8 @@ export default function UnifiedPaymentPage() {
             ? undefined
             : "Simulated test payment failure from the Refah test gateway",
           idempotencyKey: success
-            ? `public_payment_link:${token}:success`
-            : `public_payment_link:${token}:failed:${Date.now()}`
+            ? `public_payment_link:${billPaymentToken}:success`
+            : `public_payment_link:${billPaymentToken}:failed:${Date.now()}`
         });
 
         if (!success) {
