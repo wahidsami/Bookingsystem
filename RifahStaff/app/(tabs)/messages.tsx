@@ -7,7 +7,9 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
-    Platform
+    Platform,
+    TextInput,
+    ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +30,8 @@ export default function MessagesScreen() {
     const [messages, setMessages] = useState<StaffMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterKey, setFilterKey] = useState<'all' | 'unread' | 'pinned' | 'recent'>('all');
     const messagesAllowed = canViewMessages(user);
 
     const loadMessages = useCallback(async () => {
@@ -68,6 +72,42 @@ export default function MessagesScreen() {
         const readArray = Array.isArray(msg.readBy) ? msg.readBy : [];
         return !readArray.includes(user.id);
     };
+
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    const filteredMessages = messages.filter((msg) => {
+        const matchesFilter =
+            filterKey === 'all' ? true :
+                filterKey === 'unread' ? isUnread(msg) :
+                    filterKey === 'pinned' ? msg.isPinned :
+                        Date.now() - new Date(msg.createdAt).getTime() <= 1000 * 60 * 60 * 24 * 3;
+
+        if (!matchesFilter) {
+            return false;
+        }
+
+        if (!normalizedSearch) {
+            return true;
+        }
+
+        return [
+            msg.subject,
+            msg.body
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(normalizedSearch);
+    });
+
+    const unreadCount = messages.filter((msg) => isUnread(msg)).length;
+    const pinnedCount = messages.filter((msg) => msg.isPinned).length;
+    const recentCount = messages.filter((msg) => Date.now() - new Date(msg.createdAt).getTime() <= 1000 * 60 * 60 * 24 * 3).length;
+    const filterOptions: Array<{ key: 'all' | 'unread' | 'pinned' | 'recent'; label: string; count: number }> = [
+        { key: 'all', label: 'All', count: messages.length },
+        { key: 'unread', label: 'Unread', count: unreadCount },
+        { key: 'pinned', label: 'Pinned', count: pinnedCount },
+        { key: 'recent', label: 'Recent', count: recentCount },
+    ];
 
     const handlePressMessage = async (msg: StaffMessage) => {
         // Navigate to the detail screen, passing the message data as a stringified param
@@ -161,9 +201,79 @@ export default function MessagesScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={messages}
+                    data={filteredMessages}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
+                    ListHeaderComponent={(
+                        <View>
+                            <View style={styles.statsGrid}>
+                                <View style={styles.statCard}>
+                                    <Text style={styles.statValue}>{messages.length}</Text>
+                                    <Text style={styles.statLabel}>Total</Text>
+                                </View>
+                                <View style={styles.statCard}>
+                                    <Text style={styles.statValue}>{unreadCount}</Text>
+                                    <Text style={styles.statLabel}>Unread</Text>
+                                </View>
+                                <View style={styles.statCard}>
+                                    <Text style={styles.statValue}>{pinnedCount}</Text>
+                                    <Text style={styles.statLabel}>Pinned</Text>
+                                </View>
+                                <View style={styles.statCard}>
+                                    <Text style={styles.statValue}>{recentCount}</Text>
+                                    <Text style={styles.statLabel}>Recent</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.searchBox}>
+                                <Ionicons name="search-outline" size={18} color="#6b7280" style={styles.searchIcon} />
+                                <TextInput
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    placeholder="Search subject or message..."
+                                    placeholderTextColor="#9ca3af"
+                                    style={styles.searchInput}
+                                />
+                                {searchQuery ? (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.filterRow}
+                            >
+                                {filterOptions.map((option) => {
+                                    const active = filterKey === option.key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={option.key}
+                                            style={[styles.filterChip, active && styles.filterChipActive]}
+                                            onPress={() => setFilterKey(option.key)}
+                                        >
+                                            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                                {option.label} ({option.count})
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+
+                            <Text style={styles.resultsLabel}>
+                                Showing {filteredMessages.length} of {messages.length} messages
+                            </Text>
+                        </View>
+                    )}
+                    ListEmptyComponent={(
+                        <View style={styles.emptyFilterState}>
+                            <Ionicons name="search-outline" size={48} color="#d1d5db" />
+                            <Text style={styles.emptyTitle}>No messages match these filters</Text>
+                            <Text style={styles.emptySubtitle}>Try a different search or switch the selected inbox filter.</Text>
+                        </View>
+                    )}
                     contentContainerStyle={styles.listContent}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
                 />
@@ -193,6 +303,87 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 16,
         paddingBottom: 40,
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+        gap: 10,
+    },
+    statCard: {
+        width: '48%',
+        backgroundColor: '#ffffff',
+        borderRadius: 14,
+        padding: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    statValue: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#6d28d9',
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+        textTransform: 'uppercase',
+    },
+    searchBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 4,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        color: '#1f2937',
+        paddingVertical: 10,
+    },
+    filterRow: {
+        paddingBottom: 10,
+        gap: 10,
+    },
+    filterChip: {
+        backgroundColor: '#ffffff',
+        borderRadius: 999,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    filterChipActive: {
+        backgroundColor: '#ede9fe',
+        borderColor: '#8B5ADF',
+    },
+    filterChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4b5563',
+    },
+    filterChipTextActive: {
+        color: '#6d28d9',
+    },
+    resultsLabel: {
+        fontSize: 13,
+        color: '#6b7280',
+        marginBottom: 14,
     },
     messageCard: {
         backgroundColor: '#ffffff',
@@ -260,6 +451,11 @@ const styles = StyleSheet.create({
         color: '#4b5563',
         marginTop: 16,
         marginBottom: 8,
+    },
+    emptyFilterState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 36,
     },
     emptySubtitle: {
         fontSize: 14,
