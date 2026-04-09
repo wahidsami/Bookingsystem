@@ -82,6 +82,26 @@ export default function TodayScreen() {
     }
   };
 
+  const getUrgencyInfo = (item: Appointment): { label: string; color: string; background: string; priority: number } => {
+    if (item.status === 'started') {
+      return { label: 'In Service', color: '#92400e', background: '#fef3c7', priority: 0 };
+    }
+
+    if (['completed', 'no_show', 'cancelled'].includes(item.status)) {
+      return { label: 'Closed', color: '#4b5563', background: '#f3f4f6', priority: 4 };
+    }
+
+    const minutesToStart = Math.round((new Date(item.startTime).getTime() - Date.now()) / 60000);
+    if (minutesToStart < -10) {
+      return { label: 'Late', color: '#b91c1c', background: '#fee2e2', priority: 1 };
+    }
+    if (minutesToStart <= 30) {
+      return { label: 'Starting Soon', color: '#9a3412', background: '#ffedd5', priority: 2 };
+    }
+
+    return { label: 'Upcoming', color: '#1d4ed8', background: '#dbeafe', priority: 3 };
+  };
+
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredAppointments = appointments.filter((item) => {
     const matchesStatus =
@@ -115,11 +135,25 @@ export default function TodayScreen() {
     return searchFields.includes(normalizedSearch);
   });
 
+  const sortedAppointments = [...filteredAppointments].sort((a, b) => {
+    const urgencyDiff = getUrgencyInfo(a).priority - getUrgencyInfo(b).priority;
+    if (urgencyDiff !== 0) {
+      return urgencyDiff;
+    }
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
+
   const filterOptions: Array<{ key: 'all' | 'upcoming' | 'in_progress' | 'done'; label: string; count: number }> = [
     { key: 'all', label: 'All', count: appointments.length },
     { key: 'upcoming', label: 'Upcoming', count: appointments.filter((item) => ['pending', 'confirmed'].includes(item.status)).length },
     { key: 'in_progress', label: 'In Progress', count: appointments.filter((item) => item.status === 'started').length },
     { key: 'done', label: 'Done', count: appointments.filter((item) => ['completed', 'no_show'].includes(item.status)).length },
+  ];
+  const todaySignals = [
+    { label: 'Late', value: appointments.filter((item) => getUrgencyInfo(item).label === 'Late').length },
+    { label: 'Starting Soon', value: appointments.filter((item) => getUrgencyInfo(item).label === 'Starting Soon').length },
+    { label: 'In Service', value: appointments.filter((item) => item.status === 'started').length },
+    { label: 'Revenue', value: `SAR ${appointments.reduce((sum, item) => sum + Number(item.service?.finalPrice || item.service?.basePrice || 0), 0).toFixed(0)}` },
   ];
 
   const renderAppointmentCard = ({ item }: { item: Appointment }) => {
@@ -127,6 +161,7 @@ export default function TodayScreen() {
     const isStarted = item.status === 'started';
     const customerInitial = item.user?.firstName?.charAt(0)?.toUpperCase() || item.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
     const amount = Number(item.service?.finalPrice || item.service?.basePrice || 0);
+    const urgency = getUrgencyInfo(item);
 
     return (
       <View style={[styles.card, isCompleted && styles.cardCompleted]}>
@@ -135,15 +170,20 @@ export default function TodayScreen() {
             <Text style={styles.timeText}>{formatTime(item.startTime)}</Text>
             <Text style={styles.durationText}>{item.service?.duration || 0} min</Text>
           </View>
-          <View style={styles.statusBadge}>
-            <Text style={[
-              styles.statusText,
-              item.status === 'started' && { color: '#fbbf24' },
-              item.status === 'completed' && { color: '#10b981' },
-              item.status === 'cancelled' && { color: '#ef4444' },
-            ]}>
-              {t(`status.${item.status === 'no_show' ? 'noShow' : item.status}`).toUpperCase()}
-            </Text>
+          <View style={styles.cardHeaderBadges}>
+            <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
+              <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
+            </View>
+            <View style={styles.statusBadge}>
+              <Text style={[
+                styles.statusText,
+                item.status === 'started' && { color: '#fbbf24' },
+                item.status === 'completed' && { color: '#10b981' },
+                item.status === 'cancelled' && { color: '#ef4444' },
+              ]}>
+                {t(`status.${item.status === 'no_show' ? 'noShow' : item.status}`).toUpperCase()}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -344,6 +384,15 @@ export default function TodayScreen() {
               <Text style={styles.resultsLabel}>
                 Showing {filteredAppointments.length} of {appointments.length} appointments
               </Text>
+
+              <View style={styles.signalRow}>
+                {todaySignals.map((signal) => (
+                  <View key={signal.label} style={styles.signalCard}>
+                    <Text style={styles.signalValue}>{signal.value}</Text>
+                    <Text style={styles.signalLabel}>{signal.label}</Text>
+                  </View>
+                ))}
+              </View>
             </>
           ) : null}
 
@@ -365,7 +414,7 @@ export default function TodayScreen() {
             </View>
           ) : (
             <FlatList
-              data={filteredAppointments}
+              data={sortedAppointments}
               keyExtractor={(item) => item.id}
               renderItem={renderAppointmentCard}
               contentContainerStyle={styles.listContainer}
@@ -522,6 +571,35 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingHorizontal: 4,
   },
+  signalRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 10,
+  },
+  signalCard: {
+    width: '48%',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  signalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#6d28d9',
+    marginBottom: 4,
+  },
+  signalLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  },
   listContainer: {
     paddingBottom: 30,
   },
@@ -546,6 +624,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  cardHeaderBadges: {
+    alignItems: 'flex-end',
+  },
   timeBox: {
   },
   timeText: {
@@ -563,6 +644,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    marginTop: 6,
+  },
+  urgencyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  urgencyText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   statusText: {
     fontSize: 12,
