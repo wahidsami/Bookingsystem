@@ -10,6 +10,7 @@ interface User {
     phone?: string;
     photo?: string;
     must_change_password?: boolean;
+    scheduleVisibilityWeeks?: number;
     tenant?: {
         id: string;
         businessName?: string;
@@ -65,6 +66,7 @@ const normalizeUserPayload = (userData: any): User => ({
     phone: userData?.phone ? `${userData.phone}` : undefined,
     photo: userData?.photo || undefined,
     must_change_password: Boolean(userData?.must_change_password),
+    scheduleVisibilityWeeks: Number(userData?.scheduleVisibilityWeeks || 1),
     tenant: userData?.tenant
         ? {
             id: `${userData.tenant.id || ''}`,

@@ -412,6 +412,36 @@ const ensureStaffPermissionSchema = async () => {
     }
 };
 
+const ensureStaffSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'staff'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.staff
+                    ADD COLUMN IF NOT EXISTS "scheduleVisibilityWeeks" INTEGER NOT NULL DEFAULT 1;
+
+                UPDATE public.staff
+                SET "scheduleVisibilityWeeks" = 1
+                WHERE "scheduleVisibilityWeeks" IS NULL
+                   OR "scheduleVisibilityWeeks" NOT IN (1, 2, 3, 4);
+            END $$;
+        `);
+
+        console.log('Staff schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure staff schema:', error);
+        throw error;
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -450,6 +480,7 @@ const startServer = async () => {
         await db.Product.sync({ force: false }); // New: Product catalog
         await db.Customer.sync({ force: false });
         await db.Staff.sync({ force: false });
+        await ensureStaffSchema();
         await db.StaffPermission.sync({ force: false });
         await ensureStaffPermissionSchema();
         await db.MobilePushToken.sync({ force: false });

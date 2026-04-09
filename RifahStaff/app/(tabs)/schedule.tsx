@@ -45,11 +45,16 @@ export default function ScheduleScreen() {
     const [breaks, setBreaks] = useState<BreakWindow[]>([]);
     const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [weekOffset, setWeekOffset] = useState(0);
     const timeOffEnabled = canRequestTimeOff(user);
+    const scheduleVisibilityWeeks = Math.min(Math.max(Number(user?.scheduleVisibilityWeeks || 1), 1), 4);
 
-    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    const baseWeekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), []);
+    const weekStart = useMemo(() => addDays(baseWeekStart, weekOffset * 7), [baseWeekStart, weekOffset]);
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
     const weekStartStr = getDateKey(weekStart);
+    const canGoPrev = weekOffset > 0;
+    const canGoNext = weekOffset < scheduleVisibilityWeeks - 1;
 
     const loadData = useCallback(async () => {
         try {
@@ -75,6 +80,10 @@ export default function ScheduleScreen() {
         setLoading(true);
         loadData();
     }, [loadData, user]);
+
+    useEffect(() => {
+        setSelectedDate(weekOffset === 0 ? new Date() : weekStart);
+    }, [weekOffset, weekStartStr]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -308,6 +317,33 @@ export default function ScheduleScreen() {
                     </View>
                 </View>
 
+                <View style={styles.weekNavigatorCard}>
+                    <TouchableOpacity
+                        style={[styles.weekNavButton, !canGoPrev && styles.weekNavButtonDisabled]}
+                        onPress={() => canGoPrev && setWeekOffset((current) => current - 1)}
+                        disabled={!canGoPrev}
+                    >
+                        <Ionicons name="chevron-back" size={18} color={canGoPrev ? '#6d28d9' : '#9ca3af'} />
+                    </TouchableOpacity>
+
+                    <View style={styles.weekNavigatorCenter}>
+                        <Text style={styles.weekNavigatorTitle}>
+                            {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d')}
+                        </Text>
+                        <Text style={styles.weekNavigatorSubtitle}>
+                            Week {weekOffset + 1} of {scheduleVisibilityWeeks} visible week(s)
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.weekNavButton, !canGoNext && styles.weekNavButtonDisabled]}
+                        onPress={() => canGoNext && setWeekOffset((current) => current + 1)}
+                        disabled={!canGoNext}
+                    >
+                        <Ionicons name="chevron-forward" size={18} color={canGoNext ? '#6d28d9' : '#9ca3af'} />
+                    </TouchableOpacity>
+                </View>
+
                 <View style={styles.calendarStrip}>
                     {weekDays.map((day) => {
                         const isSelected = isSameDay(day, selectedDate);
@@ -421,6 +457,47 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         gap: 10,
         marginBottom: 18,
+    },
+    weekNavigatorCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 18,
+        padding: 14,
+        marginBottom: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    weekNavigatorCenter: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 12,
+    },
+    weekNavigatorTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1f2937',
+        marginBottom: 2,
+    },
+    weekNavigatorSubtitle: {
+        fontSize: 12,
+        color: '#6b7280',
+    },
+    weekNavButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f5f3ff',
+    },
+    weekNavButtonDisabled: {
+        backgroundColor: '#f3f4f6',
     },
     statCard: {
         width: '48%',

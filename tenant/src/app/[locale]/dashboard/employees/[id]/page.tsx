@@ -27,6 +27,7 @@ interface Employee {
   photo?: string;
   salary: number;
   commissionRate: number;
+  scheduleVisibilityWeeks?: number;
   // workingHours removed - use Schedules section instead
   isActive: boolean;
   app_enabled?: boolean;
@@ -54,6 +55,7 @@ export default function EditEmployeePage() {
     skills: [] as string[],
     salary: "",
     commissionRate: "",
+    scheduleVisibilityWeeks: "1",
     isActive: true
   });
   const [newSkill, setNewSkill] = useState("");
@@ -103,6 +105,7 @@ export default function EditEmployeePage() {
           skills: emp.skills || [],
           salary: emp.salary?.toString() || "",
           commissionRate: emp.commissionRate?.toString() || "",
+          scheduleVisibilityWeeks: `${emp.scheduleVisibilityWeeks || 1}`,
           isActive: emp.isActive !== undefined ? emp.isActive : true
           // Note: workingHours removed - use Schedules section to manage employee schedules
         });
@@ -281,6 +284,7 @@ export default function EditEmployeePage() {
       submitData.append("skills", JSON.stringify(formData.skills));
       submitData.append("salary", formData.salary);
       submitData.append("commissionRate", formData.commissionRate || "0");
+      submitData.append("scheduleVisibilityWeeks", formData.scheduleVisibilityWeeks || "1");
       submitData.append("isActive", formData.isActive.toString());
       // Note: workingHours removed - use Schedules section to manage employee schedules
 
@@ -587,6 +591,29 @@ export default function EditEmployeePage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule Visibility'}
+                  </label>
+                  <select
+                    name="scheduleVisibilityWeeks"
+                    value={formData.scheduleVisibilityWeeks}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    <option value="1">{locale === 'ar' ? 'أسبوع واحد' : '1 Week'}</option>
+                    <option value="2">{locale === 'ar' ? 'أسبوعان' : '2 Weeks'}</option>
+                    <option value="3">{locale === 'ar' ? '3 أسابيع' : '3 Weeks'}</option>
+                    <option value="4">{locale === 'ar' ? '4 أسابيع' : '4 Weeks'}</option>
+                  </select>
+                  <p className="text-sm text-gray-500 mt-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar'
+                      ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
+                      : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
+                  </p>
                 </div>
               </div>
             </div>

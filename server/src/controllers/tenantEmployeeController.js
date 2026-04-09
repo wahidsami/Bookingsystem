@@ -18,6 +18,20 @@ const DEFAULT_STAFF_PERMISSIONS = {
     view_clients: false,
     view_booking_notes: false
 };
+const VALID_SCHEDULE_VISIBILITY_WEEKS = [1, 2, 3, 4];
+
+const parseScheduleVisibilityWeeks = (value, fallback = 1) => {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || !VALID_SCHEDULE_VISIBILITY_WEEKS.includes(parsed)) {
+        return null;
+    }
+
+    return parsed;
+};
 
 const generateTemporaryStaffPassword = () => {
     const suffix = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -228,6 +242,7 @@ exports.getEmployees = async (req, res) => {
                 'salary',
                 'commissionRate',
                 'workingHours',
+                'scheduleVisibilityWeeks',
                 'isActive',
                 'createdAt',
                 'updatedAt'
@@ -278,6 +293,7 @@ exports.getEmployee = async (req, res) => {
                 'salary',
                 'commissionRate',
                 'workingHours',
+                'scheduleVisibilityWeeks',
                 'isActive',
                 'createdAt',
                 'updatedAt'
@@ -702,6 +718,7 @@ exports.createEmployee = async (req, res) => {
             skills,
             salary,
             commissionRate,
+            scheduleVisibilityWeeks,
             staffAppPassword,
             workingHours, // Deprecated - kept for backward compatibility
             isActive = true
@@ -732,11 +749,20 @@ exports.createEmployee = async (req, res) => {
         }
 
         const normalizedEmail = email && email.trim() ? normalizeEmail(email) : null;
+        const parsedScheduleVisibilityWeeks = parseScheduleVisibilityWeeks(scheduleVisibilityWeeks, 1);
         if (staffAppPassword && staffAppPassword.length < 8) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: 'Staff app password must be at least 8 characters long'
+            });
+        }
+
+        if (parsedScheduleVisibilityWeeks === null) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'scheduleVisibilityWeeks must be one of: 1, 2, 3, 4'
             });
         }
 
@@ -982,6 +1008,7 @@ exports.createEmployee = async (req, res) => {
             salary: salaryNum,
             commissionRate: commissionRate ? parseFloat(commissionRate) : 0.00,
             workingHours: workingHoursForDB, // JavaScript object - JSONB should handle this correctly
+            scheduleVisibilityWeeks: parsedScheduleVisibilityWeeks,
             isActive: isActiveBool
         }, { transaction });
 
@@ -1068,6 +1095,7 @@ exports.updateEmployee = async (req, res) => {
             skills,
             salary,
             commissionRate,
+            scheduleVisibilityWeeks,
             staffAppPassword,
             workingHours,
             isActive
@@ -1098,6 +1126,19 @@ exports.updateEmployee = async (req, res) => {
             });
         }
 
+        const parsedScheduleVisibilityWeeks = parseScheduleVisibilityWeeks(
+            scheduleVisibilityWeeks,
+            employee.scheduleVisibilityWeeks || 1
+        );
+
+        if (scheduleVisibilityWeeks !== undefined && parsedScheduleVisibilityWeeks === null) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'scheduleVisibilityWeeks must be one of: 1, 2, 3, 4'
+            });
+        }
+
         const previousEmail = employee.email;
 
         // Parse skills if provided
@@ -1121,6 +1162,7 @@ exports.updateEmployee = async (req, res) => {
         if (experience !== undefined) employee.experience = experience || null;
         if (salary !== undefined) employee.salary = parseFloat(salary);
         if (commissionRate !== undefined) employee.commissionRate = parseFloat(commissionRate);
+        if (scheduleVisibilityWeeks !== undefined) employee.scheduleVisibilityWeeks = parsedScheduleVisibilityWeeks;
         if (isActive !== undefined) employee.isActive = isActive === true || isActive === 'true';
 
         // Handle photo upload

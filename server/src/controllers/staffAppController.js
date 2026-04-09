@@ -53,6 +53,29 @@ const buildTodayKey = () => {
     return today.toISOString().split('T')[0];
 };
 
+const buildCurrentWeekStart = () => {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const diffToMonday = (today.getUTCDay() + 6) % 7;
+    today.setUTCDate(today.getUTCDate() - diffToMonday);
+    return today;
+};
+
+const buildScheduleVisibilityBounds = (scheduleVisibilityWeeks = 1) => {
+    const weekCount = [1, 2, 3, 4].includes(Number(scheduleVisibilityWeeks))
+        ? Number(scheduleVisibilityWeeks)
+        : 1;
+    const weekStart = buildCurrentWeekStart();
+    const visibleEnd = new Date(weekStart);
+    visibleEnd.setUTCDate(visibleEnd.getUTCDate() + (weekCount * 7) - 1);
+    visibleEnd.setUTCHours(23, 59, 59, 999);
+
+    return {
+        visibleFrom: weekStart.toISOString().split('T')[0],
+        visibleUntil: visibleEnd.toISOString().split('T')[0],
+    };
+};
+
 const normalizeEmail = (value) => value.trim().toLowerCase();
 
 const createAccessToken = (staffUser, staff) => jwt.sign({
@@ -133,6 +156,7 @@ const buildStaffPayload = async (staff, staffUser = null) => {
         totalBookings: staff.totalBookings,
         salary: staff.salary,
         commissionRate: staff.commissionRate,
+        scheduleVisibilityWeeks: Number(staff.scheduleVisibilityWeeks || 1),
         isActive: staff.isActive,
         must_change_password: Boolean(staffUser?.must_change_password),
         permissions,
@@ -682,6 +706,30 @@ const getSchedule = async (req, res) => {
         const dayEnd = buildEndOfDay(date);
         const dateKey = dayStart.toISOString().split('T')[0];
         const dayOfWeek = dayStart.getUTCDay();
+        const staffProfile = await db.Staff.findOne({
+            where: {
+                id: req.staffId,
+                tenantId: req.tenantId
+            },
+            attributes: ['id', 'scheduleVisibilityWeeks']
+        });
+
+        if (!staffProfile) {
+            return res.status(404).json({
+                success: false,
+                message: 'Staff profile not found'
+            });
+        }
+
+        const visibility = buildScheduleVisibilityBounds(staffProfile.scheduleVisibilityWeeks);
+        if (dateKey < visibility.visibleFrom || dateKey > visibility.visibleUntil) {
+            return res.status(403).json({
+                success: false,
+                message: `Schedule visibility is limited to ${staffProfile.scheduleVisibilityWeeks || 1} week(s) from the current week`,
+                visibleFrom: visibility.visibleFrom,
+                visibleUntil: visibility.visibleUntil,
+            });
+        }
 
         const [shifts, breaks, timeOff] = await Promise.all([
             db.StaffShift.findAll({

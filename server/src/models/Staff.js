@@ -158,6 +158,15 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: {},
             comment: 'Working schedule: { "sunday": { "start": "09:00", "end": "18:00" }, ... }'
         },
+        scheduleVisibilityWeeks: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 1,
+            validate: {
+                isIn: [[1, 2, 3, 4]]
+            },
+            comment: 'How many weeks of future schedule the employee can see in the staff app'
+        },
         isActive: {
             type: DataTypes.BOOLEAN,
             defaultValue: true
