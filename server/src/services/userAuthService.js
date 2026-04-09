@@ -43,6 +43,40 @@ class UserAuthService {
         return `${email || ''}`.trim().toLowerCase();
     }
 
+    buildSafeUserPayload(user) {
+        if (!user) {
+            return null;
+        }
+
+        return {
+            id: user.id,
+            email: user.email,
+            phone: user.phone,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            dateOfBirth: user.dateOfBirth || null,
+            gender: user.gender || null,
+            profileImage: user.profileImage || null,
+            preferredLanguage: user.preferredLanguage || 'en',
+            notificationPreferences: user.notificationPreferences || {
+                email: true,
+                sms: true,
+                whatsapp: true,
+                push: true,
+            },
+            walletBalance: user.walletBalance ?? 0,
+            loyaltyPoints: user.loyaltyPoints ?? 0,
+            totalSpent: user.totalSpent ?? 0,
+            totalBookings: user.totalBookings ?? 0,
+            emailVerified: Boolean(user.emailVerified),
+            phoneVerified: Boolean(user.phoneVerified),
+            isActive: Boolean(user.isActive),
+            isBanned: Boolean(user.isBanned),
+            createdAt: user.createdAt || null,
+            updatedAt: user.updatedAt || null,
+        };
+    }
+
     persistLoginMetadata(user, refreshToken) {
         Promise.resolve()
             .then(() => user.update({
@@ -142,6 +176,7 @@ class UserAuthService {
      */
     async login(email, password) {
         const normalizedEmail = this.normalizeEmail(email);
+        console.info('[UserAuthService] Login lookup started', { email: normalizedEmail });
 
         // Find user by email
         const user = await db.PlatformUser.findOne({
@@ -180,6 +215,13 @@ class UserAuthService {
             throw new Error('Invalid email or password');
         }
 
+        console.info('[UserAuthService] User found', {
+            userId: user.id,
+            email: normalizedEmail,
+            isActive: Boolean(user.isActive),
+            isBanned: Boolean(user.isBanned),
+        });
+
         // Check if user is banned
         if (user.isBanned) {
             throw new Error(`Account is banned. Reason: ${user.banReason || 'Violation of terms'}`);
@@ -197,15 +239,30 @@ class UserAuthService {
             throw new Error('Invalid email or password');
         }
 
+        console.info('[UserAuthService] Password validated', {
+            userId: user.id,
+            email: normalizedEmail,
+        });
+
         // Generate tokens
         const tokens = this.generateTokens(user);
+        console.info('[UserAuthService] Tokens generated', {
+            userId: user.id,
+            email: normalizedEmail,
+        });
 
         // Persist login metadata in the background so a slow DB write
         // does not block successful logins from mobile clients.
         this.persistLoginMetadata(user, tokens.refreshToken);
 
+        const safeUser = this.buildSafeUserPayload(user);
+        console.info('[UserAuthService] Safe payload built', {
+            userId: user.id,
+            email: normalizedEmail,
+        });
+
         return {
-            user: user.toSafeObject(),
+            user: safeUser,
             tokens
         };
     }
