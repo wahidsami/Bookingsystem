@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
-  Image
+  Image,
+  TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,8 @@ export default function TodayScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null); // tracks which appointment is being updated
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'in_progress' | 'done'>('all');
   const canViewClientContext = canViewClientNotes(user);
 
   // Format time as h:mm A
@@ -78,6 +81,46 @@ export default function TodayScreen() {
       setUpdatingId(null);
     }
   };
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredAppointments = appointments.filter((item) => {
+    const matchesStatus =
+      statusFilter === 'all' ? true :
+        statusFilter === 'upcoming' ? ['pending', 'confirmed'].includes(item.status) :
+          statusFilter === 'in_progress' ? item.status === 'started' :
+            ['completed', 'no_show'].includes(item.status);
+
+    if (!matchesStatus) {
+      return false;
+    }
+
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    const searchFields = [
+      item.user?.firstName,
+      item.user?.lastName,
+      item.user?.phone,
+      item.user?.email,
+      item.service?.name_en,
+      item.service?.name_ar,
+      item.bookingNumber,
+      item.id,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return searchFields.includes(normalizedSearch);
+  });
+
+  const filterOptions: Array<{ key: 'all' | 'upcoming' | 'in_progress' | 'done'; label: string; count: number }> = [
+    { key: 'all', label: 'All', count: appointments.length },
+    { key: 'upcoming', label: 'Upcoming', count: appointments.filter((item) => ['pending', 'confirmed'].includes(item.status)).length },
+    { key: 'in_progress', label: 'In Progress', count: appointments.filter((item) => item.status === 'started').length },
+    { key: 'done', label: 'Done', count: appointments.filter((item) => ['completed', 'no_show'].includes(item.status)).length },
+  ];
 
   const renderAppointmentCard = ({ item }: { item: Appointment }) => {
     const isCompleted = item.status === 'completed' || item.status === 'no_show';
@@ -259,6 +302,51 @@ export default function TodayScreen() {
         <View style={styles.content}>
           <Text style={styles.sectionTitle}>{t('home.todayQueue')}</Text>
 
+          {!loading && appointments.length > 0 ? (
+            <>
+              <View style={styles.searchBox}>
+                <Ionicons name="search-outline" size={18} color="#6b7280" style={styles.searchIcon} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search client, service, phone, booking..."
+                  placeholderTextColor="#9ca3af"
+                  style={styles.searchInput}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+              >
+                {filterOptions.map((option) => {
+                  const active = statusFilter === option.key;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      style={[styles.filterChip, active && styles.filterChipActive]}
+                      onPress={() => setStatusFilter(option.key)}
+                    >
+                      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                        {option.label} ({option.count})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <Text style={styles.resultsLabel}>
+                Showing {filteredAppointments.length} of {appointments.length} appointments
+              </Text>
+            </>
+          ) : null}
+
           {loading ? (
             <View style={styles.centerContainer}>
               <ActivityIndicator size="large" color="#8B5ADF" />
@@ -269,9 +357,15 @@ export default function TodayScreen() {
               <Text style={styles.emptyTitle}>{t('home.noAppointments')}</Text>
               <Text style={styles.emptySubtitle}>{t('home.noAppointmentsSub')}</Text>
             </View>
+          ) : filteredAppointments.length === 0 ? (
+            <View style={styles.centerContainer}>
+              <Ionicons name="search-outline" size={56} color="#d1d5db" />
+              <Text style={styles.emptyTitle}>No matching appointments</Text>
+              <Text style={styles.emptySubtitle}>Try a different search or change the selected filter.</Text>
+            </View>
           ) : (
             <FlatList
-              data={appointments}
+              data={filteredAppointments}
               keyExtractor={(item) => item.id}
               renderItem={renderAppointmentCard}
               contentContainerStyle={styles.listContainer}
@@ -373,6 +467,59 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1f2937',
+    paddingVertical: 10,
+  },
+  filterRow: {
+    paddingBottom: 10,
+    gap: 10,
+  },
+  filterChip: {
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterChipActive: {
+    backgroundColor: '#ede9fe',
+    borderColor: '#8B5ADF',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4b5563',
+  },
+  filterChipTextActive: {
+    color: '#6d28d9',
+  },
+  resultsLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 14,
     paddingHorizontal: 4,
   },
   listContainer: {
