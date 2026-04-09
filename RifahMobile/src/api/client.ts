@@ -1011,6 +1011,10 @@ class ApiClient {
         return this.get(`/users/notifications/${id}`);
     }
 
+    async getNotificationByCampaign(campaignId: string): Promise<{ success: boolean; notification: CustomerNotification }> {
+        return this.get(`/users/notifications/campaign/${campaignId}`);
+    }
+
     async markNotificationRead(id: string): Promise<{ success: boolean; message: string }> {
         return this.post(`/users/notifications/${id}/read`, {});
     }

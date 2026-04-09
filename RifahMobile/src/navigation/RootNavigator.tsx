@@ -12,6 +12,8 @@ import { BrowseScreen } from '../screens/BrowseScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { InfoPageScreen } from '../screens/InfoPageScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { NotificationDetailScreen } from '../screens/NotificationDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -35,6 +37,8 @@ export function RootNavigator() {
             <Stack.Screen name="Browse" component={BrowseScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="InfoPage" component={InfoPageScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
         </Stack.Navigator>
     );
 }

@@ -20,7 +20,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
-import { initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
+import { consumePendingNotificationCampaignId, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
+import { navigationRef, navigateToNotificationDetail } from './src/navigation/navigationService';
 
 type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'forgotPassword' | 'home';
 
@@ -203,7 +204,18 @@ function AppContent() {
       ) : null}
 
       {currentScreen === 'home' ? (
-        <NavigationContainer>
+        <NavigationContainer
+          ref={navigationRef}
+          onReady={() => {
+            consumePendingNotificationCampaignId()
+              .then((campaignId) => {
+                if (campaignId) {
+                  navigateToNotificationDetail(campaignId);
+                }
+              })
+              .catch(() => undefined);
+          }}
+        >
           <RootNavigator />
         </NavigationContainer>
       ) : null}

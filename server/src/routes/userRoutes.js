@@ -22,6 +22,7 @@ router.delete('/push-token', authenticateUser, userController.unregisterPushToke
 
 // Customer notification inbox
 router.get('/notifications', authenticateUser, userController.getNotifications);
+router.get('/notifications/campaign/:campaignId', authenticateUser, userController.getNotificationByCampaign);
 router.get('/notifications/:id', authenticateUser, userController.getNotificationDetail);
 router.post('/notifications/:id/read', authenticateUser, userController.markNotificationRead);
 

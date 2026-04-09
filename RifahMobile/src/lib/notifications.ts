@@ -3,8 +3,29 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from '../api/client';
+import { navigateToNotificationDetail } from '../navigation/navigationService';
 
 const PUSH_TOKEN_STORAGE_KEY = 'refah_customer_push_token';
+const PUSH_DEBUG_STORAGE_KEY = 'refah_customer_push_debug';
+const PENDING_NOTIFICATION_CAMPAIGN_KEY = 'refah_pending_notification_campaign';
+
+export type CustomerPushDebugState = {
+    status:
+        | 'idle'
+        | 'started'
+        | 'permission_denied'
+        | 'token_received'
+        | 'registered'
+        | 'register_failed'
+        | 'unregistered'
+        | 'auth_missing';
+    message: string;
+    lastAttemptAt: string;
+    permissionStatus?: string;
+    tokenPreview?: string;
+    projectId?: string;
+    error?: string;
+};
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -34,18 +55,6 @@ const ensureChannel = async () => {
     });
 };
 
-const ensurePermission = async (): Promise<boolean> => {
-    const existing = await Notifications.getPermissionsAsync();
-    let finalStatus = existing.status;
-
-    if (finalStatus !== 'granted') {
-        const requested = await Notifications.requestPermissionsAsync();
-        finalStatus = requested.status;
-    }
-
-    return finalStatus === 'granted';
-};
-
 const getStoredPushToken = async (): Promise<string | null> =>
     AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
 
@@ -55,10 +64,57 @@ const setStoredPushToken = async (token: string) =>
 const clearStoredPushToken = async () =>
     AsyncStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
 
-const resolveExpoPushToken = async (): Promise<string | null> => {
-    const hasPermission = await ensurePermission();
-    if (!hasPermission) {
+const setPendingNotificationCampaignId = async (campaignId: string) =>
+    AsyncStorage.setItem(PENDING_NOTIFICATION_CAMPAIGN_KEY, campaignId);
+
+export const consumePendingNotificationCampaignId = async (): Promise<string | null> => {
+    const campaignId = await AsyncStorage.getItem(PENDING_NOTIFICATION_CAMPAIGN_KEY);
+    if (campaignId) {
+        await AsyncStorage.removeItem(PENDING_NOTIFICATION_CAMPAIGN_KEY);
+    }
+    return campaignId;
+};
+
+const setPushDebugState = async (state: CustomerPushDebugState) =>
+    AsyncStorage.setItem(PUSH_DEBUG_STORAGE_KEY, JSON.stringify(state));
+
+export const getCustomerPushDebugState = async (): Promise<CustomerPushDebugState | null> => {
+    try {
+        const value = await AsyncStorage.getItem(PUSH_DEBUG_STORAGE_KEY);
+        return value ? JSON.parse(value) : null;
+    } catch (error) {
+        console.warn('Failed to read push debug state:', error);
         return null;
+    }
+};
+
+const getTokenPreview = (token: string | null | undefined) => {
+    if (!token) {
+        return undefined;
+    }
+
+    const normalized = `${token}`.trim();
+    if (normalized.length <= 18) {
+        return normalized;
+    }
+
+    return `${normalized.slice(0, 10)}...${normalized.slice(-6)}`;
+};
+
+const resolveExpoPushToken = async (): Promise<{ token: string | null; permissionStatus: string }> => {
+    const existing = await Notifications.getPermissionsAsync();
+    let finalStatus = existing.status;
+
+    if (finalStatus !== 'granted') {
+        const requested = await Notifications.requestPermissionsAsync();
+        finalStatus = requested.status;
+    }
+
+    if (finalStatus !== 'granted') {
+        return {
+            token: null,
+            permissionStatus: finalStatus,
+        };
     }
 
     await ensureChannel();
@@ -68,7 +124,10 @@ const resolveExpoPushToken = async (): Promise<string | null> => {
         ? await Notifications.getExpoPushTokenAsync({ projectId })
         : await Notifications.getExpoPushTokenAsync();
 
-    return response.data || null;
+    return {
+        token: response.data || null,
+        permissionStatus: finalStatus,
+    };
 };
 
 export const initializeNotificationHandling = () => {
@@ -76,8 +135,16 @@ export const initializeNotificationHandling = () => {
         // Intentionally left blank. Foreground presentation is handled by the notification handler.
     });
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(() => {
-        // Future enhancement: route users into the matching booking or order screen.
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+        const campaignId = `${response?.notification?.request?.content?.data?.campaignId || ''}`.trim();
+        if (!campaignId) {
+            return;
+        }
+
+        const navigated = navigateToNotificationDetail(campaignId);
+        if (!navigated) {
+            await setPendingNotificationCampaignId(campaignId);
+        }
     });
 
     return () => {
@@ -88,27 +155,82 @@ export const initializeNotificationHandling = () => {
 
 export const registerCustomerPushNotifications = async (): Promise<string | null> => {
     if (!(await api.isAuthenticated())) {
+        await setPushDebugState({
+            status: 'auth_missing',
+            message: 'Customer is not authenticated yet.',
+            lastAttemptAt: new Date().toISOString(),
+        });
         return null;
     }
 
-    const token = await resolveExpoPushToken();
-    if (!token) {
-        return null;
-    }
-
-    await api.registerPushToken({
-        token,
-        platform: Platform.OS,
-        appVersion: getAppVersion(),
+    const projectId = getProjectId();
+    await setPushDebugState({
+        status: 'started',
+        message: 'Starting push registration.',
+        lastAttemptAt: new Date().toISOString(),
+        projectId,
     });
 
+    const { token, permissionStatus } = await resolveExpoPushToken();
+    if (!token) {
+        await setPushDebugState({
+            status: 'permission_denied',
+            message: 'Notification permission was not granted.',
+            lastAttemptAt: new Date().toISOString(),
+            permissionStatus,
+            projectId,
+        });
+        return null;
+    }
+
+    await setPushDebugState({
+        status: 'token_received',
+        message: 'Expo push token generated on device.',
+        lastAttemptAt: new Date().toISOString(),
+        permissionStatus,
+        projectId,
+        tokenPreview: getTokenPreview(token),
+    });
+
+    try {
+        await api.registerPushToken({
+            token,
+            platform: Platform.OS,
+            appVersion: getAppVersion(),
+        });
+    } catch (error: any) {
+        await setPushDebugState({
+            status: 'register_failed',
+            message: 'Backend failed to save the Expo push token.',
+            lastAttemptAt: new Date().toISOString(),
+            permissionStatus,
+            projectId,
+            tokenPreview: getTokenPreview(token),
+            error: error?.message || 'Unknown push registration error',
+        });
+        throw error;
+    }
+
     await setStoredPushToken(token);
+    await setPushDebugState({
+        status: 'registered',
+        message: 'Push token registered successfully.',
+        lastAttemptAt: new Date().toISOString(),
+        permissionStatus,
+        projectId,
+        tokenPreview: getTokenPreview(token),
+    });
     return token;
 };
 
 export const unregisterCustomerPushNotifications = async (): Promise<void> => {
     const storedToken = await getStoredPushToken();
     if (!storedToken) {
+        await setPushDebugState({
+            status: 'unregistered',
+            message: 'No stored push token was found on this device.',
+            lastAttemptAt: new Date().toISOString(),
+        });
         return;
     }
 
@@ -118,5 +240,12 @@ export const unregisterCustomerPushNotifications = async (): Promise<void> => {
         }
     } finally {
         await clearStoredPushToken();
+        await setPushDebugState({
+            status: 'unregistered',
+            message: 'Push token removed from this device.',
+            lastAttemptAt: new Date().toISOString(),
+            tokenPreview: getTokenPreview(storedToken),
+            projectId: getProjectId(),
+        });
     }
 };

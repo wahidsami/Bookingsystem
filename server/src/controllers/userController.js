@@ -412,6 +412,37 @@ const getNotificationDetail = async (req, res) => {
 };
 
 /**
+ * Get one customer notification detail by campaign id
+ * GET /api/v1/users/notifications/campaign/:campaignId
+ */
+const getNotificationByCampaign = async (req, res) => {
+    try {
+        const notification = await customerNotificationService.getUserNotificationByCampaignId(
+            req.userId,
+            req.params.campaignId
+        );
+
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            notification
+        });
+    } catch (error) {
+        console.error('Get customer notification by campaign error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to fetch notification detail'
+        });
+    }
+};
+
+/**
  * Mark one customer notification as read
  * POST /api/v1/users/notifications/:id/read
  */
@@ -535,6 +566,7 @@ module.exports = {
     getServicesHistory,
     getNotifications,
     getNotificationDetail,
+    getNotificationByCampaign,
     markNotificationRead,
     registerPushToken,
     unregisterPushToken,

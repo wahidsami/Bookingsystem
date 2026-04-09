@@ -351,6 +351,28 @@ module.exports = {
 
         return recipient ? normalizeCustomerNotification(recipient) : null;
     },
+    async getUserNotificationByCampaignId(platformUserId, campaignId) {
+        const recipient = await db.TenantPushCampaignRecipient.findOne({
+            where: {
+                platformUserId
+            },
+            include: [{
+                model: db.TenantPushCampaign,
+                as: 'campaign',
+                where: { id: campaignId },
+                attributes: ['id', 'tenantId', 'title', 'body', 'data', 'audienceType', 'sentAt'],
+                include: [{
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'logo'],
+                    required: false
+                }]
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        return recipient ? normalizeCustomerNotification(recipient) : null;
+    },
     async markUserNotificationRead(platformUserId, recipientId) {
         const recipient = await db.TenantPushCampaignRecipient.findOne({
             where: {
