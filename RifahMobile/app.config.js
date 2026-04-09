@@ -1,4 +1,5 @@
-const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined;
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID
+  || '412b0087-4404-421d-aaf3-a44b474fed0b';
 const updateUrl = easProjectId ? `https://u.expo.dev/${easProjectId}` : undefined;
 
 module.exports = {
@@ -41,7 +42,6 @@ module.exports = {
       ar: './locales/ar.json',
       en: './locales/en.json',
     },
-    supportsRTL: true,
     runtimeVersion: {
       policy: 'appVersion',
     },

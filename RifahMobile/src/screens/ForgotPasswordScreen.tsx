@@ -13,6 +13,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface ForgotPasswordScreenProps {
     onBackToLogin: () => void;
@@ -21,6 +22,7 @@ interface ForgotPasswordScreenProps {
 
 export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotPasswordScreenProps) {
     const { t, isRTL } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -55,7 +57,16 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <ScrollView
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: spacing.xl + topInset,
+                        paddingBottom: scrollBottomPadding,
+                    }
+                ]}
+                keyboardShouldPersistTaps="handled"
+            >
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={onBackToLogin}
@@ -125,8 +136,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.xxl,
     },
     backButton: {
         paddingVertical: spacing.sm,

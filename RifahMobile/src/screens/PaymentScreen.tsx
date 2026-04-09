@@ -14,10 +14,12 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 export function PaymentScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
     const { appointmentId, orderId, amount, tenantId } = route.params || {};
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [cardNumber, setCardNumber] = useState('');
     const [expiryDate, setExpiryDate] = useState('');
@@ -75,14 +77,14 @@ export function PaymentScreen({ route, navigation }: any) {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Text style={styles.backButtonText}>←</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('payment')}</Text>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
                 <View style={styles.amountContainer}>
                     <Text style={styles.amountLabel}>{t('totalAmount')}</Text>
                     <Text style={styles.amountValue}>{amount} SAR</Text>
@@ -167,7 +169,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.xl,
-        paddingTop: spacing.xl + 20,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,

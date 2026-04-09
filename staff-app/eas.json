@@ -13,11 +13,17 @@
       "android": {
         "buildType": "apk"
       },
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rapi.unifinitylab.com/api/v1"
+      }
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rapi.unifinitylab.com/api/v1"
+      }
     }
   },
   "submit": {

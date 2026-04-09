@@ -12,9 +12,11 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { api, Tenant, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 export function BrowseScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const initialCategory = route.params?.category as string | undefined;
     const initialTitle = route.params?.title as string | undefined;
     const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -51,7 +53,7 @@ export function BrowseScreen({ route, navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Text style={styles.backButtonText}>←</Text>
                 </TouchableOpacity>
@@ -75,7 +77,10 @@ export function BrowseScreen({ route, navigation }: any) {
                 <FlatList
                     data={filteredTenants}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={filteredTenants.length === 0 ? styles.emptyList : styles.listContent}
+                    contentContainerStyle={[
+                        filteredTenants.length === 0 ? styles.emptyList : styles.listContent,
+                        { paddingBottom: scrollBottomPadding }
+                    ]}
                     onRefresh={() => {
                         setRefreshing(true);
                         loadTenants();
@@ -130,7 +135,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: spacing.md,
         paddingHorizontal: spacing.xl,
-        paddingTop: spacing.xl + 20,
         paddingBottom: spacing.lg,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
@@ -171,6 +175,7 @@ const styles = StyleSheet.create({
     },
     emptyList: {
         flexGrow: 1,
+        paddingBottom: spacing.xl,
     },
     card: {
         backgroundColor: '#FFFFFF',

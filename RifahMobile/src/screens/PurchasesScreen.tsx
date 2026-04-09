@@ -19,10 +19,12 @@ import { GuestView } from '../components/GuestView';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { orderNeedsPayment } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 export function PurchasesScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const { showLogin } = useAppSession();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -181,7 +183,7 @@ export function PurchasesScreen({ navigation }: any) {
     if (!isAuthenticated && !loading) {
         return (
             <>
-                <View style={styles.header}>
+                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
@@ -200,7 +202,7 @@ export function PurchasesScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 {/* Back Button */}
                 <TouchableOpacity
                     style={styles.backButton}
@@ -217,7 +219,7 @@ export function PurchasesScreen({ navigation }: any) {
                     data={orders}
                     renderItem={renderOrderCard}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding }]}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                     }
@@ -266,7 +268,6 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.xl,
-        paddingTop: spacing.xl + 20,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,

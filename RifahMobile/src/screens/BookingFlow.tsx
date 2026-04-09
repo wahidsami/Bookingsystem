@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { useAppSession } from '../contexts/AppSessionContext';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface BookingProps {
     route: any;
@@ -20,6 +21,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
     const { t, isRTL, language } = useLanguage();
     const { showLogin } = useAppSession();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
     const [step, setStep] = useState<BookingStep>('staff');
     const [loading, setLoading] = useState(false);
 
@@ -285,7 +287,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                     <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -298,13 +300,13 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 <View style={[styles.progressBar, { width: step === 'staff' ? '25%' : step === 'datetime' ? '50%' : '100%' }]} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
                 {step === 'staff' && renderStaffSelection()}
                 {step === 'datetime' && renderDateTimeSelection()}
                 {step === 'review' && renderReview()}
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: bottomInset }]}>
                 <TouchableOpacity style={styles.primaryButton} onPress={step === 'review' ? handleBooking : handleNext}>
                     {loading ? (
                         <ActivityIndicator color="white" />
@@ -329,7 +331,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: spacing.lg,
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
         backgroundColor: 'white',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,

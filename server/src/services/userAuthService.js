@@ -39,6 +39,9 @@ const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d'; // 
  * @class UserAuthService
  */
 class UserAuthService {
+    normalizeEmail(email) {
+        return `${email || ''}`.trim().toLowerCase();
+    }
 
     /**
      * Register a new platform user (end-user account creation)
@@ -68,16 +71,20 @@ class UserAuthService {
      */
     async register(userData) {
         const { email, phone, password, firstName, lastName } = userData;
+        const normalizedEmail = this.normalizeEmail(email);
 
         // Check if user already exists
         const existingUser = await db.PlatformUser.findOne({
             where: {
-                [db.Sequelize.Op.or]: [{ email }, { phone }]
+                [db.Sequelize.Op.or]: [{ email: normalizedEmail }, { phone }]
             }
         });
 
         if (existingUser) {
             if (existingUser.email === email) {
+                throw new Error('Email already registered');
+            }
+            if (existingUser.email === normalizedEmail) {
                 throw new Error('Email already registered');
             }
             if (existingUser.phone === phone) {
@@ -90,7 +97,7 @@ class UserAuthService {
 
         // Create user (password will be hashed by model hook)
         const user = await db.PlatformUser.create({
-            email,
+            email: normalizedEmail,
             phone,
             password,
             firstName,
@@ -117,8 +124,40 @@ class UserAuthService {
      * Login user
      */
     async login(email, password) {
+        const normalizedEmail = this.normalizeEmail(email);
+
         // Find user by email
-        const user = await db.PlatformUser.findOne({ where: { email } });
+        const user = await db.PlatformUser.findOne({
+            where: { email: normalizedEmail },
+            attributes: [
+                'id',
+                'email',
+                'phone',
+                'password',
+                'firstName',
+                'lastName',
+                'dateOfBirth',
+                'gender',
+                'profileImage',
+                'preferredLanguage',
+                'notificationPreferences',
+                'walletBalance',
+                'loyaltyPoints',
+                'totalSpent',
+                'totalBookings',
+                'emailVerified',
+                'phoneVerified',
+                'emailVerificationToken',
+                'phoneVerificationCode',
+                'lastLogin',
+                'refreshToken',
+                'isActive',
+                'isBanned',
+                'banReason',
+                'createdAt',
+                'updatedAt'
+            ]
+        });
 
         if (!user) {
             throw new Error('Invalid email or password');
@@ -266,7 +305,7 @@ class UserAuthService {
      * Request password reset
      */
     async requestPasswordReset(email) {
-        const user = await db.PlatformUser.findOne({ where: { email } });
+        const user = await db.PlatformUser.findOne({ where: { email: this.normalizeEmail(email) } });
 
         if (!user) {
             // Don't reveal if email exists

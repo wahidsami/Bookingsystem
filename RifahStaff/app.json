@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "Refah staff",
+    "slug": "RefahStaff",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/app icon.png",
+    "scheme": "rifahstaff",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/app icon.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.unifinityai.refahstaff",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "rifahstaff"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-notifications",
+      "expo-secure-store",
+      "expo-font",
+      "expo-localization",
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5a641f07-5d6a-43a5-8998-23e50d53b8ca"
+      },
+      "apiUrl": "https://rapi.unifinitylab.com/api/v1"
+    }
+  }
+}

@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface RegisterScreenProps {
     onRegisterSuccess: () => void;
@@ -25,6 +26,7 @@ interface RegisterScreenProps {
 
 export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin }: RegisterScreenProps) {
     const { t, isRTL } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -198,7 +200,13 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: spacing.xl + topInset,
+                        paddingBottom: scrollBottomPadding,
+                    }
+                ]}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Back Button */}
@@ -424,8 +432,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.xxl,
     },
     backButton: {
         paddingVertical: spacing.sm,

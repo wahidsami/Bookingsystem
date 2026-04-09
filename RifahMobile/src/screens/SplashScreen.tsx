@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 export function SplashScreen({ onFinish }: { onFinish: () => void }) {
+    const { bottomInset } = useScreenSafeArea();
+
     useEffect(() => {
         // Auto-finish after 2 seconds
         const timer = setTimeout(() => {
@@ -30,7 +33,7 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
                 style={styles.loader}
             />
 
-            <Text style={styles.version}>Version 1.0.0</Text>
+            <Text style={[styles.version, { bottom: bottomInset }]}>Version 1.0.0</Text>
         </View>
     );
 }
@@ -61,7 +64,6 @@ const styles = StyleSheet.create({
     },
     version: {
         position: 'absolute',
-        bottom: 40,
         color: '#E0E7FF',
         fontSize: 12,
     },

@@ -1,20 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Linking, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+import { UserAvatar } from '../components/UserAvatar';
+import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, User } from '../api/client';
+import { api, PublicAppContent, User } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface MoreScreenProps {
     navigation?: any;
 }
 
 export function MoreScreen({ navigation }: MoreScreenProps) {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { isAuthenticated, logout, showLogin } = useAppSession();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
+    const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
 
     useEffect(() => {
         api.getUser().then(setUser).catch(() => setUser(null));
@@ -30,6 +34,10 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                 .catch(() => {
                     api.getUser().then(setUser).catch(() => setUser(null));
                 });
+
+            api.getCustomerAppContent()
+                .then(setAppContent)
+                .catch(() => setAppContent(null));
         }, [])
     );
 
@@ -39,6 +47,57 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
         { id: 'browse', icon: '🔍', label: t('browseSalons'), action: () => navigation?.navigate('Browse') },
         { id: 'myPurchases', icon: '🛍️', label: t('myPurchases'), action: () => navigation?.navigate('Purchases') },
     ];
+
+    const settingsItems = [
+        { id: 'settings', icon: '⚙️', label: t('settings'), action: () => navigation?.navigate('Settings') },
+        {
+            id: 'savedAddresses',
+            icon: '📍',
+            label: t('savedAddresses'),
+            action: () => navigation?.navigate('EditProfile'),
+        },
+    ];
+
+    const supportItems = [
+        {
+            id: 'helpSupport',
+            icon: '💬',
+            label: appContent?.support?.help_support?.[
+                language === 'ar' ? 'titleAr' : 'titleEn'
+            ] || t('helpSupport'),
+            action: () => navigation?.navigate('InfoPage', { pageType: 'support' }),
+        },
+        {
+            id: 'aboutRefah',
+            icon: '✨',
+            label: appContent?.legal?.about_refah?.[
+                language === 'ar' ? 'titleAr' : 'titleEn'
+            ] || t('aboutRefah'),
+            action: () => navigation?.navigate('InfoPage', { pageType: 'about' }),
+        },
+        {
+            id: 'privacyTerms',
+            icon: '📄',
+            label: appContent?.legal?.privacy_terms?.[
+                language === 'ar' ? 'titleAr' : 'titleEn'
+            ] || t('privacyTerms'),
+            action: () => navigation?.navigate('InfoPage', { pageType: 'privacy' }),
+        },
+    ];
+
+    const socialLinks = (appContent?.social || []).filter((item) => item.url);
+
+    const getSocialIcon = (iconKey: string) => {
+        const socialIconMap: Record<string, string> = {
+            instagram: '📸',
+            x_twitter: '𝕏',
+            snapchat: '👻',
+            tiktok: '♪',
+            youtube: '▶️',
+            website: '🌐',
+        };
+        return socialIconMap[iconKey] || '🔗';
+    };
 
     const handleAuthAction = async () => {
         if (isAuthenticated) {
@@ -52,11 +111,16 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 <View style={styles.userInfo}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{user?.firstName?.charAt(0).toUpperCase() || 'U'}</Text>
-                    </View>
+                    <UserAvatar
+                        firstName={user?.firstName}
+                        lastName={user?.lastName}
+                        profileImage={user?.profileImage}
+                        size={60}
+                        backgroundColor="#FFFFFF"
+                        textColor={colors.primary}
+                    />
                     <View>
                         <Text style={styles.userName}>{user ? `${user.firstName} ${user.lastName}` : t('guestTitle')}</Text>
                         <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
@@ -64,7 +128,10 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                 </View>
             </View>
 
-            <ScrollView style={styles.content}>
+            <ScrollView
+                style={styles.content}
+                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+            >
                 {/* Menu Items */}
                 <View style={styles.menuSection}>
                     {menuItems.map((item) => (
@@ -81,6 +148,75 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                                     item.action();
                                 }
                             }}
+                        >
+                            <View style={styles.menuItemLeft}>
+                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <Text style={styles.menuLabel}>{item.label}</Text>
+                            </View>
+                            <Text style={styles.menuArrow}>›</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {socialLinks.length > 0 && (
+                    <>
+                        <View style={styles.sectionHeaderWrap}>
+                            <Text style={styles.sectionHeaderText}>{t('followRefah')}</Text>
+                        </View>
+
+                        <View style={styles.socialCard}>
+                            <View style={styles.socialRow}>
+                                {socialLinks.map((item) => (
+                                    <TouchableOpacity
+                                        key={`${item.key}-${item.iconKey}`}
+                                        style={styles.socialIconButton}
+                                        onPress={() => Linking.openURL(item.url)}
+                                    >
+                                        <Text style={styles.socialIconText}>{getSocialIcon(item.iconKey)}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                <View style={styles.sectionHeaderWrap}>
+                    <Text style={styles.sectionHeaderText}>{t('settings')}</Text>
+                </View>
+
+                <View style={styles.menuSection}>
+                    {settingsItems.map((item) => (
+                        <TouchableOpacity
+                            key={item.id}
+                            style={styles.menuItem}
+                            onPress={() => {
+                                if (!isAuthenticated) {
+                                    showLogin();
+                                    return;
+                                }
+
+                                void item.action();
+                            }}
+                        >
+                            <View style={styles.menuItemLeft}>
+                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <Text style={styles.menuLabel}>{item.label}</Text>
+                            </View>
+                            <Text style={styles.menuArrow}>›</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                <View style={styles.sectionHeaderWrap}>
+                    <Text style={styles.sectionHeaderText}>{t('supportAndLegal')}</Text>
+                </View>
+
+                <View style={styles.menuSection}>
+                    {supportItems.map((item) => (
+                        <TouchableOpacity
+                            key={item.id}
+                            style={styles.menuItem}
+                            onPress={item.action}
                         >
                             <View style={styles.menuItemLeft}>
                                 <Text style={styles.menuIcon}>{item.icon}</Text>
@@ -115,25 +251,11 @@ const styles = StyleSheet.create({
     header: {
         backgroundColor: colors.primary,
         padding: spacing.xl,
-        paddingTop: spacing.xl + 20,
     },
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
-    },
-    avatar: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarText: {
-        fontSize: fontSize.xxl,
-        fontWeight: '700',
-        color: colors.primary,
     },
     userName: {
         fontSize: fontSize.lg,
@@ -181,6 +303,44 @@ const styles = StyleSheet.create({
     menuArrow: {
         fontSize: 24,
         color: colors.textSecondary,
+    },
+    sectionHeaderWrap: {
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.sm,
+    },
+    sectionHeaderText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+    },
+    socialCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: spacing.lg,
+        marginTop: spacing.sm,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: spacing.lg,
+    },
+    socialRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.md,
+    },
+    socialIconButton: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: colors.backgroundGray,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    socialIconText: {
+        fontSize: 24,
     },
     logoutButton: {
         flexDirection: 'row',

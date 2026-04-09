@@ -13,6 +13,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { HotDeal, getImageUrl } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 type HotDealDetailRouteProp = RouteProp<{ HotDealDetail: { deal: HotDeal } }, 'HotDealDetail'>;
 
@@ -21,6 +22,7 @@ export function HotDealDetailScreen() {
     const navigation = useNavigation<any>();
     const { deal } = route.params;
     const { isRTL, t } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
     const title = isRTL ? deal.title_ar : deal.title_en;
     const description = isRTL ? deal.description_ar : deal.description_en;
@@ -49,7 +51,7 @@ export function HotDealDetailScreen() {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -57,7 +59,10 @@ export function HotDealDetailScreen() {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Hero Image */}
                 {deal.image ? (
                     <Image source={{ uri: getImageUrl(deal.image) }} style={styles.heroImage} resizeMode="cover" />
@@ -153,7 +158,6 @@ export function HotDealDetailScreen() {
                     </TouchableOpacity>
                 )}
 
-                <View style={{ height: spacing.xxl }} />
             </ScrollView>
         </View>
     );
@@ -169,7 +173,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
-        paddingTop: Platform.OS === 'ios' ? 56 : 20,
         paddingBottom: spacing.md,
         backgroundColor: '#fff',
         borderBottomWidth: 1,

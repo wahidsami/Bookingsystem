@@ -8,6 +8,7 @@ import { HotDealsCarousel } from '../components/home/HotDealsCarousel';
 import { TenantHorizontalList } from '../components/home/TenantHorizontalList';
 import { CategoriesGrid } from '../components/home/CategoriesGrid';
 import { TopProvidersSection } from '../components/home/TopProvidersSection';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface HomeScreenProps {
     navigation?: any;
@@ -15,6 +16,7 @@ interface HomeScreenProps {
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
     const { t } = useLanguage();
+    const { scrollBottomPadding } = useScreenSafeArea();
     const [refreshing, setRefreshing] = useState(false);
     const [key, setKey] = useState(0);
 
@@ -31,7 +33,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
             <ScrollView
                 key={key}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
@@ -61,8 +63,6 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 <SectionHeader title={t('topProviders')} />
                 <TopProvidersSection />
 
-                {/* Bottom padding */}
-                <View style={{ height: spacing.xl }} />
             </ScrollView>
         </View>
     );

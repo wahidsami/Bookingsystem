@@ -1,5 +1,21 @@
 const userAuthService = require('../services/userAuthService');
 
+const withTimeout = async (promise, timeoutMs, timeoutMessage = 'Request timed out') => {
+    let timer;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+            })
+        ]);
+    } finally {
+        if (timer) {
+            clearTimeout(timer);
+        }
+    }
+};
+
 /**
  * Register a new user
  */
@@ -68,6 +84,7 @@ const register = async (req, res) => {
  * Login user
  */
 const login = async (req, res) => {
+    const loginStartedAt = Date.now();
     try {
         const { email, password } = req.body;
 
@@ -78,7 +95,21 @@ const login = async (req, res) => {
             });
         }
 
-        const result = await userAuthService.login(email, password);
+        console.info('[UserAuth] Login attempt started', {
+            email: `${email}`.trim().toLowerCase(),
+            at: new Date(loginStartedAt).toISOString()
+        });
+
+        const result = await withTimeout(
+            userAuthService.login(email, password),
+            8000,
+            'Login service timed out'
+        );
+
+        console.info('[UserAuth] Login attempt finished', {
+            email: `${email}`.trim().toLowerCase(),
+            durationMs: Date.now() - loginStartedAt
+        });
 
         res.json({
             success: true,
@@ -88,7 +119,14 @@ const login = async (req, res) => {
             user: result.user
         });
     } catch (error) {
-        res.status(401).json({
+        const isTimeout = error.message === 'Login service timed out';
+        console.error('[UserAuth] Login attempt failed', {
+            email: `${req.body?.email || ''}`.trim().toLowerCase(),
+            durationMs: Date.now() - loginStartedAt,
+            error: error.message
+        });
+
+        res.status(isTimeout ? 503 : 401).json({
             success: false,
             message: error.message
         });

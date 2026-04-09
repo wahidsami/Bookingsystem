@@ -36,6 +36,7 @@ const KEYS = {
     ACCESS_TOKEN: 'refah_access_token',
     REFRESH_TOKEN: 'refah_refresh_token',
     USER: 'refah_user',
+    CUSTOMER_APP_CONTENT: 'refah_customer_app_content',
 };
 
 export interface ApiResponse<T> {
@@ -264,6 +265,39 @@ export interface HotDeal {
     tenant?: { id: string; name: string; name_en?: string; name_ar?: string; logo?: string; slug?: string };
     service?: { id: string; name_en: string; name_ar: string; duration?: number };
 }
+
+export interface AppContentEntry {
+    key: string;
+    titleAr: string;
+    titleEn: string;
+    contentAr: string;
+    contentEn: string;
+    url: string;
+    iconKey: string;
+    metadata: Record<string, any>;
+    publishedVersion: string;
+    publishedAt?: string | null;
+    updatedAt?: string | null;
+    sortOrder: number;
+}
+
+export interface PublicAppContent {
+    appTarget: 'customer_app' | 'staff_app';
+    legal: Record<string, AppContentEntry>;
+    support: Record<string, AppContentEntry>;
+    social: AppContentEntry[];
+    store: Record<string, AppContentEntry>;
+    display: Record<string, AppContentEntry>;
+}
+
+const DEFAULT_CUSTOMER_APP_CONTENT: PublicAppContent = {
+    appTarget: 'customer_app',
+    legal: {},
+    support: {},
+    social: [],
+    store: {},
+    display: {},
+};
 
 class ApiClient {
     private baseURL: string;
@@ -743,6 +777,29 @@ class ApiClient {
             }))
             .filter((member) => member.id)
             .sort((left, right) => right.rating - left.rating);
+    }
+
+    async getCustomerAppContent(): Promise<PublicAppContent> {
+        try {
+            const response = await this.get<{
+                success: boolean;
+                appContent: PublicAppContent;
+            }>('/public/apps-center/customer-app');
+
+            const appContent = response.appContent || DEFAULT_CUSTOMER_APP_CONTENT;
+            await AsyncStorage.setItem(KEYS.CUSTOMER_APP_CONTENT, JSON.stringify(appContent));
+            return appContent;
+        } catch (error) {
+            console.error('Failed to fetch customer app content:', error);
+
+            try {
+                const cached = await AsyncStorage.getItem(KEYS.CUSTOMER_APP_CONTENT);
+                return cached ? JSON.parse(cached) : DEFAULT_CUSTOMER_APP_CONTENT;
+            } catch (storageError) {
+                console.error('Failed to load cached app content:', storageError);
+                return DEFAULT_CUSTOMER_APP_CONTENT;
+            }
+        }
     }
 }
 

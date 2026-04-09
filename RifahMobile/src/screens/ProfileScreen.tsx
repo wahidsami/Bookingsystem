@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
+import { UserAvatar } from '../components/UserAvatar';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, User, getImageUrl } from '../api/client';
+import { api, User } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface ProfileScreenProps {
     navigation: any;
@@ -13,6 +15,7 @@ interface ProfileScreenProps {
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
     const { t } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploadLoading, setUploadLoading] = useState(false);
@@ -89,26 +92,24 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
 
     const fullName = `${user.firstName} ${user.lastName}`;
-    const avatarLetter = user.firstName?.charAt(0).toUpperCase() || 'U';
-
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 <Text style={styles.headerTitle}>{t('profile')}</Text>
             </View>
-            <ScrollView style={styles.content}>
+            <ScrollView
+                style={styles.content}
+                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+            >
                 {/* Profile Picture */}
                 <View style={styles.avatarSection}>
-                    {user.profileImage ? (
-                        <Image
-                            source={{ uri: getImageUrl(user.profileImage) }}
-                            style={styles.avatarImage}
-                        />
-                    ) : (
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{avatarLetter}</Text>
-                        </View>
-                    )}
+                    <UserAvatar
+                        firstName={user.firstName}
+                        lastName={user.lastName}
+                        profileImage={user.profileImage}
+                        size={100}
+                        style={styles.profileAvatar}
+                    />
                     {uploadError ? (
                         <Text style={styles.uploadErrorText}>{uploadError}</Text>
                     ) : null}
@@ -167,7 +168,6 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.xl,
-        paddingTop: spacing.xl + 20,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
@@ -186,19 +186,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         marginBottom: spacing.md,
     },
-    avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
+    profileAvatar: {
         marginBottom: spacing.md,
-    },
-    avatarText: {
-        fontSize: 40,
-        fontWeight: '700',
-        color: '#FFFFFF',
     },
     editButton: {
         paddingHorizontal: spacing.lg,
@@ -256,11 +245,5 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: colors.error,
         marginBottom: spacing.sm,
-    },
-    avatarImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        marginBottom: spacing.md,
     },
 });

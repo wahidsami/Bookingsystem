@@ -10,6 +10,8 @@ import { CartScreen } from '../screens/CartScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { BrowseScreen } from '../screens/BrowseScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+import { InfoPageScreen } from '../screens/InfoPageScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -31,6 +33,8 @@ export function RootNavigator() {
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Browse" component={BrowseScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="InfoPage" component={InfoPageScreen} />
         </Stack.Navigator>
     );
 }

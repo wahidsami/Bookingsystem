@@ -21,10 +21,12 @@ import { GuestView } from '../components/GuestView';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingNeedsPayment } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const { showLogin } = useAppSession();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -227,7 +229,7 @@ export function BookingsScreen({ navigation }: any) {
     if (!isAuthenticated && !loading) {
         return (
             <>
-                <View style={styles.header}>
+                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                     <Text style={styles.headerTitle}>{t('bookings')}</Text>
                 </View>
                 <GuestView
@@ -240,7 +242,7 @@ export function BookingsScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 <Text style={styles.headerTitle}>{t('bookings')}</Text>
             </View>
 
@@ -272,7 +274,7 @@ export function BookingsScreen({ navigation }: any) {
                     data={bookings}
                     renderItem={renderBookingCard}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding }]}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                     }
@@ -306,7 +308,10 @@ export function BookingsScreen({ navigation }: any) {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
-                        <ScrollView showsVerticalScrollIndicator={false}>
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+                        >
                             <View style={styles.modalHeader}>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.modalTitle}>
@@ -439,7 +444,6 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.xl,
-        paddingTop: spacing.xl + 20,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,

@@ -5,12 +5,14 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, User, Booking, getImageUrl } from '../api/client';
 import { useNavigation } from '@react-navigation/native';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 const { width } = Dimensions.get('window');
 
 export function DashboardScreen() {
     const { t, isRTL } = useLanguage();
     const navigation = useNavigation<any>();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
     const [stats, setStats] = useState({ upcomingCount: 0, pendingPayment: 0 });
     const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
@@ -61,7 +63,7 @@ export function DashboardScreen() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
                 <View>
                     <Text style={styles.greeting}>{getGreeting()},</Text>
                     <Text style={styles.username}>
@@ -86,7 +88,7 @@ export function DashboardScreen() {
             </View>
 
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
             >
                 {/* Stats Cards */}
@@ -197,7 +199,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.xl,
-        paddingTop: spacing.xl + 20,
         paddingBottom: spacing.lg,
         backgroundColor: '#FFFFFF',
     },

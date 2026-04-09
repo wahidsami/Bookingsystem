@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +20,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
     const { isRTL } = useLanguage();
     const { clearCart } = useCart();
     const { payload, tenantId, total } = route.params;
+    const { bottomInset } = useScreenSafeArea();
 
     const [cardNumber, setCardNumber] = useState('');
     const [expiry, setExpiry] = useState('');
@@ -59,7 +62,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
 
     if (isSuccess) {
         return (
-            <SafeAreaView style={[styles.container, styles.centerAll]}>
+            <SafeAreaView style={[styles.container, styles.centerAll]} edges={['top', 'bottom']}>
                 <View style={styles.successCircle}>
                     <Ionicons name="checkmark" size={60} color="white" />
                 </View>
@@ -71,7 +74,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
@@ -146,7 +149,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
                     </View>
                 </View>
 
-                <View style={styles.footer}>
+                <View style={[styles.footer, { paddingBottom: bottomInset }]}>
                     <TouchableOpacity
                         style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
                         onPress={handlePayment}

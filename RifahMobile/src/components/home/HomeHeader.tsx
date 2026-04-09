@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../ThemedText';
 import { colors, spacing, fontSize } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { api, User, getImageUrl } from '../../api/client';
+import { api, User } from '../../api/client';
 import { useAppSession } from '../../contexts/AppSessionContext';
+import { useScreenSafeArea } from '../../utils/safeArea';
+import { UserAvatar } from '../UserAvatar';
 
 interface HomeHeaderProps {
     navigation: any;
@@ -14,6 +16,7 @@ interface HomeHeaderProps {
 export function HomeHeader({ navigation }: HomeHeaderProps) {
     const { t } = useLanguage();
     const { showLogin } = useAppSession();
+    const { topInset } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
 
     useFocusEffect(
@@ -27,24 +30,21 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
         setUser(userData);
     };
 
-    const avatarUri = user?.profileImage ? getImageUrl(user.profileImage) : undefined;
-    const initials = user?.firstName?.charAt(0)?.toUpperCase() || 'U';
     const displayName = user ? `${user.firstName} ${user.lastName}` : 'Guest';
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingTop: spacing.xl + topInset }]}>
             {/* Left: Avatar */}
             <TouchableOpacity
                 onPress={() => (user ? navigation.navigate('Profile') : showLogin())}
                 style={styles.avatarTouchable}
             >
-                {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
-                ) : (
-                    <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarText}>{initials}</Text>
-                    </View>
-                )}
+                <UserAvatar
+                    firstName={user?.firstName}
+                    lastName={user?.lastName}
+                    profileImage={user?.profileImage}
+                    size={48}
+                />
             </TouchableOpacity>
 
             {/* Center: Welcome text */}
@@ -68,30 +68,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl + 20,
         paddingBottom: spacing.md,
         backgroundColor: colors.background,
     },
     avatarTouchable: {
         marginRight: spacing.md,
-    },
-    avatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-    },
-    avatarPlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarText: {
-        color: '#FFF',
-        fontSize: fontSize.lg,
-        fontWeight: '700',
     },
     textContainer: {
         flex: 1,

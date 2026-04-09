@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet, Image, Dimensions, Platform } from 
 import { ThemedText as Text } from '../components/ThemedText';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface LanguageSelectionProps {
     onLanguageSelect: (language: 'ar' | 'en') => void;
@@ -17,6 +18,7 @@ const clamp = (min: number, preferred: number, max: number) => {
 
 export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) {
     const [isSelecting, setIsSelecting] = useState(false);
+    const { bottomInset } = useScreenSafeArea();
 
     const handleSelect = (lang: 'ar' | 'en') => {
         if (isSelecting) return;
@@ -42,7 +44,7 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
             </View>
 
             {/* Bottom Half: Interactions */}
-            <View style={styles.bottomHalf}>
+            <View style={[styles.bottomHalf, { paddingBottom: bottomInset }]}>
                 <View style={styles.bottomContent}>
 
                     {/* Text Instructions */}

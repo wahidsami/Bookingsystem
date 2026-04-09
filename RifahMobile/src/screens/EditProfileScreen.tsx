@@ -13,6 +13,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, User } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface EditProfileScreenProps {
     navigation: any;
@@ -20,6 +21,7 @@ interface EditProfileScreenProps {
 
 export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
     const { t, isRTL } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -106,7 +108,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
                     <Text style={styles.headerBackText}>←</Text>
                 </TouchableOpacity>
@@ -114,7 +116,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
                 <View style={styles.headerSpacer} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
                 {error ? (
                     <View style={styles.errorContainer}>
                         <Text style={styles.errorText}>{error}</Text>
@@ -240,7 +242,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: Platform.OS === 'ios' ? 56 : 24,
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.md,
         backgroundColor: '#FFFFFF',

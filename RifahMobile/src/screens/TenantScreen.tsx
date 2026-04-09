@@ -7,6 +7,7 @@ import { useCart } from '../contexts/CartContext';
 import { api, Tenant, Service, Staff, Product, getImageUrl, getServicePrice } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface TenantDetailsProps {
     route: any;
@@ -18,6 +19,7 @@ const { width } = Dimensions.get('window');
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const { tenantId, slug } = route.params; // Expect tenantId or slug from navigation
     const { t, isRTL } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [tenant, setTenant] = useState<Tenant | null>(null);
     const [pageData, setPageData] = useState<any>(null);
@@ -264,7 +266,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         style={styles.heroGradient}
                     >
                         <View style={styles.heroContent}>
-                            <View style={styles.heroHeader}>
+                            <View style={[styles.heroHeader, { marginTop: topInset }]}>
                                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                                     <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="white" />
                                 </TouchableOpacity>
@@ -515,7 +517,10 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+            >
                 {renderHero()}
                 {renderTabs()}
                 {activeTab === 'services' && renderServices()}
@@ -556,7 +561,6 @@ const styles = StyleSheet.create({
     heroHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: Platform.OS === 'ios' ? 40 : 20,
     },
     backButton: {
         width: 40,

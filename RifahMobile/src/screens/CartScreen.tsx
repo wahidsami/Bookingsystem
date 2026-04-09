@@ -7,6 +7,7 @@ import { useCart } from '../contexts/CartContext';
 import { Ionicons } from '@expo/vector-icons';
 import { api, getImageUrl, Tenant } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface CartScreenProps {
     route: any;
@@ -17,6 +18,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     const { t, isRTL } = useLanguage();
     const { showLogin } = useAppSession();
     const { cartItems, cartTotal, updateQuantity, removeFromCart, clearCart, cartTenantId } = useCart();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     // We expect tenant to be passed from TenantScreen when navigating to Cart
     const tenant: Tenant = route.params?.tenant;
@@ -175,7 +177,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -183,7 +185,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Order Items</Text>
                     {cartItems.map(item => (
@@ -310,7 +312,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: bottomInset }]}>
                 <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout} disabled={loading}>
                     {loading ? (
                         <ActivityIndicator color="white" />
@@ -361,7 +363,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
         paddingBottom: spacing.md,
         paddingHorizontal: spacing.md,
         backgroundColor: 'white',
@@ -378,7 +379,6 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: spacing.md,
-        paddingBottom: 40,
     },
     section: {
         backgroundColor: 'white',
@@ -518,7 +518,6 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
         borderTopWidth: 1,
         borderTopColor: colors.border,
-        paddingBottom: Platform.OS === 'ios' ? 40 : spacing.lg,
     },
     checkoutBtn: {
         backgroundColor: colors.primary,

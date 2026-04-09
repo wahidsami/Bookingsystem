@@ -15,6 +15,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
+import { useScreenSafeArea } from '../utils/safeArea';
 
 interface LoginScreenProps {
     onLoginSuccess: () => void;
@@ -25,6 +26,7 @@ interface LoginScreenProps {
 
 export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, onForgotPassword }: LoginScreenProps) {
     const { t, isRTL } = useLanguage();
+    const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -92,7 +94,13 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: spacing.xl + topInset,
+                        paddingBottom: scrollBottomPadding,
+                    }
+                ]}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Back Button */}
@@ -210,8 +218,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.xxl,
     },
     backButton: {
         paddingVertical: spacing.sm,
