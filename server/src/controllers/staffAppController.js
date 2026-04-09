@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const db = require('../models');
 const pushNotificationService = require('../services/pushNotificationService');
+const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { normalizePackageEntitlements, isFeatureEnabled } = require('../utils/packageEntitlements');
 const {
     STAFF_APPOINTMENT_TRANSITIONS,
     canTransitionAppointmentStatus,
@@ -13,6 +15,12 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+const DEFAULT_STAFF_PERMISSIONS = {
+    view_earnings: false,
+    view_reviews: true,
+    reply_reviews: false,
+    view_clients: false
+};
 
 const buildStartOfDay = (value) => {
     const date = value ? new Date(`${value}T00:00:00.000Z`) : new Date();
@@ -49,10 +57,47 @@ const createRefreshToken = (staffUser, staff) => jwt.sign({
     expiresIn: JWT_REFRESH_EXPIRES_IN
 });
 
-const buildStaffPayload = async (staff) => {
-    const tenant = await db.Tenant.findByPk(staff.tenantId, {
-        attributes: ['id', 'name', 'name_en', 'name_ar', 'businessType', 'city', 'logo']
-    });
+const buildStaffFeatureFlags = (packageLimits = {}) => {
+    const normalizedLimits = normalizePackageEntitlements(packageLimits || {});
+    const messagingEntitled = Boolean(normalizedLimits.hasInternalMessaging);
+    const earningsEntitled = isFeatureEnabled(normalizedLimits.payroll);
+    const pushEntitled = Boolean(normalizedLimits.hasPushNotifications) || Boolean(normalizedLimits.pushNotifications);
+
+    return {
+        today: true,
+        schedule: true,
+        profile: true,
+        messages: false,
+        earnings: false,
+        reviews: false,
+        timeOff: false,
+        clientNotes: true,
+        pushNotifications: pushEntitled || true,
+        entitlements: {
+            internalMessaging: messagingEntitled,
+            payroll: earningsEntitled,
+            pushNotifications: pushEntitled,
+        }
+    };
+};
+
+const buildStaffPayload = async (staff, staffUser = null) => {
+    const [tenant, permissionRecord, subscriptionResult] = await Promise.all([
+        db.Tenant.findByPk(staff.tenantId, {
+            attributes: ['id', 'name', 'name_en', 'name_ar', 'businessType', 'city', 'logo']
+        }),
+        db.StaffPermission.findOne({
+            where: { staffId: staff.id },
+            attributes: ['permissions']
+        }),
+        getActiveSubscriptionForTenant(staff.tenantId)
+    ]);
+
+    const permissions = {
+        ...DEFAULT_STAFF_PERMISSIONS,
+        ...(permissionRecord?.permissions || {})
+    };
+    const features = buildStaffFeatureFlags(subscriptionResult?.package?.limits || {});
 
     return {
         id: staff.id,
@@ -70,6 +115,9 @@ const buildStaffPayload = async (staff) => {
         salary: staff.salary,
         commissionRate: staff.commissionRate,
         isActive: staff.isActive,
+        must_change_password: Boolean(staffUser?.must_change_password),
+        permissions,
+        features,
         tenant: tenant ? {
             id: tenant.id,
             businessName: tenant.name_ar || tenant.name_en || tenant.name,
@@ -136,7 +184,7 @@ const login = async (req, res) => {
         }
 
         const staff = await getLinkedStaffForUser(staffUser);
-        const staffPayload = await buildStaffPayload(staff);
+        const staffPayload = await buildStaffPayload(staff, staffUser);
 
         res.json({
             success: true,
@@ -206,7 +254,7 @@ const logout = async (req, res) => {
 const getMe = async (req, res) => {
     try {
         const staff = await db.Staff.findByPk(req.staffId);
-        const staffPayload = await buildStaffPayload(staff);
+        const staffPayload = await buildStaffPayload(staff, req.staffUser);
 
         res.json({
             success: true,
