@@ -21,7 +21,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
-import { navigationRef, navigateToNotificationDetail } from './src/navigation/navigationService';
+import { navigationRef, navigateToNotifications } from './src/navigation/navigationService';
 
 type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'forgotPassword' | 'home';
 
@@ -228,9 +228,9 @@ function AppContent() {
           ref={navigationRef}
           onReady={() => {
             consumePendingNotificationCampaignId()
-              .then((campaignId) => {
-                if (campaignId) {
-                  navigateToNotificationDetail(campaignId);
+              .then((pendingNotification) => {
+                if (pendingNotification) {
+                  navigateToNotifications();
                 }
               })
               .catch(() => undefined);

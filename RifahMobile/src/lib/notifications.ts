@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from '../api/client';
-import { navigateToNotificationDetail } from '../navigation/navigationService';
+import { navigateToNotifications } from '../navigation/navigationService';
 
 const PUSH_TOKEN_STORAGE_KEY = 'refah_customer_push_token';
 const PUSH_DEBUG_STORAGE_KEY = 'refah_customer_push_debug';
@@ -49,9 +49,10 @@ const ensureChannel = async () => {
 
     await Notifications.setNotificationChannelAsync('default', {
         name: 'Default',
-        importance: Notifications.AndroidImportance.DEFAULT,
+        importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#8B5CF6',
+        sound: 'default',
     });
 };
 
@@ -141,7 +142,7 @@ export const initializeNotificationHandling = () => {
             return;
         }
 
-        const navigated = navigateToNotificationDetail(campaignId);
+        const navigated = navigateToNotifications();
         if (!navigated) {
             await setPendingNotificationCampaignId(campaignId);
         }

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { ThemedText as Text } from '../ThemedText';
 import { colors, spacing, fontSize } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -15,20 +16,47 @@ interface HomeHeaderProps {
 
 export function HomeHeader({ navigation }: HomeHeaderProps) {
     const { t } = useLanguage();
-    const { showLogin } = useAppSession();
+    const { showLogin, isAuthenticated } = useAppSession();
     const { topInset } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
 
-    useFocusEffect(
-        React.useCallback(() => {
-            loadUser();
-        }, [])
-    );
-
-    const loadUser = async () => {
+    const loadUser = useCallback(async () => {
         const userData = await api.getProfile().catch(() => api.getUser());
         setUser(userData);
-    };
+    }, []);
+
+    const loadUnreadCount = useCallback(async () => {
+        if (!isAuthenticated) {
+            setUnreadCount(0);
+            return;
+        }
+
+        try {
+            const response = await api.getNotifications(1, 1);
+            setUnreadCount(response.unreadCount || 0);
+        } catch (error) {
+            console.warn('Failed to load notification count:', error);
+            setUnreadCount(0);
+        }
+    }, [isAuthenticated]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadUser();
+            loadUnreadCount();
+        }, [loadUnreadCount, loadUser])
+    );
+
+    useEffect(() => {
+        const subscription = Notifications.addNotificationReceivedListener(() => {
+            loadUnreadCount();
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [loadUnreadCount]);
 
     const displayName = user ? `${user.firstName} ${user.lastName}` : 'Guest';
 
@@ -55,6 +83,17 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
 
             {/* Right: Icons */}
             <View style={styles.iconsRow}>
+                <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => (isAuthenticated ? navigation.navigate('Notifications') : showLogin())}
+                >
+                    <Text style={styles.icon}>🔔</Text>
+                    {unreadCount > 0 ? (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                        </View>
+                    ) : null}
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Browse')}>
                     <Text style={styles.icon}>🔍</Text>
                 </TouchableOpacity>
@@ -97,8 +136,29 @@ const styles = StyleSheet.create({
         backgroundColor: colors.backgroundGray,
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
     },
     icon: {
         fontSize: 20,
+    },
+    badge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: colors.error,
+        paddingHorizontal: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: colors.background,
+    },
+    badgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+        lineHeight: 12,
     },
 });

@@ -8,6 +8,7 @@ import {
     View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { CustomerNotification, api, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
@@ -45,6 +46,12 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
         loadNotifications();
     }, [loadNotifications]);
 
+    useFocusEffect(
+        useCallback(() => {
+            loadNotifications();
+        }, [loadNotifications])
+    );
+
     const onRefresh = () => {
         setRefreshing(true);
         loadNotifications();
@@ -74,7 +81,12 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
                         <Text style={styles.cardTitle}>{item.title}</Text>
                         <Text style={styles.cardDate}>{formatDateTime(item.sentAt || item.createdAt)}</Text>
                     </View>
-                    {!item.readAt ? <View style={styles.unreadDot} /> : null}
+                    {!item.readAt ? (
+                        <View style={styles.unreadWrap}>
+                            <View style={styles.unreadDot} />
+                            <Text style={styles.unreadLabel}>{language === 'ar' ? 'غير مقروء' : 'Unread'}</Text>
+                        </View>
+                    ) : null}
                 </View>
                 <Text style={styles.cardBody} numberOfLines={3}>{item.body}</Text>
                 <View style={styles.cardFooter}>
@@ -227,7 +239,16 @@ const styles = StyleSheet.create({
         height: 10,
         borderRadius: 5,
         backgroundColor: colors.primary,
-        marginTop: 6,
+        marginTop: 4,
+    },
+    unreadWrap: {
+        alignItems: 'flex-end',
+        gap: 4,
+    },
+    unreadLabel: {
+        fontSize: fontSize.xs,
+        color: colors.error,
+        fontWeight: '700',
     },
     cardBody: {
         marginTop: spacing.sm,
