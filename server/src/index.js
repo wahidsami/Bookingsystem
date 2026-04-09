@@ -356,8 +356,11 @@ const ensureStaffPermissionSchema = async () => {
                     ADD COLUMN IF NOT EXISTS "staffId" UUID;
 
                 ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS "tenantId" UUID;
+
+                ALTER TABLE public.staff_permissions
                     ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT
-                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false}'::jsonb;
+                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb;
 
                 ALTER TABLE public.staff_permissions
                     ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
@@ -377,18 +380,28 @@ const ensureStaffPermissionSchema = async () => {
                         ALTER COLUMN permissions TYPE JSONB
                         USING CASE
                             WHEN permissions IS NULL OR permissions::text = '' THEN
-                                '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false}'::jsonb
+                                '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb
                             ELSE permissions::jsonb
                         END;
                 END IF;
 
                 ALTER TABLE public.staff_permissions
                     ALTER COLUMN permissions SET DEFAULT
-                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false}'::jsonb;
+                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb;
+
+                UPDATE public.staff_permissions sp
+                SET "tenantId" = s."tenantId"
+                FROM public.staff s
+                WHERE sp."staffId" = s.id
+                  AND sp."tenantId" IS NULL;
 
                 UPDATE public.staff_permissions
-                SET permissions = '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false}'::jsonb
+                SET permissions = '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb
                 WHERE permissions IS NULL;
+
+                UPDATE public.staff_permissions
+                SET permissions = permissions || '{"view_booking_notes": false}'::jsonb
+                WHERE NOT (permissions ? 'view_booking_notes');
             END $$;
         `);
 

@@ -8,6 +8,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'staffId',
                 as: 'staff'
             });
+
+            StaffPermission.belongsTo(models.Tenant, {
+                foreignKey: 'tenantId',
+                as: 'tenant'
+            });
         }
     }
 
@@ -23,6 +28,15 @@ module.exports = (sequelize, DataTypes) => {
             unique: true,
             references: {
                 model: 'staff',
+                key: 'id'
+            },
+            onDelete: 'CASCADE'
+        },
+        tenantId: {
+            type: DataTypes.UUID,
+            allowNull: false,
+            references: {
+                model: 'tenants',
                 key: 'id'
             },
             onDelete: 'CASCADE'

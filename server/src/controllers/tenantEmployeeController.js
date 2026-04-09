@@ -32,15 +32,20 @@ const buildStaffAppAccessPayload = ({ email, hasAccount, temporaryPassword = nul
     accountRemoved
 });
 
-const getOrCreateStaffPermissionRecord = async (staffId, transaction = null) => {
+const getOrCreateStaffPermissionRecord = async (staffId, tenantId, transaction = null) => {
     const [record] = await db.StaffPermission.findOrCreate({
         where: { staffId },
         defaults: {
             staffId,
+            tenantId,
             permissions: DEFAULT_STAFF_PERMISSIONS
         },
         transaction
     });
+
+    if (!record.tenantId || record.tenantId !== tenantId) {
+        await record.update({ tenantId }, { transaction });
+    }
 
     return record;
 };
@@ -355,7 +360,7 @@ exports.getEmployeePermissions = async (req, res) => {
             });
         }
 
-        const permissionRecord = await getOrCreateStaffPermissionRecord(employee.id);
+        const permissionRecord = await getOrCreateStaffPermissionRecord(employee.id, tenantId);
         const staffUser = employee.email
             ? await db.User.findOne({
                 where: {
@@ -414,7 +419,7 @@ exports.updateEmployeePermissions = async (req, res) => {
             }
         }
 
-        const permissionRecord = await getOrCreateStaffPermissionRecord(employee.id);
+        const permissionRecord = await getOrCreateStaffPermissionRecord(employee.id, tenantId);
         const nextPermissions = {
             ...DEFAULT_STAFF_PERMISSIONS,
             ...(permissionRecord.permissions || {}),
