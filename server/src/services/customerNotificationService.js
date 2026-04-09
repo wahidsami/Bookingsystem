@@ -232,15 +232,16 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
     }
 
     const sent = sentToIds.length;
+    const billableRecipients = uniqueUserIds.length;
     const skippedRecipients = recipientResults.filter((item) => item.skipped).length;
     const failedRecipients = recipientResults.filter((item) => !item.success && !item.skipped).length;
 
-    if (limit !== -1 && sent > 0) {
+    if (limit !== -1 && billableRecipients > 0) {
         const [usage] = await db.TenantPushUsage.findOrCreate({
             where: { tenantId, month: monthKey },
             defaults: { tenantId, month: monthKey, count: 0 }
         });
-        await usage.increment('count', { by: sent });
+        await usage.increment('count', { by: billableRecipients });
     }
 
     if (campaign) {
