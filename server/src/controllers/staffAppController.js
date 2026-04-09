@@ -22,6 +22,18 @@ const DEFAULT_STAFF_PERMISSIONS = {
     view_clients: false
 };
 
+const getStaffPermissions = async (staffId) => {
+    const permissionRecord = await db.StaffPermission.findOne({
+        where: { staffId },
+        attributes: ['permissions']
+    });
+
+    return {
+        ...DEFAULT_STAFF_PERMISSIONS,
+        ...(permissionRecord?.permissions || {})
+    };
+};
+
 const buildStartOfDay = (value) => {
     const date = value ? new Date(`${value}T00:00:00.000Z`) : new Date();
     date.setUTCHours(0, 0, 0, 0);
@@ -32,6 +44,12 @@ const buildEndOfDay = (value) => {
     const date = buildStartOfDay(value);
     date.setUTCHours(23, 59, 59, 999);
     return date;
+};
+
+const buildTodayKey = () => {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    return today.toISOString().split('T')[0];
 };
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
@@ -68,9 +86,9 @@ const buildStaffFeatureFlags = (packageLimits = {}) => {
         schedule: true,
         profile: true,
         messages: false,
-        earnings: false,
-        reviews: false,
-        timeOff: false,
+        earnings: earningsEntitled,
+        reviews: true,
+        timeOff: true,
         clientNotes: true,
         pushNotifications: pushEntitled || true,
         entitlements: {
@@ -313,6 +331,162 @@ const getAppointments = async (req, res) => {
     }
 };
 
+const getReviews = async (req, res) => {
+    try {
+        const permissions = await getStaffPermissions(req.staffId);
+        if (!permissions.view_reviews) {
+            return res.status(403).json({
+                success: false,
+                message: 'Review access is not enabled for this employee account'
+            });
+        }
+
+        const reviews = await db.Review.findAll({
+            where: {
+                tenantId: req.tenantId,
+                staffId: req.staffId
+            },
+            order: [['createdAt', 'DESC']]
+        });
+
+        const avgRating = reviews.length > 0
+            ? (reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length).toFixed(1)
+            : null;
+
+        const distribution = reviews.reduce((acc, review) => {
+            const rating = Number(review.rating || 0);
+            if (rating >= 1 && rating <= 5) {
+                acc[rating] = (acc[rating] || 0) + 1;
+            }
+            return acc;
+        }, {});
+
+        res.json({
+            success: true,
+            data: {
+                reviews,
+                avgRating,
+                distribution,
+                total: reviews.length
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load staff reviews',
+            error: error.message
+        });
+    }
+};
+
+const getEarnings = async (req, res) => {
+    try {
+        const permissions = await getStaffPermissions(req.staffId);
+        if (!permissions.view_earnings) {
+            return res.status(403).json({
+                success: false,
+                message: 'Earnings access is not enabled for this employee account'
+            });
+        }
+
+        const payrolls = await db.StaffPayroll.findAll({
+            where: {
+                tenantId: req.tenantId,
+                staffId: req.staffId
+            },
+            order: [['periodStart', 'DESC'], ['createdAt', 'DESC']]
+        });
+
+        const totals = payrolls.reduce((acc, payroll) => {
+            const base = Number(payroll.baseSalary || 0);
+            const commission = Number(payroll.commission || 0);
+            const tips = Number(payroll.tipsTotal || 0);
+            const bonuses = Number(payroll.bonuses || 0);
+            const deductions = Number(payroll.deductions || 0);
+            const totalNet = base + commission + tips + bonuses - deductions;
+
+            acc.totalBase += base;
+            acc.totalCommission += commission;
+            acc.totalTips += tips;
+            acc.totalBonuses += bonuses;
+            acc.totalDeductions += deductions;
+            acc.totalNet += totalNet;
+            return acc;
+        }, {
+            totalBase: 0,
+            totalCommission: 0,
+            totalTips: 0,
+            totalBonuses: 0,
+            totalDeductions: 0,
+            totalNet: 0,
+        });
+
+        const currentMonth = payrolls.length > 0 ? payrolls[0] : null;
+
+        res.json({
+            success: true,
+            data: {
+                payrolls,
+                totals,
+                currentMonth
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load staff earnings',
+            error: error.message
+        });
+    }
+};
+
+const replyToReview = async (req, res) => {
+    try {
+        const permissions = await getStaffPermissions(req.staffId);
+        if (!permissions.reply_reviews) {
+            return res.status(403).json({
+                success: false,
+                message: 'Review reply access is not enabled for this employee account'
+            });
+        }
+
+        const review = await db.Review.findOne({
+            where: {
+                id: req.params.id,
+                tenantId: req.tenantId,
+                staffId: req.staffId
+            }
+        });
+
+        if (!review) {
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found'
+            });
+        }
+
+        const trimmedReply = typeof req.body?.staffReply === 'string'
+            ? req.body.staffReply.trim()
+            : '';
+
+        await review.update({
+            staffReply: trimmedReply || null,
+            staffRepliedAt: trimmedReply ? new Date() : null
+        });
+
+        res.json({
+            success: true,
+            data: review
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update review reply',
+            error: error.message
+        });
+    }
+};
+
 const getSchedule = async (req, res) => {
     try {
         const { date } = req.query;
@@ -408,6 +582,150 @@ const getSchedule = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to load staff schedule',
+            error: error.message
+        });
+    }
+};
+
+const getTimeOffRequests = async (req, res) => {
+    try {
+        const timeOff = await db.StaffTimeOff.findAll({
+            where: {
+                staffId: req.staffId
+            },
+            order: [['startDate', 'DESC'], ['createdAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            data: timeOff
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load time off requests',
+            error: error.message
+        });
+    }
+};
+
+const requestTimeOff = async (req, res) => {
+    try {
+        const { startDate, endDate, type, reason } = req.body || {};
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'startDate and endDate are required'
+            });
+        }
+
+        if (startDate > endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'End date cannot be before start date'
+            });
+        }
+
+        const todayKey = buildTodayKey();
+        if (startDate < todayKey) {
+            return res.status(400).json({
+                success: false,
+                message: 'Time off cannot start in the past'
+            });
+        }
+
+        const overlapping = await db.StaffTimeOff.findOne({
+            where: {
+                staffId: req.staffId,
+                [Op.or]: [
+                    {
+                        [Op.and]: [
+                            { startDate: { [Op.lte]: startDate } },
+                            { endDate: { [Op.gte]: startDate } }
+                        ]
+                    },
+                    {
+                        [Op.and]: [
+                            { startDate: { [Op.lte]: endDate } },
+                            { endDate: { [Op.gte]: endDate } }
+                        ]
+                    },
+                    {
+                        [Op.and]: [
+                            { startDate: { [Op.gte]: startDate } },
+                            { endDate: { [Op.lte]: endDate } }
+                        ]
+                    }
+                ]
+            }
+        });
+
+        if (overlapping) {
+            return res.status(409).json({
+                success: false,
+                message: 'Time off overlaps with an existing request'
+            });
+        }
+
+        const timeOff = await db.StaffTimeOff.create({
+            staffId: req.staffId,
+            startDate,
+            endDate,
+            type: type || 'vacation',
+            reason: typeof reason === 'string' && reason.trim() ? reason.trim() : null,
+            isApproved: true,
+            approvedAt: new Date()
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Time off request submitted successfully',
+            data: timeOff
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to submit time off request',
+            error: error.message
+        });
+    }
+};
+
+const cancelTimeOffRequest = async (req, res) => {
+    try {
+        const timeOff = await db.StaffTimeOff.findOne({
+            where: {
+                id: req.params.id,
+                staffId: req.staffId
+            }
+        });
+
+        if (!timeOff) {
+            return res.status(404).json({
+                success: false,
+                message: 'Time off request not found'
+            });
+        }
+
+        const todayKey = buildTodayKey();
+        if (timeOff.startDate < todayKey) {
+            return res.status(400).json({
+                success: false,
+                message: 'Past or active time off requests cannot be cancelled'
+            });
+        }
+
+        await timeOff.destroy();
+
+        res.json({
+            success: true,
+            message: 'Time off request cancelled successfully'
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to cancel time off request',
             error: error.message
         });
     }
@@ -622,8 +940,14 @@ module.exports = {
     logout,
     getMe,
     getAppointments,
+    getEarnings,
+    getReviews,
     getSchedule,
+    getTimeOffRequests,
+    requestTimeOff,
+    cancelTimeOffRequest,
     updateAppointmentStatus,
+    replyToReview,
     changePassword,
     registerPushToken,
     unregisterPushToken

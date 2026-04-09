@@ -7,10 +7,12 @@ interface User {
     id: string;
     name: string;
     email: string;
+    phone?: string;
     photo?: string;
     must_change_password?: boolean;
     tenant?: {
         id: string;
+        businessName?: string;
         name_en: string;
         name_ar: string;
         logo?: string;
@@ -20,6 +22,22 @@ interface User {
         view_reviews: boolean;
         reply_reviews: boolean;
         view_clients: boolean;
+    };
+    features?: {
+        today: boolean;
+        schedule: boolean;
+        profile: boolean;
+        messages: boolean;
+        earnings: boolean;
+        reviews: boolean;
+        timeOff: boolean;
+        clientNotes: boolean;
+        pushNotifications: boolean;
+        entitlements?: {
+            internalMessaging: boolean;
+            payroll: boolean;
+            pushNotifications: boolean;
+        };
     };
 }
 
@@ -37,6 +55,46 @@ const AuthContext = createContext<AuthContextType>({
     signIn: async () => { },
     signOut: async () => { },
     updateUser: () => { },
+});
+
+const normalizeUserPayload = (userData: any): User => ({
+    id: `${userData?.id || ''}`,
+    name: `${userData?.name || 'Staff'}`,
+    email: `${userData?.email || ''}`,
+    phone: userData?.phone ? `${userData.phone}` : undefined,
+    photo: userData?.photo || undefined,
+    must_change_password: Boolean(userData?.must_change_password),
+    tenant: userData?.tenant
+        ? {
+            id: `${userData.tenant.id || ''}`,
+            businessName: userData.tenant.businessName || undefined,
+            name_en: userData.tenant.name_en || userData.tenant.businessName || '',
+            name_ar: userData.tenant.name_ar || userData.tenant.businessName || '',
+            logo: userData.tenant.logo || undefined,
+        }
+        : undefined,
+    permissions: {
+        view_earnings: Boolean(userData?.permissions?.view_earnings),
+        view_reviews: Boolean(userData?.permissions?.view_reviews),
+        reply_reviews: Boolean(userData?.permissions?.reply_reviews),
+        view_clients: Boolean(userData?.permissions?.view_clients),
+    },
+    features: {
+        today: userData?.features?.today !== false,
+        schedule: userData?.features?.schedule !== false,
+        profile: userData?.features?.profile !== false,
+        messages: Boolean(userData?.features?.messages),
+        earnings: Boolean(userData?.features?.earnings),
+        reviews: Boolean(userData?.features?.reviews),
+        timeOff: Boolean(userData?.features?.timeOff),
+        clientNotes: userData?.features?.clientNotes !== false,
+        pushNotifications: userData?.features?.pushNotifications !== false,
+        entitlements: {
+            internalMessaging: Boolean(userData?.features?.entitlements?.internalMessaging),
+            payroll: Boolean(userData?.features?.entitlements?.payroll),
+            pushNotifications: Boolean(userData?.features?.entitlements?.pushNotifications),
+        },
+    },
 });
 
 export function useAuth() {
@@ -82,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     // Verify token by fetching user profile
                     const response = await api.get('/staff/me');
                     if (response.data.success && response.data.staff) {
-                        setUser(response.data.staff);
+                        setUser(normalizeUserPayload(response.data.staff));
                     }
                 }
             } catch (e) {
@@ -104,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const signIn = async (tokens: { accessToken: string; refreshToken: string }, userData: User) => {
         await SecureStore.setItemAsync('refah_staff_access_token', tokens.accessToken);
         await SecureStore.setItemAsync('refah_staff_refresh_token', tokens.refreshToken);
-        setUser(userData);
+        setUser(normalizeUserPayload(userData));
     };
 
     const signOut = async () => {
@@ -120,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateUser = (userData: Partial<User>) => {
-        setUser(prev => prev ? { ...prev, ...userData } : null);
+        setUser(prev => prev ? normalizeUserPayload({ ...prev, ...userData }) : null);
     };
 
     return (

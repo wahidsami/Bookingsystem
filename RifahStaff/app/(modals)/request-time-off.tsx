@@ -3,12 +3,13 @@ import {
     StyleSheet,
     View,
     Text,
-    TextInput,
     TouchableOpacity,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
-    ActivityIndicator
+    ActivityIndicator,
+    TextInput,
+    Alert
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,44 +19,49 @@ import { useTranslation } from 'react-i18next';
 
 export default function RequestTimeOffModal() {
     const { t } = useTranslation();
+    const [type, setType] = useState<'vacation' | 'sick' | 'personal' | 'training' | 'other'>('vacation');
     const [startDate, setStartDate] = useState(new Date());
     const [endDate, setEndDate] = useState(new Date());
-
+    const [reason, setReason] = useState('');
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
-    const [type, setType] = useState<'vacation' | 'sick' | 'personal' | 'training' | 'other'>('vacation');
-    const [reason, setReason] = useState('');
+    const formatDate = (value: Date) => value.toISOString().split('T')[0];
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const types = [
-        { label: t('timeOff.vacation'), value: 'vacation' },
-        { label: t('timeOff.sickLeave'), value: 'sick' },
-        { label: t('timeOff.personal'), value: 'personal' },
-        { label: t('timeOff.training'), value: 'training' },
-    ];
+    const leaveTypes = [
+        { value: 'vacation', label: t('timeOff.vacation') },
+        { value: 'sick', label: t('timeOff.sickLeave') },
+        { value: 'personal', label: t('timeOff.personal') },
+        { value: 'training', label: t('timeOff.training') },
+        { value: 'other', label: 'Other' },
+    ] as const;
 
     const handleSubmit = async () => {
         if (endDate < startDate) {
-            setError(t('timeOff.errorDateEndBeforeStart'));
+            Alert.alert(t('common.error'), t('timeOff.errorDateEndBeforeStart'));
             return;
         }
 
-        setLoading(true);
-        setError('');
-
         try {
-            // Format dates as YYYY-MM-DD for the backend
-            const formattedStart = startDate.toISOString().split('T')[0];
-            const formattedEnd = endDate.toISOString().split('T')[0];
+            setSubmitting(true);
+            await submitTimeOffRequest(
+                formatDate(startDate),
+                formatDate(endDate),
+                type,
+                reason.trim() || undefined
+            );
 
-            await submitTimeOffRequest(formattedStart, formattedEnd, type, reason);
-            router.back(); // Dismiss modal on success
-        } catch (err: any) {
-            setError(err.message || t('timeOff.errorSubmit'));
-            setLoading(false);
+            Alert.alert(t('common.success'), 'Your time off has been submitted.', [
+                {
+                    text: t('common.ok'),
+                    onPress: () => router.back(),
+                }
+            ]);
+        } catch (error: any) {
+            Alert.alert(t('common.error'), error?.response?.data?.message || error?.message || t('timeOff.errorSubmit'));
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -72,99 +78,99 @@ export default function RequestTimeOffModal() {
                     </TouchableOpacity>
                 </View>
 
-                {error ? (
-                    <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                ) : null}
-
                 <View style={styles.formGroup}>
                     <Text style={styles.label}>{t('timeOff.typeLabel')}</Text>
                     <View style={styles.typeGrid}>
-                        {types.map((t) => (
-                            <TouchableOpacity
-                                key={t.value}
-                                style={[styles.typeButton, type === t.value && styles.typeButtonActive]}
-                                onPress={() => setType(t.value as any)}
-                            >
-                                <Text style={[styles.typeButtonText, type === t.value && styles.typeButtonTextActive]}>
-                                    {t.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                        {leaveTypes.map((option) => {
+                            const active = option.value === type;
+                            return (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    style={[styles.typeButton, active && styles.typeButtonActive]}
+                                    onPress={() => setType(option.value)}
+                                >
+                                    <Text style={[styles.typeButtonText, active && styles.typeButtonTextActive]}>
+                                        {option.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </View>
 
-                <View style={styles.datesRow}>
-                    <View style={[styles.formGroup, { flex: 1, marginRight: 10 }]}>
-                        <Text style={styles.label}>{t('timeOff.startDate')}</Text>
-                        <TouchableOpacity
-                            style={styles.dateInput}
-                            onPress={() => setShowStartPicker(true)}
-                        >
-                            <Ionicons name="calendar-outline" size={20} color="#6b7280" style={{ marginRight: 8 }} />
-                            <Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text>
-                        </TouchableOpacity>
-                        {showStartPicker && (
-                            <DateTimePicker
-                                value={startDate}
-                                mode="date"
-                                display="default"
-                                onChange={(event, date) => {
-                                    setShowStartPicker(Platform.OS === 'ios');
-                                    if (date) setStartDate(date);
-                                }}
-                            />
-                        )}
-                    </View>
+                <View style={styles.formGroup}>
+                    <Text style={styles.label}>{t('timeOff.startDate')}</Text>
+                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+                        <Ionicons name="calendar-outline" size={18} color="#6b7280" style={{ marginRight: 8 }} />
+                        <Text style={styles.dateText}>{formatDate(startDate)}</Text>
+                    </TouchableOpacity>
+                </View>
 
-                    <View style={[styles.formGroup, { flex: 1 }]}>
-                        <Text style={styles.label}>{t('timeOff.endDate')}</Text>
-                        <TouchableOpacity
-                            style={styles.dateInput}
-                            onPress={() => setShowEndPicker(true)}
-                        >
-                            <Ionicons name="calendar-outline" size={20} color="#6b7280" style={{ marginRight: 8 }} />
-                            <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
-                        </TouchableOpacity>
-                        {showEndPicker && (
-                            <DateTimePicker
-                                value={endDate}
-                                mode="date"
-                                minimumDate={startDate}
-                                display="default"
-                                onChange={(event, date) => {
-                                    setShowEndPicker(Platform.OS === 'ios');
-                                    if (date) setEndDate(date);
-                                }}
-                            />
-                        )}
-                    </View>
+                <View style={styles.formGroup}>
+                    <Text style={styles.label}>{t('timeOff.endDate')}</Text>
+                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+                        <Ionicons name="calendar-outline" size={18} color="#6b7280" style={{ marginRight: 8 }} />
+                        <Text style={styles.dateText}>{formatDate(endDate)}</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.formGroup}>
                     <Text style={styles.label}>{t('timeOff.reasonLabel')}</Text>
                     <TextInput
-                        style={styles.textInput}
-                        multiline
-                        numberOfLines={4}
-                        placeholder={t('timeOff.reasonPlaceholder')}
                         value={reason}
                         onChangeText={setReason}
+                        placeholder={t('timeOff.reasonPlaceholder')}
+                        placeholderTextColor="#9ca3af"
+                        multiline
+                        style={styles.textInput}
                         textAlignVertical="top"
                     />
                 </View>
 
+                {showStartPicker ? (
+                    <DateTimePicker
+                        value={startDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        minimumDate={new Date()}
+                        onChange={(_, value) => {
+                            setShowStartPicker(Platform.OS === 'ios');
+                            if (!value) {
+                                return;
+                            }
+                            setStartDate(value);
+                            if (value > endDate) {
+                                setEndDate(value);
+                            }
+                        }}
+                    />
+                ) : null}
+
+                {showEndPicker ? (
+                    <DateTimePicker
+                        value={endDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        minimumDate={startDate}
+                        onChange={(_, value) => {
+                            setShowEndPicker(Platform.OS === 'ios');
+                            if (value) {
+                                setEndDate(value);
+                            }
+                        }}
+                    />
+                ) : null}
+
                 <TouchableOpacity
-                    style={styles.submitButton}
+                    style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
                     onPress={handleSubmit}
-                    disabled={loading}
+                    disabled={submitting}
                 >
-                    {loading ? (
+                    {submitting ? (
                         <ActivityIndicator color="#ffffff" />
                     ) : (
                         <>
-                            <Ionicons name="send" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                            <Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
                             <Text style={styles.submitText}>{t('timeOff.submitBtn')}</Text>
                         </>
                     )}
@@ -191,18 +197,6 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: '#1f2937',
-    },
-    errorBox: {
-        backgroundColor: '#fee2e2',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 20,
-        borderLeftWidth: 4,
-        borderLeftColor: '#ef4444',
-    },
-    errorText: {
-        color: '#991b1b',
-        fontSize: 14,
     },
     formGroup: {
         marginBottom: 20,
@@ -237,10 +231,6 @@ const styles = StyleSheet.create({
     typeButtonTextActive: {
         color: '#8B5ADF',
         fontWeight: 'bold',
-    },
-    datesRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
     },
     dateInput: {
         flexDirection: 'row',
@@ -278,6 +268,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
+    },
+    submitButtonDisabled: {
+        opacity: 0.7,
     },
     submitText: {
         color: '#ffffff',

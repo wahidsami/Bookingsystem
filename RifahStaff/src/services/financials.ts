@@ -46,18 +46,71 @@ export interface ReviewsSummary {
 }
 
 export const getEarnings = async (): Promise<EarningsSummary> => {
-    const response = await api.get('/staff/me/earnings');
-    if (response.data.success) return response.data.data;
-    throw new Error('Failed to fetch earnings');
+    const response = await api.get('/staff/earnings');
+    const payload = response.data?.data;
+
+    return {
+        payrolls: Array.isArray(payload?.payrolls)
+            ? payload.payrolls.map((payroll: any) => ({
+                ...payroll,
+                baseSalary: Number(payroll.baseSalary || 0),
+                commission: Number(payroll.commission || 0),
+                tipsTotal: Number(payroll.tipsTotal || 0),
+                bonuses: Number(payroll.bonuses || 0),
+                deductions: Number(payroll.deductions || 0),
+                totalNet: Number(payroll.totalNet || (
+                    Number(payroll.baseSalary || 0) +
+                    Number(payroll.commission || 0) +
+                    Number(payroll.tipsTotal || 0) +
+                    Number(payroll.bonuses || 0) -
+                    Number(payroll.deductions || 0)
+                )),
+            }))
+            : [],
+        totals: {
+            totalBase: Number(payload?.totals?.totalBase || 0),
+            totalCommission: Number(payload?.totals?.totalCommission || 0),
+            totalTips: Number(payload?.totals?.totalTips || 0),
+            totalBonuses: Number(payload?.totals?.totalBonuses || 0),
+            totalDeductions: Number(payload?.totals?.totalDeductions || 0),
+            totalNet: Number(payload?.totals?.totalNet || 0),
+        },
+        currentMonth: payload?.currentMonth
+            ? {
+                ...payload.currentMonth,
+                baseSalary: Number(payload.currentMonth.baseSalary || 0),
+                commission: Number(payload.currentMonth.commission || 0),
+                tipsTotal: Number(payload.currentMonth.tipsTotal || 0),
+                bonuses: Number(payload.currentMonth.bonuses || 0),
+                deductions: Number(payload.currentMonth.deductions || 0),
+                totalNet: Number(payload.currentMonth.totalNet || (
+                    Number(payload.currentMonth.baseSalary || 0) +
+                    Number(payload.currentMonth.commission || 0) +
+                    Number(payload.currentMonth.tipsTotal || 0) +
+                    Number(payload.currentMonth.bonuses || 0) -
+                    Number(payload.currentMonth.deductions || 0)
+                )),
+            }
+            : null,
+    };
 };
 
 export const getMyReviews = async (): Promise<ReviewsSummary> => {
-    const response = await api.get('/staff/me/reviews');
-    if (response.data.success) return response.data.data;
-    throw new Error('Failed to fetch reviews');
+    const response = await api.get('/staff/reviews');
+    const payload = response.data?.data;
+
+    return {
+        reviews: Array.isArray(payload?.reviews) ? payload.reviews : [],
+        avgRating: payload?.avgRating || null,
+        distribution: payload?.distribution || {},
+        total: Number(payload?.total || 0),
+    };
 };
 
 export const replyToReview = async (id: string, reply: string): Promise<boolean> => {
-    const response = await api.post(`/staff/me/reviews/${id}/reply`, { reply });
-    return response.data.success;
+    const response = await api.patch(`/staff/reviews/${id}`, {
+        staffReply: reply,
+    });
+
+    return Boolean(response.data?.success);
 };

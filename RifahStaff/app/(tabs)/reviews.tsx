@@ -10,6 +10,7 @@ import { getMyReviews, replyToReview, ReviewsSummary, Review } from '../../src/s
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { canReplyToReviews, canViewReviews } from '../../src/utils/capabilities';
 
 const StarRating = ({ rating }: { rating: number }) => (
     <View style={{ flexDirection: 'row', gap: 2 }}>
@@ -28,6 +29,8 @@ export default function ReviewsScreen() {
     const [replyModal, setReplyModal] = useState<Review | null>(null);
     const [replyText, setReplyText] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const reviewsAllowed = canViewReviews(user);
+    const canReply = canReplyToReviews(user);
 
     const load = async () => {
         try {
@@ -71,7 +74,7 @@ export default function ReviewsScreen() {
                     <Text style={styles.replyLabel}>{t('reviews.yourReply')}</Text>
                     <Text style={styles.replyText}>{item.staffReply}</Text>
                 </View>
-            ) : user?.permissions?.reply_reviews ? (
+            ) : canReply ? (
                 <TouchableOpacity style={styles.replyBtn} onPress={() => { setReplyModal(item); setReplyText(''); }}>
                     <Ionicons name="chatbubble-outline" size={16} color="#8B5ADF" />
                     <Text style={styles.replyBtnText}>{t('reviews.replyBtn')}</Text>
@@ -93,7 +96,13 @@ export default function ReviewsScreen() {
                 )}
             </LinearGradient>
 
-            {loading ? (
+            {!reviewsAllowed ? (
+                <View style={styles.center}>
+                    <Ionicons name="lock-closed-outline" size={64} color="#d1d5db" />
+                    <Text style={styles.emptyTitle}>Reviews are not enabled for this account</Text>
+                    <Text style={styles.emptySub}>Ask your salon manager to enable review access for your employee account.</Text>
+                </View>
+            ) : loading ? (
                 <View style={styles.center}><ActivityIndicator size="large" color="#8B5ADF" /></View>
             ) : !data || data.reviews.length === 0 ? (
                 <View style={styles.center}>

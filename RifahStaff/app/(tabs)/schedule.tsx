@@ -7,31 +7,30 @@ import {
     ScrollView,
     ActivityIndicator,
     RefreshControl,
-    Platform
+    Platform,
+    Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
-import { getSchedule, getTimeOffRequests, cancelTimeOffRequest, Shift, TimeOff } from '../../src/services/schedule';
+import { getSchedule, cancelTimeOffRequest, Shift, TimeOff } from '../../src/services/schedule';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { canRequestTimeOff } from '../../src/utils/capabilities';
 
 export default function ScheduleScreen() {
     const { user } = useAuth();
     const { t } = useTranslation();
-    const [activeTab, setActiveTab] = useState<'shifts' | 'timeoff'>('shifts');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
     // Shifts State
     const [shifts, setShifts] = useState<Shift[]>([]);
+    const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
     const [selectedDate, setSelectedDate] = useState(new Date());
-
-    // Time Off State
-    const [timeOffRequests, setTimeOffRequests] = useState<TimeOff[]>([]);
-    const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const timeOffEnabled = canRequestTimeOff(user);
 
     // Calculate current week dates for the header (Mon-Sun)
     // startOfWeek in date-fns defaults to Sunday (0). We want Monday (1).
@@ -42,22 +41,18 @@ export default function ScheduleScreen() {
 
     const loadData = useCallback(async () => {
         try {
-            if (activeTab === 'shifts') {
-                const start = weekStartStr;
-                const end = format(addDays(new Date(weekStartStr), 6), 'yyyy-MM-dd');
-                const data = await getSchedule(start, end);
-                setShifts(data.shifts);
-            } else {
-                const data = await getTimeOffRequests();
-                setTimeOffRequests(data);
-            }
+            const start = weekStartStr;
+            const end = format(addDays(new Date(weekStartStr), 6), 'yyyy-MM-dd');
+            const data = await getSchedule(start, end);
+            setShifts(data.shifts);
+            setTimeOff(data.timeOff);
         } catch (error) {
             console.error('Failed to load schedule data', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [activeTab, weekStartStr]); // String dep = stable across renders
+    }, [weekStartStr]);
 
     useEffect(() => {
         if (!user) { setLoading(false); return; }
@@ -70,24 +65,39 @@ export default function ScheduleScreen() {
         loadData();
     };
 
-    const handleCancelTimeOff = async (id: string) => {
-        if (cancellingId) return;
-        try {
-            setCancellingId(id);
-            await cancelTimeOffRequest(id);
-            // Reload to reflect the deletion
-            loadData();
-        } catch (error) {
-            console.error('Failed to cancel time off request', error);
-        } finally {
-            setCancellingId(null);
-        }
+    const handleCancelTimeOff = (id: string) => {
+        Alert.alert(
+            t('schedule.cancelRequest'),
+            'Do you want to cancel this upcoming time off request?',
+            [
+                { text: t('common.no'), style: 'cancel' },
+                {
+                    text: t('common.yes'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await cancelTimeOffRequest(id);
+                            loadData();
+                        } catch (error: any) {
+                            Alert.alert(
+                                t('common.error'),
+                                error?.response?.data?.message || error?.message || 'Could not cancel this time off request.'
+                            );
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     // Filter shifts based on the currently selected date tile
     const shiftsForSelectedDate = shifts.filter(
         s => s.date === format(selectedDate, 'yyyy-MM-dd')
     );
+    const timeOffForSelectedDate = timeOff.filter((item) => {
+        const selected = format(selectedDate, 'yyyy-MM-dd');
+        return item.startDate <= selected && item.endDate >= selected;
+    });
 
     const formatTime = (timeString: string) => {
         // timeString is often HH:mm:ss
@@ -153,75 +163,62 @@ export default function ScheduleScreen() {
                     </View>
                 ))
             )}
-        </View>
-    );
 
-    const renderTimeOffTab = () => (
-        <View style={styles.tabContent}>
-            <TouchableOpacity
-                style={styles.requestButton}
-                onPress={() => router.push('/(modals)/request-time-off')}
-            >
-                <Ionicons name="add-circle-outline" size={24} color="#ffffff" style={{ marginRight: 8 }} />
-                <Text style={styles.requestButtonText}>{t('schedule.requestTimeOff')}</Text>
-            </TouchableOpacity>
-
-            {loading ? (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color="#8B5ADF" />
+            <View style={styles.timeOffSection}>
+                <View style={styles.timeOffHeaderRow}>
+                    <Text style={styles.sectionTitle}>Time Off</Text>
+                    {timeOffEnabled ? (
+                        <TouchableOpacity style={styles.requestButton} onPress={() => router.push('/(modals)/request-time-off')}>
+                            <Ionicons name="add" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                            <Text style={styles.requestButtonText}>Request Time Off</Text>
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
-            ) : timeOffRequests.length === 0 ? (
-                <View style={styles.centerContainer}>
-                    <Ionicons name="airplane-outline" size={64} color="#d1d5db" />
-                    <Text style={styles.emptyTitle}>{t('schedule.noRequests')}</Text>
-                    <Text style={styles.emptySubtitle}>{t('schedule.noRequestsSub')}</Text>
-                </View>
-            ) : (
-                timeOffRequests.map((request) => (
-                    <View key={request.id} style={styles.timeOffCard}>
-                        <View style={styles.timeOffHeader}>
-                            <View style={styles.typeBadge}>
-                                <Text style={styles.typeText}>{request.type.toUpperCase()}</Text>
-                            </View>
-                            <Text style={[
-                                styles.statusText,
-                                { color: request.isApproved ? '#10b981' : '#f59e0b' }
-                            ]}>
-                                {request.isApproved ? t('schedule.approved') : t('schedule.pendingReview')}
-                            </Text>
-                        </View>
 
-                        <View style={styles.timeOffDates}>
-                            <Ionicons name="calendar-outline" size={16} color="#4b5563" style={{ marginRight: 6 }} />
-                            <Text style={styles.datesText}>
-                                {format(new Date(request.startDate), 'MMM d, yyyy')} - {format(new Date(request.endDate), 'MMM d, yyyy')}
-                            </Text>
-                        </View>
-
-                        {request.reason && (
-                            <Text style={styles.reasonText}>"{request.reason}"</Text>
-                        )}
-
-                        {/* Cancel button for pending (not yet approved) requests */}
-                        {!request.isApproved && (
-                            <TouchableOpacity
-                                style={[styles.cancelBtn, cancellingId === request.id && { opacity: 0.5 }]}
-                                onPress={() => handleCancelTimeOff(request.id)}
-                                disabled={!!cancellingId}
-                            >
-                                {cancellingId === request.id ? (
-                                    <ActivityIndicator size="small" color="#ef4444" />
-                                ) : (
-                                    <>
-                                        <Ionicons name="trash-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
-                                        <Text style={styles.cancelBtnText}>{t('schedule.cancelRequest')}</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
-                        )}
+                {!timeOffEnabled ? (
+                    <View style={styles.infoCard}>
+                        <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
+                        <Text style={styles.infoCardText}>
+                            Time off requests are not enabled for this account yet. Please contact your salon manager.
+                        </Text>
                     </View>
-                ))
-            )}
+                ) : timeOffForSelectedDate.length === 0 ? (
+                    <View style={styles.infoCard}>
+                        <Ionicons name="calendar-clear-outline" size={18} color="#6b7280" />
+                        <Text style={styles.infoCardText}>
+                            No time off is recorded for the selected day.
+                        </Text>
+                    </View>
+                ) : (
+                    timeOffForSelectedDate.map((item) => (
+                        <View key={item.id} style={styles.timeOffCard}>
+                            <View style={styles.timeOffHeader}>
+                                <View style={styles.typeBadge}>
+                                    <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
+                                </View>
+                                <Text style={[styles.statusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
+                                    {item.isApproved ? 'APPROVED' : 'PENDING'}
+                                </Text>
+                            </View>
+                            <Text style={styles.shiftLabel}>
+                                {item.startDate} to {item.endDate}
+                            </Text>
+                            {item.reason ? (
+                                <Text style={styles.notesText}>{item.reason}</Text>
+                            ) : null}
+                            {timeOffEnabled && item.startDate >= format(new Date(), 'yyyy-MM-dd') ? (
+                                <TouchableOpacity
+                                    style={styles.cancelButton}
+                                    onPress={() => handleCancelTimeOff(item.id)}
+                                >
+                                    <Ionicons name="close-circle-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
+                                    <Text style={styles.cancelButtonText}>{t('schedule.cancelRequest')}</Text>
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+                    ))
+                )}
+            </View>
         </View>
     );
 
@@ -229,32 +226,13 @@ export default function ScheduleScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
                 <Text style={styles.headerTitle}>{t('schedule.title')}</Text>
-
-                <View style={styles.segmentedControl}>
-                    <TouchableOpacity
-                        style={[styles.segmentBtn, activeTab === 'shifts' && styles.segmentBtnActive]}
-                        onPress={() => setActiveTab('shifts')}
-                    >
-                        <Text style={[styles.segmentText, activeTab === 'shifts' && styles.segmentTextActive]}>
-                            {t('schedule.myShifts')}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.segmentBtn, activeTab === 'timeoff' && styles.segmentBtnActive]}
-                        onPress={() => setActiveTab('timeoff')}
-                    >
-                        <Text style={[styles.segmentText, activeTab === 'timeoff' && styles.segmentTextActive]}>
-                            {t('schedule.timeOff')}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
             </LinearGradient>
 
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
             >
-                {activeTab === 'shifts' ? renderShiftsTab() : renderTimeOffTab()}
+                {renderShiftsTab()}
             </ScrollView>
         </SafeAreaView>
     );
@@ -309,6 +287,11 @@ const styles = StyleSheet.create({
     tabContent: {
         flex: 1,
     },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1f2937',
+    },
     // Week Calendar
     calendarStrip: {
         flexDirection: 'row',
@@ -353,6 +336,15 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#1f2937',
     },
+    timeOffSection: {
+        marginTop: 8,
+    },
+    timeOffHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
     // Shifts
     shiftCard: {
         flexDirection: 'row',
@@ -395,6 +387,47 @@ const styles = StyleSheet.create({
     shiftLabel: {
         fontSize: 14,
         color: '#6b7280',
+    },
+    infoCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2,
+    },
+    infoCardText: {
+        flex: 1,
+        marginLeft: 10,
+        color: '#4b5563',
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    notesText: {
+        fontSize: 13,
+        color: '#6b7280',
+        marginTop: 8,
+        lineHeight: 18,
+    },
+    cancelButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        marginTop: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        backgroundColor: '#fef2f2',
+    },
+    cancelButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#ef4444',
     },
     // Time Off
     requestButton: {

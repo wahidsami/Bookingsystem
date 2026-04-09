@@ -18,6 +18,7 @@ import { getTodayAppointments, updateAppointmentStatus, Appointment } from '../.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import api, { getImageUrl } from '../../src/services/api';
+import { canViewClientNotes } from '../../src/utils/capabilities';
 
 export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
@@ -79,6 +80,8 @@ export default function TodayScreen() {
   const renderAppointmentCard = ({ item }: { item: Appointment }) => {
     const isCompleted = item.status === 'completed' || item.status === 'no_show';
     const isStarted = item.status === 'started';
+    const customerInitial = item.user?.firstName?.charAt(0)?.toUpperCase() || item.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
+    const amount = Number(item.service?.finalPrice || item.service?.basePrice || 0);
 
     return (
       <View style={[styles.card, isCompleted && styles.cardCompleted]}>
@@ -100,17 +103,51 @@ export default function TodayScreen() {
         </View>
 
         <View style={styles.cardBody}>
-          <Text style={styles.customerName}>
-            {item.user?.firstName} {item.user?.lastName}
-          </Text>
+          <View style={styles.customerRow}>
+            <View style={styles.customerAvatar}>
+              {item.user?.profileImage ? (
+                <Image
+                  source={{ uri: getImageUrl(item.user.profileImage) }}
+                  style={styles.customerAvatarImage}
+                />
+              ) : (
+                <Text style={styles.customerAvatarInitial}>{customerInitial}</Text>
+              )}
+            </View>
+            <View style={styles.customerMeta}>
+              <Text style={styles.customerName}>
+                {item.user?.firstName} {item.user?.lastName}
+              </Text>
+              <Text style={styles.bookingMeta}>
+                Booking #{item.bookingNumber?.slice(0, 8) || item.id.slice(0, 8)}
+              </Text>
+            </View>
+            <View style={styles.amountBox}>
+              <Text style={styles.amountText}>SAR {amount.toFixed(2)}</Text>
+            </View>
+          </View>
           <Text style={styles.serviceName}>
             {item.service?.name_en}
           </Text>
+          {item.paymentStatus ? (
+            <View style={styles.metaRow}>
+              <View style={styles.metaBadge}>
+                <Ionicons name="card-outline" size={13} color="#6b7280" />
+                <Text style={styles.metaBadgeText}>{item.paymentStatus.replace(/_/g, ' ')}</Text>
+              </View>
+              {item.paymentMethod ? (
+                <View style={styles.metaBadge}>
+                  <Ionicons name="wallet-outline" size={13} color="#6b7280" />
+                  <Text style={styles.metaBadgeText}>{item.paymentMethod.replace(/_/g, ' ')}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
-          {user?.permissions?.view_clients && item.customerNotes && (
+          {canViewClientNotes(user) && item.notes && (
             <View style={styles.notesContainer}>
               <Ionicons name="document-text-outline" size={14} color="#6b7280" />
-              <Text style={styles.notesText} numberOfLines={2}>{item.customerNotes}</Text>
+              <Text style={styles.notesText} numberOfLines={2}>{item.notes}</Text>
             </View>
           )}
         </View>
@@ -380,11 +417,73 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
+  },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  customerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ede9fe',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  customerAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  customerAvatarInitial: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6d28d9',
+  },
+  customerMeta: {
+    flex: 1,
+  },
+  bookingMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  amountBox: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  amountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1f2937',
   },
   serviceName: {
     fontSize: 15,
     color: '#4b5563',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  metaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  metaBadgeText: {
+    fontSize: 12,
+    color: '#4b5563',
+    marginLeft: 6,
+    textTransform: 'capitalize',
   },
   notesContainer: {
     flexDirection: 'row',

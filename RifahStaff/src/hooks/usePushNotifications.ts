@@ -33,8 +33,7 @@ export function usePushNotifications() {
             .then(token => {
                 if (token) {
                     setDeviceToken(token);
-                    // Send the NATIVE FCM token to our backend
-                    registerFcmToken(token).catch(err => console.error("Failed to register FCM token on server:", err));
+                    registerFcmToken(token).catch(err => console.error("Failed to register Expo token on server:", err));
                 }
             })
             .catch((error: any) => console.log('Error registering for push notifications', error));
@@ -91,33 +90,18 @@ async function registerForPushNotificationsAsync() {
             return undefined;
         }
 
-        // https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
         const projectId =
             Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
 
         try {
-            // Try native FCM token first (for production builds)
-            const pushTokenData = await Notifications.getDevicePushTokenAsync();
-            token = pushTokenData.data;
-            console.log('[Push] Native FCM token obtained:', token?.substring(0, 20) + '...');
-        } catch (e: any) {
-            // This error is expected in Expo Go because it lacks the google-services.json context
-            // We don't want to print the massive error, just a clean info log
-            console.log('[Push] Native FCM token not available, falling back to Expo Token...');
-
-            try {
-                // Fallback to Expo push token (useful for Expo Go testing)
-                // projectId MUST be passed explicitly in newer Expo SDKs
-                if (projectId) {
-                    const expoPushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-                    token = expoPushToken;
-                    console.log('[Push] Fallback Expo Push Token obtained:', token?.substring(0, 20) + '...');
-                } else {
-                    console.log('[Push] Cannot fetch Expo token: EAS projectId missing in app.json');
-                }
-            } catch (e2) {
-                console.log('[Push] Error fetching Expo push token as final fallback', e2);
+            if (projectId) {
+                token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+            } else {
+                token = (await Notifications.getExpoPushTokenAsync()).data;
             }
+            console.log('[Push] Expo push token obtained:', token?.substring(0, 20) + '...');
+        } catch (e: any) {
+            console.log('[Push] Error fetching Expo push token', e);
         }
     } else {
         console.log('Must use physical device for Push Notifications');

@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useRouter, useFocusEffect } from 'expo-router';
 import { usePushNotifications } from '../../src/hooks/usePushNotifications';
+import { canViewMessages } from '../../src/utils/capabilities';
 
 export default function MessagesScreen() {
     const { user } = useAuth();
@@ -27,6 +28,7 @@ export default function MessagesScreen() {
     const [messages, setMessages] = useState<StaffMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const messagesAllowed = canViewMessages(user);
 
     const loadMessages = useCallback(async () => {
         try {
@@ -142,7 +144,13 @@ export default function MessagesScreen() {
                 <Text style={styles.headerTitle}>{t('messages.title')}</Text>
             </LinearGradient>
 
-            {loading ? (
+            {!messagesAllowed ? (
+                <View style={styles.centerContainer}>
+                    <Ionicons name="lock-closed-outline" size={64} color="#d1d5db" />
+                    <Text style={styles.emptyTitle}>Messages are not enabled for this account</Text>
+                    <Text style={styles.emptySubtitle}>Messaging will appear here when your tenant enables the feature.</Text>
+                </View>
+            ) : loading ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color="#8B5ADF" />
                 </View>

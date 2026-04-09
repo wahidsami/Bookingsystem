@@ -1,46 +1,22 @@
 import { Tabs } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 import { useTranslation } from 'react-i18next';
-import { getMessages, StaffMessage } from '../../src/services/messages';
+import { canViewEarnings, canViewMessages, canViewReviews } from '../../src/utils/capabilities';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { user } = useAuth();
   const { t } = useTranslation();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const reviewsVisible = canViewReviews(user);
+  const earningsVisible = canViewEarnings(user);
+  const messagesVisible = canViewMessages(user);
 
   // Initialize push notification listeners
-  const { notification } = usePushNotifications();
-
-  // Count unread messages
-  const refreshUnreadCount = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const messages = await getMessages();
-      const count = messages.filter((m: StaffMessage) => {
-        const readArray = Array.isArray(m.readBy) ? m.readBy : [];
-        return !readArray.includes(user.id!);
-      }).length;
-      setUnreadCount(count);
-    } catch (e) {
-      // silently fail — badge is cosmetic
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    refreshUnreadCount();
-  }, [refreshUnreadCount]);
-
-  // Re-check when a new notification arrives (real-time badge update)
-  useEffect(() => {
-    if (notification) {
-      refreshUnreadCount();
-    }
-  }, [notification, refreshUnreadCount]);
+  usePushNotifications();
 
   return (
     <Tabs
@@ -64,23 +40,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="schedule"
         options={{
-          title: t('schedule.title').split(' ')[0], // keep it short for tab bar
+          title: t('schedule.title').split(' ')[0],
           tabBarIcon: ({ color }) => <Ionicons name="calendar" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
+          href: messagesVisible ? undefined : null,
           title: t('messages.title'),
-          tabBarIcon: ({ color }) => <Ionicons name="chatbubble-ellipses" size={24} color={color} />,
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: '#ef4444', fontSize: 11 },
-        }}
-        listeners={{
-          tabPress: () => {
-            // Refresh badge when switching to messages tab
-            setTimeout(refreshUnreadCount, 1500);
-          }
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubbles-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -94,7 +63,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="earnings"
         options={{
-          href: user?.permissions?.view_earnings ? "/earnings" : null,
+          href: earningsVisible ? undefined : null,
           title: t('earnings.title'),
           tabBarIcon: ({ color }) => <Ionicons name="cash-outline" size={24} color={color} />
         }}
@@ -102,9 +71,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="reviews"
         options={{
-          href: user?.permissions?.view_reviews ? "/reviews" : null,
+          href: reviewsVisible ? undefined : null,
           title: t('reviews.title'),
           tabBarIcon: ({ color }) => <Ionicons name="star-outline" size={24} color={color} />
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

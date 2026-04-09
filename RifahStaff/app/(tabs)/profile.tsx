@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal, FlatList, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal, FlatList, ActivityIndicator, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../src/context/LanguageContext';
 import { getImageUrl } from '../../src/services/api';
+import { router } from 'expo-router';
 
 const SUPPORTED_LANGUAGES = [
     { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
@@ -67,7 +68,7 @@ export default function ProfileScreen() {
                     {user?.tenant && (
                         <View style={styles.tenantBadge}>
                             <Ionicons name="business" size={14} color="#6b7280" style={{ marginHorizontal: 6 }} />
-                            <Text style={styles.tenantText}>{user.tenant.name_en || user.tenant.name_ar}</Text>
+                            <Text style={styles.tenantText}>{user.tenant.businessName || user.tenant.name_en || user.tenant.name_ar}</Text>
                         </View>
                     )}
                 </View>
@@ -75,7 +76,7 @@ export default function ProfileScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>{t('profile.settings')}</Text>
 
-                    <TouchableOpacity style={styles.menuItem}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(auth)/change-password')}>
                         <View style={styles.menuItemLeft}>
                             <Ionicons name="lock-closed-outline" size={24} color="#4b5563" />
                             <Text style={styles.menuItemText}>{t('auth.changePassword')}</Text>
@@ -95,13 +96,58 @@ export default function ProfileScreen() {
 
                     <View style={styles.divider} />
 
-                    <TouchableOpacity style={styles.menuItem}>
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => Alert.alert(
+                            t('common.ok'),
+                            'Notification preferences are not available in the current backend yet.'
+                        )}
+                    >
                         <View style={styles.menuItemLeft}>
                             <Ionicons name="notifications-outline" size={24} color="#4b5563" />
                             <Text style={styles.menuItemText}>Notifications</Text>
                         </View>
                         <Ionicons name={language === 'ar' || language === 'ur' ? 'chevron-back' : 'chevron-forward'} size={20} color="#9ca3af" />
                     </TouchableOpacity>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Staff App Access</Text>
+
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>View Clients</Text>
+                        <Text style={styles.debugValue}>{user?.permissions?.view_clients ? 'Enabled' : 'Disabled'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>View Reviews</Text>
+                        <Text style={styles.debugValue}>{user?.permissions?.view_reviews ? 'Enabled' : 'Disabled'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>Reply Reviews</Text>
+                        <Text style={styles.debugValue}>{user?.permissions?.reply_reviews ? 'Enabled' : 'Disabled'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>View Earnings</Text>
+                        <Text style={styles.debugValue}>{user?.permissions?.view_earnings ? 'Enabled' : 'Disabled'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>Reviews Feature</Text>
+                        <Text style={styles.debugValue}>{user?.features?.reviews ? 'Available' : 'Hidden'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>Earnings Feature</Text>
+                        <Text style={styles.debugValue}>{user?.features?.earnings ? 'Available' : 'Hidden'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>Messages Feature</Text>
+                        <Text style={styles.debugValue}>{user?.features?.messages ? 'Available' : 'Hidden'}</Text>
+                    </View>
                 </View>
 
                 <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
@@ -288,6 +334,23 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#f3f4f6',
         marginLeft: 48,
+    },
+    debugRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 8,
+    },
+    debugLabel: {
+        fontSize: 15,
+        color: '#374151',
+        fontWeight: '500',
+    },
+    debugValue: {
+        fontSize: 14,
+        color: '#6b7280',
+        fontWeight: '700',
     },
     logoutButton: {
         flexDirection: 'row',

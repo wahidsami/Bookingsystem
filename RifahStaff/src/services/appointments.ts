@@ -2,18 +2,20 @@ import api from './api';
 
 export interface Appointment {
     id: string;
+    bookingNumber?: string;
     startTime: string;
     endTime: string;
-    // DB/API response status (server uses underscore for no_show)
     status: 'pending' | 'confirmed' | 'started' | 'completed' | 'cancelled' | 'no_show';
-
-    customerNotes?: string;
+    notes?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
     user?: {
         id: string;
         firstName: string;
         lastName: string;
         email: string;
         phone: string;
+        profileImage?: string;
     };
     service?: {
         id: string;
@@ -25,14 +27,45 @@ export interface Appointment {
     };
 }
 
+const getTodayDateKey = () => new Date().toISOString().split('T')[0];
+
+const normalizeAppointment = (appointment: any): Appointment => {
+    const backendStatus = `${appointment?.status || ''}`;
+    const normalizedStatus: Appointment['status'] =
+        backendStatus === 'in_service'
+            ? 'started'
+            : backendStatus === 'no_show'
+                ? 'no_show'
+                : backendStatus === 'checked_in'
+                    ? 'confirmed'
+                    : ['pending', 'confirmed', 'completed', 'cancelled'].includes(backendStatus)
+                        ? backendStatus as Appointment['status']
+                        : 'pending';
+
+    return {
+        id: appointment.id,
+        bookingNumber: appointment.bookingNumber || appointment.id,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        status: normalizedStatus,
+        notes: appointment.notes,
+        paymentStatus: appointment.paymentStatus,
+        paymentMethod: appointment.paymentMethod,
+        user: appointment.user,
+        service: appointment.service,
+    };
+};
+
 /**
  * Fetch today's appointments for the logged-in staff
  */
 export const getTodayAppointments = async (): Promise<Appointment[]> => {
     try {
-        const response = await api.get('/staff/me/appointments/today');
+        const response = await api.get(`/staff/appointments?date=${getTodayDateKey()}`);
         if (response.data.success) {
-            return response.data.data;
+            return Array.isArray(response.data.appointments)
+                ? response.data.appointments.map(normalizeAppointment)
+                : [];
         }
         return [];
     } catch (error) {
@@ -49,12 +82,19 @@ export const updateAppointmentStatus = async (
     status: 'started' | 'completed' | 'no-show'
 ): Promise<Appointment> => {
     try {
-        const response = await api.patch(`/staff/me/appointments/${appointmentId}/status`, {
-            status
+        const backendStatus =
+            status === 'started'
+                ? 'in_service'
+                : status === 'no-show'
+                    ? 'no_show'
+                    : 'completed';
+
+        const response = await api.patch(`/staff/appointments/${appointmentId}/status`, {
+            status: backendStatus
         });
 
         if (response.data.success) {
-            return response.data.data;
+            return normalizeAppointment(response.data.appointment);
         }
         throw new Error(response.data.message || 'Failed to update status');
     } catch (error) {

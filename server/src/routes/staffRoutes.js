@@ -11,7 +11,13 @@ router.patch('/me/password', authenticateStaff, staffAppController.changePasswor
 router.post('/me/push-token', authenticateStaff, staffAppController.registerPushToken);
 router.delete('/me/push-token', authenticateStaff, staffAppController.unregisterPushToken);
 router.get('/appointments', authenticateStaff, staffAppController.getAppointments);
+router.get('/earnings', authenticateStaff, staffAppController.getEarnings);
+router.get('/reviews', authenticateStaff, staffAppController.getReviews);
+router.patch('/reviews/:id', authenticateStaff, staffAppController.replyToReview);
 router.patch('/appointments/:id/status', authenticateStaff, staffAppController.updateAppointmentStatus);
 router.get('/schedule', authenticateStaff, staffAppController.getSchedule);
+router.get('/time-off', authenticateStaff, staffAppController.getTimeOffRequests);
+router.post('/time-off', authenticateStaff, staffAppController.requestTimeOff);
+router.delete('/time-off/:id', authenticateStaff, staffAppController.cancelTimeOffRequest);
 
 module.exports = router;

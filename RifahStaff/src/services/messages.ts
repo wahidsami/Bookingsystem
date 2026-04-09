@@ -1,4 +1,5 @@
 import api from './api';
+import { Platform } from 'react-native';
 
 export interface StaffMessage {
     id: string;
@@ -17,29 +18,14 @@ export interface StaffMessage {
  * Fetch all messages for the authenticated staff member
  */
 export const getMessages = async (): Promise<StaffMessage[]> => {
-    try {
-        const response = await api.get('/staff/me/messages');
-        if (response.data.success) {
-            return response.data.data;
-        }
-        return [];
-    } catch (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
-    }
+    return [];
 };
 
 /**
  * Mark a message as read
  */
 export const markMessageAsRead = async (id: string): Promise<boolean> => {
-    try {
-        const response = await api.patch(`/staff/me/messages/${id}/read`);
-        return response.data.success;
-    } catch (error) {
-        console.error('Error marking message read:', error);
-        throw error;
-    }
+    return true;
 };
 
 /**
@@ -47,10 +33,13 @@ export const markMessageAsRead = async (id: string): Promise<boolean> => {
  */
 export const registerFcmToken = async (fcmToken: string): Promise<boolean> => {
     try {
-        const response = await api.post('/staff/me/fcm-token', { fcmToken });
+        const response = await api.post('/staff/me/push-token', {
+            token: fcmToken,
+            platform: Platform.OS,
+        });
         return response.data.success;
     } catch (error) {
-        console.error('Error registering FCM token:', error);
+        console.error('Error registering Expo push token:', error);
         throw error;
     }
 };

@@ -10,6 +10,7 @@ import { getEarnings, EarningsSummary } from '../../src/services/financials';
 import { format } from 'date-fns';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { canViewEarnings } from '../../src/utils/capabilities';
 
 export default function EarningsScreen() {
     const { user } = useAuth();
@@ -17,6 +18,7 @@ export default function EarningsScreen() {
     const [data, setData] = useState<EarningsSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const earningsAllowed = canViewEarnings(user);
 
     const load = async () => {
         try {
@@ -46,7 +48,13 @@ export default function EarningsScreen() {
                 <Text style={styles.headerTitle}>{t('earnings.title')}</Text>
             </LinearGradient>
 
-            {loading ? (
+            {!earningsAllowed ? (
+                <View style={styles.center}>
+                    <Ionicons name="lock-closed-outline" size={64} color="#d1d5db" />
+                    <Text style={styles.emptyTitle}>Earnings are not enabled for this account</Text>
+                    <Text style={styles.emptySub}>Your salon manager can grant earnings visibility for your employee account.</Text>
+                </View>
+            ) : loading ? (
                 <View style={styles.center}><ActivityIndicator size="large" color="#8B5ADF" /></View>
             ) : !data || data.payrolls.length === 0 ? (
                 <View style={styles.center}>
