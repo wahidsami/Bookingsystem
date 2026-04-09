@@ -85,7 +85,7 @@ const buildStaffFeatureFlags = (packageLimits = {}) => {
         today: true,
         schedule: true,
         profile: true,
-        messages: false,
+        messages: messagingEntitled,
         earnings: earningsEntitled,
         reviews: true,
         timeOff: true,
@@ -374,6 +374,83 @@ const getReviews = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to load staff reviews',
+            error: error.message
+        });
+    }
+};
+
+const getMessages = async (req, res) => {
+    try {
+        const subscriptionResult = await getActiveSubscriptionForTenant(req.tenantId);
+        const features = buildStaffFeatureFlags(subscriptionResult?.package?.limits || {});
+
+        if (!features.messages) {
+            return res.status(403).json({
+                success: false,
+                message: 'Internal messaging is not enabled for this tenant subscription'
+            });
+        }
+
+        const messages = await db.StaffMessage.findAll({
+            where: {
+                tenantId: req.tenantId,
+                senderType: 'admin',
+                [Op.or]: [
+                    { recipientId: null },
+                    { recipientId: req.staffId }
+                ]
+            },
+            order: [['isPinned', 'DESC'], ['createdAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            data: messages
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load staff messages',
+            error: error.message
+        });
+    }
+};
+
+const markMessageAsRead = async (req, res) => {
+    try {
+        const message = await db.StaffMessage.findOne({
+            where: {
+                id: req.params.id,
+                tenantId: req.tenantId,
+                senderType: 'admin',
+                [Op.or]: [
+                    { recipientId: null },
+                    { recipientId: req.staffId }
+                ]
+            }
+        });
+
+        if (!message) {
+            return res.status(404).json({
+                success: false,
+                message: 'Message not found'
+            });
+        }
+
+        const readBy = Array.isArray(message.readBy) ? message.readBy.map((value) => `${value}`) : [];
+        if (!readBy.includes(req.staffId)) {
+            readBy.push(req.staffId);
+            await message.update({ readBy });
+        }
+
+        res.json({
+            success: true,
+            data: message
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update message status',
             error: error.message
         });
     }
@@ -942,6 +1019,8 @@ module.exports = {
     getAppointments,
     getEarnings,
     getReviews,
+    getMessages,
+    markMessageAsRead,
     getSchedule,
     getTimeOffRequests,
     requestTimeOff,
