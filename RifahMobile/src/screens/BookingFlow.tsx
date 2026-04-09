@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, Service, Staff, SlotItem, getServicePrice } from '../api/client';
+import { api, Service, Staff, SlotItem, getServicePrice, normalizeStaff } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -31,6 +31,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [selectedTime, setSelectedTime] = useState<SlotItem | null>(null);
     const [availableSlots, setAvailableSlots] = useState<SlotItem[]>([]);
+    const [bookingNote, setBookingNote] = useState('');
 
     useEffect(() => {
         loadStaff();
@@ -49,7 +50,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 `/public/tenant/${tenant.id}/services/${service.id}/staff`
             );
             if (response.success) {
-                setStaffList(response.staff || []);
+                setStaffList((response.staff || []).map((item) => normalizeStaff(item)));
             }
         } catch (error) {
             console.error('Failed to load staff:', error);
@@ -118,6 +119,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 tenantId: tenant.id,
                 staffId: selectedTime.staffId || selectedStaff?.id || undefined,
                 startTime: selectedTime.startTime,
+                notes: bookingNote.trim() || undefined,
             });
 
             const appointmentId = response.appointment?.id;
@@ -280,6 +282,30 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     <Text style={styles.totalLabel}>Total</Text>
                     <Text style={styles.totalValue}>{getServicePrice(service).toFixed(2)} SAR</Text>
                 </View>
+            </View>
+
+            <View style={styles.noteCard}>
+                <Text style={styles.noteTitle}>
+                    {language === 'ar' ? 'ملاحظة للحجز' : 'Booking Note'}
+                </Text>
+                <Text style={styles.noteDescription}>
+                    {language === 'ar'
+                        ? 'يمكنك إضافة أي تعليمات أو ملاحظات تريد أن يراها مقدم الخدمة.'
+                        : 'Add any instructions or preferences you want the provider to see.'}
+                </Text>
+                <TextInput
+                    style={styles.noteInput}
+                    value={bookingNote}
+                    onChangeText={(value: string) => setBookingNote(value.slice(0, 1000))}
+                    multiline
+                    textAlignVertical="top"
+                    placeholder={language === 'ar' ? 'مثال: أفضّل خدمة هادئة أو لدي حساسية من منتج معيّن.' : 'Example: I prefer a quiet session or I have a sensitivity to a product.'}
+                    placeholderTextColor={colors.textSecondary}
+                    maxLength={1000}
+                />
+                <Text style={styles.noteCounter}>
+                    {bookingNote.length}/1000
+                </Text>
             </View>
         </View>
     );
@@ -495,6 +521,39 @@ const styles = StyleSheet.create({
         fontSize: fontSize.lg,
         fontWeight: 'bold',
         color: colors.primary,
+    },
+    noteCard: {
+        backgroundColor: 'white',
+        padding: spacing.lg,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.sm,
+    },
+    noteTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    noteDescription: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 20,
+    },
+    noteInput: {
+        minHeight: 120,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.md,
+        padding: spacing.md,
+        fontSize: fontSize.md,
+        color: colors.text,
+        backgroundColor: colors.background,
+    },
+    noteCounter: {
+        alignSelf: 'flex-end',
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
     },
     footer: {
         padding: spacing.lg,

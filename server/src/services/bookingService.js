@@ -34,7 +34,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, staffId, platformUserId, tenantId, startTime } = data;
+        const { serviceId, staffId, platformUserId, tenantId, startTime, notes } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -48,6 +48,11 @@ class BookingService {
         if (!platformUserId) throw new Error('Platform User ID is required');
         if (!tenantId) throw new Error('Tenant ID is required');
         if (!startTime) throw new Error('Start time is required');
+
+        const normalizedNotes = typeof notes === 'string' ? notes.trim() : '';
+        if (normalizedNotes.length > 1000) {
+            throw new Error('Booking notes must be 1000 characters or less');
+        }
 
         // Validate tenant exists and is active
         const tenant = await db.Tenant.findByPk(tenantId, { transaction: finalTransaction });
@@ -193,6 +198,7 @@ class BookingService {
                 employeeRevenue: pricing.employeeRevenue,
                 employeeCommissionRate: pricing.employeeCommissionRate,
                 employeeCommission: pricing.employeeCommission,
+                notes: normalizedNotes || null,
                 status: 'confirmed',
                 paymentStatus: 'pending'
             }, { transaction: finalTransaction });

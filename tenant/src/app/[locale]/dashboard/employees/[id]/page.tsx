@@ -73,7 +73,8 @@ export default function EditEmployeePage() {
     view_earnings: false,
     view_reviews: true,
     reply_reviews: false,
-    view_clients: false
+    view_clients: false,
+    view_booking_notes: false
   });
   const [permissionsLoading, setPermissionsLoading] = useState(false);
 
@@ -122,7 +123,8 @@ export default function EditEmployeePage() {
               view_earnings: permRes.permissions.view_earnings || false,
               view_reviews: permRes.permissions.view_reviews !== undefined ? permRes.permissions.view_reviews : true,
               reply_reviews: permRes.permissions.reply_reviews || false,
-              view_clients: permRes.permissions.view_clients || false
+              view_clients: permRes.permissions.view_clients || false,
+              view_booking_notes: permRes.permissions.view_booking_notes || false
             });
           }
         } catch (permErr) {
@@ -722,10 +724,23 @@ export default function EditEmployeePage() {
                   <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                     <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       <p className="font-medium text-gray-800">👥 {locale === 'ar' ? 'عرض العملاء الدائمين' : 'View Clients'}</p>
-                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح بمعرفة سجل العملاء.' : 'Let this staff see repeat clients and notes.'}</p>
+                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح بمعرفة سجل العملاء ومؤشراتهم.' : 'Let this staff see repeat clients and customer context.'}</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={permissions.view_clients} onChange={(e) => handlePermissionChange('view_clients', e.target.checked)} />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
+                  <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <p className="font-medium text-gray-800">📝 {locale === 'ar' ? 'عرض ملاحظات الحجوزات' : 'View Booking Notes'}</p>
+                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف برؤية الملاحظات التي يضيفها العميل مع الحجز.' : 'Let this staff see notes that customers add while booking.'}</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={permissions.view_booking_notes} onChange={(e) => handlePermissionChange('view_booking_notes', e.target.checked)} />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>

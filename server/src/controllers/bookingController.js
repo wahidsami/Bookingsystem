@@ -100,7 +100,7 @@ const getRecommendations = async (req, res) => {
  */
 const createBooking = async (req, res) => {
     try {
-        const { serviceId, staffId, startTime, tenantId } = req.body;
+        const { serviceId, staffId, startTime, tenantId, notes } = req.body;
         const platformUserId = req.userId; // From auth middleware
 
         // Validation
@@ -134,7 +134,8 @@ const createBooking = async (req, res) => {
             staffId: staffId || null, // null = "Any Staff"
             platformUserId,
             tenantId: finalTenantId,
-            startTime
+            startTime,
+            notes
         });
 
         // Load related data with platform user

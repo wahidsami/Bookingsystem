@@ -120,6 +120,11 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.divider} />
                     <View style={styles.debugRow}>
+                        <Text style={styles.debugLabel}>View Booking Notes</Text>
+                        <Text style={styles.debugValue}>{user?.permissions?.view_booking_notes ? 'Enabled' : 'Disabled'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.debugRow}>
                         <Text style={styles.debugLabel}>View Reviews</Text>
                         <Text style={styles.debugValue}>{user?.permissions?.view_reviews ? 'Enabled' : 'Disabled'}</Text>
                     </View>

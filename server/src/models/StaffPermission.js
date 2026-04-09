@@ -34,7 +34,8 @@ module.exports = (sequelize, DataTypes) => {
                 view_earnings: false,
                 view_reviews: true,
                 reply_reviews: false,
-                view_clients: false
+                view_clients: false,
+                view_booking_notes: false
             }
         }
     }, {

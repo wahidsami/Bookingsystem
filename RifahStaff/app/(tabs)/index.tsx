@@ -19,7 +19,7 @@ import { getTodayAppointments, updateAppointmentStatus, Appointment } from '../.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import api, { getImageUrl } from '../../src/services/api';
-import { canViewClientNotes } from '../../src/utils/capabilities';
+import { canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { router } from 'expo-router';
 
 export default function TodayScreen() {
@@ -31,7 +31,8 @@ export default function TodayScreen() {
   const [updatingId, setUpdatingId] = useState<string | null>(null); // tracks which appointment is being updated
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'in_progress' | 'done'>('all');
-  const canViewClientContext = canViewClientNotes(user);
+  const canViewClientContext = canViewClients(user);
+  const canSeeBookingNotes = canViewBookingNotes(user);
 
   // Format time as h:mm A
   const formatTime = (dateString: string) => {
@@ -229,7 +230,7 @@ export default function TodayScreen() {
             </View>
           ) : null}
 
-          {canViewClientContext && item.notes && (
+          {canSeeBookingNotes && item.notes && (
             <View style={styles.notesContainer}>
               <Ionicons name="document-text-outline" size={14} color="#6b7280" />
               <Text style={styles.notesText} numberOfLines={2}>{item.notes}</Text>

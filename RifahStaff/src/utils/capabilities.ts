@@ -3,6 +3,7 @@ type StaffPermissions = {
     view_reviews?: boolean;
     reply_reviews?: boolean;
     view_clients?: boolean;
+    view_booking_notes?: boolean;
 } | null | undefined;
 
 type StaffFeatures = {
@@ -22,8 +23,11 @@ type StaffLike = {
     features?: StaffFeatures;
 } | null | undefined;
 
-export const canViewClientNotes = (user: StaffLike): boolean =>
-    Boolean(user?.permissions?.view_clients && user?.features?.clientNotes !== false);
+export const canViewClients = (user: StaffLike): boolean =>
+    Boolean(user?.permissions?.view_clients);
+
+export const canViewBookingNotes = (user: StaffLike): boolean =>
+    Boolean(user?.permissions?.view_booking_notes && user?.features?.clientNotes !== false);
 
 export const canViewReviews = (user: StaffLike): boolean =>
     Boolean(user?.permissions?.view_reviews && user?.features?.reviews);
