@@ -43,6 +43,23 @@ class UserAuthService {
         return `${email || ''}`.trim().toLowerCase();
     }
 
+    persistLoginMetadata(user, refreshToken) {
+        Promise.resolve()
+            .then(() => user.update({
+                lastLogin: new Date(),
+                refreshToken
+            }, {
+                fields: ['lastLogin', 'refreshToken'],
+                hooks: false,
+            }))
+            .catch((error) => {
+                console.error('[UserAuthService] Failed to persist login metadata', {
+                    userId: user?.id,
+                    error: error?.message || error,
+                });
+            });
+    }
+
     /**
      * Register a new platform user (end-user account creation)
      * 
@@ -183,11 +200,9 @@ class UserAuthService {
         // Generate tokens
         const tokens = this.generateTokens(user);
 
-        // Update last login and refresh token
-        await user.update({
-            lastLogin: new Date(),
-            refreshToken: tokens.refreshToken
-        });
+        // Persist login metadata in the background so a slow DB write
+        // does not block successful logins from mobile clients.
+        this.persistLoginMetadata(user, tokens.refreshToken);
 
         return {
             user: user.toSafeObject(),
