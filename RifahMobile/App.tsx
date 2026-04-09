@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StyleSheet, Text, View } from 'react-native';
+import { AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import * as Font from 'expo-font';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { LanguageSelection } from './src/screens/LanguageSelection';
@@ -46,6 +46,7 @@ function AppContent() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { setLanguage } = useLanguage();
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
     const init = async () => {
@@ -67,6 +68,25 @@ function AppContent() {
     registerCustomerPushNotifications().catch((error) => {
       console.warn('Customer push registration warning:', error?.message || error);
     });
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const wasBackgrounded = /inactive|background/.test(appStateRef.current);
+      appStateRef.current = nextState;
+
+      if (!isAuthenticated || !wasBackgrounded || nextState !== 'active') {
+        return;
+      }
+
+      registerCustomerPushNotifications().catch((error) => {
+        console.warn('Customer push refresh warning:', error?.message || error);
+      });
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [isAuthenticated]);
 
   const loadFontsAndLanguage = async () => {

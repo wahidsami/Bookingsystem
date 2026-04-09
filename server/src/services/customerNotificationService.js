@@ -243,16 +243,16 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
         await usage.increment('count', { by: sent });
     }
 
-    if (sent > 0 && campaign) {
+    if (campaign) {
         try {
             await campaign.update({
-                recipientCount: sent,
+                recipientCount: uniqueUserIds.length,
                 sentAt: new Date()
             });
 
-            if (sentToIds.length > 0) {
+            if (uniqueUserIds.length > 0) {
                 await db.TenantPushCampaignRecipient.bulkCreate(
-                    sentToIds.map((platformUserId) => ({
+                    uniqueUserIds.map((platformUserId) => ({
                         campaignId: campaign.id,
                         platformUserId
                     }))
@@ -260,12 +260,6 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
             }
         } catch (error) {
             console.error('[CustomerNotification] Failed to record push campaign:', error.message);
-        }
-    } else if (campaign && sent === 0) {
-        try {
-            await campaign.destroy();
-        } catch (error) {
-            console.error('[CustomerNotification] Failed to cleanup empty push campaign:', error.message);
         }
     }
 
