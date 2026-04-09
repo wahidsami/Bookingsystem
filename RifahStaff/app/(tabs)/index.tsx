@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import api, { getImageUrl } from '../../src/services/api';
 import { canViewClientNotes } from '../../src/utils/capabilities';
+import { router } from 'expo-router';
 
 export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
@@ -27,6 +28,7 @@ export default function TodayScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null); // tracks which appointment is being updated
+  const canViewClientContext = canViewClientNotes(user);
 
   // Format time as h:mm A
   const formatTime = (dateString: string) => {
@@ -144,12 +146,22 @@ export default function TodayScreen() {
             </View>
           ) : null}
 
-          {canViewClientNotes(user) && item.notes && (
+          {canViewClientContext && item.notes && (
             <View style={styles.notesContainer}>
               <Ionicons name="document-text-outline" size={14} color="#6b7280" />
               <Text style={styles.notesText} numberOfLines={2}>{item.notes}</Text>
             </View>
           )}
+
+          {canViewClientContext && item.user?.id ? (
+            <TouchableOpacity
+              style={styles.clientButton}
+              onPress={() => router.push((`/client/${item.user?.id}` as any))}
+            >
+              <Ionicons name="person-circle-outline" size={16} color="#6d28d9" style={styles.clientButtonIcon} />
+              <Text style={styles.clientButtonText}>View Client</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {!isCompleted && item.status !== 'cancelled' && (
@@ -498,6 +510,24 @@ const styles = StyleSheet.create({
     color: '#92400e',
     marginLeft: 6,
     flex: 1,
+  },
+  clientButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f5f3ff',
+    borderRadius: 999,
+  },
+  clientButtonIcon: {
+    marginRight: 6,
+  },
+  clientButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6d28d9',
   },
   cardActions: {
     flexDirection: 'row',

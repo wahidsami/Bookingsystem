@@ -11,6 +11,7 @@ router.patch('/me/password', authenticateStaff, staffAppController.changePasswor
 router.post('/me/push-token', authenticateStaff, staffAppController.registerPushToken);
 router.delete('/me/push-token', authenticateStaff, staffAppController.unregisterPushToken);
 router.get('/appointments', authenticateStaff, staffAppController.getAppointments);
+router.get('/clients/:id', authenticateStaff, staffAppController.getClientSummary);
 router.get('/earnings', authenticateStaff, staffAppController.getEarnings);
 router.get('/messages', authenticateStaff, staffAppController.getMessages);
 router.post('/messages/:id/read', authenticateStaff, staffAppController.markMessageAsRead);

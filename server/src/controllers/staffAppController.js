@@ -416,6 +416,116 @@ const getMessages = async (req, res) => {
     }
 };
 
+const getClientSummary = async (req, res) => {
+    try {
+        const permissions = await getStaffPermissions(req.staffId);
+        if (!permissions.view_clients) {
+            return res.status(403).json({
+                success: false,
+                message: 'Client access is not enabled for this employee account'
+            });
+        }
+
+        const customer = await db.PlatformUser.findByPk(req.params.id, {
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
+        });
+
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Customer not found'
+            });
+        }
+
+        const [insight, appointments] = await Promise.all([
+            db.CustomerInsight.findOne({
+                where: {
+                    platformUserId: customer.id,
+                    tenantId: req.tenantId
+                }
+            }),
+            db.Appointment.findAll({
+                where: {
+                    tenantId: req.tenantId,
+                    platformUserId: customer.id
+                },
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        attributes: ['id', 'name_en', 'name_ar', 'finalPrice', 'rawPrice'],
+                        required: false
+                    },
+                    {
+                        model: db.Staff,
+                        as: 'staff',
+                        attributes: ['id', 'name'],
+                        required: false
+                    }
+                ],
+                order: [['startTime', 'DESC']],
+                limit: 6
+            })
+        ]);
+
+        const totalVisits = Number(insight?.totalBookings || appointments.length || 0);
+        const totalSpent = Number(insight?.totalSpent || 0);
+        const completedVisits = appointments.filter((item) => item.status === 'completed').length;
+        const recentAppointments = appointments.map((appointment) => ({
+            id: appointment.id,
+            startTime: appointment.startTime,
+            status: appointment.status,
+            price: appointment.price,
+            notes: appointment.notes,
+            service: appointment.service ? {
+                id: appointment.service.id,
+                name_en: appointment.service.name_en,
+                name_ar: appointment.service.name_ar,
+            } : null,
+            staff: appointment.staff ? {
+                id: appointment.staff.id,
+                name: appointment.staff.name
+            } : null
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                customer: {
+                    id: customer.id,
+                    firstName: customer.firstName,
+                    lastName: customer.lastName,
+                    email: customer.email,
+                    phone: customer.phone,
+                    profileImage: customer.profileImage
+                },
+                summary: {
+                    totalVisits,
+                    completedVisits,
+                    totalSpent,
+                    lastVisit: insight?.lastVisit || recentAppointments[0]?.startTime || null,
+                    firstVisit: insight?.firstVisit || null,
+                    loyaltyTier: insight?.loyaltyTier || 'bronze',
+                    loyaltyPoints: Number(insight?.tenantLoyaltyPoints || 0),
+                    averageBookingValue: Number(insight?.averageBookingValue || 0),
+                    noShowCount: Number(insight?.noShowCount || 0),
+                    cancellationCount: Number(insight?.cancellationCount || 0),
+                    notes: insight?.notes || '',
+                    tags: Array.isArray(insight?.tags) ? insight.tags : [],
+                    isRepeatClient: totalVisits > 1
+                },
+                recentAppointments
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load client summary',
+            error: error.message
+        });
+    }
+};
+
 const markMessageAsRead = async (req, res) => {
     try {
         const message = await db.StaffMessage.findOne({
@@ -1020,6 +1130,7 @@ module.exports = {
     getEarnings,
     getReviews,
     getMessages,
+    getClientSummary,
     markMessageAsRead,
     getSchedule,
     getTimeOffRequests,
