@@ -10,6 +10,16 @@ export interface Shift {
     type: 'shift' | 'specific';
 }
 
+export interface BreakWindow {
+    id: string;
+    breakId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    label?: string;
+    type: 'break' | 'specific';
+}
+
 export interface TimeOff {
     id: string;
     startDate: string;
@@ -22,6 +32,7 @@ export interface TimeOff {
 
 export interface ScheduleData {
     shifts: Shift[];
+    breaks: BreakWindow[];
     timeOff: TimeOff[];
 }
 
@@ -58,6 +69,16 @@ const normalizeTimeOff = (item: any): TimeOff => ({
     createdAt: item.createdAt,
 });
 
+const normalizeBreak = (item: any, date: string): BreakWindow => ({
+    id: `${date}-${item.id}`,
+    breakId: item.id,
+    date,
+    startTime: item.startTime,
+    endTime: item.endTime,
+    label: item.label || undefined,
+    type: item.specificDate ? 'specific' : 'break',
+});
+
 /**
  * Fetch schedule for a given date range
  */
@@ -69,6 +90,7 @@ export const getSchedule = async (startDate: string, endDate: string): Promise<S
         );
 
         const shifts: Shift[] = [];
+        const breaks: BreakWindow[] = [];
         const timeOffMap = new Map<string, TimeOff>();
 
         responses.forEach((response, index) => {
@@ -81,6 +103,9 @@ export const getSchedule = async (startDate: string, endDate: string): Promise<S
             (schedule.shifts || []).forEach((shift: any) => {
                 shifts.push(normalizeShift(shift, date));
             });
+            (schedule.breaks || []).forEach((item: any) => {
+                breaks.push(normalizeBreak(item, date));
+            });
 
             (schedule.timeOff || []).forEach((item: any) => {
                 const normalized = normalizeTimeOff(item);
@@ -90,6 +115,7 @@ export const getSchedule = async (startDate: string, endDate: string): Promise<S
 
         return {
             shifts,
+            breaks,
             timeOff: Array.from(timeOffMap.values()),
         };
     } catch (error) {

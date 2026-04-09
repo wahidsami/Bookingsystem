@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
     View,
@@ -13,38 +13,51 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
-import { getSchedule, cancelTimeOffRequest, Shift, TimeOff } from '../../src/services/schedule';
+import { addDays, differenceInCalendarDays, format, isSameDay, startOfWeek } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useTranslation } from 'react-i18next';
 import { canRequestTimeOff } from '../../src/utils/capabilities';
+import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
+
+const getDateKey = (value: Date) => format(value, 'yyyy-MM-dd');
+
+const minutesBetween = (startTime: string, endTime: string) => {
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    return ((endHour * 60) + endMinute) - ((startHour * 60) + startMinute);
+};
+
+const formatClock = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':');
+    const h = parseInt(hours, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const formattedH = h % 12 || 12;
+    return `${formattedH}:${minutes} ${ampm}`;
+};
+
+const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)}h`;
 
 export default function ScheduleScreen() {
     const { user } = useAuth();
-    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
-    // Shifts State
     const [shifts, setShifts] = useState<Shift[]>([]);
+    const [breaks, setBreaks] = useState<BreakWindow[]>([]);
     const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const timeOffEnabled = canRequestTimeOff(user);
 
-    // Calculate current week dates for the header (Mon-Sun)
-    // startOfWeek in date-fns defaults to Sunday (0). We want Monday (1).
     const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-    // Stable string key for the current week — prevents re-creating loadData on every render
-    const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+    const weekStartStr = getDateKey(weekStart);
 
     const loadData = useCallback(async () => {
         try {
             const start = weekStartStr;
-            const end = format(addDays(new Date(weekStartStr), 6), 'yyyy-MM-dd');
+            const end = getDateKey(addDays(new Date(weekStartStr), 6));
             const data = await getSchedule(start, end);
             setShifts(data.shifts);
+            setBreaks(data.breaks);
             setTimeOff(data.timeOff);
         } catch (error) {
             console.error('Failed to load schedule data', error);
@@ -55,7 +68,10 @@ export default function ScheduleScreen() {
     }, [weekStartStr]);
 
     useEffect(() => {
-        if (!user) { setLoading(false); return; }
+        if (!user) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         loadData();
     }, [loadData, user]);
@@ -67,12 +83,12 @@ export default function ScheduleScreen() {
 
     const handleCancelTimeOff = (id: string) => {
         Alert.alert(
-            t('schedule.cancelRequest'),
+            'Cancel Request',
             'Do you want to cancel this upcoming time off request?',
             [
-                { text: t('common.no'), style: 'cancel' },
+                { text: 'No', style: 'cancel' },
                 {
-                    text: t('common.yes'),
+                    text: 'Yes',
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -80,7 +96,7 @@ export default function ScheduleScreen() {
                             loadData();
                         } catch (error: any) {
                             Alert.alert(
-                                t('common.error'),
+                                'Error',
                                 error?.response?.data?.message || error?.message || 'Could not cancel this time off request.'
                             );
                         }
@@ -90,149 +106,288 @@ export default function ScheduleScreen() {
         );
     };
 
-    // Filter shifts based on the currently selected date tile
-    const shiftsForSelectedDate = shifts.filter(
-        s => s.date === format(selectedDate, 'yyyy-MM-dd')
-    );
-    const timeOffForSelectedDate = timeOff.filter((item) => {
-        const selected = format(selectedDate, 'yyyy-MM-dd');
-        return item.startDate <= selected && item.endDate >= selected;
-    });
+    const selectedDateKey = getDateKey(selectedDate);
+    const shiftsForSelectedDate = shifts.filter((shift) => shift.date === selectedDateKey);
+    const breaksForSelectedDate = breaks.filter((item) => item.date === selectedDateKey);
+    const timeOffForSelectedDate = timeOff.filter((item) => item.startDate <= selectedDateKey && item.endDate >= selectedDateKey);
 
-    const formatTime = (timeString: string) => {
-        // timeString is often HH:mm:ss
-        const [hours, minutes] = timeString.split(':');
-        const h = parseInt(hours, 10);
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const formattedH = h % 12 || 12;
-        return `${formattedH}:${minutes} ${ampm}`;
+    const weekShiftMinutes = shifts.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
+    const workingDays = new Set(shifts.map((shift) => shift.date)).size;
+    const timeOffDays = weekDays.filter((day) => {
+        const key = getDateKey(day);
+        return timeOff.some((item) => item.startDate <= key && item.endDate >= key);
+    }).length;
+
+    const nextShift = useMemo(() => {
+        const now = Date.now();
+        return shifts
+            .map((shift) => ({
+                ...shift,
+                startsAt: new Date(`${shift.date}T${shift.startTime}`).getTime()
+            }))
+            .filter((shift) => shift.startsAt >= now)
+            .sort((a, b) => a.startsAt - b.startsAt)[0] || null;
+    }, [shifts]);
+
+    const selectedDayShiftMinutes = shiftsForSelectedDate.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
+    const selectedDayBreakMinutes = breaksForSelectedDate.reduce((sum, item) => sum + Math.max(minutesBetween(item.startTime, item.endTime), 0), 0);
+
+    const upcomingTimeOff = timeOff
+        .filter((item) => item.startDate > getDateKey(new Date()))
+        .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    const activeTimeOff = timeOff
+        .filter((item) => item.startDate <= getDateKey(new Date()) && item.endDate >= getDateKey(new Date()))
+        .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    const pastTimeOff = timeOff
+        .filter((item) => item.endDate < getDateKey(new Date()))
+        .sort((a, b) => b.endDate.localeCompare(a.endDate));
+
+    const getDayState = (day: Date) => {
+        const key = getDateKey(day);
+        if (timeOff.some((item) => item.startDate <= key && item.endDate >= key)) {
+            return 'timeoff';
+        }
+        if (shifts.some((shift) => shift.date === key)) {
+            return 'working';
+        }
+        return 'off';
     };
 
-    const renderShiftsTab = () => (
-        <View style={styles.tabContent}>
-            {/* Week Calendar Strip */}
-            <View style={styles.calendarStrip}>
-                {weekDays.map((day, index) => {
-                    const isSelected = isSameDay(day, selectedDate);
-                    return (
-                        <TouchableOpacity
-                            key={index}
-                            style={[styles.dayCard, isSelected && styles.dayCardSelected]}
-                            onPress={() => setSelectedDate(day)}
-                        >
-                            <Text style={[styles.dayName, isSelected && styles.textSelected]}>
-                                {format(day, 'EEE')}
-                            </Text>
-                            <Text style={[styles.dayNumber, isSelected && styles.textSelected]}>
-                                {format(day, 'd')}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-
-            <View style={styles.dateHeader}>
-                <Text style={styles.dateTitle}>{format(selectedDate, 'EEEE, MMMM d')}</Text>
-            </View>
-
-            {loading ? (
+    const renderSelectedDayContent = () => {
+        if (loading) {
+            return (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color="#8B5ADF" />
                 </View>
-            ) : shiftsForSelectedDate.length === 0 ? (
+            );
+        }
+
+        if (shiftsForSelectedDate.length === 0 && timeOffForSelectedDate.length === 0) {
+            return (
                 <View style={styles.centerContainer}>
-                    <Ionicons name="cafe-outline" size={64} color="#d1d5db" />
-                    <Text style={styles.emptyTitle}>{t('schedule.noShifts')}</Text>
-                    <Text style={styles.emptySubtitle}>{t('schedule.noShiftsSub')}</Text>
+                    <Ionicons name="calendar-clear-outline" size={64} color="#d1d5db" />
+                    <Text style={styles.emptyTitle}>No schedule for this day</Text>
+                    <Text style={styles.emptySubtitle}>This day is currently clear with no shifts or approved time off.</Text>
+                </View>
+            );
+        }
+
+        return (
+            <>
+                {shiftsForSelectedDate.map((shift) => (
+                    <View key={shift.id} style={styles.shiftCard}>
+                        <View style={styles.shiftTopRow}>
+                            <View>
+                                <Text style={styles.shiftTime}>
+                                    {formatClock(shift.startTime)} - {formatClock(shift.endTime)}
+                                </Text>
+                                <Text style={styles.shiftLabel}>
+                                    {shift.label || 'Regular Working Hours'}
+                                </Text>
+                            </View>
+                            <View style={styles.shiftBadges}>
+                                <View style={[styles.badge, shift.type === 'specific' ? styles.badgeSpecific : styles.badgeRecurring]}>
+                                    <Text style={[styles.badgeText, shift.type === 'specific' ? styles.badgeSpecificText : styles.badgeRecurringText]}>
+                                        {shift.type === 'specific' ? 'Override' : 'Recurring'}
+                                    </Text>
+                                </View>
+                                <View style={styles.hoursBadge}>
+                                    <Text style={styles.hoursBadgeText}>{formatDurationHours(minutesBetween(shift.startTime, shift.endTime))}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                ))}
+
+                {breaksForSelectedDate.length > 0 ? (
+                    <View style={styles.breaksCard}>
+                        <Text style={styles.sectionTitle}>Breaks</Text>
+                        {breaksForSelectedDate.map((item) => (
+                            <View key={item.id} style={styles.breakRow}>
+                                <View style={styles.breakDot} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.breakLabel}>{item.label || 'Break'}</Text>
+                                    <Text style={styles.breakTime}>
+                                        {formatClock(item.startTime)} - {formatClock(item.endTime)} ({formatDurationHours(minutesBetween(item.startTime, item.endTime))})
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                ) : null}
+
+                {timeOffForSelectedDate.length > 0 ? (
+                    <View style={styles.timeOffSection}>
+                        <Text style={styles.sectionTitle}>Time Off</Text>
+                        {timeOffForSelectedDate.map((item) => (
+                            <View key={item.id} style={styles.timeOffCard}>
+                                <View style={styles.timeOffHeader}>
+                                    <View style={styles.typeBadge}>
+                                        <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
+                                    </View>
+                                    <Text style={[styles.statusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
+                                        {item.isApproved ? 'APPROVED' : 'PENDING'}
+                                    </Text>
+                                </View>
+                                <Text style={styles.shiftLabel}>{item.startDate} to {item.endDate}</Text>
+                                {item.reason ? <Text style={styles.notesText}>{item.reason}</Text> : null}
+                            </View>
+                        ))}
+                    </View>
+                ) : null}
+            </>
+        );
+    };
+
+    const renderTimeOffGroup = (title: string, items: TimeOff[], allowCancel = false) => (
+        <View style={styles.timeOffGroup}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {items.length === 0 ? (
+                <View style={styles.infoCard}>
+                    <Ionicons name="calendar-clear-outline" size={18} color="#6b7280" />
+                    <Text style={styles.infoCardText}>No items in this section.</Text>
                 </View>
             ) : (
-                shiftsForSelectedDate.map((shift) => (
-                    <View key={shift.id} style={styles.shiftCard}>
-                        <View style={styles.shiftTimeline}>
-                            <View style={styles.timelineDot} />
-                            <View style={styles.timelineLine} />
-                        </View>
-                        <View style={styles.shiftDetails}>
-                            <Text style={styles.shiftTime}>
-                                {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
-                            </Text>
-                            <Text style={styles.shiftLabel}>
-                                {shift.label || 'Regular Working Hours'}
+                items.map((item) => (
+                    <View key={item.id} style={styles.timeOffCard}>
+                        <View style={styles.timeOffHeader}>
+                            <View style={styles.typeBadge}>
+                                <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
+                            </View>
+                            <Text style={[styles.statusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
+                                {item.isApproved ? 'APPROVED' : 'PENDING'}
                             </Text>
                         </View>
+                        <Text style={styles.shiftLabel}>
+                            {item.startDate} to {item.endDate} • {differenceInCalendarDays(new Date(item.endDate), new Date(item.startDate)) + 1} day(s)
+                        </Text>
+                        {item.reason ? <Text style={styles.notesText}>{item.reason}</Text> : null}
+                        {allowCancel ? (
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => handleCancelTimeOff(item.id)}
+                            >
+                                <Ionicons name="close-circle-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
+                                <Text style={styles.cancelButtonText}>Cancel Request</Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                 ))
             )}
-
-            <View style={styles.timeOffSection}>
-                <View style={styles.timeOffHeaderRow}>
-                    <Text style={styles.sectionTitle}>Time Off</Text>
-                    {timeOffEnabled ? (
-                        <TouchableOpacity style={styles.requestButton} onPress={() => router.push('/(modals)/request-time-off')}>
-                            <Ionicons name="add" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                            <Text style={styles.requestButtonText}>Request Time Off</Text>
-                        </TouchableOpacity>
-                    ) : null}
-                </View>
-
-                {!timeOffEnabled ? (
-                    <View style={styles.infoCard}>
-                        <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
-                        <Text style={styles.infoCardText}>
-                            Time off requests are not enabled for this account yet. Please contact your salon manager.
-                        </Text>
-                    </View>
-                ) : timeOffForSelectedDate.length === 0 ? (
-                    <View style={styles.infoCard}>
-                        <Ionicons name="calendar-clear-outline" size={18} color="#6b7280" />
-                        <Text style={styles.infoCardText}>
-                            No time off is recorded for the selected day.
-                        </Text>
-                    </View>
-                ) : (
-                    timeOffForSelectedDate.map((item) => (
-                        <View key={item.id} style={styles.timeOffCard}>
-                            <View style={styles.timeOffHeader}>
-                                <View style={styles.typeBadge}>
-                                    <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
-                                </View>
-                                <Text style={[styles.statusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
-                                    {item.isApproved ? 'APPROVED' : 'PENDING'}
-                                </Text>
-                            </View>
-                            <Text style={styles.shiftLabel}>
-                                {item.startDate} to {item.endDate}
-                            </Text>
-                            {item.reason ? (
-                                <Text style={styles.notesText}>{item.reason}</Text>
-                            ) : null}
-                            {timeOffEnabled && item.startDate >= format(new Date(), 'yyyy-MM-dd') ? (
-                                <TouchableOpacity
-                                    style={styles.cancelButton}
-                                    onPress={() => handleCancelTimeOff(item.id)}
-                                >
-                                    <Ionicons name="close-circle-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
-                                    <Text style={styles.cancelButtonText}>{t('schedule.cancelRequest')}</Text>
-                                </TouchableOpacity>
-                            ) : null}
-                        </View>
-                    ))
-                )}
-            </View>
         </View>
     );
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-                <Text style={styles.headerTitle}>{t('schedule.title')}</Text>
+                <Text style={styles.headerTitle}>Schedule & Availability</Text>
             </LinearGradient>
 
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
             >
-                {renderShiftsTab()}
+                <View style={styles.statsGrid}>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statValue}>{formatDurationHours(weekShiftMinutes)}</Text>
+                        <Text style={styles.statLabel}>Week Hours</Text>
+                    </View>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statValue}>{workingDays}</Text>
+                        <Text style={styles.statLabel}>Working Days</Text>
+                    </View>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statValue}>{timeOffDays}</Text>
+                        <Text style={styles.statLabel}>Time Off Days</Text>
+                    </View>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statValue}>
+                            {nextShift ? format(new Date(`${nextShift.date}T${nextShift.startTime}`), 'EEE h:mm a') : 'None'}
+                        </Text>
+                        <Text style={styles.statLabel}>Next Shift</Text>
+                    </View>
+                </View>
+
+                <View style={styles.calendarStrip}>
+                    {weekDays.map((day) => {
+                        const isSelected = isSameDay(day, selectedDate);
+                        const state = getDayState(day);
+                        return (
+                            <TouchableOpacity
+                                key={getDateKey(day)}
+                                style={[
+                                    styles.dayCard,
+                                    isSelected && styles.dayCardSelected,
+                                    !isSelected && state === 'timeoff' && styles.dayCardTimeOff,
+                                    !isSelected && state === 'working' && styles.dayCardWorking,
+                                ]}
+                                onPress={() => setSelectedDate(day)}
+                            >
+                                <Text style={[styles.dayName, isSelected && styles.textSelected]}>
+                                    {format(day, 'EEE')}
+                                </Text>
+                                <Text style={[styles.dayNumber, isSelected && styles.textSelected]}>
+                                    {format(day, 'd')}
+                                </Text>
+                                <View style={[
+                                    styles.dayStateDot,
+                                    isSelected && styles.dayStateDotSelected,
+                                    !isSelected && state === 'timeoff' && styles.dayStateDotTimeOff,
+                                    !isSelected && state === 'working' && styles.dayStateDotWorking,
+                                    !isSelected && state === 'off' && styles.dayStateDotOff,
+                                ]} />
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                <View style={styles.dayOverviewCard}>
+                    <View style={styles.dayOverviewHeader}>
+                        <View>
+                            <Text style={styles.dateTitle}>{format(selectedDate, 'EEEE, MMMM d')}</Text>
+                            <Text style={styles.dateSubtitle}>
+                                {shiftsForSelectedDate.length > 0
+                                    ? `${shiftsForSelectedDate.length} shift(s) • ${formatDurationHours(selectedDayShiftMinutes)} total`
+                                    : timeOffForSelectedDate.length > 0
+                                        ? 'Time off is active on this day'
+                                        : 'No shift assigned for this day'}
+                            </Text>
+                        </View>
+                        <View style={styles.dayOverviewStats}>
+                            <Text style={styles.dayOverviewValue}>{formatDurationHours(selectedDayBreakMinutes)}</Text>
+                            <Text style={styles.dayOverviewLabel}>Breaks</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {renderSelectedDayContent()}
+
+                <View style={styles.timeOffSection}>
+                    <View style={styles.timeOffHeaderRow}>
+                        <Text style={styles.sectionTitle}>Time Off Requests</Text>
+                        {timeOffEnabled ? (
+                            <TouchableOpacity style={styles.requestButton} onPress={() => router.push('/(modals)/request-time-off')}>
+                                <Ionicons name="add" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                <Text style={styles.requestButtonText}>Request Time Off</Text>
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+
+                    {!timeOffEnabled ? (
+                        <View style={styles.infoCard}>
+                            <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
+                            <Text style={styles.infoCardText}>
+                                Time off requests are not enabled for this account yet. Please contact your salon manager.
+                            </Text>
+                        </View>
+                    ) : (
+                        <>
+                            {renderTimeOffGroup('Active', activeTimeOff)}
+                            {renderTimeOffGroup('Upcoming', upcomingTimeOff, true)}
+                            {renderTimeOffGroup('History', pastTimeOff)}
+                        </>
+                    )}
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -255,48 +410,44 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#ffffff',
         textAlign: 'center',
-        marginBottom: 20,
-    },
-    segmentedControl: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 12,
-        padding: 4,
-    },
-    segmentBtn: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    segmentBtnActive: {
-        backgroundColor: '#ffffff',
-    },
-    segmentText: {
-        color: 'rgba(255,255,255,0.8)',
-        fontWeight: '600',
-        fontSize: 15,
-    },
-    segmentTextActive: {
-        color: '#8B5ADF',
     },
     content: {
         padding: 16,
         paddingBottom: 40,
     },
-    tabContent: {
-        flex: 1,
+    statsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 18,
     },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1f2937',
+    statCard: {
+        width: '48%',
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
     },
-    // Week Calendar
+    statValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#6d28d9',
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+        textTransform: 'uppercase',
+    },
     calendarStrip: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 24,
+        marginBottom: 18,
     },
     dayCard: {
         alignItems: 'center',
@@ -314,6 +465,12 @@ const styles = StyleSheet.create({
     dayCardSelected: {
         backgroundColor: '#8B5ADF',
     },
+    dayCardWorking: {
+        backgroundColor: '#eff6ff',
+    },
+    dayCardTimeOff: {
+        backgroundColor: '#fef3c7',
+    },
     dayName: {
         fontSize: 12,
         color: '#6b7280',
@@ -328,26 +485,69 @@ const styles = StyleSheet.create({
     textSelected: {
         color: '#ffffff',
     },
-    dateHeader: {
+    dayStateDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginTop: 8,
+    },
+    dayStateDotSelected: {
+        backgroundColor: '#ffffff',
+    },
+    dayStateDotWorking: {
+        backgroundColor: '#2563eb',
+    },
+    dayStateDotTimeOff: {
+        backgroundColor: '#d97706',
+    },
+    dayStateDotOff: {
+        backgroundColor: '#d1d5db',
+    },
+    dayOverviewCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 18,
+        padding: 18,
         marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    dayOverviewHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     dateTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#1f2937',
+        marginBottom: 4,
     },
-    timeOffSection: {
-        marginTop: 8,
+    dateSubtitle: {
+        fontSize: 14,
+        color: '#6b7280',
     },
-    timeOffHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
+    dayOverviewStats: {
+        alignItems: 'flex-end',
     },
-    // Shifts
+    dayOverviewValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#6d28d9',
+    },
+    dayOverviewLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+        textTransform: 'uppercase',
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1f2937',
+    },
     shiftCard: {
-        flexDirection: 'row',
         backgroundColor: '#ffffff',
         borderRadius: 16,
         padding: 16,
@@ -358,25 +558,10 @@ const styles = StyleSheet.create({
         shadowRadius: 5,
         elevation: 2,
     },
-    shiftTimeline: {
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    timelineDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: '#8B5ADF',
-        marginTop: 4,
-    },
-    timelineLine: {
-        width: 2,
-        flex: 1,
-        backgroundColor: '#e5e7eb',
-        marginTop: 4,
-    },
-    shiftDetails: {
-        flex: 1,
+    shiftTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
     },
     shiftTime: {
         fontSize: 18,
@@ -387,6 +572,90 @@ const styles = StyleSheet.create({
     shiftLabel: {
         fontSize: 14,
         color: '#6b7280',
+    },
+    shiftBadges: {
+        alignItems: 'flex-end',
+    },
+    badge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 999,
+        marginBottom: 8,
+    },
+    badgeRecurring: {
+        backgroundColor: '#eff6ff',
+    },
+    badgeRecurringText: {
+        color: '#2563eb',
+    },
+    badgeSpecific: {
+        backgroundColor: '#f3e8ff',
+    },
+    badgeSpecificText: {
+        color: '#7c3aed',
+    },
+    badgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    hoursBadge: {
+        backgroundColor: '#f3f4f6',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    hoursBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#4b5563',
+    },
+    breaksCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2,
+    },
+    breakRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        paddingVertical: 10,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: '#e5e7eb',
+    },
+    breakDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#8B5ADF',
+        marginTop: 6,
+        marginRight: 10,
+    },
+    breakLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1f2937',
+        marginBottom: 2,
+    },
+    breakTime: {
+        fontSize: 13,
+        color: '#6b7280',
+    },
+    timeOffSection: {
+        marginTop: 8,
+    },
+    timeOffHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    timeOffGroup: {
+        marginBottom: 16,
     },
     infoCard: {
         backgroundColor: '#ffffff',
@@ -408,45 +677,18 @@ const styles = StyleSheet.create({
         fontSize: 14,
         lineHeight: 20,
     },
-    notesText: {
-        fontSize: 13,
-        color: '#6b7280',
-        marginTop: 8,
-        lineHeight: 18,
-    },
-    cancelButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        marginTop: 12,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 999,
-        backgroundColor: '#fef2f2',
-    },
-    cancelButtonText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#ef4444',
-    },
-    // Time Off
     requestButton: {
         flexDirection: 'row',
         backgroundColor: '#8B5ADF',
         borderRadius: 12,
-        paddingVertical: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20,
-        shadowColor: '#8B5ADF',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
     },
     requestButtonText: {
         color: '#ffffff',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     timeOffCard: {
@@ -483,22 +725,27 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
     },
-    timeOffDates: {
+    notesText: {
+        fontSize: 13,
+        color: '#6b7280',
+        marginTop: 8,
+        lineHeight: 18,
+    },
+    cancelButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
+        alignSelf: 'flex-start',
+        marginTop: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        backgroundColor: '#fef2f2',
     },
-    datesText: {
-        fontSize: 15,
-        color: '#374151',
-        fontWeight: '500',
+    cancelButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#ef4444',
     },
-    reasonText: {
-        fontSize: 14,
-        color: '#6b7280',
-        fontStyle: 'italic',
-    },
-    // Empty State
     centerContainer: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -516,18 +763,4 @@ const styles = StyleSheet.create({
         color: '#9ca3af',
         textAlign: 'center',
     },
-    cancelBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 12,
-        paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
-    },
-    cancelBtnText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#ef4444',
-    }
 });
