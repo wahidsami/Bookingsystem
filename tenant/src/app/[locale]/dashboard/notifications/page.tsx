@@ -429,7 +429,8 @@ export default function NotificationsPage() {
       });
 
       if (res.success) {
-        setMessage({ type: 'success', text: copy.sentTo(res.data?.sent ?? 0) });
+        const recipientCount = res.debug?.requestedRecipients ?? res.data?.sent ?? 0;
+        setMessage({ type: 'success', text: copy.sentTo(recipientCount) });
         setTitle('');
         setBody('');
         setImageUrl('');

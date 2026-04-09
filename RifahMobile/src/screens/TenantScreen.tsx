@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking, Modal } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { api, Tenant, Service, Staff, Product, getImageUrl, getServicePrice } from '../api/client';
+import { api, Tenant, Service, Staff, Product, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -17,7 +17,7 @@ interface TenantDetailsProps {
 const { width } = Dimensions.get('window');
 
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
-    const { tenantId, slug } = route.params; // Expect tenantId or slug from navigation
+    const { tenantId, slug, selectedServiceId } = route.params; // Expect tenantId or slug from navigation
     const { t, isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
@@ -32,11 +32,24 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showProductsTab, setShowProductsTab] = useState(false);
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
+    const [selectedService, setSelectedService] = useState<Service | null>(null);
     const { itemCount, addToCart, clearCart } = useCart();
 
     useEffect(() => {
         loadTenantDetails();
     }, [tenantId, slug]);
+
+    useEffect(() => {
+        if (!selectedServiceId || services.length === 0) {
+            return;
+        }
+
+        const matchedService = services.find((service) => service.id === selectedServiceId);
+        if (matchedService) {
+            setActiveTab('services');
+            setSelectedService(matchedService);
+        }
+    }, [selectedServiceId, services]);
 
     const loadTenantDetails = async () => {
         try {
@@ -48,12 +61,14 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             } else if (slug) {
                 const tenantRes = await api.get<{ success: boolean; data: Tenant }>(`/public/tenant/${slug}`);
                 if (tenantRes.success && tenantRes.data) {
-                    resolvedTenant = tenantRes.data;
+                    resolvedTenant = normalizeTenant(tenantRes.data);
                     setTenant(resolvedTenant);
                 }
             } else {
                 const tenantsRes = await api.get<{ success: boolean; tenants: Tenant[] }>('/public/tenants');
-                const matchedTenant = (tenantsRes.tenants || []).find((item) => item.id === tenantId);
+                const matchedTenant = (tenantsRes.tenants || [])
+                    .map((item) => normalizeTenant(item))
+                    .find((item) => item.id === tenantId);
                 if (matchedTenant) {
                     resolvedTenant = matchedTenant;
                     setTenant(resolvedTenant);
@@ -103,7 +118,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             if (isServicesEnabled) {
                 try {
                     const servicesRes = await api.get<{ success: boolean; services: Service[] }>(`/public/tenant/${idToFetch}/services`);
-                    if (servicesRes.success) setServices(servicesRes.services || []);
+                    if (servicesRes.success) setServices((servicesRes.services || []).map((service) => normalizeService(service)));
                 } catch {
                     setServices([]);
                 }
@@ -114,7 +129,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 try {
                     const productsRes = await api.get<{ success: boolean; products: Product[] }>(`/public/tenant/${idToFetch}/products`);
                     if (productsRes.success) {
-                        setProducts((productsRes.products || []).map((product) => ({
+                        setProducts((productsRes.products || []).map((product) => normalizeProduct({
                             ...product,
                             tenantId: idToFetch,
                         })));
@@ -127,7 +142,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             // 5. Fetch Staff
             try {
                 const staffRes = await api.get<{ success: boolean; staff: Staff[] }>(`/public/tenant/${idToFetch}/staff`);
-                if (staffRes.success) setStaff(staffRes.staff || []);
+                if (staffRes.success) setStaff((staffRes.staff || []).map((member) => normalizeStaff(member)));
             } catch {
                 setStaff([]);
             }
@@ -253,6 +268,21 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         }
     };
 
+    const getServiceDescription = (service: Service) =>
+        (isRTL ? service.description_ar : service.description_en)
+        || service.description_en
+        || service.description_ar
+        || '';
+
+    const openServiceDetails = (service: Service) => {
+        setSelectedService(service);
+    };
+
+    const handleBookService = (service: Service) => {
+        setSelectedService(null);
+        navigation.navigate('Booking', { service, tenant });
+    };
+
     const renderHero = () => {
         if (!tenant) return null;
 
@@ -346,20 +376,22 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         <View key={category} style={styles.categorySection}>
                             <Text style={styles.categoryTitle}>{category}</Text>
                             {services.filter(s => (s.category || 'General') === category).map(service => (
-                                <TouchableOpacity
-                                    key={service.id}
-                                    style={styles.serviceCard}
-                                    onPress={() => navigation.navigate('Booking', { service, tenant })} // Navigate to BookingFlow
-                                >
+                                <View key={service.id} style={styles.serviceCard}>
+                                    <TouchableOpacity
+                                        style={styles.serviceMainAction}
+                                        onPress={() => openServiceDetails(service)}
+                                        activeOpacity={0.85}
+                                    >
                                     <View style={styles.serviceInfo}>
                                         <Text style={styles.serviceName}>{isRTL ? service.name_ar : service.name_en}</Text>
                                         <Text style={styles.serviceDuration}>{service.duration} mins</Text>
                                         <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
                                     </View>
-                                    <View style={styles.addButton}>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.addButton} onPress={() => handleBookService(service)}>
                                         <Ionicons name="add" size={24} color={colors.primary} />
-                                    </View>
-                                </TouchableOpacity>
+                                    </TouchableOpacity>
+                                </View>
                             ))}
                         </View>
                     ))
@@ -390,7 +422,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     />
                                     <View style={styles.productInfo}>
                                         <Text style={styles.productName} numberOfLines={2}>{isRTL ? product.name_ar : product.name_en}</Text>
-                                        <Text style={styles.productPrice}>{product.price} SAR</Text>
+                                        <Text style={styles.productPrice}>{product.price.toFixed(2)} SAR</Text>
                                     </View>
                                     <TouchableOpacity style={styles.addToCartButton} onPress={() => handleAddProduct(product)}>
                                         <Text style={styles.addToCartText}>{t('addToCart' as any) || 'Add'}</Text>
@@ -528,6 +560,49 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 {activeTab === 'reviews' && renderReviews()}
                 {activeTab === 'about' && renderAbout()}
             </ScrollView>
+
+            <Modal
+                visible={!!selectedService}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSelectedService(null)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setSelectedService(null)} />
+                    {selectedService ? (
+                        <View style={styles.serviceModalCard}>
+                            <View style={styles.serviceModalHeader}>
+                                <View style={styles.serviceModalTitleWrap}>
+                                    <Text style={styles.serviceModalCategory}>{selectedService.category}</Text>
+                                    <Text style={styles.serviceModalTitle}>{isRTL ? selectedService.name_ar : selectedService.name_en}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setSelectedService(null)} style={styles.serviceModalClose}>
+                                    <Ionicons name="close" size={24} color={colors.text} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.serviceMetaRow}>
+                                <View style={styles.serviceMetaBadge}>
+                                    <Ionicons name="time-outline" size={16} color={colors.primary} />
+                                    <Text style={styles.serviceMetaText}>{selectedService.duration} mins</Text>
+                                </View>
+                                <View style={styles.serviceMetaBadge}>
+                                    <Ionicons name="cash-outline" size={16} color={colors.primary} />
+                                    <Text style={styles.serviceMetaText}>{getServicePrice(selectedService).toFixed(2)} SAR</Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.serviceModalDescription}>
+                                {getServiceDescription(selectedService) || 'Service details will appear here soon.'}
+                            </Text>
+
+                            <TouchableOpacity style={styles.serviceBookButton} onPress={() => handleBookService(selectedService)}>
+                                <Text style={styles.serviceBookButtonText}>{isRTL ? 'احجز هذه الخدمة' : 'Book This Service'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
+                </View>
+            </Modal>
 
             {/* Bottom Action Bar (if needed, e.g. View Cart or Quick Book) */}
             {/* For now, individual service booking is sufficient */}
@@ -697,6 +772,9 @@ const styles = StyleSheet.create({
             },
         }),
     },
+    serviceMainAction: {
+        flex: 1,
+    },
     serviceInfo: {
         flex: 1,
     },
@@ -725,6 +803,86 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: colors.primary,
+        marginLeft: spacing.md,
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        justifyContent: 'flex-end',
+    },
+    serviceModalCard: {
+        backgroundColor: colors.background,
+        borderTopLeftRadius: borderRadius.xl,
+        borderTopRightRadius: borderRadius.xl,
+        padding: spacing.lg,
+        gap: spacing.md,
+        maxHeight: '75%',
+    },
+    serviceModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+    },
+    serviceModalTitleWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    serviceModalCategory: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
+    serviceModalTitle: {
+        fontSize: fontSize.xl,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    serviceModalClose: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.backgroundGray,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    serviceMetaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+    },
+    serviceMetaBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 6,
+        borderRadius: borderRadius.full,
+        backgroundColor: '#F3E8FF',
+    },
+    serviceMetaText: {
+        fontSize: fontSize.sm,
+        color: colors.primaryDark,
+        fontWeight: '600',
+    },
+    serviceModalDescription: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        lineHeight: 24,
+    },
+    serviceBookButton: {
+        marginTop: spacing.sm,
+        backgroundColor: colors.primary,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    serviceBookButtonText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.md,
+        fontWeight: '700',
     },
     emptyState: {
         alignItems: 'center',

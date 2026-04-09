@@ -81,6 +81,7 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
 
         navigation.navigate('Tenant', {
             tenantId: notification.tenantId,
+            selectedServiceId: notification.serviceId || undefined,
         });
     };
 
