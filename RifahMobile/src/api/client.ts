@@ -135,6 +135,8 @@ export interface Service {
     category: string;
     duration: number;
     basePrice?: number;
+    minPrice?: number;
+    maxPrice?: number;
     rawPrice?: number;
     finalPrice?: number;
 }
@@ -193,6 +195,24 @@ export interface Booking {
         logo?: string;
     };
     duration?: number; // Calculated or from service
+}
+
+export interface CustomerNotification {
+    id: string;
+    campaignId?: string;
+    title: string;
+    body: string;
+    imageUrl?: string;
+    linkType?: 'none' | 'tenant' | 'service';
+    tenantId?: string | null;
+    tenantName?: string | null;
+    tenantLogo?: string;
+    serviceId?: string | null;
+    audienceType?: string;
+    sentAt?: string | null;
+    createdAt?: string | null;
+    readAt?: string | null;
+    data?: Record<string, any>;
 }
 
 export interface OrderItem {
@@ -299,11 +319,342 @@ const DEFAULT_CUSTOMER_APP_CONTENT: PublicAppContent = {
     display: {},
 };
 
+const toNumber = (value: unknown, fallback: number = 0): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toBoolean = (value: unknown, fallback: boolean = false): boolean => {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        if (value.toLowerCase() === 'true') return true;
+        if (value.toLowerCase() === 'false') return false;
+    }
+
+    return fallback;
+};
+
+const toStringValue = (value: unknown, fallback = ''): string => {
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (value === null || value === undefined) {
+        return fallback;
+    }
+
+    return `${value}`;
+};
+
+const toOptionalString = (value: unknown): string | undefined => {
+    const normalized = toStringValue(value, '').trim();
+    return normalized ? normalized : undefined;
+};
+
+const normalizeNotificationPreferences = (value: unknown): User['notificationPreferences'] => {
+    if (!value || typeof value !== 'object') {
+        return {
+            email: true,
+            sms: true,
+            push: true,
+            whatsapp: false,
+        };
+    }
+
+    const prefs = value as Record<string, unknown>;
+    return {
+        email: toBoolean(prefs.email, true),
+        sms: toBoolean(prefs.sms, true),
+        push: toBoolean(prefs.push, true),
+        whatsapp: toBoolean(prefs.whatsapp, false),
+    };
+};
+
+const normalizeUser = (user: Partial<User> | null | undefined): User => ({
+    id: toStringValue(user?.id),
+    email: toStringValue(user?.email),
+    phone: toStringValue(user?.phone),
+    firstName: toStringValue(user?.firstName, 'Refah'),
+    lastName: toStringValue(user?.lastName),
+    profileImage: toOptionalString(user?.profileImage),
+    createdAt: toOptionalString(user?.createdAt),
+    dateOfBirth: toOptionalString(user?.dateOfBirth),
+    gender: (user?.gender as User['gender']) || '',
+    emailVerified: toBoolean(user?.emailVerified),
+    phoneVerified: toBoolean(user?.phoneVerified),
+    walletBalance: toNumber(user?.walletBalance),
+    loyaltyPoints: toNumber(user?.loyaltyPoints),
+    totalBookings: toNumber(user?.totalBookings),
+    totalSpent: toNumber(user?.totalSpent),
+    preferredLanguage: toOptionalString(user?.preferredLanguage),
+    addressStreet: toOptionalString(user?.addressStreet),
+    addressCity: toOptionalString(user?.addressCity),
+    addressBuilding: toOptionalString(user?.addressBuilding),
+    addressFloor: toOptionalString(user?.addressFloor),
+    addressApartment: toOptionalString(user?.addressApartment),
+    addressPhone: toOptionalString(user?.addressPhone),
+    addressNotes: toOptionalString(user?.addressNotes),
+    notificationPreferences: normalizeNotificationPreferences(user?.notificationPreferences),
+});
+
+export const normalizeTenant = (tenant: Partial<Tenant> | null | undefined): Tenant => ({
+    id: toStringValue(tenant?.id),
+    name: toStringValue(tenant?.name || tenant?.name_en || tenant?.name_ar, 'Refah'),
+    name_en: toOptionalString(tenant?.name_en),
+    name_ar: toOptionalString(tenant?.name_ar),
+    slug: toStringValue(tenant?.slug || tenant?.id),
+    plan: toStringValue(tenant?.plan),
+    status: toStringValue(tenant?.status),
+    businessType: Array.isArray(tenant?.businessType)
+        ? tenant?.businessType.map((item) => toStringValue(item)).filter(Boolean)
+        : toOptionalString(tenant?.businessType),
+    servicesCount: toNumber(tenant?.servicesCount),
+    staffCount: toNumber(tenant?.staffCount),
+    customColors: tenant?.customColors,
+    logo: toOptionalString(tenant?.logo),
+    coverImage: toOptionalString(tenant?.coverImage),
+    city: toOptionalString(tenant?.city),
+    district: toOptionalString(tenant?.district),
+    street: toOptionalString(tenant?.street),
+    buildingNumber: toOptionalString(tenant?.buildingNumber),
+    country: toOptionalString(tenant?.country),
+    postalCode: toOptionalString(tenant?.postalCode),
+    location: toOptionalString(tenant?.location),
+    address: toOptionalString(tenant?.address),
+    googleMapLink: toOptionalString(tenant?.googleMapLink),
+    description: toOptionalString(tenant?.description),
+    descriptionAr: toOptionalString(tenant?.descriptionAr),
+    description_en: toOptionalString(tenant?.description_en),
+    description_ar: toOptionalString(tenant?.description_ar),
+    phone: toOptionalString(tenant?.phone),
+    mobile: toOptionalString(tenant?.mobile),
+    email: toOptionalString(tenant?.email),
+    website: toOptionalString(tenant?.website),
+    instagramUrl: toOptionalString(tenant?.instagramUrl),
+    twitterUrl: toOptionalString(tenant?.twitterUrl),
+    facebookUrl: toOptionalString(tenant?.facebookUrl),
+    linkedinUrl: toOptionalString(tenant?.linkedinUrl),
+    tiktokUrl: toOptionalString(tenant?.tiktokUrl),
+    youtubeUrl: toOptionalString(tenant?.youtubeUrl),
+    snapchatUrl: toOptionalString(tenant?.snapchatUrl),
+    pinterestUrl: toOptionalString(tenant?.pinterestUrl),
+    whatsappNumber: toOptionalString(tenant?.whatsappNumber),
+    workingHours: tenant?.workingHours,
+    isAvailable: toBoolean(tenant?.isAvailable),
+});
+
+export const normalizeService = (service: Partial<Service> | null | undefined): Service => ({
+    id: toStringValue(service?.id),
+    tenantId: toOptionalString(service?.tenantId),
+    name_en: toStringValue(service?.name_en || service?.name_ar, 'Service'),
+    name_ar: toStringValue(service?.name_ar || service?.name_en, 'الخدمة'),
+    description_en: toStringValue(service?.description_en),
+    description_ar: toStringValue(service?.description_ar),
+    category: toStringValue(service?.category, 'General'),
+    duration: toNumber(service?.duration),
+    basePrice: toNumber(service?.basePrice),
+    minPrice: toNumber((service as Partial<Service> & { minPrice?: number }).minPrice),
+    maxPrice: toNumber((service as Partial<Service> & { maxPrice?: number }).maxPrice),
+    rawPrice: toNumber(service?.rawPrice),
+    finalPrice: toNumber(service?.finalPrice),
+});
+
+export const normalizeProduct = (product: Partial<Product> | null | undefined): Product => ({
+    id: toStringValue(product?.id),
+    tenantId: toOptionalString(product?.tenantId),
+    name_en: toStringValue(product?.name_en || product?.name_ar, 'Product'),
+    name_ar: toStringValue(product?.name_ar || product?.name_en, 'منتج'),
+    description_en: toStringValue(product?.description_en),
+    description_ar: toStringValue(product?.description_ar),
+    category: toStringValue(product?.category, 'General'),
+    price: toNumber(product?.price),
+    rawPrice: toNumber(product?.rawPrice ?? product?.price),
+    images: Array.isArray(product?.images)
+        ? product.images.map((image) => toStringValue(image)).filter(Boolean)
+        : [],
+    stock: toNumber(product?.stock),
+    isAvailable: toBoolean(product?.isAvailable, true),
+});
+
+export const normalizeStaff = (staff: Partial<Staff> | null | undefined): Staff => ({
+    id: toStringValue(staff?.id),
+    name: toStringValue(staff?.name, 'Staff'),
+    role: toOptionalString(staff?.role),
+    specialty: toOptionalString(staff?.specialty),
+    avatar: toOptionalString(staff?.avatar),
+    rating: toNumber(staff?.rating),
+    skills: Array.isArray(staff?.skills)
+        ? staff.skills.map((item) => toStringValue(item)).filter(Boolean)
+        : [],
+    aiScore: staff?.aiScore !== undefined ? toNumber(staff.aiScore) : undefined,
+    recommended: staff?.recommended !== undefined ? toBoolean(staff.recommended) : undefined,
+    specialization: toOptionalString(staff?.specialization),
+});
+
+const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Booking => {
+    const normalizedService = appointment?.Service || appointment?.service
+        ? normalizeService(appointment?.Service || appointment?.service)
+        : undefined;
+    const normalizedStaff = appointment?.Staff || appointment?.staff
+        ? normalizeStaff(appointment?.Staff || appointment?.staff)
+        : undefined;
+
+    return {
+        id: toStringValue(appointment?.id),
+        bookingNumber: toOptionalString(appointment?.bookingNumber),
+        serviceId: toStringValue(appointment?.serviceId || normalizedService?.id),
+        staffId: toStringValue(appointment?.staffId || normalizedStaff?.id),
+        platformUserId: toStringValue(appointment?.platformUserId),
+        startTime: toStringValue(appointment?.startTime),
+        endTime: toStringValue(appointment?.endTime),
+        status: (appointment?.status as Booking['status']) || 'pending',
+        price: toNumber(appointment?.price),
+        paymentStatus: toOptionalString(appointment?.paymentStatus),
+        paymentMethod: toOptionalString(appointment?.paymentMethod),
+        paidAt: toOptionalString(appointment?.paidAt),
+        notes: toOptionalString(appointment?.notes),
+        tenantId: toOptionalString(appointment?.tenantId),
+        Service: normalizedService,
+        Staff: normalizedStaff,
+        service: normalizedService,
+        staff: normalizedStaff,
+        tenant: appointment?.tenant ? {
+            id: toStringValue(appointment.tenant.id),
+            name: toStringValue(appointment.tenant.name, 'Refah'),
+            slug: toOptionalString(appointment.tenant.slug),
+            logo: toOptionalString(appointment.tenant.logo),
+        } : undefined,
+        duration: appointment?.duration !== undefined
+            ? toNumber(appointment.duration)
+            : normalizedService?.duration,
+    };
+};
+
+const normalizeOrderItem = (item: Partial<OrderItem> | null | undefined): OrderItem => {
+    const normalizedProductNameEn = toStringValue(item?.Product?.name_en || item?.product?.name_en);
+    const normalizedProductNameAr = toStringValue(item?.Product?.name_ar || item?.product?.name_ar);
+    const normalizedImages = Array.isArray(item?.Product?.images)
+        ? item!.Product!.images!.map((image) => toStringValue(image)).filter(Boolean)
+        : Array.isArray(item?.product?.images)
+            ? item!.product!.images!.map((image) => toStringValue(image)).filter(Boolean)
+            : [];
+
+    return {
+        id: toStringValue(item?.id),
+        productId: toStringValue(item?.productId),
+        quantity: toNumber(item?.quantity),
+        price: toNumber(item?.price),
+        Product: normalizedProductNameEn || normalizedProductNameAr ? {
+            name_en: normalizedProductNameEn,
+            name_ar: normalizedProductNameAr,
+            images: normalizedImages,
+        } : undefined,
+        product: normalizedProductNameEn || normalizedProductNameAr ? {
+            name_en: normalizedProductNameEn,
+            name_ar: normalizedProductNameAr,
+            images: normalizedImages,
+        } : undefined,
+    };
+};
+
+const normalizeOrder = (order: Partial<Order> | null | undefined): Order => ({
+    id: toStringValue(order?.id),
+    orderNumber: toOptionalString(order?.orderNumber),
+    tenantId: toStringValue(order?.tenantId),
+    platformUserId: toStringValue(order?.platformUserId),
+    items: Array.isArray(order?.items) ? order.items.map((item) => normalizeOrderItem(item)) : [],
+    totalAmount: toNumber(order?.totalAmount),
+    status: (order?.status as Order['status']) || 'pending',
+    paymentStatus: toStringValue(order?.paymentStatus),
+    paymentMethod: toStringValue(order?.paymentMethod),
+    createdAt: toStringValue(order?.createdAt),
+    shippingAddress: order?.shippingAddress,
+    tenant: order?.tenant ? {
+        name: toStringValue(order.tenant.name, 'Refah'),
+        logo: toOptionalString(order.tenant.logo),
+    } : undefined,
+});
+
+const normalizeHotDeal = (deal: Partial<HotDeal> | null | undefined): HotDeal => ({
+    id: toStringValue(deal?.id),
+    title_en: toStringValue(deal?.title_en || deal?.title_ar, 'Hot Deal'),
+    title_ar: toStringValue(deal?.title_ar || deal?.title_en, 'عرض ساخن'),
+    description_en: toOptionalString(deal?.description_en),
+    description_ar: toOptionalString(deal?.description_ar),
+    discountType: deal?.discountType === 'fixed_amount' ? 'fixed_amount' : 'percentage',
+    discountValue: toNumber(deal?.discountValue),
+    originalPrice: toNumber(deal?.originalPrice),
+    discountedPrice: toNumber(deal?.discountedPrice),
+    validFrom: toStringValue(deal?.validFrom),
+    validUntil: toStringValue(deal?.validUntil),
+    maxRedemptions: toNumber(deal?.maxRedemptions),
+    currentRedemptions: toNumber(deal?.currentRedemptions),
+    image: toOptionalString(deal?.image),
+    tenant: deal?.tenant ? {
+        id: toStringValue(deal.tenant.id),
+        name: toStringValue(deal.tenant.name, 'Refah'),
+        name_en: toOptionalString(deal.tenant.name_en),
+        name_ar: toOptionalString(deal.tenant.name_ar),
+        logo: toOptionalString(deal.tenant.logo),
+        slug: toOptionalString(deal.tenant.slug),
+    } : undefined,
+    service: deal?.service ? {
+        id: toStringValue(deal.service.id),
+        name_en: toStringValue(deal.service.name_en || deal.service.name_ar, 'Service'),
+        name_ar: toStringValue(deal.service.name_ar || deal.service.name_en, 'الخدمة'),
+        duration: deal.service.duration !== undefined ? toNumber(deal.service.duration) : undefined,
+    } : undefined,
+});
+
+const normalizeCategory = (category: Partial<ServiceCategory> | null | undefined): ServiceCategory => ({
+    id: toStringValue(category?.id),
+    name_en: toStringValue(category?.name_en || category?.name_ar, 'Category'),
+    name_ar: toStringValue(category?.name_ar || category?.name_en, 'الفئة'),
+    slug: toStringValue(category?.slug || category?.id),
+    icon: toOptionalString(category?.icon),
+    sortOrder: toNumber(category?.sortOrder),
+    isActive: toBoolean(category?.isActive, true),
+});
+
+const normalizeAppContent = (content: PublicAppContent | null | undefined): PublicAppContent => ({
+    appTarget: content?.appTarget || 'customer_app',
+    legal: content?.legal || {},
+    support: content?.support || {},
+    social: Array.isArray(content?.social) ? content.social : [],
+    store: content?.store || {},
+    display: content?.display || {},
+});
+
 class ApiClient {
     private baseURL: string;
 
     constructor(baseURL: string) {
         this.baseURL = baseURL;
+    }
+
+    getBaseUrl(): string {
+        return this.baseURL;
+    }
+
+    private async fetchWithTimeout(
+        input: RequestInfo | URL,
+        init?: RequestInit,
+        timeoutMs: number = 15000
+    ): Promise<Response> {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            return await fetch(input, {
+                ...init,
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
     }
 
     /**
@@ -363,9 +714,10 @@ class ApiClient {
         if (!refreshToken) return null;
 
         try {
-            const response = await fetch(`${this.baseURL}/auth/user/refresh-token`, {
+            const response = await this.fetchWithTimeout(`${this.baseURL}/auth/user/refresh-token`, {
                 method: 'POST',
                 headers: {
+                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ refreshToken }),
@@ -405,6 +757,8 @@ class ApiClient {
             ...(options.headers as Record<string, string>),
         };
 
+        headers['Accept'] = headers['Accept'] || 'application/json';
+
         // Don't set Content-Type for FormData - browser will set it with boundary
         if (!(options.body instanceof FormData)) {
             headers['Content-Type'] = 'application/json';
@@ -415,7 +769,7 @@ class ApiClient {
         }
 
         // Make request
-        let response = await fetch(url, {
+        let response = await this.fetchWithTimeout(url, {
             ...options,
             headers,
         });
@@ -426,7 +780,7 @@ class ApiClient {
             if (newToken) {
                 // Retry with new token
                 headers['Authorization'] = `Bearer ${newToken}`;
-                response = await fetch(url, {
+                response = await this.fetchWithTimeout(url, {
                     ...options,
                     headers,
                 });
@@ -522,6 +876,48 @@ class ApiClient {
         return response.json();
     }
 
+    async testConnection(): Promise<{
+        ok: boolean;
+        status: number;
+        url: string;
+        success?: boolean;
+        message?: string;
+    }> {
+        const endpoint = '/tenants';
+        const url = `${this.baseURL}${endpoint}`;
+
+        try {
+            const response = await this.fetchWithTimeout(url, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                },
+            }, 10000);
+
+            let payload: any = null;
+            try {
+                payload = await response.json();
+            } catch {
+                payload = null;
+            }
+
+            return {
+                ok: response.ok,
+                status: response.status,
+                url,
+                success: payload?.success,
+                message: payload?.message,
+            };
+        } catch (error: any) {
+            return {
+                ok: false,
+                status: 0,
+                url,
+                message: error?.message || 'Connection test failed',
+            };
+        }
+    }
+
     /**
      * Check if user is authenticated
      */
@@ -536,7 +932,7 @@ class ApiClient {
     async getUser(): Promise<User | null> {
         try {
             const userJson = await AsyncStorage.getItem(KEYS.USER);
-            return userJson ? JSON.parse(userJson) : null;
+            return userJson ? normalizeUser(JSON.parse(userJson)) : null;
         } catch (error) {
             console.error('Error getting user:', error);
             return null;
@@ -548,7 +944,7 @@ class ApiClient {
      */
     async setUser(user: User): Promise<void> {
         try {
-            await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
+            await AsyncStorage.setItem(KEYS.USER, JSON.stringify(normalizeUser(user)));
         } catch (error) {
             console.error('Error storing user:', error);
         }
@@ -568,7 +964,7 @@ class ApiClient {
      */
     async getProfile(): Promise<User> {
         const response = await this.get<{ success: boolean; user: User }>('/users/profile');
-        return response.user;
+        return normalizeUser(response.user);
     }
 
     /**
@@ -576,7 +972,7 @@ class ApiClient {
      */
     async updateProfile(data: Partial<User>): Promise<User> {
         const response = await this.put<{ success: boolean; user: User }>('/users/profile', data);
-        return response.user;
+        return normalizeUser(response.user);
     }
 
     async registerPushToken(data: {
@@ -600,6 +996,23 @@ class ApiClient {
         }
 
         return response.json();
+    }
+
+    async getNotifications(page: number = 1, limit: number = 20): Promise<{
+        success: boolean;
+        notifications: CustomerNotification[];
+        unreadCount: number;
+        pagination: { total: number; page: number; limit: number; totalPages: number };
+    }> {
+        return this.get(`/users/notifications?page=${page}&limit=${limit}`);
+    }
+
+    async getNotificationDetail(id: string): Promise<{ success: boolean; notification: CustomerNotification }> {
+        return this.get(`/users/notifications/${id}`);
+    }
+
+    async markNotificationRead(id: string): Promise<{ success: boolean; message: string }> {
+        return this.post(`/users/notifications/${id}/read`, {});
     }
 
     /**
@@ -630,11 +1043,7 @@ class ApiClient {
      */
     async getBookings(status?: 'upcoming' | 'completed' | 'cancelled'): Promise<Booking[]> {
         const response = await this.get<{ success: boolean; appointments: Booking[] }>('/bookings');
-        const normalized = (response.appointments || []).map((appointment) => ({
-            ...appointment,
-            Service: appointment.Service || appointment.service,
-            Staff: appointment.Staff || appointment.staff,
-        }));
+        const normalized = (response.appointments || []).map((appointment) => normalizeBooking(appointment));
 
         if (!status) {
             return normalized;
@@ -668,11 +1077,7 @@ class ApiClient {
         const response = await this.get<{ success: boolean; appointment: Booking }>(
             `/bookings/${id}`
         );
-        return {
-            ...response.appointment,
-            Service: response.appointment.Service || response.appointment.service,
-            Staff: response.appointment.Staff || response.appointment.staff,
-        };
+        return normalizeBooking(response.appointment);
     }
 
     /**
@@ -680,7 +1085,7 @@ class ApiClient {
      */
     async getOrders(): Promise<Order[]> {
         const response = await this.get<{ success: boolean; orders: Order[] }>('/orders');
-        return response.orders || [];
+        return (response.orders || []).map((order) => normalizeOrder(order));
     }
 
     /**
@@ -688,7 +1093,7 @@ class ApiClient {
      */
     async getOrder(id: string): Promise<Order> {
         const response = await this.get<{ success: boolean; order: Order }>(`/orders/${id}`);
-        return response.order;
+        return normalizeOrder(response.order);
     }
 
     /**
@@ -723,7 +1128,7 @@ class ApiClient {
      */
     async getHotDeals(): Promise<HotDeal[]> {
         const response = await this.get<{ success: boolean; deals: HotDeal[] }>('/hot-deals');
-        return response.deals || [];
+        return (response.deals || []).map((deal) => normalizeHotDeal(deal));
     }
 
     /**
@@ -731,15 +1136,15 @@ class ApiClient {
      */
     async getCategories(): Promise<ServiceCategory[]> {
         const response = await this.get<{ success: boolean; categories: ServiceCategory[] }>('/categories');
-        return response.categories || [];
+        return (response.categories || []).map((category) => normalizeCategory(category));
     }
 
     /**
      * Get all public tenants for discovery
      */
     async getTenants(): Promise<Tenant[]> {
-        const response = await this.get<{ success: boolean; tenants: Tenant[] }>('/tenants');
-        return response.tenants || [];
+        const response = await this.get<{ success: boolean; tenants: Tenant[] }>('/public/tenants');
+        return (response.tenants || []).map((tenant) => normalizeTenant(tenant));
     }
 
     /**
@@ -755,7 +1160,7 @@ class ApiClient {
      */
     async getTrendingTenants(limit: number = 8): Promise<Tenant[]> {
         const response = await this.get<{ success: boolean; tenants: Tenant[] }>('/featured-tenants');
-        return (response.tenants || []).slice(0, limit);
+        return (response.tenants || []).map((tenant) => normalizeTenant(tenant)).slice(0, limit);
     }
 
     /**
@@ -775,6 +1180,7 @@ class ApiClient {
                 rating: Number(member.rating || 0),
                 skills: Array.isArray(member.skills) ? member.skills : [],
             }))
+            .map((member) => normalizeStaff(member))
             .filter((member) => member.id)
             .sort((left, right) => right.rating - left.rating);
     }
@@ -786,7 +1192,7 @@ class ApiClient {
                 appContent: PublicAppContent;
             }>('/public/apps-center/customer-app');
 
-            const appContent = response.appContent || DEFAULT_CUSTOMER_APP_CONTENT;
+            const appContent = normalizeAppContent(response.appContent || DEFAULT_CUSTOMER_APP_CONTENT);
             await AsyncStorage.setItem(KEYS.CUSTOMER_APP_CONTENT, JSON.stringify(appContent));
             return appContent;
         } catch (error) {
@@ -794,7 +1200,7 @@ class ApiClient {
 
             try {
                 const cached = await AsyncStorage.getItem(KEYS.CUSTOMER_APP_CONTENT);
-                return cached ? JSON.parse(cached) : DEFAULT_CUSTOMER_APP_CONTENT;
+                return cached ? normalizeAppContent(JSON.parse(cached)) : DEFAULT_CUSTOMER_APP_CONTENT;
             } catch (storageError) {
                 console.error('Failed to load cached app content:', storageError);
                 return DEFAULT_CUSTOMER_APP_CONTENT;
@@ -818,9 +1224,13 @@ export const getServicePrice = (service: Partial<Service> | null | undefined): n
         return 0;
     }
 
-    const candidate = service.finalPrice ?? service.basePrice ?? service.rawPrice ?? 0;
-    const parsed = Number(candidate);
-    return Number.isFinite(parsed) ? parsed : 0;
+    const candidate = service.finalPrice
+        ?? service.basePrice
+        ?? service.minPrice
+        ?? service.maxPrice
+        ?? service.rawPrice
+        ?? 0;
+    return toNumber(candidate);
 };
 
 export const bookingNeedsPayment = (paymentStatus?: string | null): boolean =>

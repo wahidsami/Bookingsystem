@@ -29,6 +29,11 @@ module.exports = (sequelize, DataTypes) => {
             references: { model: 'platform_users', key: 'id' },
             onDelete: 'CASCADE'
         },
+        readAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            field: 'read_at'
+        },
         createdAt: {
             type: DataTypes.DATE,
             allowNull: false,
@@ -43,7 +48,8 @@ module.exports = (sequelize, DataTypes) => {
         timestamps: false,
         updatedAt: false,
         indexes: [
-            { fields: ['campaign_id'], name: 'idx_tenant_push_campaign_recipients_campaign' }
+            { fields: ['campaign_id'], name: 'idx_tenant_push_campaign_recipients_campaign' },
+            { fields: ['platform_user_id', 'created_at'], name: 'idx_tenant_push_campaign_recipients_user_created' }
         ]
     });
 

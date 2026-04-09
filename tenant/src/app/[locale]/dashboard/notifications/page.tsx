@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { TenantLayout } from '@/components/TenantLayout';
-import { tenantApi } from '@/lib/api';
+import { getImageUrl, tenantApi } from '@/lib/api';
 
 interface Customer {
   id: string;
@@ -64,6 +64,7 @@ interface PushDebugState {
     body: string;
     linkType?: 'none' | 'tenant' | 'service';
     serviceId?: string;
+    imageUrl?: string;
   };
   response?: PushSendResponse;
   error?: string;
@@ -86,6 +87,11 @@ export default function NotificationsPage() {
         formTitle: 'العنوان',
         formBody: 'الرسالة',
         formLink: 'ربط الاشعار',
+        formImage: 'صورة الاشعار',
+        uploadImage: 'رفع صورة',
+        changeImage: 'تغيير الصورة',
+        removeImage: 'حذف الصورة',
+        imageUploadFailed: 'فشل رفع الصورة',
         titlePlaceholder: 'مثال: عرض خاص',
         bodyPlaceholder: 'اكتب نص الاشعار...',
         linkNone: 'بدون رابط',
@@ -164,6 +170,11 @@ export default function NotificationsPage() {
       formTitle: 'Title',
       formBody: 'Message',
       formLink: 'Link notification to',
+      formImage: 'Notification image',
+      uploadImage: 'Upload image',
+      changeImage: 'Change image',
+      removeImage: 'Remove image',
+      imageUploadFailed: 'Image upload failed',
       titlePlaceholder: 'e.g. Special offer',
       bodyPlaceholder: 'Write the notification text...',
       linkNone: 'None',
@@ -245,6 +256,8 @@ export default function NotificationsPage() {
   const [sendToAllBooked, setSendToAllBooked] = useState(false);
   const [linkType, setLinkType] = useState<'none' | 'tenant' | 'service'>('tenant');
   const [serviceId, setServiceId] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const [servicesWithOffers, setServicesWithOffers] = useState<ServiceOption[]>([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [historyCampaigns, setHistoryCampaigns] = useState<Array<{ id: string; title: string; bodyTruncated: string; data?: { linkType?: string }; audienceType: string; recipientCount: number; sentAt: string }>>([]);
@@ -391,6 +404,9 @@ export default function NotificationsPage() {
     if (linkType === 'service' && serviceId) {
       payload.serviceId = serviceId;
     }
+    if (imageUrl) {
+      payload.imageUrl = imageUrl;
+    }
 
     const startedAt = new Date().toISOString();
     setPushDebug({
@@ -416,6 +432,7 @@ export default function NotificationsPage() {
         setMessage({ type: 'success', text: copy.sentTo(res.data?.sent ?? 0) });
         setTitle('');
         setBody('');
+        setImageUrl('');
         setSelectedCustomers(new Set());
         const usageRes = await tenantApi.getPushUsage();
         if (usageRes?.data) {
@@ -451,6 +468,29 @@ export default function NotificationsPage() {
       return new Date(value).toLocaleString(locale === 'ar' ? 'ar' : 'en');
     } catch {
       return value;
+    }
+  };
+
+  const handleImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImageUploading(true);
+    setMessage(null);
+    try {
+      const res = await tenantApi.uploadMarketingPushImage(file);
+      if (res.success && res.data?.imageUrl) {
+        setImageUrl(res.data.imageUrl);
+      } else {
+        setMessage({ type: 'error', text: res.message || copy.imageUploadFailed });
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || copy.imageUploadFailed });
+    } finally {
+      setImageUploading(false);
+      event.target.value = '';
     }
   };
 
@@ -535,6 +575,37 @@ export default function NotificationsPage() {
                               <option value="" disabled>{copy.noOfferedServices}</option>
                             )}
                           </select>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{copy.formImage}</label>
+                        {imageUrl ? (
+                          <div className="space-y-3">
+                            <img
+                              src={getImageUrl(imageUrl)}
+                              alt="Notification"
+                              className="w-full max-w-md h-48 object-cover rounded-xl border border-gray-200"
+                            />
+                            <div className="flex gap-3">
+                              <label className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50">
+                                <input type="file" accept="image/*" className="hidden" onChange={handleImageSelected} />
+                                {imageUploading ? copy.sending : copy.changeImage}
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setImageUrl('')}
+                                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                              >
+                                {copy.removeImage}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="inline-flex items-center justify-center rounded-lg border border-dashed border-gray-300 px-4 py-6 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 w-full max-w-md">
+                            <input type="file" accept="image/*" className="hidden" onChange={handleImageSelected} />
+                            {imageUploading ? copy.sending : copy.uploadImage}
+                          </label>
                         )}
                       </div>
 

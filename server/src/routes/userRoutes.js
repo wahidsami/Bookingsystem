@@ -20,6 +20,11 @@ router.put('/password', authenticateUser, userController.changePassword);
 router.post('/push-token', authenticateUser, userController.registerPushToken);
 router.delete('/push-token', authenticateUser, userController.unregisterPushToken);
 
+// Customer notification inbox
+router.get('/notifications', authenticateUser, userController.getNotifications);
+router.get('/notifications/:id', authenticateUser, userController.getNotificationDetail);
+router.post('/notifications/:id/read', authenticateUser, userController.markNotificationRead);
+
 // Get user bookings
 router.get('/bookings', authenticateUser, userController.getUserBookings);
 

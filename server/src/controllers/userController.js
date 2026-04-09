@@ -4,6 +4,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pushNotificationService = require('../services/pushNotificationService');
+const customerNotificationService = require('../services/customerNotificationService');
+const logger = require('../utils/productionLogger');
 
 // Configure multer for file uploads (profile photos)
 const storage = multer.diskStorage({
@@ -358,6 +360,86 @@ const getServicesHistory = async (req, res) => {
 };
 
 /**
+ * Get customer notification inbox
+ * GET /api/v1/users/notifications
+ */
+const getNotifications = async (req, res) => {
+    try {
+        const { page, limit } = req.query;
+        const result = await customerNotificationService.getUserNotifications(req.userId, { page, limit });
+
+        res.json({
+            success: true,
+            notifications: result.notifications,
+            unreadCount: result.unreadCount,
+            pagination: result.pagination
+        });
+    } catch (error) {
+        console.error('Get customer notifications error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to fetch notifications'
+        });
+    }
+};
+
+/**
+ * Get one customer notification detail
+ * GET /api/v1/users/notifications/:id
+ */
+const getNotificationDetail = async (req, res) => {
+    try {
+        const notification = await customerNotificationService.getUserNotificationById(req.userId, req.params.id);
+
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            notification
+        });
+    } catch (error) {
+        console.error('Get customer notification detail error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to fetch notification detail'
+        });
+    }
+};
+
+/**
+ * Mark one customer notification as read
+ * POST /api/v1/users/notifications/:id/read
+ */
+const markNotificationRead = async (req, res) => {
+    try {
+        const notification = await customerNotificationService.markUserNotificationRead(req.userId, req.params.id);
+
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Notification marked as read'
+        });
+    } catch (error) {
+        console.error('Mark customer notification read error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to update notification'
+        });
+    }
+};
+
+/**
  * Register customer mobile push token
  * POST /api/v1/users/push-token
  */
@@ -380,12 +462,25 @@ const registerPushToken = async (req, res) => {
             deviceName
         });
 
+        logger.warn('Customer push token registered', {
+            platformUserId: req.userId,
+            platform: platform || 'unknown',
+            appVersion: appVersion || null,
+            tokenPreview: `${token}`.trim().slice(0, 18)
+        });
+
         res.json({
             success: true,
             message: 'Push token registered successfully'
         });
     } catch (error) {
         console.error('Register push token error:', error);
+        logger.warn('Customer push token registration failed', {
+            platformUserId: req.userId,
+            platform: req.body?.platform || 'unknown',
+            appVersion: req.body?.appVersion || null,
+            error: error.message
+        });
         res.status(400).json({
             success: false,
             message: error.message || 'Failed to register push token'
@@ -413,6 +508,11 @@ const unregisterPushToken = async (req, res) => {
             token
         });
 
+        logger.warn('Customer push token unregistered', {
+            platformUserId: req.userId,
+            tokenPreview: `${token}`.trim().slice(0, 18)
+        });
+
         res.json({
             success: true,
             message: 'Push token unregistered successfully'
@@ -433,6 +533,9 @@ module.exports = {
     changePassword,
     getUserBookings,
     getServicesHistory,
+    getNotifications,
+    getNotificationDetail,
+    markNotificationRead,
     registerPushToken,
     unregisterPushToken,
     uploadMiddleware: upload.single('photo')

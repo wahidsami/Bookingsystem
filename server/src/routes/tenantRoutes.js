@@ -32,6 +32,7 @@ const {
 } = require('../middleware/checkSubscription');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Configure multer for settings uploads
 const settingsStorage = multer.diskStorage({
@@ -44,6 +45,21 @@ const settingsStorage = multer.diskStorage({
     }
 });
 const settingsUpload = multer({ storage: settingsStorage });
+
+const notificationImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = path.join(__dirname, '../../uploads/tenants/notifications');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `${req.tenant.id}-notification-${uniqueSuffix}${path.extname(file.originalname)}`);
+    }
+});
+const notificationImageUpload = multer({ storage: notificationImageStorage });
 
 // All routes require authentication
 router.use(authenticateTenant);
@@ -168,6 +184,7 @@ router.patch('/reviews/:id', tenantPayrollController.updateReview);
 
 // Customer push notifications
 router.get('/notifications/usage', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushUsage);
+router.post('/notifications/image', checkTenantFeature('inAppMarketingNotifications'), notificationImageUpload.single('image'), tenantNotificationController.uploadMarketingImage);
 router.post('/notifications/send', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.sendMarketingPush);
 router.get('/notifications/history', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistory);
 router.get('/notifications/history/:id', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryDetail);

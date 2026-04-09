@@ -1,6 +1,8 @@
 const { Op } = require('sequelize');
 const db = require('../models');
 const customerNotificationService = require('../services/customerNotificationService');
+const path = require('path');
+const fs = require('fs');
 
 function parsePage(query) {
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
@@ -31,7 +33,7 @@ exports.sendMarketingPush = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
 
-        const { platformUserIds, audience, title, body, linkType, serviceId } = req.body;
+        const { platformUserIds, audience, title, body, linkType, serviceId, imageUrl } = req.body;
         if (!title || typeof title !== 'string' || !body || typeof body !== 'string') {
             return res.status(400).json({
                 success: false,
@@ -41,7 +43,8 @@ exports.sendMarketingPush = async (req, res) => {
 
         const pushData = {
             linkType: linkType || 'tenant',
-            audienceType: audience === 'all_booked' ? 'all_booked' : 'selected'
+            audienceType: audience === 'all_booked' ? 'all_booked' : 'selected',
+            imageUrl: imageUrl || ''
         };
 
         if (serviceId && (linkType === 'service' || !linkType)) {
@@ -128,6 +131,39 @@ exports.sendMarketingPush = async (req, res) => {
     } catch (error) {
         console.error('Send marketing push error:', error);
         return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.uploadMarketingImage = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No image uploaded'
+            });
+        }
+
+        const relativePath = `uploads/tenants/notifications/${path.basename(req.file.path)}`;
+
+        return res.json({
+            success: true,
+            message: 'Notification image uploaded successfully',
+            data: {
+                imageUrl: relativePath
+            }
+        });
+    } catch (error) {
+        console.error('Upload marketing image error:', error);
+
+        if (req.file?.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to upload notification image',
+            error: error.message
+        });
     }
 };
 

@@ -9,6 +9,50 @@ function getCurrentMonthKey() {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function normalizeMediaUrl(value) {
+    const candidate = `${value || ''}`.trim();
+    if (!candidate) {
+        return '';
+    }
+
+    if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+        return candidate;
+    }
+
+    const baseUrl = (process.env.BASE_URL || process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const normalizedValue = candidate.replace(/\\/g, '/').replace(/^\/+/, '');
+    const normalizedPath = normalizedValue.startsWith('uploads/')
+        ? `/${normalizedValue}`
+        : normalizedValue.startsWith('/uploads/')
+            ? `/${normalizedValue.replace(/^\/+/, '')}`
+            : `/uploads/${normalizedValue}`;
+    return `${baseUrl}${normalizedPath}`;
+}
+
+function normalizeCustomerNotification(recipient) {
+    const campaign = recipient?.campaign;
+    const tenant = campaign?.tenant;
+    const data = campaign?.data || {};
+
+    return {
+        id: recipient.id,
+        campaignId: recipient.campaignId,
+        title: campaign?.title || '',
+        body: campaign?.body || '',
+        imageUrl: normalizeMediaUrl(data.imageUrl || data.logoUrl || ''),
+        linkType: data.linkType || 'tenant',
+        tenantId: data.tenantId || tenant?.id || null,
+        tenantName: tenant?.name_ar || tenant?.name_en || tenant?.name || null,
+        tenantLogo: normalizeMediaUrl(tenant?.logo || ''),
+        serviceId: data.serviceId || null,
+        audienceType: campaign?.audienceType || 'selected',
+        sentAt: campaign?.sentAt || recipient?.createdAt || null,
+        createdAt: recipient?.createdAt || null,
+        readAt: recipient?.readAt || null,
+        data
+    };
+}
+
 function resolvePushLimit(limits) {
     if (!limits || typeof limits !== 'object') {
         return 0;
@@ -106,15 +150,14 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
         }
     }
 
-    let logoUrl = data.logoUrl || '';
+    let logoUrl = normalizeMediaUrl(data.logoUrl || '');
+    const imageUrl = normalizeMediaUrl(data.imageUrl || '');
     if (!logoUrl) {
         const tenant = await db.Tenant.findByPk(tenantId, {
             attributes: ['logo']
         });
         if (tenant?.logo) {
-            const baseUrl = (process.env.BASE_URL || process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
-            const path = tenant.logo.startsWith('/') ? tenant.logo : `/${tenant.logo}`;
-            logoUrl = tenant.logo.startsWith('http') ? tenant.logo : `${baseUrl}${path}`;
+            logoUrl = normalizeMediaUrl(tenant.logo);
         }
     }
 
@@ -130,8 +173,30 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
         payload.logoUrl = logoUrl;
     }
 
+    if (imageUrl) {
+        payload.imageUrl = imageUrl;
+    }
+
     if (payload.linkType === 'service' && payload.serviceId) {
         payload.screen = 'ServiceDetail';
+    }
+
+    let campaign = null;
+    try {
+        campaign = await db.TenantPushCampaign.create({
+            tenantId,
+            title,
+            body,
+            data: payload,
+            audienceType: data.audienceType || 'selected',
+            recipientCount: 0,
+            sentAt: new Date()
+        });
+        payload.campaignId = String(campaign.id);
+        await campaign.update({ data: payload });
+    } catch (error) {
+        console.error('[CustomerNotification] Failed to prepare push campaign:', error.message);
+        campaign = null;
     }
 
     const sentToIds = [];
@@ -178,14 +243,9 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
         await usage.increment('count', { by: sent });
     }
 
-    if (sent > 0) {
+    if (sent > 0 && campaign) {
         try {
-            const campaign = await db.TenantPushCampaign.create({
-                tenantId,
-                title,
-                body,
-                data: payload,
-                audienceType: data.audienceType || 'selected',
+            await campaign.update({
                 recipientCount: sent,
                 sentAt: new Date()
             });
@@ -200,6 +260,12 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
             }
         } catch (error) {
             console.error('[CustomerNotification] Failed to record push campaign:', error.message);
+        }
+    } else if (campaign && sent === 0) {
+        try {
+            await campaign.destroy();
+        } catch (error) {
+            console.error('[CustomerNotification] Failed to cleanup empty push campaign:', error.message);
         }
     }
 
@@ -221,5 +287,86 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
 module.exports = {
     sendToCustomer,
     getTenantPushUsage,
-    sendTenantMarketingPush
+    sendTenantMarketingPush,
+    normalizeCustomerNotification,
+    async getUserNotifications(platformUserId, { page = 1, limit = 20 } = {}) {
+        const safePage = Math.max(parseInt(page, 10) || 1, 1);
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const offset = (safePage - 1) * safeLimit;
+
+        const { count, rows } = await db.TenantPushCampaignRecipient.findAndCountAll({
+            where: { platformUserId },
+            include: [{
+                model: db.TenantPushCampaign,
+                as: 'campaign',
+                attributes: ['id', 'tenantId', 'title', 'body', 'data', 'audienceType', 'sentAt'],
+                include: [{
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'logo'],
+                    required: false
+                }]
+            }],
+            order: [['createdAt', 'DESC']],
+            limit: safeLimit,
+            offset
+        });
+
+        const unreadCount = await db.TenantPushCampaignRecipient.count({
+            where: {
+                platformUserId,
+                readAt: null
+            }
+        });
+
+        return {
+            notifications: rows.map(normalizeCustomerNotification),
+            pagination: {
+                total: count,
+                page: safePage,
+                limit: safeLimit,
+                totalPages: Math.ceil(count / safeLimit)
+            },
+            unreadCount
+        };
+    },
+    async getUserNotificationById(platformUserId, recipientId) {
+        const recipient = await db.TenantPushCampaignRecipient.findOne({
+            where: {
+                id: recipientId,
+                platformUserId
+            },
+            include: [{
+                model: db.TenantPushCampaign,
+                as: 'campaign',
+                attributes: ['id', 'tenantId', 'title', 'body', 'data', 'audienceType', 'sentAt'],
+                include: [{
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'logo'],
+                    required: false
+                }]
+            }]
+        });
+
+        return recipient ? normalizeCustomerNotification(recipient) : null;
+    },
+    async markUserNotificationRead(platformUserId, recipientId) {
+        const recipient = await db.TenantPushCampaignRecipient.findOne({
+            where: {
+                id: recipientId,
+                platformUserId
+            }
+        });
+
+        if (!recipient) {
+            return null;
+        }
+
+        if (!recipient.readAt) {
+            await recipient.update({ readAt: new Date() });
+        }
+
+        return recipient;
+    }
 };

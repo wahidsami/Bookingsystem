@@ -1753,6 +1753,7 @@ class TenantApiClient {
     body: string;
     linkType?: 'none' | 'tenant' | 'service';
     serviceId?: string;
+    imageUrl?: string;
   }): Promise<{
     success: boolean;
     message?: string;
@@ -1831,6 +1832,57 @@ class TenantApiClient {
           : `Server returned ${response.status}: ${response.statusText}`,
         status: response.status
       };
+    }
+
+    const result = await response.json();
+    return {
+      ...result,
+      success: !!result.success && response.ok,
+      status: response.status
+    };
+  }
+
+  async uploadMarketingPushImage(file: File): Promise<{ success: boolean; data?: { imageUrl: string }; message?: string; status?: number }> {
+    const accessToken = this.getAccessToken();
+    const headers: Record<string, string> = {};
+    const formData = new FormData();
+    formData.append('image', file);
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    let response = await fetch(`${this.baseUrl}/tenant/notifications/image`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (response.status === 401) {
+      const refreshed = await this.refreshAccessToken();
+
+      if (refreshed) {
+        const newAccessToken = this.getAccessToken();
+        if (newAccessToken) {
+          headers['Authorization'] = `Bearer ${newAccessToken}`;
+        }
+
+        response = await fetch(`${this.baseUrl}/tenant/notifications/image`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+      } else {
+        this.clearTokens();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/ar/login';
+        }
+        return {
+          success: false,
+          message: 'Authentication failed. Please login again.',
+          status: 401
+        };
+      }
     }
 
     const result = await response.json();
