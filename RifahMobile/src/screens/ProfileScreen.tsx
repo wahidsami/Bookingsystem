@@ -7,6 +7,7 @@ import { UserAvatar } from '../components/UserAvatar';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, User } from '../api/client';
+import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 
 interface ProfileScreenProps {
@@ -15,6 +16,7 @@ interface ProfileScreenProps {
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
     const { t } = useLanguage();
+    const { isAuthenticated, showLogin, showRegister } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -24,10 +26,17 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     useFocusEffect(
         React.useCallback(() => {
             loadUserData();
-        }, [])
+        }, [isAuthenticated])
     );
 
     const loadUserData = async () => {
+        setLoading(true);
+        if (!isAuthenticated) {
+            setUser(null);
+            setLoading(false);
+            return;
+        }
+
         try {
             const userData = await api.getProfile().catch(() => api.getUser());
             setUser(userData);
@@ -36,6 +45,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
             }
         } catch (error) {
             console.error('Failed to load user data:', error);
+            setUser(null);
         } finally {
             setLoading(false);
         }
@@ -85,8 +95,34 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
 
     if (!user) {
         return (
-            <View style={[styles.container, styles.centerContent]}>
-                <Text style={styles.errorText}>{t('failedToLoadProfile')}</Text>
+            <View style={styles.container}>
+                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                    <Text style={styles.headerTitle}>{t('profile')}</Text>
+                </View>
+                <ScrollView
+                    style={styles.content}
+                    contentContainerStyle={[styles.guestContent, { paddingBottom: scrollBottomPadding }]}
+                >
+                    <View style={styles.avatarSection}>
+                        <UserAvatar
+                            size={100}
+                            backgroundColor="#E9D5FF"
+                            textColor={colors.primary}
+                            style={styles.profileAvatar}
+                        />
+                        <Text style={styles.guestTitle}>{t('notLoggedInTitle')}</Text>
+                        <Text style={styles.guestMessage}>{t('notLoggedInProfileMessage')}</Text>
+                    </View>
+
+                    <View style={styles.guestActionCard}>
+                        <TouchableOpacity style={styles.editProfileButton} onPress={showLogin}>
+                            <Text style={styles.editProfileText}>{t('loginButton')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.secondaryActionButton} onPress={showRegister}>
+                            <Text style={styles.secondaryActionText}>{t('registerButton')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
             </View>
         );
     }
@@ -240,6 +276,45 @@ const styles = StyleSheet.create({
     errorText: {
         fontSize: fontSize.md,
         color: colors.textSecondary,
+    },
+    guestContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    guestTitle: {
+        fontSize: fontSize.xl,
+        fontWeight: '700',
+        color: colors.text,
+        marginBottom: spacing.sm,
+        textAlign: 'center',
+    },
+    guestMessage: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        lineHeight: 24,
+        textAlign: 'center',
+        maxWidth: 320,
+    },
+    guestActionCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: spacing.lg,
+        padding: spacing.lg,
+        borderRadius: 16,
+        gap: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    secondaryActionButton: {
+        borderWidth: 1,
+        borderColor: colors.primary,
+        padding: spacing.lg,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    secondaryActionText: {
+        fontSize: fontSize.md,
+        fontWeight: '600',
+        color: colors.primary,
     },
     uploadErrorText: {
         fontSize: fontSize.sm,

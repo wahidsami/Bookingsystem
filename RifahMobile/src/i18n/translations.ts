@@ -138,6 +138,8 @@ export const translations = {
         memberSince: 'Member Since',
         failedToLoadProfile: 'Failed to load profile',
         editProfile: 'Edit Profile',
+        notLoggedInTitle: 'You are not logged in',
+        notLoggedInProfileMessage: 'Sign in or create an account to view your profile, bookings, and purchases across Refah.',
         // Purchases
 
         noOrders: 'No orders found',
@@ -348,6 +350,8 @@ export const translations = {
         memberSince: 'عضو منذ',
         failedToLoadProfile: 'فشل تحميل الملف الشخصي',
         editProfile: 'تعديل الملف الشخصي',
+        notLoggedInTitle: 'أنت غير مسجل الدخول',
+        notLoggedInProfileMessage: 'سجل الدخول أو أنشئ حساباً لعرض ملفك الشخصي وحجوزاتك ومشترياتك عبر رفاه.',
 
         // Guest State
         loginToOrderOrders: 'للبدء في الطلب، يجب عليك تسجيل الدخول أو إنشاء حساب',

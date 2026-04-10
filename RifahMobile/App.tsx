@@ -65,6 +65,7 @@ function AppContent() {
       return;
     }
 
+    api.touchSession().catch(() => undefined);
     registerCustomerPushNotifications().catch((error) => {
       console.warn('Customer push registration warning:', error?.message || error);
     });
@@ -79,9 +80,19 @@ function AppContent() {
         return;
       }
 
-      registerCustomerPushNotifications().catch((error) => {
-        console.warn('Customer push refresh warning:', error?.message || error);
-      });
+      void (async () => {
+        const hasActiveSession = await api.hasActiveSession();
+        if (!hasActiveSession) {
+          setIsAuthenticated(false);
+          setCurrentScreen('welcome');
+          return;
+        }
+
+        await api.touchSession().catch(() => undefined);
+        registerCustomerPushNotifications().catch((error) => {
+          console.warn('Customer push refresh warning:', error?.message || error);
+        });
+      })();
     });
 
     return () => {
@@ -111,7 +122,7 @@ function AppContent() {
     } else if (!onboardingCompleted) {
       setCurrentScreen('onboarding');
     } else {
-      const authenticated = await api.isAuthenticated();
+      const authenticated = await api.hasActiveSession();
       setIsAuthenticated(authenticated);
       setCurrentScreen(authenticated ? 'home' : 'welcome');
     }
@@ -128,11 +139,13 @@ function AppContent() {
   };
 
   const handleLoginSuccess = () => {
+    api.touchSession().catch(() => undefined);
     setIsAuthenticated(true);
     setCurrentScreen('home');
   };
 
   const handleRegisterSuccess = () => {
+    api.touchSession().catch(() => undefined);
     setIsAuthenticated(true);
     setCurrentScreen('home');
   };

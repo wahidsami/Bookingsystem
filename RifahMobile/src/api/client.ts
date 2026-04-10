@@ -37,7 +37,11 @@ const KEYS = {
     REFRESH_TOKEN: 'refah_refresh_token',
     USER: 'refah_user',
     CUSTOMER_APP_CONTENT: 'refah_customer_app_content',
+    SESSION_LAST_ACTIVE: 'refah_session_last_active',
 };
+
+const SESSION_MAX_INACTIVE_DAYS = 30;
+const SESSION_MAX_INACTIVE_MS = SESSION_MAX_INACTIVE_DAYS * 24 * 60 * 60 * 1000;
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -727,9 +731,62 @@ class ApiClient {
             await SecureStore.deleteItemAsync(KEYS.ACCESS_TOKEN);
             await SecureStore.deleteItemAsync(KEYS.REFRESH_TOKEN);
             await AsyncStorage.removeItem(KEYS.USER);
+            await AsyncStorage.removeItem(KEYS.SESSION_LAST_ACTIVE);
         } catch (error) {
             console.error('Error clearing tokens:', error);
         }
+    }
+
+    async touchSession(): Promise<void> {
+        try {
+            await AsyncStorage.setItem(KEYS.SESSION_LAST_ACTIVE, new Date().toISOString());
+        } catch (error) {
+            console.error('Error updating session activity:', error);
+        }
+    }
+
+    async getLastSessionActivity(): Promise<Date | null> {
+        try {
+            const rawValue = await AsyncStorage.getItem(KEYS.SESSION_LAST_ACTIVE);
+            if (!rawValue) {
+                return null;
+            }
+
+            const parsed = new Date(rawValue);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        } catch (error) {
+            console.error('Error reading session activity:', error);
+            return null;
+        }
+    }
+
+    async isSessionExpired(): Promise<boolean> {
+        const lastActive = await this.getLastSessionActivity();
+        if (!lastActive) {
+            return false;
+        }
+
+        return Date.now() - lastActive.getTime() > SESSION_MAX_INACTIVE_MS;
+    }
+
+    async hasActiveSession(): Promise<boolean> {
+        const token = await this.getToken();
+        if (!token) {
+            return false;
+        }
+
+        const expired = await this.isSessionExpired();
+        if (expired) {
+            await this.clearTokens();
+            return false;
+        }
+
+        const lastActive = await this.getLastSessionActivity();
+        if (!lastActive) {
+            await this.touchSession();
+        }
+
+        return true;
     }
 
     /**
@@ -948,8 +1005,7 @@ class ApiClient {
      * Check if user is authenticated
      */
     async isAuthenticated(): Promise<boolean> {
-        const token = await this.getToken();
-        return !!token;
+        return this.hasActiveSession();
     }
 
     /**
