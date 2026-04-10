@@ -70,7 +70,7 @@ const END_HOUR = 22; // 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
 const PIXELS_PER_HOUR = 240; // Taller rhythm so cards can breathe and align with the grid
 const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
-const MIN_APPOINTMENT_HEIGHT = 120;
+const MIN_APPOINTMENT_HEIGHT = 192;
 const MIN_BREAK_HEIGHT = 72;
 
 export function CalendarView({
@@ -111,6 +111,33 @@ export function CalendarView({
     }, 60000); // Update every minute
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!openNoteAppointmentId) {
+      return;
+    }
+
+    const handleDocumentPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) {
+        return;
+      }
+
+      if (target.closest('[data-note-trigger="true"]') || target.closest('[data-note-panel="true"]')) {
+        return;
+      }
+
+      setOpenNoteAppointmentId(null);
+    };
+
+    document.addEventListener('mousedown', handleDocumentPointerDown);
+    document.addEventListener('touchstart', handleDocumentPointerDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentPointerDown);
+      document.removeEventListener('touchstart', handleDocumentPointerDown);
+    };
+  }, [openNoteAppointmentId]);
 
   // Filter appointments for selected date
   // Use local date comparison to avoid timezone issues
@@ -727,7 +754,8 @@ export function CalendarView({
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
 
                         const style = getAppointmentStyle(appointment);
-                        const minHeight = Math.max(parseFloat(style.height as string), MIN_APPOINTMENT_HEIGHT);
+                        const contentHeight = MIN_APPOINTMENT_HEIGHT + (appointment.notes?.trim() ? 8 : 0);
+                        const minHeight = Math.max(parseFloat(style.height as string), contentHeight);
                         const userInitials = appointment.user
                           ? `${appointment.user.firstName?.[0] || ''}${appointment.user.lastName?.[0] || ''}`.toUpperCase() || '?'
                           : '?';
@@ -747,7 +775,9 @@ export function CalendarView({
                             <div className="flex h-full flex-col overflow-hidden rounded-2xl">
                               <div className="flex flex-shrink-0 items-center justify-between gap-3 bg-black/25 px-4 py-3">
                                 <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold leading-tight">{serviceName}</div>
+                                  <div className="break-words text-sm font-semibold leading-tight">
+                                    {serviceName}
+                                  </div>
                                 </div>
                                 {hasCustomerSelectedStaff && (
                                   <span
@@ -808,6 +838,7 @@ export function CalendarView({
                                         {hasBookingNote && (
                                           <button
                                             type="button"
+                                            data-note-trigger="true"
                                             className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20 transition hover:bg-white/30"
                                             title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
                                             onClick={(event) => {
@@ -867,11 +898,23 @@ export function CalendarView({
 
                               {isNoteOpen && appointment.notes ? (
                                 <div
+                                  data-note-panel="true"
                                   className={`absolute top-16 z-30 w-56 rounded-2xl bg-white px-3 py-2 text-xs text-slate-700 shadow-xl ring-1 ring-slate-200 ${isRTL ? 'left-3' : 'right-3'}`}
                                   onClick={(event) => event.stopPropagation()}
                                 >
-                                  <div className="mb-1 font-semibold text-slate-900">
-                                    {locale === 'ar' ? 'ملاحظة العميل' : 'Customer note'}
+                                  <div className="mb-1 flex items-start justify-between gap-2 font-semibold text-slate-900">
+                                    <span>{locale === 'ar' ? 'ملاحظة العميل' : 'Customer note'}</span>
+                                    <button
+                                      type="button"
+                                      className="rounded-full px-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                                      aria-label={locale === 'ar' ? 'إغلاق الملاحظة' : 'Close note'}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setOpenNoteAppointmentId(null);
+                                      }}
+                                    >
+                                      ×
+                                    </button>
                                   </div>
                                   <div className="whitespace-pre-wrap leading-relaxed">{appointment.notes}</div>
                                 </div>
