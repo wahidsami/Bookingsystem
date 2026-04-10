@@ -830,10 +830,11 @@ class ApiClient {
      */
     async request(
         endpoint: string,
-        options: RequestInit = {}
+        options: RequestInit & { timeoutMs?: number } = {}
     ): Promise<Response> {
         const token = await this.getToken();
         const url = `${this.baseURL}${endpoint}`;
+        const { timeoutMs, ...requestOptions } = options;
 
         // Add auth header if token exists
         const headers: Record<string, string> = {
@@ -843,7 +844,7 @@ class ApiClient {
         headers['Accept'] = headers['Accept'] || 'application/json';
 
         // Don't set Content-Type for FormData - browser will set it with boundary
-        if (!(options.body instanceof FormData)) {
+        if (!(requestOptions.body instanceof FormData)) {
             headers['Content-Type'] = 'application/json';
         }
 
@@ -853,9 +854,9 @@ class ApiClient {
 
         // Make request
         let response = await this.fetchWithTimeout(url, {
-            ...options,
+            ...requestOptions,
             headers,
-        });
+        }, timeoutMs);
 
         // If 401, try to refresh token and retry once
         if (response.status === 401 && token) {
@@ -864,9 +865,9 @@ class ApiClient {
                 // Retry with new token
                 headers['Authorization'] = `Bearer ${newToken}`;
                 response = await this.fetchWithTimeout(url, {
-                    ...options,
+                    ...requestOptions,
                     headers,
-                });
+                }, timeoutMs);
             } else {
                 // Refresh failed, clear tokens
                 await this.clearTokens();
@@ -879,8 +880,8 @@ class ApiClient {
     /**
      * GET request
      */
-    async get<T>(endpoint: string): Promise<T> {
-        const response = await this.request(endpoint, { method: 'GET' });
+    async get<T>(endpoint: string, options: { timeoutMs?: number } = {}): Promise<T> {
+        const response = await this.request(endpoint, { method: 'GET', ...options });
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: 'Request failed' }));
@@ -893,7 +894,7 @@ class ApiClient {
     /**
      * POST request
      */
-    async post<T>(endpoint: string, data?: any, options?: RequestInit): Promise<T> {
+    async post<T>(endpoint: string, data?: any, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
         // Check if data is FormData
         const isFormData = data instanceof FormData;
 
@@ -914,10 +915,11 @@ class ApiClient {
     /**
      * PUT request
      */
-    async put<T>(endpoint: string, data?: any): Promise<T> {
+    async put<T>(endpoint: string, data?: any, options?: { timeoutMs?: number }): Promise<T> {
         const response = await this.request(endpoint, {
             method: 'PUT',
             body: data ? JSON.stringify(data) : undefined,
+            ...options,
         });
 
         if (!response.ok) {
@@ -931,10 +933,11 @@ class ApiClient {
     /**
      * PATCH request
      */
-    async patch<T>(endpoint: string, data?: any): Promise<T> {
+    async patch<T>(endpoint: string, data?: any, options?: { timeoutMs?: number }): Promise<T> {
         const response = await this.request(endpoint, {
             method: 'PATCH',
             body: data ? JSON.stringify(data) : undefined,
+            ...options,
         });
 
         if (!response.ok) {
@@ -948,8 +951,8 @@ class ApiClient {
     /**
      * DELETE request
      */
-    async delete<T>(endpoint: string): Promise<T> {
-        const response = await this.request(endpoint, { method: 'DELETE' });
+    async delete<T>(endpoint: string, options: { timeoutMs?: number } = {}): Promise<T> {
+        const response = await this.request(endpoint, { method: 'DELETE', ...options });
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: 'Request failed' }));

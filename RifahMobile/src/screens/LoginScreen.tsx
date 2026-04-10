@@ -32,6 +32,8 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
+    const [connectionMessage, setConnectionMessage] = useState('');
+    const [testingConnection, setTestingConnection] = useState(false);
 
     const validateEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,6 +42,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
 
     const handleLogin = async () => {
         setError('');
+        setConnectionMessage('');
 
         // Validation
         if (!email.trim()) {
@@ -70,7 +73,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                 accessToken: string;
                 refreshToken: string;
                 user: any;
-            }>('/auth/user/login', loginData);
+            }>('/auth/user/login', loginData, { timeoutMs: 30000 });
 
             if (response.success && response.accessToken) {
                 // Store tokens and user data
@@ -82,9 +85,52 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
             }
         } catch (err: any) {
             console.error('Login error:', err);
-            setError(err.message || 'Login failed. Please try again.');
+            const message = err?.message || 'Login failed. Please try again.';
+            const normalizedMessage = `${message}`.toLowerCase();
+
+            if (normalizedMessage.includes('aborted') || normalizedMessage.includes('timed out')) {
+                const probe = await api.testConnection();
+                if (probe.ok) {
+                    setConnectionMessage(`${t('loginTimedOutHint')} ${probe.url}`);
+                } else {
+                    setConnectionMessage(`API check failed at ${probe.url}${probe.status ? ` (HTTP ${probe.status})` : ''}${probe.message ? ` - ${probe.message}` : ''}`);
+                }
+
+                setError(`${t('loginTimedOut')}. ${t('loginTimedOutMessage')}`);
+                return;
+            }
+
+            if (/network request failed/i.test(message)) {
+                const probe = await api.testConnection();
+
+                if (probe.ok) {
+                    setConnectionMessage(`API GET succeeded at ${probe.url}. This build can reach the server, but the login POST still failed.`);
+                    setError('Network request failed during login. Please install the latest APK and try again.');
+                } else {
+                    setConnectionMessage(`API check failed at ${probe.url}${probe.status ? ` (HTTP ${probe.status})` : ''}${probe.message ? ` - ${probe.message}` : ''}`);
+                    setError(message);
+                }
+            } else {
+                setError(message);
+            }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTestConnection = async () => {
+        setTestingConnection(true);
+        setConnectionMessage('');
+
+        try {
+            const probe = await api.testConnection();
+            if (probe.ok) {
+                setConnectionMessage(`API connection OK: ${probe.url} (HTTP ${probe.status})`);
+            } else {
+                setConnectionMessage(`API connection failed: ${probe.url}${probe.status ? ` (HTTP ${probe.status})` : ''}${probe.message ? ` - ${probe.message}` : ''}`);
+            }
+        } finally {
+            setTestingConnection(false);
         }
     };
 
@@ -136,6 +182,12 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     </View>
                 ) : null}
 
+                {connectionMessage ? (
+                    <View style={styles.connectionContainer}>
+                        <Text style={styles.connectionText}>{connectionMessage}</Text>
+                    </View>
+                ) : null}
+
                 {/* Form */}
                 <View style={styles.form}>
                     {/* Email */}
@@ -182,6 +234,18 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     <TouchableOpacity style={styles.forgotPasswordButton} onPress={onForgotPassword}>
                         <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.connectionButton}
+                        onPress={handleTestConnection}
+                        disabled={testingConnection || loading}
+                    >
+                        <Text style={styles.connectionButtonText}>
+                            {testingConnection ? 'Testing connection...' : 'Test API connection'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.apiUrlText}>{api.getBaseUrl()}</Text>
 
                     {/* Login Button */}
                     <TouchableOpacity
@@ -267,6 +331,19 @@ const styles = StyleSheet.create({
         color: '#DC2626',
         fontSize: fontSize.sm,
     },
+    connectionContainer: {
+        backgroundColor: '#EEF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        borderRadius: borderRadius.md,
+        padding: spacing.md,
+        marginBottom: spacing.lg,
+    },
+    connectionText: {
+        color: colors.text,
+        fontSize: fontSize.sm,
+        textAlign: 'center',
+    },
     form: {
         flex: 1,
     },
@@ -316,6 +393,21 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontSize: fontSize.sm,
         fontWeight: '600',
+    },
+    connectionButton: {
+        alignSelf: 'center',
+        marginBottom: spacing.sm,
+    },
+    connectionButtonText: {
+        color: colors.primary,
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+    },
+    apiUrlText: {
+        color: colors.textSecondary,
+        fontSize: fontSize.xs,
+        textAlign: 'center',
+        marginBottom: spacing.lg,
     },
     loginButton: {
         backgroundColor: colors.primary,
