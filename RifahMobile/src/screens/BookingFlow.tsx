@@ -118,6 +118,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 serviceId: service.id,
                 tenantId: tenant.id,
                 staffId: selectedTime.staffId || selectedStaff?.id || undefined,
+                requestedStaffId: selectedStaff?.id || undefined,
                 startTime: selectedTime.startTime,
                 notes: bookingNote.trim() || undefined,
             });

@@ -63,6 +63,24 @@ function buildDateRangeWhere(field, startDate, endDate) {
     };
 }
 
+function parseBoardDate(value) {
+    if (!value || typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+    }
+
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildBreakDateTime(date, timeValue) {
+    if (!date || !timeValue) {
+        return null;
+    }
+
+    const safeTime = `${timeValue}`.slice(0, 8);
+    return `${date}T${safeTime}`;
+}
+
 /**
  * Get all appointments for the authenticated tenant
  * GET /api/v1/tenant/appointments
@@ -228,6 +246,164 @@ exports.getCalendarAppointments = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch calendar appointments',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get appointments board data for a single day.
+ * Includes appointments plus resolved employee breaks for the same date.
+ * GET /api/v1/tenant/appointments/board
+ */
+exports.getAppointmentsBoard = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const {
+            date,
+            staffId,
+            serviceId,
+            status,
+            paymentStatus
+        } = req.query;
+
+        const selectedDate = parseBoardDate(date);
+        if (!selectedDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'A valid date (YYYY-MM-DD) is required'
+            });
+        }
+
+        const dateKey = date;
+        const dayStart = new Date(`${dateKey}T00:00:00`);
+        const dayEnd = new Date(`${dateKey}T23:59:59.999`);
+        const dayOfWeek = selectedDate.getDay();
+
+        const appointmentWhere = {
+            startTime: {
+                [Op.between]: [dayStart, dayEnd]
+            }
+        };
+
+        if (staffId) {
+            appointmentWhere.staffId = staffId;
+        }
+
+        if (serviceId) {
+            appointmentWhere.serviceId = serviceId;
+        }
+
+        if (status) {
+            appointmentWhere.status = status;
+        }
+
+        if (paymentStatus) {
+            appointmentWhere.paymentStatus = paymentStatus;
+        }
+
+        const appointments = await db.Appointment.findAll({
+            where: appointmentWhere,
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    where: { tenantId },
+                    attributes: ['id', 'name_en', 'name_ar', 'duration', 'category', 'image'],
+                    required: true
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    where: { tenantId },
+                    attributes: ['id', 'name', 'photo', 'phone', 'email'],
+                    required: true
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
+                    required: false
+                }
+            ],
+            order: [['startTime', 'ASC']]
+        });
+
+        const activeStaffWhere = {
+            tenantId,
+            isActive: true
+        };
+
+        if (staffId) {
+            activeStaffWhere.id = staffId;
+        }
+
+        const boardStaff = await db.Staff.findAll({
+            where: activeStaffWhere,
+            attributes: ['id']
+        });
+
+        const boardStaffIds = boardStaff.map((staffMember) => staffMember.id);
+        let breaks = [];
+
+        if (boardStaffIds.length > 0) {
+            breaks = await db.StaffBreak.findAll({
+                where: {
+                    staffId: { [Op.in]: boardStaffIds },
+                    isActive: true,
+                    [Op.or]: [
+                        {
+                            isRecurring: false,
+                            specificDate: dateKey
+                        },
+                        {
+                            isRecurring: true,
+                            dayOfWeek,
+                            [Op.and]: [
+                                {
+                                    [Op.or]: [
+                                        { startDate: null },
+                                        { startDate: { [Op.lte]: dateKey } }
+                                    ]
+                                },
+                                {
+                                    [Op.or]: [
+                                        { endDate: null },
+                                        { endDate: { [Op.gte]: dateKey } }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                order: [['startTime', 'ASC']]
+            });
+        }
+
+        const mappedBreaks = breaks.map((breakRecord) => ({
+            id: breakRecord.id,
+            staffId: breakRecord.staffId,
+            type: breakRecord.type,
+            label: breakRecord.label,
+            isRecurring: breakRecord.isRecurring,
+            specificDate: breakRecord.specificDate,
+            startTime: breakRecord.startTime,
+            endTime: breakRecord.endTime,
+            startDateTime: buildBreakDateTime(dateKey, breakRecord.startTime),
+            endDateTime: buildBreakDateTime(dateKey, breakRecord.endTime)
+        }));
+
+        res.json({
+            success: true,
+            date: dateKey,
+            appointments,
+            breaks: mappedBreaks
+        });
+    } catch (error) {
+        console.error('Get appointments board error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch appointments board',
             error: error.message
         });
     }
@@ -676,6 +852,11 @@ exports.rescheduleAppointment = async (req, res) => {
                 success: false,
                 message: 'Selected time slot is no longer available'
             });
+        }
+
+        if (staffId) {
+            appointment.requestedStaffId = staffId;
+            appointment.assignmentMode = 'tenant_reassigned';
         }
 
         appointment.staffId = requestedStaffId;

@@ -442,6 +442,39 @@ const ensureStaffSchema = async () => {
     }
 };
 
+const ensureAppointmentSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'appointments'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "requestedStaffId" UUID;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "assignmentMode" VARCHAR(32) NOT NULL DEFAULT 'unknown';
+
+                UPDATE public.appointments
+                SET "assignmentMode" = 'unknown'
+                WHERE "assignmentMode" IS NULL
+                   OR "assignmentMode" NOT IN ('unknown', 'customer_selected', 'auto_assigned', 'tenant_reassigned');
+            END $$;
+        `);
+
+        console.log('Appointment schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure appointment schema:', error);
+        throw error;
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -508,6 +541,7 @@ const startServer = async () => {
             console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
         }
         await db.Appointment.sync({ force: false });
+        await ensureAppointmentSchema();
         await db.Review.sync({ force: false }); // Customer reviews
         await db.CustomerInsight.sync({ force: false });
         await db.Transaction.sync({ force: false });

@@ -881,6 +881,7 @@ exports.createPublicBooking = async (req, res) => {
         const appointment = await bookingService.createBooking({
             serviceId,
             staffId: staffId || null, // null = "Any Staff"
+            requestedStaffId: staffId || null,
             platformUserId: platformUser.id,
             tenantId,
             startTime: startTime.toISOString()

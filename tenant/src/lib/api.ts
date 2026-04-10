@@ -1061,6 +1061,23 @@ class TenantApiClient {
     return this.get(`/tenant/appointments/calendar${query ? `?${query}` : ''}`);
   }
 
+  async getAppointmentsBoard(params: {
+    date: string;
+    staffId?: string;
+    serviceId?: string;
+    status?: string;
+    paymentStatus?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('date', params.date);
+    if (params.staffId) queryParams.append('staffId', params.staffId);
+    if (params.serviceId) queryParams.append('serviceId', params.serviceId);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.paymentStatus) queryParams.append('paymentStatus', params.paymentStatus);
+    const query = queryParams.toString();
+    return this.get(`/tenant/appointments/board?${query}`);
+  }
+
   async getAppointment(id: string): Promise<any> {
     return this.get(`/tenant/appointments/${id}`);
   }

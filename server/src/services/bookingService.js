@@ -34,7 +34,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, staffId, platformUserId, tenantId, startTime, notes } = data;
+        const { serviceId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -86,7 +86,10 @@ class BookingService {
         const maxBookingsPerCustomerPerDay = bookingSettings.maxBookingsPerCustomerPerDay || null;
 
         // Handle "Any Staff" selection
-        let finalStaffId = staffId;
+        const normalizedRequestedStaffId = requestedStaffId || null;
+        const customerSelectedSpecificStaff = Boolean(normalizedRequestedStaffId);
+        let finalStaffId = staffId || normalizedRequestedStaffId;
+
         if (!finalStaffId) {
             // Check if "Any Staff" is allowed
             if (!allowAnyStaff) {
@@ -186,10 +189,12 @@ class BookingService {
             const appointment = await db.Appointment.create({
                 serviceId,
                 staffId: finalStaffId,
+                requestedStaffId: customerSelectedSpecificStaff ? normalizedRequestedStaffId : null,
                 platformUserId,
                 tenantId, // Store tenantId for faster queries
                 startTime: start,
                 endTime: end,
+                assignmentMode: customerSelectedSpecificStaff ? 'customer_selected' : 'auto_assigned',
                 price: pricing.price,
                 rawPrice: pricing.rawPrice,
                 taxAmount: pricing.taxAmount,
@@ -332,24 +337,69 @@ class BookingService {
         }
 
         const start = new Date(startTime);
-        const service = await db.Service.findByPk(serviceId, { transaction: transaction });
-        const duration = service.duration || 30;
-        const end = new Date(start.getTime() + duration * 60000);
-
-        // Check availability for each staff member
-        // Sort by rating (best first) for better assignment
-        const sortedStaff = staffMembers.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-
-        for (const staff of sortedStaff) {
-            const hasConflict = await this.hasConflict(staff.id, start, end, null, transaction);
-            if (!hasConflict) {
-                // Return first available staff (sorted by rating)
-                // TODO: Enhance with workload balance, customer history, etc.
-                return staff.id;
-            }
+        if (Number.isNaN(start.getTime())) {
+            return null;
         }
 
-        return null;
+        const availabilityService = require('./availabilityService');
+        const date = start.toISOString().split('T')[0];
+        const requestedTimestamp = start.getTime();
+
+        const candidateResults = await Promise.all(staffMembers.map(async (staff) => {
+            try {
+                const result = await availabilityService.getAvailableSlots(tenantId, {
+                    serviceId,
+                    staffId: staff.id,
+                    date
+                });
+
+                const matchingSlot = (result.slots || []).find((slot) => {
+                    const slotStart = new Date(slot.startTime);
+                    return slot.available && !Number.isNaN(slotStart.getTime()) && slotStart.getTime() === requestedTimestamp;
+                });
+
+                if (!matchingSlot) {
+                    return null;
+                }
+
+                const dayStart = new Date(start);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(start);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                const workload = await db.Appointment.count({
+                    where: {
+                        staffId: staff.id,
+                        status: { [Op.notIn]: ['cancelled', 'no_show'] },
+                        startTime: { [Op.between]: [dayStart, dayEnd] }
+                    },
+                    transaction
+                });
+
+                return {
+                    staff,
+                    workload
+                };
+            } catch (error) {
+                return null;
+            }
+        }));
+
+        const candidates = candidateResults.filter(Boolean);
+
+        if (candidates.length === 0) {
+            return null;
+        }
+
+        candidates.sort((a, b) => {
+            if (a.workload !== b.workload) {
+                return a.workload - b.workload;
+            }
+
+            return (b.staff.rating || 0) - (a.staff.rating || 0);
+        });
+
+        return candidates[0].staff.id;
     }
 
     /**

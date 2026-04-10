@@ -122,6 +122,15 @@ module.exports = (sequelize, DataTypes) => {
                 key: 'id'
             }
         },
+        requestedStaffId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'staff',
+                key: 'id'
+            },
+            comment: 'Staff explicitly chosen by the customer. Null means any available staff.'
+        },
         platformUserId: {
             type: DataTypes.UUID,
             allowNull: true, // Nullable for migration period
@@ -166,6 +175,15 @@ module.exports = (sequelize, DataTypes) => {
                 'no_show'
             ),
             defaultValue: 'pending'
+        },
+        assignmentMode: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: 'unknown',
+            validate: {
+                isIn: [['unknown', 'customer_selected', 'auto_assigned', 'tenant_reassigned']]
+            },
+            comment: 'Tracks how the assigned staff member was chosen'
         },
         price: {
             type: DataTypes.DECIMAL(10, 2),
@@ -281,6 +299,10 @@ module.exports = (sequelize, DataTypes) => {
             {
                 fields: ['staffId', 'startTime'],
                 name: 'idx_staff_start_time'
+            },
+            {
+                fields: ['requestedStaffId'],
+                name: 'idx_requested_staff'
             },
             {
                 fields: ['startTime', 'endTime'],

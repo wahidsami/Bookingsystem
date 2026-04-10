@@ -46,9 +46,23 @@ interface Appointment {
   employeeCommission?: number;
   remainderAmount?: number;
   notes?: string;
+  paymentMethod?: string | null;
+  requestedStaffId?: string | null;
+  assignmentMode?: 'unknown' | 'customer_selected' | 'auto_assigned' | 'tenant_reassigned';
   service: Service;
   staff: Employee;
   user?: User;
+}
+
+interface EmployeeBreak {
+  id: string;
+  staffId: string;
+  type: string;
+  label?: string | null;
+  startTime: string;
+  endTime: string;
+  startDateTime?: string | null;
+  endDateTime?: string | null;
 }
 
 export default function AppointmentsPage() {
@@ -60,6 +74,7 @@ export default function AppointmentsPage() {
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [breaks, setBreaks] = useState<EmployeeBreak[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState("");
@@ -80,7 +95,7 @@ export default function AppointmentsPage() {
   const [filterServiceId, setFilterServiceId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -89,23 +104,13 @@ export default function AppointmentsPage() {
   }, []);
 
   useEffect(() => {
-    loadAppointments();
-  }, [startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
-
-  // When calendar view is selected, adjust date range to selected date
-  // Use local date to avoid timezone issues
-  // Set endDate to end of day to ensure we get all appointments for that day
-  useEffect(() => {
     if (viewMode === 'calendar') {
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      setStartDate(dateStr);
-      // Use date-only for endDate so HTML date inputs get valid yyyy-MM-dd (same day range)
-      setEndDate(dateStr);
+      loadAppointmentsBoard();
+      return;
     }
-  }, [viewMode, selectedDate]);
+
+    loadAppointments();
+  }, [viewMode, selectedDate, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
 
   const loadServices = async () => {
     try {
@@ -148,11 +153,44 @@ export default function AppointmentsPage() {
 
       if (response.success) {
         setAppointments(response.appointments || []);
+        setBreaks([]);
       } else {
         setError(response.message || t("loadError"));
       }
     } catch (err: any) {
       console.error("Failed to load appointments:", err);
+      setError(err.message || t("loadError"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAppointmentsBoard = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const date = `${year}-${month}-${day}`;
+
+      const response = await tenantApi.getAppointmentsBoard({
+        date,
+        staffId: filterStaffId || undefined,
+        serviceId: filterServiceId || undefined,
+        status: filterStatus || undefined,
+        paymentStatus: filterPaymentStatus || undefined
+      });
+
+      if (response.success) {
+        setAppointments(response.appointments || []);
+        setBreaks(response.breaks || []);
+      } else {
+        setError(response.message || t("loadError"));
+      }
+    } catch (err: any) {
+      console.error("Failed to load appointments board:", err);
       setError(err.message || t("loadError"));
     } finally {
       setLoading(false);
@@ -389,7 +427,7 @@ export default function AppointmentsPage() {
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="mt-4 text-gray-600">{t("loading")}</p>
         </div>
-      ) : appointments.length === 0 ? (
+      ) : viewMode === 'list' && appointments.length === 0 ? (
         <div className="card text-center py-12">
           <div className="text-6xl mb-4">📅</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noAppointments")}</h3>
@@ -513,6 +551,7 @@ export default function AppointmentsPage() {
         /* Calendar View */
         <CalendarView
           appointments={appointments}
+          breaks={breaks}
           employees={employees}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}

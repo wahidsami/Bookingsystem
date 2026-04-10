@@ -19,6 +19,9 @@ interface Appointment {
     | 'partially_refunded';
   price: number;
   notes?: string;
+  paymentMethod?: string | null;
+  requestedStaffId?: string | null;
+  assignmentMode?: 'unknown' | 'customer_selected' | 'auto_assigned' | 'tenant_reassigned';
   service: {
     id: string;
     name_en: string;
@@ -39,8 +42,20 @@ interface Appointment {
   };
 }
 
+interface EmployeeBreak {
+  id: string;
+  staffId: string;
+  type: string;
+  label?: string | null;
+  startTime: string;
+  endTime: string;
+  startDateTime?: string | null;
+  endDateTime?: string | null;
+}
+
 interface CalendarViewProps {
   appointments: Appointment[];
+  breaks?: EmployeeBreak[];
   employees: Array<{ id: string; name: string; photo?: string }>;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
@@ -58,6 +73,7 @@ const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60; // 1px per minute
 
 export function CalendarView({
   appointments,
+  breaks = [],
   employees,
   selectedDate,
   onDateChange,
@@ -71,6 +87,19 @@ export function CalendarView({
   const [visibleStaffIds, setVisibleStaffIds] = useState<Set<string>>(
     new Set(employees.map(emp => emp.id))
   );
+
+  useEffect(() => {
+    setVisibleStaffIds((previous) => {
+      const nextIds = employees.map((employee) => employee.id);
+
+      if (nextIds.length === 0) {
+        return new Set();
+      }
+
+      const retained = nextIds.filter((id) => previous.has(id));
+      return new Set(retained.length > 0 ? retained : nextIds);
+    });
+  }, [employees]);
 
   // Update current time every minute
   useEffect(() => {
@@ -98,6 +127,21 @@ export function CalendarView({
              aptDay === selectedDay;
     });
   }, [appointments, selectedDate]);
+
+  const dayBreaks = useMemo(() => {
+    return breaks.filter((breakItem) => {
+      if (!breakItem.startDateTime) {
+        return true;
+      }
+
+      const breakDate = new Date(breakItem.startDateTime);
+      return (
+        breakDate.getFullYear() === selectedDate.getFullYear() &&
+        breakDate.getMonth() === selectedDate.getMonth() &&
+        breakDate.getDate() === selectedDate.getDate()
+      );
+    });
+  }, [breaks, selectedDate]);
 
   // Filter visible staff
   const visibleStaff = useMemo(() => {
@@ -156,8 +200,35 @@ export function CalendarView({
     };
   };
 
+  const getBreakStyle = (breakItem: EmployeeBreak) => {
+    const startParts = `${breakItem.startTime}`.split(':').map((value) => parseInt(value, 10));
+    const endParts = `${breakItem.endTime}`.split(':').map((value) => parseInt(value, 10));
+
+    const startHour = startParts[0] || 0;
+    const startMinute = startParts[1] || 0;
+    const endHour = endParts[0] || 0;
+    const endMinute = endParts[1] || 0;
+
+    const top = (startHour - START_HOUR) * PIXELS_PER_HOUR + startMinute * PIXELS_PER_MINUTE;
+    const duration = (endHour - startHour) * 60 + (endMinute - startMinute);
+    const height = duration * PIXELS_PER_MINUTE;
+
+    return {
+      top: `${top}px`,
+      height: `${Math.max(height, 28)}px`,
+      position: 'absolute' as const,
+      width: 'calc(100% - 12px)',
+      left: '6px',
+      right: '6px'
+    };
+  };
+
   // Get appointment color based on status
   const getAppointmentColor = (appointment: Appointment) => {
+    if (appointment.assignmentMode === 'auto_assigned') {
+      return 'bg-slate-500 hover:bg-slate-600';
+    }
+
     switch (appointment.status) {
       case 'confirmed':
         return 'bg-purple-500';
@@ -197,6 +268,34 @@ export function CalendarView({
       default:
         return status;
     }
+  };
+
+  const getPaymentBadgeLabel = (appointment: Appointment) => {
+    if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
+      return locale === 'ar' ? 'مدفوع' : 'Paid';
+    }
+
+    if (appointment.paymentStatus === 'deposit_paid') {
+      return locale === 'ar' ? 'عربون' : 'Deposit';
+    }
+
+    return locale === 'ar' ? 'معلّق' : 'Pending';
+  };
+
+  const getBreakLabel = (breakItem: EmployeeBreak) => {
+    if (breakItem.label?.trim()) {
+      return breakItem.label.trim();
+    }
+
+    const labels: Record<string, { ar: string; en: string }> = {
+      lunch: { ar: 'استراحة', en: 'Break' },
+      prayer: { ar: 'صلاة', en: 'Prayer' },
+      cleaning: { ar: 'تنظيف', en: 'Cleaning' },
+      other: { ar: 'استراحة', en: 'Break' }
+    };
+
+    const resolved = labels[breakItem.type] || labels.other;
+    return locale === 'ar' ? resolved.ar : resolved.en;
   };
 
   // Calculate current time position
@@ -374,12 +473,15 @@ export function CalendarView({
                 const staffAppointments = dayAppointments.filter(
                   apt => apt.staff.id === staff.id
                 );
+                const staffBreaks = dayBreaks.filter(
+                  breakItem => breakItem.staffId === staff.id
+                );
 
                 return (
                   <div
                     key={staff.id}
                     className="flex-shrink-0 border-r border-gray-200"
-                    style={{ minWidth: '180px', width: '180px' }}
+                    style={{ minWidth: '240px', width: '240px' }}
                   >
                     {/* Staff Header */}
                     <div className="h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
@@ -452,10 +554,30 @@ export function CalendarView({
                       )}
 
                       {/* Appointment Blocks */}
+                      {staffBreaks.map((breakItem) => {
+                        const breakStyle = getBreakStyle(breakItem);
+                        const startLabel = `${breakItem.startTime}`.slice(0, 5);
+                        const endLabel = `${breakItem.endTime}`.slice(0, 5);
+
+                        return (
+                          <div
+                            key={`break-${breakItem.id}`}
+                            className="absolute z-[1] rounded-xl border border-rose-200 bg-rose-100/90 px-3 py-2 text-rose-700 shadow-sm"
+                            style={breakStyle}
+                            title={`${getBreakLabel(breakItem)} • ${startLabel} - ${endLabel}`}
+                          >
+                            <div className="flex items-center justify-between gap-2 text-xs font-semibold">
+                              <span className="truncate">{getBreakLabel(breakItem)}</span>
+                              <span className="whitespace-nowrap opacity-80">{startLabel} - {endLabel}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
                       {staffAppointments.map(appointment => {
-                        const userName = appointment.user
-                          ? `${appointment.user.firstName} ${appointment.user.lastName}`.trim()
-                          : t('unknownCustomer');
+                        const customerFirstName = appointment.user?.firstName?.trim()
+                          || appointment.user?.lastName?.trim()
+                          || t('unknownCustomer');
                         const serviceName = locale === 'ar' 
                           ? appointment.service.name_ar 
                           : appointment.service.name_en;
@@ -468,18 +590,19 @@ export function CalendarView({
                         const userInitials = appointment.user
                           ? `${appointment.user.firstName?.[0] || ''}${appointment.user.lastName?.[0] || ''}`.toUpperCase() || '?'
                           : '?';
+                        const hasCustomerSelectedStaff = appointment.assignmentMode === 'customer_selected';
+                        const hasBookingNote = Boolean(appointment.notes?.trim());
                         
                         return (
                           <div
                             key={appointment.id}
                             onClick={() => handleAppointmentClick(appointment.id)}
-                            className={`${getAppointmentColor(appointment)} text-white rounded-lg cursor-pointer hover:opacity-90 transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/20`}
+                            className={`${getAppointmentColor(appointment)} z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/15`}
                             style={{ ...style, height: `${minHeight}px` }}
-                            title={`${userName} - ${serviceName} - ${timeLabel}`}
+                            title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                            <div className="p-2 h-full flex flex-col">
-                              {/* User Avatar and Name Row */}
-                              <div className="flex items-center gap-2 mb-1.5 flex-shrink-0">
+                            <div className="p-3 h-full flex flex-col">
+                              <div className="flex items-start gap-2 mb-2 flex-shrink-0">
                                 <div className="relative flex-shrink-0 w-6 h-6">
                                   {(() => {
                                     const userPhoto = appointment.user?.photo;
@@ -494,7 +617,7 @@ export function CalendarView({
                                         <>
                                           <img
                                             src={photoUrl}
-                                            alt={userName}
+                                            alt={customerFirstName}
                                             className="w-6 h-6 rounded-full object-cover border border-white/30 relative z-10"
                                             onError={(e) => {
                                               const img = e.currentTarget;
@@ -523,38 +646,70 @@ export function CalendarView({
                                   })()}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-semibold truncate leading-tight">{userName}</div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-sm font-semibold truncate leading-tight">{customerFirstName}</div>
+                                    <div className="flex items-center gap-1.5">
+                                      {hasCustomerSelectedStaff && (
+                                        <span
+                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20"
+                                          title={locale === 'ar' ? 'اختار الموظف بنفسه' : 'Customer selected a specific employee'}
+                                        >
+                                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81H7.03a1 1 0 00.951-.69l1.07-3.292z" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                      {hasBookingNote && (
+                                        <span
+                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20"
+                                          title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
+                                        >
+                                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z" clipRule="evenodd" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
 
                               {/* Service Name */}
-                              <div className="text-xs font-medium opacity-95 truncate leading-tight mb-1">
+                              <div className="text-sm font-medium opacity-95 truncate leading-tight mb-1">
                                 {serviceName}
                               </div>
 
                               {/* Time Range */}
-                              <div className="text-xs opacity-80 leading-tight flex items-center gap-1">
+                              <div className="text-xs opacity-85 leading-tight flex items-center gap-1.5">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {timeLabel}
                               </div>
 
-                              {/* Notes (if available and space permits) */}
-                              {appointment.notes && minHeight > 80 && (
-                                <div className="text-xs opacity-75 mt-1.5 flex items-start gap-1 leading-tight">
-                                  <span>💬</span>
-                                  <span className="line-clamp-2">{appointment.notes}</span>
+                              {appointment.notes && minHeight > 92 && (
+                                <div className="text-xs opacity-80 mt-2 leading-snug line-clamp-2">
+                                  {appointment.notes}
                                 </div>
                               )}
 
-                              {/* Status indicator dot */}
-                              <div className="mt-auto pt-1 flex items-center gap-1">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/60"></div>
-                                <span className="text-xs opacity-75 capitalize">
-                                  {getStatusLabel(appointment.status)}
+                              <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/70"></div>
+                                  <span className="text-xs opacity-80 capitalize">
+                                    {getStatusLabel(appointment.status)}
+                                  </span>
+                                </div>
+                                <span className="rounded-full bg-white/20 px-2 py-1 text-[11px] font-semibold">
+                                  {getPaymentBadgeLabel(appointment)}
                                 </span>
                               </div>
+
+                              {appointment.assignmentMode === 'auto_assigned' && minHeight > 84 && (
+                                <div className="pt-1 text-[11px] opacity-75">
+                                  {locale === 'ar' ? 'تم تعيينه تلقائياً' : 'Auto-assigned'}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );

@@ -100,7 +100,7 @@ const getRecommendations = async (req, res) => {
  */
 const createBooking = async (req, res) => {
     try {
-        const { serviceId, staffId, startTime, tenantId, notes } = req.body;
+        const { serviceId, staffId, requestedStaffId, startTime, tenantId, notes } = req.body;
         const platformUserId = req.userId; // From auth middleware
 
         // Validation
@@ -132,6 +132,7 @@ const createBooking = async (req, res) => {
         const appointment = await bookingService.createBooking({
             serviceId,
             staffId: staffId || null, // null = "Any Staff"
+            requestedStaffId: requestedStaffId || null,
             platformUserId,
             tenantId: finalTenantId,
             startTime,

@@ -125,6 +125,7 @@ router.delete('/services/:id', tenantServiceController.deleteService);
 // Appointment management
 router.get('/appointments', tenantAppointmentController.getAppointments);
 router.get('/appointments/calendar', tenantAppointmentController.getCalendarAppointments);
+router.get('/appointments/board', tenantAppointmentController.getAppointmentsBoard);
 router.get('/appointments/stats', tenantAppointmentController.getAppointmentStats);
 router.get('/appointments/:id', tenantAppointmentController.getAppointment);
 router.patch('/appointments/:id/status', tenantAppointmentController.updateAppointmentStatus);
