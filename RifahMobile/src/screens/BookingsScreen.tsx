@@ -14,7 +14,7 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, Booking, getImageUrl } from '../api/client';
+import { api, Booking, getBookingOutstandingAmount, getImageUrl } from '../api/client';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { GuestView } from '../components/GuestView';
@@ -175,7 +175,7 @@ export function BookingsScreen({ navigation }: any) {
                     <Text style={styles.bookingNumberLabel}>
                         {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(item)}
                     </Text>
-                    <Text style={styles.serviceName}>{isArabic ? item.Service?.name_ar : item.Service?.name_en}</Text>
+                    <Text style={styles.serviceName}>{getServiceName(item)}</Text>
                     <View style={styles.dateTimeRow}>
                         <Text style={styles.dateIcon}>📅</Text>
                         <Text style={styles.dateTimeText}>
@@ -198,15 +198,18 @@ export function BookingsScreen({ navigation }: any) {
 
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
-                    <Text style={styles.price}>{item.price} SAR</Text>
+                    <Text style={styles.price}>{Number(item.price || 0).toFixed(2)} SAR</Text>
                     <View style={styles.actions}>
                         {bookingNeedsPayment(item.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(item.status) && activeTab === 'upcoming' && (
                             <TouchableOpacity
                                 style={styles.payButton}
                                 onPress={() => (navigation as any).navigate('Payment', {
                                     appointmentId: item.id,
-                                    amount: Number(item.price),
-                                    tenantId: item.tenantId || item.tenant?.id
+                                    amount: getBookingOutstandingAmount(item),
+                                    tenantId: item.tenantId || item.tenant?.id,
+                                    paymentChoice: item.paymentStatus === 'pending' && item.paymentMethod === 'booking-fee'
+                                        ? 'booking-fee'
+                                        : undefined,
                                 })}
                             >
                                 <Text style={styles.payButtonText}>{t('payNow')}</Text>
@@ -375,7 +378,7 @@ export function BookingsScreen({ navigation }: any) {
                                     </View>
                                     <View style={styles.detailRow}>
                                         <Text style={styles.detailLabel}>{language === 'ar' ? 'السعر' : 'Amount'}</Text>
-                                        <Text style={styles.detailValue}>{selectedBooking.price} SAR</Text>
+                                        <Text style={styles.detailValue}>{Number(selectedBooking.price || 0).toFixed(2)} SAR</Text>
                                     </View>
                                     {selectedBooking.paymentMethod && (
                                         <View style={styles.detailRow}>

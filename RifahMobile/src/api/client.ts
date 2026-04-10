@@ -123,6 +123,14 @@ export interface Tenant {
         [key: string]: { open: string; close: string; isOpen: boolean };
     };
     isAvailable?: boolean;
+    paymentSettings?: {
+        allowServicePayAtCenter: boolean;
+        allowServiceFullOnline: boolean;
+        allowServiceDeposit: boolean;
+        serviceDepositMode: 'fixed' | 'percentage';
+        serviceDepositFixedAmount: number;
+        serviceDepositPercentage: number;
+    };
 }
 
 export interface Service {
@@ -182,6 +190,11 @@ export interface Booking {
     paymentStatus?: string;
     paymentMethod?: string;
     paidAt?: string;
+    depositAmount?: number;
+    depositPaid?: boolean;
+    remainderAmount?: number;
+    remainderPaid?: boolean;
+    totalPaid?: number;
     notes?: string;
     tenantId?: string;
     Service?: Service;
@@ -444,6 +457,14 @@ export const normalizeTenant = (tenant: Partial<Tenant> | null | undefined): Ten
     whatsappNumber: toOptionalString(tenant?.whatsappNumber),
     workingHours: tenant?.workingHours,
     isAvailable: toBoolean(tenant?.isAvailable),
+    paymentSettings: tenant?.paymentSettings ? {
+        allowServicePayAtCenter: toBoolean((tenant.paymentSettings as any).allowServicePayAtCenter, true),
+        allowServiceFullOnline: toBoolean((tenant.paymentSettings as any).allowServiceFullOnline, true),
+        allowServiceDeposit: toBoolean((tenant.paymentSettings as any).allowServiceDeposit, true),
+        serviceDepositMode: (tenant.paymentSettings as any).serviceDepositMode === 'percentage' ? 'percentage' : 'fixed',
+        serviceDepositFixedAmount: toNumber((tenant.paymentSettings as any).serviceDepositFixedAmount, 50),
+        serviceDepositPercentage: toNumber((tenant.paymentSettings as any).serviceDepositPercentage, 50),
+    } : undefined,
 });
 
 export const normalizeService = (service: Partial<Service> | null | undefined): Service => ({
@@ -515,6 +536,11 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
         paymentStatus: toOptionalString(appointment?.paymentStatus),
         paymentMethod: toOptionalString(appointment?.paymentMethod),
         paidAt: toOptionalString(appointment?.paidAt),
+        depositAmount: toNumber(appointment?.depositAmount),
+        depositPaid: toBoolean(appointment?.depositPaid),
+        remainderAmount: toNumber(appointment?.remainderAmount),
+        remainderPaid: toBoolean(appointment?.remainderPaid),
+        totalPaid: toNumber(appointment?.totalPaid),
         notes: toOptionalString(appointment?.notes),
         tenantId: toOptionalString(appointment?.tenantId),
         Service: normalizedService,
@@ -1123,6 +1149,7 @@ class ApiClient {
         cardholderName: string;
         saveCard?: boolean;
         tenantId?: string;
+        paymentChoice?: 'online-full' | 'booking-fee';
     }): Promise<{ success: boolean; transaction: any }> {
         return this.post<{ success: boolean; transaction: any }>('/payments/process', data);
     }
@@ -1239,6 +1266,25 @@ export const getServicePrice = (service: Partial<Service> | null | undefined): n
 
 export const bookingNeedsPayment = (paymentStatus?: string | null): boolean =>
     paymentStatus === 'pending' || paymentStatus === 'deposit_paid';
+
+export const getBookingOutstandingAmount = (booking: Partial<Booking> | null | undefined): number => {
+    if (!booking) {
+        return 0;
+    }
+
+    const totalPrice = toNumber(booking.price);
+    const totalPaid = toNumber(booking.totalPaid);
+    const remainingBalance = parseFloat(Math.max(0, totalPrice - totalPaid).toFixed(2));
+
+    if (booking.paymentStatus === 'pending'
+        && booking.paymentMethod === 'booking-fee'
+        && !toBoolean(booking.depositPaid)
+        && toNumber(booking.depositAmount) > 0) {
+        return toNumber(booking.depositAmount);
+    }
+
+    return remainingBalance;
+};
 
 export const orderNeedsPayment = (order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status'>): boolean =>
     order.paymentMethod === 'online' &&

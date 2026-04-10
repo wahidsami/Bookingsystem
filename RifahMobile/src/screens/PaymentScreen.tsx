@@ -18,7 +18,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 
 export function PaymentScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
-    const { appointmentId, orderId, amount, tenantId } = route.params || {};
+    const { appointmentId, orderId, amount, tenantId, paymentChoice } = route.params || {};
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [cardNumber, setCardNumber] = useState('');
@@ -44,6 +44,7 @@ export function PaymentScreen({ route, navigation }: any) {
                 cvv,
                 cardholderName,
                 tenantId,
+                paymentChoice,
             });
 
             if (response.success) {
@@ -86,8 +87,17 @@ export function PaymentScreen({ route, navigation }: any) {
 
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
                 <View style={styles.amountContainer}>
-                    <Text style={styles.amountLabel}>{t('totalAmount')}</Text>
+                    <Text style={styles.amountLabel}>
+                        {paymentChoice === 'booking-fee'
+                            ? (isRTL ? 'المبلغ المطلوب الآن' : 'Due Now')
+                            : t('totalAmount')}
+                    </Text>
                     <Text style={styles.amountValue}>{amount} SAR</Text>
+                    {paymentChoice === 'booking-fee' ? (
+                        <Text style={styles.amountHint}>
+                            {isRTL ? 'هذا هو عربون الحجز المطلوب لتأكيد الموعد.' : 'This is the booking fee required to confirm your appointment.'}
+                        </Text>
+                    ) : null}
                 </View>
 
                 {/* Virtual Card Tip */}
@@ -203,6 +213,12 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: '700',
         color: colors.primary,
+    },
+    amountHint: {
+        marginTop: spacing.sm,
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        textAlign: 'center',
     },
     testCardButton: {
         backgroundColor: '#F3E8FF',

@@ -9,7 +9,7 @@ const { handlePaymentError } = require('../utils/paymentErrorHandler');
  */
 const processPayment = async (req, res, next) => {
     try {
-        const { appointmentId, orderId, amount, cardNumber, expiryDate, cvv, cardholderName, saveCard, tenantId } = req.body;
+        const { appointmentId, orderId, amount, cardNumber, expiryDate, cvv, cardholderName, saveCard, tenantId, paymentChoice } = req.body;
         const platformUserId = req.userId;
 
         // Check authentication
@@ -73,7 +73,8 @@ const processPayment = async (req, res, next) => {
                 cvv,
                 cardholderName,
                 saveCard: saveCard || false,
-                tenantId
+                tenantId,
+                paymentChoice
             });
         }
 

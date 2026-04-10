@@ -16,6 +16,16 @@ interface BookingProps {
 }
 
 type BookingStep = 'staff' | 'datetime' | 'review';
+type ServicePaymentChoice = 'at-center' | 'online-full' | 'booking-fee';
+
+const DEFAULT_BOOKING_PAYMENT_SETTINGS = {
+    allowServicePayAtCenter: true,
+    allowServiceFullOnline: true,
+    allowServiceDeposit: true,
+    serviceDepositMode: 'fixed' as const,
+    serviceDepositFixedAmount: 50,
+    serviceDepositPercentage: 50,
+};
 
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
@@ -32,9 +42,15 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [selectedTime, setSelectedTime] = useState<SlotItem | null>(null);
     const [availableSlots, setAvailableSlots] = useState<SlotItem[]>([]);
     const [bookingNote, setBookingNote] = useState('');
+    const [paymentSettings, setPaymentSettings] = useState(tenant?.paymentSettings || DEFAULT_BOOKING_PAYMENT_SETTINGS);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServicePaymentChoice>('at-center');
 
     useEffect(() => {
         loadStaff();
+    }, []);
+
+    useEffect(() => {
+        loadPaymentSettings();
     }, []);
 
     useEffect(() => {
@@ -58,6 +74,98 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             setLoading(false);
         }
     };
+
+    const loadPaymentSettings = async () => {
+        if (tenant?.paymentSettings) {
+            setPaymentSettings({
+                ...DEFAULT_BOOKING_PAYMENT_SETTINGS,
+                ...tenant.paymentSettings,
+            });
+            return;
+        }
+
+        if (!tenant?.slug) {
+            setPaymentSettings(DEFAULT_BOOKING_PAYMENT_SETTINGS);
+            return;
+        }
+
+        try {
+            const response = await api.get<{ success: boolean; data: any }>(`/public/tenant/${tenant.slug}`);
+            if (response.success && response.data?.paymentSettings) {
+                setPaymentSettings({
+                    ...DEFAULT_BOOKING_PAYMENT_SETTINGS,
+                    ...response.data.paymentSettings,
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load payment settings:', error);
+            setPaymentSettings(DEFAULT_BOOKING_PAYMENT_SETTINGS);
+        }
+    };
+
+    useEffect(() => {
+        if (paymentSettings.allowServicePayAtCenter) {
+            setSelectedPaymentMethod((current) =>
+                current === 'at-center' || !current ? 'at-center' : current
+            );
+            return;
+        }
+
+        if (paymentSettings.allowServiceFullOnline) {
+            setSelectedPaymentMethod('online-full');
+            return;
+        }
+
+        if (paymentSettings.allowServiceDeposit) {
+            setSelectedPaymentMethod('booking-fee');
+        }
+    }, [
+        paymentSettings.allowServiceDeposit,
+        paymentSettings.allowServiceFullOnline,
+        paymentSettings.allowServicePayAtCenter,
+    ]);
+
+    const servicePrice = getServicePrice(service);
+    const bookingFeeAmount = paymentSettings.serviceDepositMode === 'percentage'
+        ? Math.min(servicePrice, parseFloat((servicePrice * (paymentSettings.serviceDepositPercentage / 100)).toFixed(2)))
+        : Math.min(servicePrice, paymentSettings.serviceDepositFixedAmount);
+    const payableNowAmount = selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : servicePrice;
+
+    const paymentOptions = [
+        paymentSettings.allowServicePayAtCenter ? {
+            id: 'at-center' as ServicePaymentChoice,
+            title: language === 'ar' ? 'الدفع عند الوصول' : 'Pay When You Arrive',
+            subtitle: language === 'ar'
+                ? 'احجز الآن وادفع في المركز عند حضور الموعد.'
+                : 'Book now and settle the amount at the center when you arrive.',
+            amountLabel: language === 'ar' ? 'يدفع لاحقاً' : 'Pay later',
+            icon: 'storefront-outline' as const,
+        } : null,
+        paymentSettings.allowServiceFullOnline ? {
+            id: 'online-full' as ServicePaymentChoice,
+            title: language === 'ar' ? 'الدفع الكامل الآن' : 'Pay In Full Now',
+            subtitle: language === 'ar'
+                ? 'ادفع كامل قيمة الخدمة الآن لتأكيد الحجز.'
+                : 'Pay the full service amount now to lock in your booking.',
+            amountLabel: `${servicePrice.toFixed(2)} SAR`,
+            icon: 'card-outline' as const,
+        } : null,
+        paymentSettings.allowServiceDeposit ? {
+            id: 'booking-fee' as ServicePaymentChoice,
+            title: language === 'ar' ? 'دفع عربون الحجز' : 'Pay Booking Fee',
+            subtitle: language === 'ar'
+                ? 'ادفع جزءاً من المبلغ الآن وأكمل الباقي عند المركز.'
+                : 'Pay a deposit now and settle the rest at the center.',
+            amountLabel: `${bookingFeeAmount.toFixed(2)} SAR`,
+            icon: 'cash-outline' as const,
+        } : null,
+    ].filter(Boolean) as Array<{
+        id: ServicePaymentChoice;
+        title: string;
+        subtitle: string;
+        amountLabel: string;
+        icon: keyof typeof Ionicons.glyphMap;
+    }>;
 
     const loadTimeSlots = async () => {
         setLoading(true);
@@ -121,40 +229,46 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 requestedStaffId: selectedStaff?.id || undefined,
                 startTime: selectedTime.startTime,
                 notes: bookingNote.trim() || undefined,
+                paymentMethod: selectedPaymentMethod,
             });
 
             const appointmentId = response.appointment?.id;
             const bookingNumber = response.appointment?.bookingNumber || appointmentId?.slice(0, 8)?.toUpperCase();
             const bookingAmount = Number(response.appointment?.price ?? getServicePrice(service));
             const successTitle = language === 'ar' ? 'تم تأكيد الحجز' : 'Booking Confirmed';
-            const successMessage = language === 'ar'
-                ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.\nيمكنك الدفع الآن أو لاحقاً من حجوزاتي.`
-                : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.\nYou can pay now or later from My Appointments.`;
+            const successMessage = selectedPaymentMethod === 'at-center'
+                ? (language === 'ar'
+                    ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.\nسيكون الدفع عند الوصول للمركز.`
+                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.\nPayment will be collected when you arrive at the center.`)
+                : (language === 'ar'
+                    ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.\nالمطلوب الآن: ${payableNowAmount.toFixed(2)} ريال.`
+                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.\nDue now: ${payableNowAmount.toFixed(2)} SAR.`);
             const payLaterLabel = language === 'ar' ? 'الدفع لاحقاً' : 'Pay Later';
-            const payNowLabel = language === 'ar' ? 'الدفع الآن' : 'Pay Now';
+            const payNowLabel = selectedPaymentMethod === 'booking-fee'
+                ? (language === 'ar' ? 'دفع العربون الآن' : 'Pay Deposit Now')
+                : (language === 'ar' ? 'الدفع الآن' : 'Pay Now');
             const viewBookingsLabel = language === 'ar' ? 'عرض حجوزاتي' : 'View My Bookings';
 
-            Alert.alert(
-                successTitle,
-                successMessage,
-                [
-                    {
-                        text: payLaterLabel,
-                        onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
-                    },
-                    appointmentId ? {
-                        text: payNowLabel,
-                        onPress: () => navigation.navigate('Payment', {
-                            appointmentId,
-                            amount: bookingAmount,
-                            tenantId: tenant.id,
-                        }),
-                    } : {
-                        text: viewBookingsLabel,
-                        onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
-                    },
-                ]
-            );
+            const successActions: Array<{ text: string; onPress: () => void }> = [
+                {
+                    text: selectedPaymentMethod === 'at-center' ? viewBookingsLabel : payLaterLabel,
+                    onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
+                },
+            ];
+
+            if (appointmentId && selectedPaymentMethod !== 'at-center') {
+                successActions.push({
+                    text: payNowLabel,
+                    onPress: () => navigation.navigate('Payment', {
+                        appointmentId,
+                        amount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : bookingAmount,
+                        tenantId: tenant.id,
+                        paymentChoice: selectedPaymentMethod === 'booking-fee' ? 'booking-fee' : 'online-full',
+                    }),
+                });
+            }
+
+            Alert.alert(successTitle, successMessage, successActions);
         } catch (error: any) {
             const msg = error.message || 'Failed to create booking';
             // Surface meaningful server errors to the user
@@ -281,7 +395,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 </View>
                 <View style={[styles.summaryRow, styles.totalRow]}>
                     <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalValue}>{getServicePrice(service).toFixed(2)} SAR</Text>
+                    <Text style={styles.totalValue}>{servicePrice.toFixed(2)} SAR</Text>
                 </View>
             </View>
 
@@ -307,6 +421,44 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 <Text style={styles.noteCounter}>
                     {bookingNote.length}/1000
                 </Text>
+            </View>
+
+            <View style={styles.noteCard}>
+                <Text style={styles.noteTitle}>
+                    {language === 'ar' ? 'طريقة الدفع' : 'Payment Option'}
+                </Text>
+                <Text style={styles.noteDescription}>
+                    {language === 'ar'
+                        ? 'اختر كيف تريد تأكيد هذا الحجز والدفع له.'
+                        : 'Choose how you want to confirm and pay for this booking.'}
+                </Text>
+                {paymentOptions.map((option) => {
+                    const isSelected = selectedPaymentMethod === option.id;
+                    return (
+                        <TouchableOpacity
+                            key={option.id}
+                            style={[styles.paymentOptionCard, isSelected && styles.selectedPaymentOptionCard]}
+                            onPress={() => setSelectedPaymentMethod(option.id)}
+                            activeOpacity={0.9}
+                        >
+                            <View style={styles.paymentOptionIcon}>
+                                <Ionicons name={option.icon} size={20} color={colors.primary} />
+                            </View>
+                            <View style={styles.paymentOptionContent}>
+                                <View style={styles.paymentOptionHeader}>
+                                    <Text style={styles.paymentOptionTitle}>{option.title}</Text>
+                                    <Text style={styles.paymentOptionAmount}>{option.amountLabel}</Text>
+                                </View>
+                                <Text style={styles.paymentOptionSubtitle}>{option.subtitle}</Text>
+                            </View>
+                            <Ionicons
+                                name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                                size={22}
+                                color={isSelected ? colors.primary : colors.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
         </View>
     );
@@ -555,6 +707,55 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-end',
         fontSize: fontSize.xs,
         color: colors.textSecondary,
+    },
+    paymentOptionCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+        padding: spacing.md,
+        borderRadius: borderRadius.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#FFFFFF',
+    },
+    selectedPaymentOptionCard: {
+        borderColor: colors.primary,
+        backgroundColor: '#F8F2FF',
+    },
+    paymentOptionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F3E8FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    paymentOptionContent: {
+        flex: 1,
+        gap: 4,
+    },
+    paymentOptionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+    paymentOptionTitle: {
+        flex: 1,
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    paymentOptionAmount: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    paymentOptionSubtitle: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 20,
     },
     footer: {
         padding: spacing.lg,

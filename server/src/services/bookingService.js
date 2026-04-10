@@ -2,6 +2,12 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const userService = require('./userService');
 const pushNotificationService = require('./pushNotificationService');
+const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const {
+    getTenantPaymentSettings,
+    assertServicePaymentMethodAllowed,
+    calculateServiceDeposit
+} = require('../utils/tenantPaymentSettings');
 
 const formatNotificationDate = (value) => {
     const date = new Date(value);
@@ -34,7 +40,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes } = data;
+        const { serviceId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -53,6 +59,7 @@ class BookingService {
         if (normalizedNotes.length > 1000) {
             throw new Error('Booking notes must be 1000 characters or less');
         }
+        const normalizedPaymentMethod = paymentMethod || 'at-center';
 
         // Validate tenant exists and is active
         const tenant = await db.Tenant.findByPk(tenantId, { transaction: finalTransaction });
@@ -80,6 +87,8 @@ class BookingService {
             where: { tenantId },
             transaction: finalTransaction
         });
+        const tenantPaymentSettings = await getTenantPaymentSettings(tenantId, { transaction: finalTransaction });
+        assertServicePaymentMethodAllowed(normalizedPaymentMethod, tenantPaymentSettings);
 
         const bookingSettings = tenantSettings?.bookingSettings || {};
         const allowAnyStaff = bookingSettings.allowAnyStaff !== false; // Default true
@@ -166,6 +175,14 @@ class BookingService {
 
         // ========== PRICING CALCULATION ==========
         const pricing = db.Appointment.calculateRevenueBreakdown(service, staff);
+        const bookingSplit = normalizedPaymentMethod === 'booking-fee'
+            ? calculateServiceDeposit(pricing.price, tenantPaymentSettings)
+            : {
+                depositAmount: 0,
+                remainderAmount: pricing.price
+            };
+        const initialDepositAmount = parseFloat((bookingSplit.depositAmount || 0).toFixed(2));
+        const initialRemainderAmount = parseFloat((bookingSplit.remainderAmount || pricing.price).toFixed(2));
 
         // ========== REDIS LOCK (Phase 6.2) ==========
         // Acquire short-term lock to prevent concurrent bookings of same slot
@@ -205,7 +222,13 @@ class BookingService {
                 employeeCommission: pricing.employeeCommission,
                 notes: normalizedNotes || null,
                 status: 'confirmed',
-                paymentStatus: 'pending'
+                paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING,
+                paymentMethod: normalizedPaymentMethod,
+                depositAmount: initialDepositAmount,
+                depositPaid: false,
+                remainderAmount: initialRemainderAmount,
+                remainderPaid: false,
+                totalPaid: 0
             }, { transaction: finalTransaction });
 
             // ========== UPDATE RELATED RECORDS ==========

@@ -173,6 +173,7 @@ const resolvePublicOrderPaymentMethod = (paymentMethod, deliveryType, settings) 
 
 module.exports = {
     DEFAULT_TENANT_PAYMENT_SETTINGS,
+    SERVICE_PAYMENT_METHOD_RULES,
     normalizeTenantPaymentSettings,
     validateTenantPaymentSettings,
     getTenantPaymentSettings,

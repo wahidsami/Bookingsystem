@@ -1,6 +1,7 @@
 const bookingService = require('../services/bookingService');
 const db = require('../models');
 const { Op } = require('sequelize');
+const { SERVICE_PAYMENT_METHOD_RULES } = require('../utils/tenantPaymentSettings');
 
 /**
  * Search for available slots
@@ -100,7 +101,7 @@ const getRecommendations = async (req, res) => {
  */
 const createBooking = async (req, res) => {
     try {
-        const { serviceId, staffId, requestedStaffId, startTime, tenantId, notes } = req.body;
+        const { serviceId, staffId, requestedStaffId, startTime, tenantId, notes, paymentMethod } = req.body;
         const platformUserId = req.userId; // From auth middleware
 
         // Validation
@@ -108,6 +109,13 @@ const createBooking = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'serviceId and startTime are required. staffId is optional (for "Any Staff" selection).'
+            });
+        }
+
+        if (paymentMethod && !SERVICE_PAYMENT_METHOD_RULES[paymentMethod]) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment method selected for this booking'
             });
         }
 
@@ -136,7 +144,8 @@ const createBooking = async (req, res) => {
             platformUserId,
             tenantId: finalTenantId,
             startTime,
-            notes
+            notes,
+            paymentMethod
         });
 
         // Load related data with platform user
@@ -163,7 +172,12 @@ const createBooking = async (req, res) => {
         
         // Determine appropriate status code
         let statusCode = 500;
-        if (error.message.includes('required') || error.message.includes('not found')) {
+        if (error.message.includes('required')
+            || error.message.includes('not found')
+            || error.message.includes('payment option')
+            || error.message.includes('Pay at')
+            || error.message.includes('Cash on delivery')
+            || error.message.includes('Online product payment')) {
             statusCode = 400;
         } else if (error.message.includes('conflict') || error.message.includes('not available')) {
             statusCode = 409; // Conflict

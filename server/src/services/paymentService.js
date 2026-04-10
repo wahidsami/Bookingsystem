@@ -15,6 +15,7 @@ const {
 const logger = require('../utils/productionLogger');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('./pushNotificationService');
+const { createAppointmentTransaction } = require('./paymentTransactionLedgerService');
 
 class PaymentService {
     /**
@@ -85,7 +86,7 @@ class PaymentService {
      * Process payment with comprehensive error handling
      */
     async processPayment(paymentData) {
-        const { platformUserId, appointmentId, amount, cardNumber, expiryDate, cvv, cardholderName, saveCard } = paymentData;
+        const { platformUserId, appointmentId, amount, cardNumber, expiryDate, cvv, cardholderName, saveCard, paymentChoice } = paymentData;
 
         try {
             // Validate required fields
@@ -157,24 +158,67 @@ class PaymentService {
 
         const totalAmount = parseFloat(appointment.price || 0);
         const totalPaid = parseFloat(appointment.totalPaid || 0);
+        const depositAmount = parseFloat(appointment.depositAmount || 0);
         const outstandingAmount = parseFloat((totalAmount - totalPaid).toFixed(2));
 
         if (outstandingAmount <= 0) {
             throw new Error('Appointment has no outstanding balance');
         }
 
-        if (Math.abs(requestedAmount - outstandingAmount) > 0.01) {
-            throw new Error(`Payment amount must match the outstanding balance of ${outstandingAmount.toFixed(2)} SAR`);
-        }
+        const normalizedPaymentChoice = paymentChoice === 'booking-fee'
+            ? 'booking-fee'
+            : paymentChoice === 'online-full'
+                ? 'online-full'
+                : null;
 
         // Get tenant from service or appointment
         // For now, we'll need to get tenantId from somewhere
         // Let's assume it's passed or we can get it from the booking context
         const tenantId = paymentData.tenantId;
 
+        let chargeAmount = outstandingAmount;
+        let ledgerType = totalPaid > 0 ? 'remainder' : 'full';
+        let nextPaymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
+        let nextDepositPaid = appointment.depositPaid || totalPaid > 0;
+        let nextRemainderAmount = 0;
+        let nextRemainderPaid = true;
+        let nextTotalPaid = totalAmount;
+
+        if (normalizedPaymentChoice === 'booking-fee' && appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
+            if (depositAmount <= 0) {
+                throw new Error('This booking does not have a deposit configured');
+            }
+
+            if (Math.abs(requestedAmount - depositAmount) > 0.01) {
+                throw new Error(`Payment amount must match the booking fee of ${depositAmount.toFixed(2)} SAR`);
+            }
+
+            chargeAmount = depositAmount;
+            ledgerType = depositAmount >= totalAmount ? 'full' : 'deposit';
+            nextPaymentStatus = depositAmount >= totalAmount
+                ? APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                : APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
+            nextDepositPaid = true;
+            nextRemainderAmount = parseFloat(Math.max(0, totalAmount - depositAmount).toFixed(2));
+            nextRemainderPaid = nextRemainderAmount <= 0;
+            nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
+        } else {
+            if (Math.abs(requestedAmount - outstandingAmount) > 0.01) {
+                throw new Error(`Payment amount must match the outstanding balance of ${outstandingAmount.toFixed(2)} SAR`);
+            }
+
+            chargeAmount = outstandingAmount;
+            ledgerType = appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID ? 'remainder' : 'full';
+            nextPaymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
+            nextDepositPaid = appointment.depositPaid || totalPaid > 0;
+            nextRemainderAmount = 0;
+            nextRemainderPaid = true;
+            nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
+        }
+
         // Calculate platform fee (2.5%)
-        const platformFee = parseFloat((outstandingAmount * 0.025).toFixed(2));
-        const tenantRevenue = parseFloat((outstandingAmount - platformFee).toFixed(2));
+        const platformFee = parseFloat((chargeAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((chargeAmount - platformFee).toFixed(2));
 
         // Save payment method if requested
         let paymentMethodId = null;
@@ -210,7 +254,7 @@ class PaymentService {
             tenantId,
             appointmentId,
             paymentMethodId,
-            amount: outstandingAmount,
+            amount: chargeAmount,
             currency: 'SAR',
             type: 'booking',
             status: 'completed',
@@ -232,18 +276,36 @@ class PaymentService {
         // Update appointment status and payment information
         await appointment.update({ 
             status: 'confirmed',
-            paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
+            paymentStatus: nextPaymentStatus,
             paymentMethod: paymentMethodName,
             paidAt: new Date(),
-            depositPaid: appointment.depositPaid || totalPaid > 0,
-            remainderAmount: 0,
-            remainderPaid: true,
-            totalPaid: totalAmount
+            depositPaid: nextDepositPaid,
+            remainderAmount: nextRemainderAmount,
+            remainderPaid: nextRemainderPaid,
+            totalPaid: nextTotalPaid
+        });
+
+        await createAppointmentTransaction({
+            appointmentId,
+            type: ledgerType,
+            amount: chargeAmount,
+            paymentMethod: 'online',
+            status: 'completed',
+            processedBy: null,
+            processedAt: appointment.paidAt || new Date(),
+            transactionRef: `APP-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}-${ledgerType.toUpperCase()}`,
+            notes: ledgerType === 'deposit' ? 'Online booking deposit payment' : 'Online booking payment',
+            metadata: {
+                source: 'customer_mobile_payment',
+                paymentChoice: normalizedPaymentChoice || appointment.paymentMethod || null,
+                platformUserId,
+                tenantId
+            }
         });
 
         // Update platform user stats
         await db.PlatformUser.increment('totalSpent', {
-            by: outstandingAmount,
+            by: chargeAmount,
             where: { id: platformUserId }
         });
 
@@ -253,19 +315,21 @@ class PaymentService {
                 where: { platformUserId, tenantId }
             });
             if (insight) {
-                await insight.increment('totalSpent', { by: outstandingAmount });
+                await insight.increment('totalSpent', { by: chargeAmount });
             }
         }
 
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'booking';
             await pushNotificationService.sendToUser(platformUserId, {
-                title: 'Booking payment confirmed',
-                body: `Your payment for ${serviceName} was received successfully.`,
+                title: nextPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID ? 'Booking deposit confirmed' : 'Booking payment confirmed',
+                body: nextPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                    ? `Your booking fee for ${serviceName} was received successfully.`
+                    : `Your payment for ${serviceName} was received successfully.`,
                 data: {
                     type: 'booking_payment_received',
                     appointmentId: appointment.id,
-                    paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                    paymentStatus: nextPaymentStatus
                 }
             });
         } catch (notificationError) {
