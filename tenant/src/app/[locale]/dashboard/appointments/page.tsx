@@ -65,6 +65,20 @@ interface EmployeeBreak {
   endDateTime?: string | null;
 }
 
+function getCurrentMonthRange() {
+  const start = new Date();
+  start.setDate(1);
+
+  const end = new Date();
+  end.setMonth(end.getMonth() + 1);
+  end.setDate(0);
+
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
+  };
+}
+
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
@@ -80,23 +94,32 @@ export default function AppointmentsPage() {
   const [error, setError] = useState("");
 
   // Filters
-  const [startDate, setStartDate] = useState(() => {
-    const date = new Date();
-    date.setDate(1); // First day of current month
-    return date.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + 1);
-    date.setDate(0); // Last day of current month
-    return date.toISOString().split('T')[0];
-  });
+  const [startDate, setStartDate] = useState(() => getCurrentMonthRange().start);
+  const [endDate, setEndDate] = useState(() => getCurrentMonthRange().end);
   const [filterStaffId, setFilterStaffId] = useState<string>("");
   const [filterServiceId, setFilterServiceId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showFilters, setShowFilters] = useState(false);
+
+  const defaultMonthRange = getCurrentMonthRange();
+  const hasActiveFilters =
+    startDate !== defaultMonthRange.start ||
+    endDate !== defaultMonthRange.end ||
+    Boolean(filterStaffId) ||
+    Boolean(filterServiceId) ||
+    Boolean(filterStatus) ||
+    Boolean(filterPaymentStatus);
+  const activeFilterCount = [
+    startDate !== defaultMonthRange.start,
+    endDate !== defaultMonthRange.end,
+    Boolean(filterStaffId),
+    Boolean(filterServiceId),
+    Boolean(filterStatus),
+    Boolean(filterPaymentStatus)
+  ].filter(Boolean).length;
 
   useEffect(() => {
     loadServices();
@@ -262,6 +285,14 @@ export default function AppointmentsPage() {
     }
   };
 
+  const filterSummary = [
+    `${startDate} → ${endDate}`,
+    filterStaffId ? employees.find((employee) => employee.id === filterStaffId)?.name || t("employee") : t("allEmployees"),
+    filterServiceId ? (services.find((service) => service.id === filterServiceId)?.[locale === 'ar' ? 'name_ar' : 'name_en'] || t("allServices")) : t("allServices"),
+    filterStatus ? getStatusLabel(filterStatus) : t("allStatuses"),
+    filterPaymentStatus ? getPaymentStatusLabel(filterPaymentStatus) : (t("allPayments") || "All")
+  ];
+
   const handleStatusUpdate = async (id: string, newStatus: string) => {
     try {
       const response = await tenantApi.updateAppointmentStatus(id, newStatus);
@@ -274,6 +305,16 @@ export default function AppointmentsPage() {
       console.error("Failed to update status:", err);
       alert(err.message || t("updateError"));
     }
+  };
+
+  const clearFilters = () => {
+    const defaults = getCurrentMonthRange();
+    setStartDate(defaults.start);
+    setEndDate(defaults.end);
+    setFilterStaffId("");
+    setFilterServiceId("");
+    setFilterStatus("");
+    setFilterPaymentStatus("");
   };
 
   return (
@@ -313,104 +354,155 @@ export default function AppointmentsPage() {
       </div>
 
       {/* Filters */}
-      <div className={`card mb-6 ${isRTL ? 'text-right' : ''}`}>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-          {t("filters")}
-        </h3>
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 ${isRTL ? 'md:grid-cols-2 lg:grid-cols-6' : ''}`}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("startDate")}
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
+      <div className={`card mb-4 ${isRTL ? 'text-right' : ''}`}>
+        <div className="flex flex-col gap-3">
+          <div className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 ${isRTL ? 'xl:flex-row-reverse' : ''}`}>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {t("filters")}
+              </h3>
+              <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'قم بتوسيع الفلاتر عند الحاجة فقط لتوفير مساحة أكبر للجدول.' : 'Expand filters only when needed so the schedule stays spacious.'}
+              </p>
+            </div>
+            <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'justify-end' : ''}`}>
+              <button
+                type="button"
+                onClick={() => setShowFilters((current) => !current)}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                  showFilters
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span>{showFilters ? (locale === 'ar' ? 'إخفاء الفلاتر' : 'Hide filters') : (locale === 'ar' ? 'إظهار الفلاتر' : 'Show filters')}</span>
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1 text-[11px] font-bold">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  {locale === 'ar' ? 'إعادة الضبط' : 'Reset'}
+                </button>
+              )}
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("endDate")}
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("employee")}
-            </label>
-            <select
-              value={filterStaffId}
-              onChange={(e) => setFilterStaffId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            >
-              <option value="">{t("allEmployees")}</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
+
+          {!showFilters && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {filterSummary.map((item, index) => (
+                <span
+                  key={`${item}-${index}`}
+                  className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+                >
+                  {item}
+                </span>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("service")}
-            </label>
-            <select
-              value={filterServiceId}
-              onChange={(e) => setFilterServiceId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            >
-              <option value="">{t("allServices")}</option>
-              {services.map(service => (
-                <option key={service.id} value={service.id}>
-                  {locale === 'ar' ? service.name_ar : service.name_en}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("statusLabel")}
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            >
-              <option value="">{t("allStatuses")}</option>
-              <option value="pending">{t("pending")}</option>
-              <option value="confirmed">{t("confirmed")}</option>
-              <option value="checked_in">{t("checkedIn")}</option>
-              <option value="in_service">{t("inProgress")}</option>
-              <option value="completed">{t("completed")}</option>
-              <option value="cancelled">{t("cancelled")}</option>
-              <option value="no_show">{t("noShow")}</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("paymentStatus") || "Payment"}
-            </label>
-            <select
-              value={filterPaymentStatus}
-              onChange={(e) => setFilterPaymentStatus(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            >
-              <option value="">{t("allPayments") || "All"}
-              </option>
-              <option value="pending">{t("paymentPending")}</option>
-              <option value="deposit_paid">{t("remainderDue") || "Remainder due"}</option>
-              <option value="fully_paid">{t("paid")}</option>
-            </select>
-          </div>
+            </div>
+          )}
+
+          {showFilters && (
+            <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 ${isRTL ? 'md:grid-cols-2 lg:grid-cols-6' : ''}`}>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("startDate")}
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("endDate")}
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("employee")}
+                </label>
+                <select
+                  value={filterStaffId}
+                  onChange={(e) => setFilterStaffId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                >
+                  <option value="">{t("allEmployees")}</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("service")}
+                </label>
+                <select
+                  value={filterServiceId}
+                  onChange={(e) => setFilterServiceId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                >
+                  <option value="">{t("allServices")}</option>
+                  {services.map(service => (
+                    <option key={service.id} value={service.id}>
+                      {locale === 'ar' ? service.name_ar : service.name_en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("statusLabel")}
+                </label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                >
+                  <option value="">{t("allStatuses")}</option>
+                  <option value="pending">{t("pending")}</option>
+                  <option value="confirmed">{t("confirmed")}</option>
+                  <option value="checked_in">{t("checkedIn")}</option>
+                  <option value="in_service">{t("inProgress")}</option>
+                  <option value="completed">{t("completed")}</option>
+                  <option value="cancelled">{t("cancelled")}</option>
+                  <option value="no_show">{t("noShow")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t("paymentStatus") || "Payment"}
+                </label>
+                <select
+                  value={filterPaymentStatus}
+                  onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                >
+                  <option value="">{t("allPayments") || "All"}</option>
+                  <option value="pending">{t("paymentPending")}</option>
+                  <option value="deposit_paid">{t("remainderDue") || "Remainder due"}</option>
+                  <option value="fully_paid">{t("paid")}</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

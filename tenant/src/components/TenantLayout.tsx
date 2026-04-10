@@ -296,7 +296,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                 {posAlerts.map((alert) => (
                   <div
                     key={`pos-${alert.id}`}
-                    className={`rounded-2xl border px-4 py-3 flex items-start justify-between gap-3 ${
+                    className={`rounded-2xl border px-3 py-2.5 flex items-start justify-between gap-3 ${
                       alert.severity === 'high'
                         ? 'bg-rose-50 border-rose-200 text-rose-900'
                         : 'bg-sky-50 border-sky-200 text-sky-900'
@@ -304,15 +304,15 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                     style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                   >
                     <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="text-sm font-bold">
+                      <p className="text-[13px] font-bold leading-tight">
                         {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
                       </p>
-                      <p className="text-xs mt-1 opacity-90">
+                      <p className="text-[11px] mt-1 opacity-90 leading-snug">
                         {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
                       </p>
                       <Link
                         href={`/${locale}${alert.detailPath || '/dashboard/pos'}`}
-                        className="mt-2 inline-flex text-xs font-semibold underline"
+                        className="mt-1.5 inline-flex text-[11px] font-semibold underline"
                       >
                         {locale === 'ar' ? 'فتح التحصيل' : 'Open collection'}
                       </Link>
@@ -320,7 +320,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                     <button
                       type="button"
                       onClick={() => dismissPosAlert(alert.id)}
-                      className="text-xs font-semibold px-3 py-1 rounded-full bg-white/80 hover:bg-white"
+                      className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold hover:bg-white"
                     >
                       {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
                     </button>
@@ -329,7 +329,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                 {usageAlerts.map((alert) => (
                   <div
                     key={alert.id}
-                    className={`rounded-2xl border px-4 py-3 flex items-start justify-between gap-3 ${
+                    className={`rounded-2xl border px-3 py-2.5 flex items-start justify-between gap-3 ${
                       alert.priority === 'high' || alert.priority === 'critical'
                         ? 'bg-rose-50 border-rose-200 text-rose-900'
                         : 'bg-amber-50 border-amber-200 text-amber-900'
@@ -337,17 +337,17 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                     style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                   >
                     <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="text-sm font-bold">
+                      <p className="text-[13px] font-bold leading-tight">
                         {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
                       </p>
-                      <p className="text-xs mt-1 opacity-90">
+                      <p className="text-[11px] mt-1 opacity-90 leading-snug">
                         {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => dismissAlert(alert.id)}
-                      className="text-xs font-semibold px-3 py-1 rounded-full bg-white/80 hover:bg-white"
+                      className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold hover:bg-white"
                     >
                       {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
                     </button>
