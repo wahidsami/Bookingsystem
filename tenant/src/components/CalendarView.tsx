@@ -68,10 +68,10 @@ interface CalendarViewProps {
 const START_HOUR = 6; // 6 AM
 const END_HOUR = 22; // 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
-const PIXELS_PER_HOUR = 168; // Taller rhythm so cards can breathe and align with the grid
+const PIXELS_PER_HOUR = 240; // Taller rhythm so cards can breathe and align with the grid
 const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
-const MIN_APPOINTMENT_HEIGHT = 84;
-const MIN_BREAK_HEIGHT = 56;
+const MIN_APPOINTMENT_HEIGHT = 120;
+const MIN_BREAK_HEIGHT = 72;
 
 export function CalendarView({
   appointments,
@@ -86,6 +86,7 @@ export function CalendarView({
   const router = useRouter();
   const params = useParams();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [openNoteAppointmentId, setOpenNoteAppointmentId] = useState<string | null>(null);
   const [visibleStaffIds, setVisibleStaffIds] = useState<Set<string>>(
     new Set(employees.map(emp => emp.id))
   );
@@ -312,6 +313,61 @@ export function CalendarView({
     return locale === 'ar' ? 'الحجز بانتظار الدفع' : 'Booking still pending payment';
   };
 
+  const getPaymentTypeLabel = (appointment: Appointment) => {
+    const normalizedMethod = `${appointment.paymentMethod || ''}`.toLowerCase();
+
+    if (
+      appointment.paymentStatus === 'deposit_paid'
+      || normalizedMethod.includes('booking')
+      || normalizedMethod.includes('deposit')
+    ) {
+      return locale === 'ar' ? 'عربون الحجز' : 'Booking fee';
+    }
+
+    if (
+      appointment.paymentStatus === 'fully_paid'
+      || appointment.paymentStatus === 'paid'
+      || normalizedMethod.includes('online')
+    ) {
+      return locale === 'ar' ? 'دفع كامل' : 'Paid in full';
+    }
+
+    if (
+      normalizedMethod.includes('at-center')
+      || normalizedMethod.includes('pay_on_visit')
+      || normalizedMethod.includes('cash')
+      || appointment.paymentStatus === 'pending'
+    ) {
+      return locale === 'ar' ? 'الدفع عند الوصول' : 'Pay on arrival';
+    }
+
+    return appointment.paymentMethod
+      ? `${appointment.paymentMethod}`
+      : (locale === 'ar' ? 'غير محدد' : 'Unspecified');
+  };
+
+  const getPaymentTypeSymbol = (appointment: Appointment) => {
+    const normalizedMethod = `${appointment.paymentMethod || ''}`.toLowerCase();
+
+    if (
+      appointment.paymentStatus === 'deposit_paid'
+      || normalizedMethod.includes('booking')
+      || normalizedMethod.includes('deposit')
+    ) {
+      return '💰';
+    }
+
+    if (
+      appointment.paymentStatus === 'fully_paid'
+      || appointment.paymentStatus === 'paid'
+      || normalizedMethod.includes('online')
+    ) {
+      return '💳';
+    }
+
+    return '🏢';
+  };
+
   const getBreakLabel = (breakItem: EmployeeBreak) => {
     if (breakItem.label?.trim()) {
       return breakItem.label.trim();
@@ -516,11 +572,11 @@ export function CalendarView({
 
       {/* Calendar Grid */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="inline-flex min-w-full">
+        <div className="overflow-auto max-h-[calc(100vh-360px)]">
+          <div className="inline-flex min-w-full items-start">
             {/* Time Column */}
             <div className="flex-shrink-0 w-16 md:w-20 border-r border-gray-200 sticky left-0 z-20 bg-white">
-              <div className="h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
+              <div className="sticky top-0 z-30 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
               <div className="relative" style={{ height: `${totalHeight}px` }}>
                 {timeSlots.map((slot, index) => (
                   <div
@@ -563,7 +619,7 @@ export function CalendarView({
                     style={{ minWidth: '240px', width: '240px' }}
                   >
                     {/* Staff Header */}
-                    <div className="h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
+                    <div className="sticky top-0 z-30 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
                       <div className="flex-shrink-0 mb-1.5 relative">
                         {staff.photo ? (
                           <>
@@ -677,17 +733,38 @@ export function CalendarView({
                           : '?';
                         const hasCustomerSelectedStaff = appointment.assignmentMode === 'customer_selected';
                         const hasBookingNote = Boolean(appointment.notes?.trim());
+                        const paymentTypeLabel = getPaymentTypeLabel(appointment);
+                        const isNoteOpen = openNoteAppointmentId === appointment.id;
                         
                         return (
                           <div
                             key={appointment.id}
                             onClick={() => handleAppointmentClick(appointment.id)}
-                            className={`${getAppointmentColor(appointment)} z-[2] text-white rounded-xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''}`}
+                            className={`${getAppointmentColor(appointment)} relative z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                            <div className="p-2.5 h-full flex flex-col">
-                              <div className="flex items-start gap-2 mb-1.5 flex-shrink-0">
+                            <div className="rounded-2xl overflow-hidden h-full flex flex-col">
+                              <div className="bg-black/20 px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold truncate leading-tight">
+                                    {serviceName}
+                                  </div>
+                                </div>
+                                {hasCustomerSelectedStaff && (
+                                  <span
+                                    className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/25"
+                                    title={locale === 'ar' ? 'اختار الموظف بنفسه' : 'Customer selected a specific employee'}
+                                  >
+                                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81H7.03a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="p-4 h-full flex flex-col gap-2 bg-black/15 backdrop-blur-[1px]">
+                              <div className="flex items-start gap-2 flex-shrink-0">
                                 <div className="relative flex-shrink-0 w-6 h-6">
                                   {(() => {
                                     const userPhoto = appointment.user?.photo;
@@ -734,20 +811,14 @@ export function CalendarView({
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="text-sm font-semibold truncate leading-tight">{customerFirstName}</div>
                                     <div className="flex items-center gap-1.5">
-                                      {hasCustomerSelectedStaff && (
-                                        <span
-                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20"
-                                          title={locale === 'ar' ? 'اختار الموظف بنفسه' : 'Customer selected a specific employee'}
-                                        >
-                                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81H7.03a1 1 0 00.951-.69l1.07-3.292z" />
-                                          </svg>
-                                        </span>
-                                      )}
                                       {hasBookingNote && (
                                         <span
                                           className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20"
                                           title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setOpenNoteAppointmentId((current) => current === appointment.id ? null : appointment.id);
+                                          }}
                                         >
                                           <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                             <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z" clipRule="evenodd" />
@@ -759,24 +830,26 @@ export function CalendarView({
                                 </div>
                               </div>
 
-                              {/* Service Name */}
-                              <div className="text-sm font-medium opacity-95 truncate leading-tight mb-0.5">
-                                {serviceName}
+                              <div className="flex items-center gap-2 text-xs font-medium opacity-90">
+                                <span className="opacity-70">
+                                  {locale === 'ar' ? 'نوع الدفع' : 'Payment type'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1">
+                                  <span aria-hidden="true">{getPaymentTypeSymbol(appointment)}</span>
+                                  <span>{paymentTypeLabel}</span>
+                                </span>
                               </div>
 
                               {/* Time Range */}
-                              <div className="text-xs opacity-85 leading-tight flex items-center gap-1.5">
+                              <div className="text-xs opacity-90 leading-tight flex items-center gap-1.5">
+                                <span className="opacity-70 whitespace-nowrap">
+                                  {locale === 'ar' ? 'وقت الحجز' : 'Booked time'}
+                                </span>
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {timeLabel}
                               </div>
-
-                              {appointment.notes && minHeight > 96 && (
-                                <div className="text-xs opacity-80 mt-1.5 leading-snug line-clamp-2">
-                                  {appointment.notes}
-                                </div>
-                              )}
 
                               <div className="mt-auto pt-1.5 flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1">
@@ -793,12 +866,25 @@ export function CalendarView({
                                 </span>
                               </div>
 
-                              {appointment.assignmentMode === 'auto_assigned' && minHeight > 72 && (
+                              {appointment.assignmentMode === 'auto_assigned' && minHeight > 96 && (
                                 <div className="pt-1 text-[11px] opacity-75">
                                   {locale === 'ar' ? 'تم تعيينه تلقائياً' : 'Auto-assigned'}
                                 </div>
                               )}
                             </div>
+                            {isNoteOpen && appointment.notes ? (
+                              <div
+                                className={`absolute top-16 z-30 w-56 rounded-2xl bg-white px-3 py-2 text-xs text-slate-700 shadow-xl ring-1 ring-slate-200 ${isRTL ? 'left-3' : 'right-3'}`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <div className="mb-1 font-semibold text-slate-900">
+                                  {locale === 'ar' ? 'ملاحظة العميل' : 'Customer note'}
+                                </div>
+                                <div className="whitespace-pre-wrap leading-relaxed">
+                                  {appointment.notes}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         );
                       })}
