@@ -715,13 +715,13 @@ export function CalendarView({
                         </div>
                       )}
 
-                      {staffAppointments.map(appointment => {
-                        const customerFirstName = appointment.user?.firstName?.trim()
-                          || appointment.user?.lastName?.trim()
-                          || t('unknownCustomer');
-                        const serviceName = locale === 'ar' 
-                          ? appointment.service.name_ar 
-                          : appointment.service.name_en;
+                      {staffAppointments.map((appointment) => {
+                        const customerFirstName =
+                          appointment.user?.firstName?.trim() ||
+                          appointment.user?.lastName?.trim() ||
+                          t('unknownCustomer');
+                        const serviceName =
+                          locale === 'ar' ? appointment.service.name_ar : appointment.service.name_en;
                         const startTime = new Date(appointment.startTime);
                         const endTime = new Date(appointment.endTime);
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
@@ -735,7 +735,7 @@ export function CalendarView({
                         const hasBookingNote = Boolean(appointment.notes?.trim());
                         const paymentTypeLabel = getPaymentTypeLabel(appointment);
                         const isNoteOpen = openNoteAppointmentId === appointment.id;
-                        
+
                         return (
                           <div
                             key={appointment.id}
@@ -744,12 +744,10 @@ export function CalendarView({
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                            <div className="rounded-2xl overflow-hidden h-full flex flex-col">
-                              <div className="bg-black/20 px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
+                            <div className="flex h-full flex-col overflow-hidden rounded-2xl">
+                              <div className="flex flex-shrink-0 items-center justify-between gap-3 bg-black/25 px-4 py-3">
                                 <div className="min-w-0">
-                                  <div className="text-sm font-semibold truncate leading-tight">
-                                    {serviceName}
-                                  </div>
+                                  <div className="truncate text-sm font-semibold leading-tight">{serviceName}</div>
                                 </div>
                                 {hasCustomerSelectedStaff && (
                                   <span
@@ -763,128 +761,122 @@ export function CalendarView({
                                 )}
                               </div>
 
-                              <div className="p-4 h-full flex flex-col gap-2 bg-black/15 backdrop-blur-[1px]">
-                              <div className="flex items-start gap-2 flex-shrink-0">
-                                <div className="relative flex-shrink-0 w-6 h-6">
-                                  {(() => {
-                                    const userPhoto = appointment.user?.photo;
-                                    const hasValidPhoto = userPhoto && typeof userPhoto === 'string' && userPhoto.trim() !== '';
-
-                                    if (hasValidPhoto) {
-                                      const photoUrl = userPhoto.startsWith('/') 
-? getImageUrl(userPhoto)
-                                        : getImageUrl(userPhoto);
-                                      
-                                      return (
-                                        <>
-                                          <img
-                                            src={photoUrl}
-                                            alt={customerFirstName}
-                                            className="w-6 h-6 rounded-full object-cover border border-white/30 relative z-10"
-                                            onError={(e) => {
-                                              const img = e.currentTarget;
-                                              img.style.display = 'none';
-                                              const fallback = img.parentElement?.querySelector('.avatar-fallback') as HTMLElement;
-                                              if (fallback) {
-                                                fallback.style.display = 'flex';
-                                              }
-                                            }}
-                                          />
-                                          <div 
-                                            className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center border border-white/30 hidden avatar-fallback absolute inset-0"
-                                            data-appointment-id={appointment.id}
-                                          >
-                                            <span className="text-xs font-semibold">{userInitials}</span>
-                                          </div>
-                                        </>
+                              <div className="flex flex-1 flex-col gap-2 bg-black/15 px-4 py-4 backdrop-blur-[1px]">
+                                <div className="flex items-start gap-2">
+                                  <div className="relative flex-shrink-0">
+                                    {(() => {
+                                      const userPhoto = appointment.user?.photo;
+                                      const hasValidPhoto = Boolean(
+                                        userPhoto && typeof userPhoto === 'string' && userPhoto.trim() !== ''
                                       );
-                                    } else {
+
+                                      if (hasValidPhoto) {
+                                        return (
+                                          <>
+                                            <img
+                                              src={getImageUrl(userPhoto as string)}
+                                              alt={customerFirstName}
+                                              className="relative z-10 h-6 w-6 rounded-full border border-white/30 object-cover"
+                                              onError={(e) => {
+                                                const img = e.currentTarget;
+                                                img.style.display = 'none';
+                                                const fallback = img.parentElement?.querySelector('.avatar-fallback') as HTMLElement;
+                                                if (fallback) {
+                                                  fallback.style.display = 'flex';
+                                                }
+                                              }}
+                                            />
+                                            <div className="avatar-fallback absolute inset-0 hidden h-6 w-6 items-center justify-center rounded-full border border-white/30 bg-white/20">
+                                              <span className="text-xs font-semibold">{userInitials}</span>
+                                            </div>
+                                          </>
+                                        );
+                                      }
+
                                       return (
-                                        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center border border-white/30">
+                                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/30 bg-white/20">
                                           <span className="text-xs font-semibold">{userInitials}</span>
                                         </div>
                                       );
-                                    }
-                                  })()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="text-sm font-semibold truncate leading-tight">{customerFirstName}</div>
-                                    <div className="flex items-center gap-1.5">
-                                      {hasBookingNote && (
-                                        <span
-                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20"
-                                          title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setOpenNoteAppointmentId((current) => current === appointment.id ? null : appointment.id);
-                                          }}
-                                        >
-                                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z" clipRule="evenodd" />
-                                          </svg>
-                                        </span>
-                                      )}
+                                    })()}
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="truncate text-sm font-semibold leading-tight">{customerFirstName}</div>
+                                      <div className="flex items-center gap-1.5">
+                                        {hasBookingNote && (
+                                          <button
+                                            type="button"
+                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20 transition hover:bg-white/30"
+                                            title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setOpenNoteAppointmentId((current) => (current === appointment.id ? null : appointment.id));
+                                            }}
+                                          >
+                                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                              <path
+                                                fillRule="evenodd"
+                                                d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z"
+                                                clipRule="evenodd"
+                                              />
+                                            </svg>
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              <div className="flex items-center gap-2 text-xs font-medium opacity-90">
-                                <span className="opacity-70">
-                                  {locale === 'ar' ? 'نوع الدفع' : 'Payment type'}
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1">
-                                  <span aria-hidden="true">{getPaymentTypeSymbol(appointment)}</span>
-                                  <span>{paymentTypeLabel}</span>
-                                </span>
-                              </div>
-
-                              {/* Time Range */}
-                              <div className="text-xs opacity-90 leading-tight flex items-center gap-1.5">
-                                <span className="opacity-70 whitespace-nowrap">
-                                  {locale === 'ar' ? 'وقت الحجز' : 'Booked time'}
-                                </span>
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {timeLabel}
-                              </div>
-
-                              <div className="mt-auto pt-1.5 flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/70"></div>
-                                  <span className="text-xs opacity-80 capitalize">
-                                    {getStatusLabel(appointment.status)}
+                                <div className="flex items-center gap-2 text-xs font-medium opacity-90">
+                                  <span className="opacity-70">{locale === 'ar' ? 'نوع الدفع' : 'Payment type'}</span>
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1">
+                                    <span aria-hidden="true">{getPaymentTypeSymbol(appointment)}</span>
+                                    <span>{paymentTypeLabel}</span>
                                   </span>
                                 </div>
-                                <span
-                                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}
-                                  title={getPaymentBadgeTitle(appointment)}
-                                >
-                                  {getPaymentBadgeLabel(appointment)}
-                                </span>
+
+                                <div className="flex items-center gap-1.5 text-xs leading-tight opacity-90">
+                                  <span className="whitespace-nowrap opacity-70">{locale === 'ar' ? 'وقت الحجز' : 'Booked time'}</span>
+                                  <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span className="truncate">{timeLabel}</span>
+                                </div>
+
+                                <div className="mt-auto flex items-center justify-between gap-2 pt-1.5">
+                                  <div className="flex items-center gap-1">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-white/70"></div>
+                                    <span className="text-xs capitalize opacity-80">{getStatusLabel(appointment.status)}</span>
+                                  </div>
+                                  <span
+                                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}
+                                    title={getPaymentBadgeTitle(appointment)}
+                                  >
+                                    {getPaymentBadgeLabel(appointment)}
+                                  </span>
+                                </div>
+
+                                {appointment.assignmentMode === 'auto_assigned' && (
+                                  <div className="pt-1 text-[11px] opacity-75">
+                                    {locale === 'ar' ? 'تم تعيينه تلقائياً' : 'Auto-assigned'}
+                                  </div>
+                                )}
                               </div>
 
-                              {appointment.assignmentMode === 'auto_assigned' && minHeight > 96 && (
-                                <div className="pt-1 text-[11px] opacity-75">
-                                  {locale === 'ar' ? 'تم تعيينه تلقائياً' : 'Auto-assigned'}
+                              {isNoteOpen && appointment.notes ? (
+                                <div
+                                  className={`absolute top-16 z-30 w-56 rounded-2xl bg-white px-3 py-2 text-xs text-slate-700 shadow-xl ring-1 ring-slate-200 ${isRTL ? 'left-3' : 'right-3'}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <div className="mb-1 font-semibold text-slate-900">
+                                    {locale === 'ar' ? 'ملاحظة العميل' : 'Customer note'}
+                                  </div>
+                                  <div className="whitespace-pre-wrap leading-relaxed">{appointment.notes}</div>
                                 </div>
-                              )}
+                              ) : null}
                             </div>
-                            {isNoteOpen && appointment.notes ? (
-                              <div
-                                className={`absolute top-16 z-30 w-56 rounded-2xl bg-white px-3 py-2 text-xs text-slate-700 shadow-xl ring-1 ring-slate-200 ${isRTL ? 'left-3' : 'right-3'}`}
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                <div className="mb-1 font-semibold text-slate-900">
-                                  {locale === 'ar' ? 'ملاحظة العميل' : 'Customer note'}
-                                </div>
-                                <div className="whitespace-pre-wrap leading-relaxed">
-                                  {appointment.notes}
-                                </div>
-                              </div>
-                            ) : null}
                           </div>
                         );
                       })}
