@@ -68,8 +68,10 @@ interface CalendarViewProps {
 const START_HOUR = 6; // 6 AM
 const END_HOUR = 22; // 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
-const PIXELS_PER_HOUR = 60; // 60px per hour
-const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60; // 1px per minute
+const PIXELS_PER_HOUR = 96; // 96px per hour keeps 30-minute slots visually balanced
+const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
+const MIN_APPOINTMENT_HEIGHT = 48;
+const MIN_BREAK_HEIGHT = 40;
 
 export function CalendarView({
   appointments,
@@ -192,7 +194,7 @@ export function CalendarView({
 
     return {
       top: `${top}px`,
-      height: `${Math.max(height, 40)}px`, // Minimum 40px height
+      height: `${Math.max(height, MIN_APPOINTMENT_HEIGHT)}px`,
       position: 'absolute' as const,
       width: 'calc(100% - 8px)',
       left: '4px',
@@ -215,7 +217,7 @@ export function CalendarView({
 
     return {
       top: `${top}px`,
-      height: `${Math.max(height, 28)}px`,
+      height: `${Math.max(height, MIN_BREAK_HEIGHT)}px`,
       position: 'absolute' as const,
       width: 'calc(100% - 12px)',
       left: '6px',
@@ -669,7 +671,7 @@ export function CalendarView({
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
 
                         const style = getAppointmentStyle(appointment);
-                        const minHeight = Math.max(parseFloat(style.height as string), 60);
+                        const minHeight = Math.max(parseFloat(style.height as string), MIN_APPOINTMENT_HEIGHT);
                         const userInitials = appointment.user
                           ? `${appointment.user.firstName?.[0] || ''}${appointment.user.lastName?.[0] || ''}`.toUpperCase() || '?'
                           : '?';
@@ -680,12 +682,12 @@ export function CalendarView({
                           <div
                             key={appointment.id}
                             onClick={() => handleAppointmentClick(appointment.id)}
-                            className={`${getAppointmentColor(appointment)} z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''}`}
+                            className={`${getAppointmentColor(appointment)} z-[2] text-white rounded-xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                            <div className="p-3 h-full flex flex-col">
-                              <div className="flex items-start gap-2 mb-2 flex-shrink-0">
+                            <div className="p-2.5 h-full flex flex-col">
+                              <div className="flex items-start gap-2 mb-1.5 flex-shrink-0">
                                 <div className="relative flex-shrink-0 w-6 h-6">
                                   {(() => {
                                     const userPhoto = appointment.user?.photo;
@@ -758,7 +760,7 @@ export function CalendarView({
                               </div>
 
                               {/* Service Name */}
-                              <div className="text-sm font-medium opacity-95 truncate leading-tight mb-1">
+                              <div className="text-sm font-medium opacity-95 truncate leading-tight mb-0.5">
                                 {serviceName}
                               </div>
 
@@ -770,13 +772,13 @@ export function CalendarView({
                                 {timeLabel}
                               </div>
 
-                              {appointment.notes && minHeight > 92 && (
-                                <div className="text-xs opacity-80 mt-2 leading-snug line-clamp-2">
+                              {appointment.notes && minHeight > 96 && (
+                                <div className="text-xs opacity-80 mt-1.5 leading-snug line-clamp-2">
                                   {appointment.notes}
                                 </div>
                               )}
 
-                              <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+                              <div className="mt-auto pt-1.5 flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1">
                                   <div className="w-1.5 h-1.5 rounded-full bg-white/70"></div>
                                   <span className="text-xs opacity-80 capitalize">
@@ -791,7 +793,7 @@ export function CalendarView({
                                 </span>
                               </div>
 
-                              {appointment.assignmentMode === 'auto_assigned' && minHeight > 84 && (
+                              {appointment.assignmentMode === 'auto_assigned' && minHeight > 72 && (
                                 <div className="pt-1 text-[11px] opacity-75">
                                   {locale === 'ar' ? 'تم تعيينه تلقائياً' : 'Auto-assigned'}
                                 </div>
