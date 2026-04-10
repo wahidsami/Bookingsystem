@@ -68,10 +68,10 @@ interface CalendarViewProps {
 const START_HOUR = 6; // 6 AM
 const END_HOUR = 22; // 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
-const PIXELS_PER_HOUR = 96; // 96px per hour keeps 30-minute slots visually balanced
+const PIXELS_PER_HOUR = 168; // Taller rhythm so cards can breathe and align with the grid
 const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
-const MIN_APPOINTMENT_HEIGHT = 48;
-const MIN_BREAK_HEIGHT = 40;
+const MIN_APPOINTMENT_HEIGHT = 84;
+const MIN_BREAK_HEIGHT = 56;
 
 export function CalendarView({
   appointments,
