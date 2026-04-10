@@ -282,6 +282,34 @@ export function CalendarView({
     return locale === 'ar' ? 'معلّق' : 'Pending';
   };
 
+  const getPaymentBadgeClasses = (appointment: Appointment) => {
+    if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
+      return 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200';
+    }
+
+    if (appointment.paymentStatus === 'deposit_paid') {
+      return 'bg-amber-100 text-amber-900 ring-1 ring-amber-200';
+    }
+
+    return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
+  };
+
+  const getPaymentBadgeTitle = (appointment: Appointment) => {
+    if (appointment.paymentStatus === 'deposit_paid') {
+      return locale === 'ar' ? 'تم دفع العربون ويتبقى جزء عند الوصول' : 'Deposit paid, remainder still due';
+    }
+
+    if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
+      return locale === 'ar' ? 'تم سداد الحجز بالكامل' : 'Booking fully paid';
+    }
+
+    if (appointment.paymentMethod === 'at-center' || appointment.paymentMethod === 'pay_on_visit') {
+      return locale === 'ar' ? 'الدفع عند الوصول' : 'Pay on arrival';
+    }
+
+    return locale === 'ar' ? 'الحجز بانتظار الدفع' : 'Booking still pending payment';
+  };
+
   const getBreakLabel = (breakItem: EmployeeBreak) => {
     if (breakItem.label?.trim()) {
       return breakItem.label.trim();
@@ -374,6 +402,11 @@ export function CalendarView({
 
   const totalHeight = (END_HOUR - START_HOUR) * PIXELS_PER_HOUR;
   const currentTimePosition = getCurrentTimePosition();
+  const summaryCounts = {
+    appointments: dayAppointments.length,
+    breaks: dayBreaks.length,
+    visibleStaff: visibleStaff.length
+  };
 
   return (
     <div className="space-y-4">
@@ -432,6 +465,50 @@ export function CalendarView({
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className={`flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 ${isRTL ? 'text-right' : ''}`}>
+        <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {locale === 'ar' ? 'مفاتيح اللوحة' : 'Board Guide'}
+          </span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+            {locale === 'ar' ? `${summaryCounts.appointments} حجوزات` : `${summaryCounts.appointments} bookings`}
+          </span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+            {locale === 'ar' ? `${summaryCounts.breaks} استراحات` : `${summaryCounts.breaks} breaks`}
+          </span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+            {locale === 'ar' ? `${summaryCounts.visibleStaff} موظفين ظاهرين` : `${summaryCounts.visibleStaff} visible staff`}
+          </span>
+        </div>
+
+        <div className={`flex flex-wrap items-center gap-2 text-xs ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+            {locale === 'ar' ? 'مدفوع بالكامل' : 'Fully paid'}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+            {locale === 'ar' ? 'عربون' : 'Deposit'}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
+            <span className="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+            {locale === 'ar' ? 'بانتظار الدفع' : 'Pending payment'}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-500 text-[10px] font-bold text-white">A</span>
+            {locale === 'ar' ? 'تعيين تلقائي' : 'Auto-assigned'}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">S</span>
+            {locale === 'ar' ? 'اختيار العميل للموظف' : 'Customer picked staff'}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-200 text-[10px] font-bold text-rose-700">B</span>
+            {locale === 'ar' ? 'استراحة' : 'Break'}
+          </span>
         </div>
       </div>
 
@@ -574,6 +651,12 @@ export function CalendarView({
                         );
                       })}
 
+                      {staffAppointments.length === 0 && staffBreaks.length === 0 && (
+                        <div className="absolute inset-x-3 top-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs text-slate-400">
+                          {locale === 'ar' ? 'لا توجد حجوزات لهذا اليوم' : 'No bookings for this day'}
+                        </div>
+                      )}
+
                       {staffAppointments.map(appointment => {
                         const customerFirstName = appointment.user?.firstName?.trim()
                           || appointment.user?.lastName?.trim()
@@ -597,7 +680,7 @@ export function CalendarView({
                           <div
                             key={appointment.id}
                             onClick={() => handleAppointmentClick(appointment.id)}
-                            className={`${getAppointmentColor(appointment)} z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/15`}
+                            className={`${getAppointmentColor(appointment)} z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-hidden border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
@@ -651,7 +734,7 @@ export function CalendarView({
                                     <div className="flex items-center gap-1.5">
                                       {hasCustomerSelectedStaff && (
                                         <span
-                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20"
+                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20"
                                           title={locale === 'ar' ? 'اختار الموظف بنفسه' : 'Customer selected a specific employee'}
                                         >
                                           <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -661,7 +744,7 @@ export function CalendarView({
                                       )}
                                       {hasBookingNote && (
                                         <span
-                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20"
+                                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20"
                                           title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
                                         >
                                           <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -700,7 +783,10 @@ export function CalendarView({
                                     {getStatusLabel(appointment.status)}
                                   </span>
                                 </div>
-                                <span className="rounded-full bg-white/20 px-2 py-1 text-[11px] font-semibold">
+                                <span
+                                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}
+                                  title={getPaymentBadgeTitle(appointment)}
+                                >
                                   {getPaymentBadgeLabel(appointment)}
                                 </span>
                               </div>
