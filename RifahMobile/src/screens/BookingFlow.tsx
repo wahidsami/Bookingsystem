@@ -36,7 +36,9 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [loading, setLoading] = useState(false);
 
     // Selection State
-    const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null); // null = Any
+    const [selectedStaff, setSelectedStaff] = useState<Staff | null>(
+        route.params?.selectedStaff ? normalizeStaff(route.params.selectedStaff) : null
+    ); // null = Any
     const [staffList, setStaffList] = useState<Staff[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [selectedTime, setSelectedTime] = useState<SlotItem | null>(null);

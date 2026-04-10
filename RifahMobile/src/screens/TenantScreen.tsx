@@ -33,6 +33,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
+    const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[] }) | null>(null);
+    const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
     const { itemCount, addToCart, clearCart } = useCart();
 
     useEffect(() => {
@@ -274,13 +276,49 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         || service.description_ar
         || '';
 
-    const openServiceDetails = (service: Service) => {
-        setSelectedService(service);
+    const closeServiceDetails = () => {
+        setSelectedService(null);
+        setSelectedServiceDetails(null);
+        setSelectedServiceLoading(false);
     };
 
-    const handleBookService = (service: Service) => {
-        setSelectedService(null);
-        navigation.navigate('Booking', { service, tenant });
+    const openServiceDetails = async (service: Service) => {
+        setSelectedService(service);
+        setSelectedServiceDetails(null);
+        setSelectedServiceLoading(true);
+
+        try {
+            const serviceRes = await api.get<{ success: boolean; service: Service & { employees?: Staff[] } }>(
+                `/public/tenant/${tenant?.id || tenantId}/services/${service.id}`
+            );
+
+            if (serviceRes.success && serviceRes.service) {
+                const normalizedEmployees = Array.isArray(serviceRes.service.employees)
+                    ? serviceRes.service.employees.map((employee) => normalizeStaff(employee))
+                    : [];
+
+                setSelectedServiceDetails({
+                    ...normalizeService(serviceRes.service),
+                    employees: normalizedEmployees,
+                });
+                return;
+            }
+        } catch (error) {
+            console.warn('Failed to load service details:', error);
+        } finally {
+            setSelectedServiceLoading(false);
+        }
+
+        setSelectedServiceDetails(service);
+    };
+
+    const handleBookService = (service: Service, staff?: Staff | null) => {
+        closeServiceDetails();
+        navigation.navigate('Booking', {
+            service,
+            tenant,
+            selectedStaff: staff || undefined,
+        });
     };
 
     const renderHero = () => {
@@ -565,18 +603,23 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 visible={!!selectedService}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setSelectedService(null)}
+                onRequestClose={closeServiceDetails}
             >
                 <View style={styles.modalBackdrop}>
-                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setSelectedService(null)} />
+                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={closeServiceDetails} />
                     {selectedService ? (
+                        selectedServiceLoading ? (
+                            <View style={styles.serviceModalCard}>
+                                <ActivityIndicator color={colors.primary} />
+                            </View>
+                        ) : (
                         <View style={styles.serviceModalCard}>
                             <View style={styles.serviceModalHeader}>
                                 <View style={styles.serviceModalTitleWrap}>
-                                    <Text style={styles.serviceModalCategory}>{selectedService.category}</Text>
-                                    <Text style={styles.serviceModalTitle}>{isRTL ? selectedService.name_ar : selectedService.name_en}</Text>
+                                    <Text style={styles.serviceModalCategory}>{selectedServiceDetails?.category || selectedService.category}</Text>
+                                    <Text style={styles.serviceModalTitle}>{isRTL ? (selectedServiceDetails?.name_ar || selectedService.name_ar) : (selectedServiceDetails?.name_en || selectedService.name_en)}</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setSelectedService(null)} style={styles.serviceModalClose}>
+                                <TouchableOpacity onPress={closeServiceDetails} style={styles.serviceModalClose}>
                                     <Ionicons name="close" size={24} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
@@ -584,22 +627,83 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             <View style={styles.serviceMetaRow}>
                                 <View style={styles.serviceMetaBadge}>
                                     <Ionicons name="time-outline" size={16} color={colors.primary} />
-                                    <Text style={styles.serviceMetaText}>{selectedService.duration} mins</Text>
+                                    <Text style={styles.serviceMetaText}>{(selectedServiceDetails?.duration || selectedService.duration)} mins</Text>
                                 </View>
                                 <View style={styles.serviceMetaBadge}>
                                     <Ionicons name="cash-outline" size={16} color={colors.primary} />
-                                    <Text style={styles.serviceMetaText}>{getServicePrice(selectedService).toFixed(2)} SAR</Text>
+                                    <Text style={styles.serviceMetaText}>{getServicePrice(selectedServiceDetails || selectedService).toFixed(2)} SAR</Text>
                                 </View>
+                                {(selectedServiceDetails?.employees || []).length > 0 ? (
+                                    <View style={styles.serviceMetaBadge}>
+                                        <Ionicons name="star" size={16} color={colors.primary} />
+                                        <Text style={styles.serviceMetaText}>
+                                            {(selectedServiceDetails!.employees!.reduce((sum, member) => sum + (member.rating || 0), 0) / selectedServiceDetails!.employees!.length).toFixed(1)} ⭐
+                                        </Text>
+                                    </View>
+                                ) : null}
                             </View>
 
                             <Text style={styles.serviceModalDescription}>
-                                {getServiceDescription(selectedService) || 'Service details will appear here soon.'}
+                                {getServiceDescription(selectedServiceDetails || selectedService) || 'Service details will appear here soon.'}
                             </Text>
 
-                            <TouchableOpacity style={styles.serviceBookButton} onPress={() => handleBookService(selectedService)}>
+                            {(selectedServiceDetails?.employees || []).length > 0 ? (
+                                <View style={styles.employeeSection}>
+                                    <Text style={styles.employeeSectionTitle}>
+                                        {isRTL ? 'المتخصصون المتاحون' : 'Available Professionals'}
+                                    </Text>
+                                    {(selectedServiceDetails?.employees || []).map((employee) => {
+                                        const avatarUrl = getImageUrl(employee.avatar || employee.image);
+                                        const initials = employee.name?.charAt(0)?.toUpperCase() || '?';
+                                        const experienceLabel = employee.experience
+                                            ? (isRTL ? `الخبرة: ${employee.experience}` : `Experience: ${employee.experience}`)
+                                            : (isRTL ? 'الخبرة غير متاحة' : 'Experience not listed');
+
+                                        return (
+                                            <View key={employee.id} style={styles.employeeCard}>
+                                                {avatarUrl ? (
+                                                    <Image source={{ uri: avatarUrl }} style={styles.employeeAvatar} />
+                                                ) : (
+                                                    <View style={styles.employeeAvatarPlaceholder}>
+                                                        <Text style={styles.employeeAvatarText}>{initials}</Text>
+                                                    </View>
+                                                )}
+                                                <View style={styles.employeeContent}>
+                                                    <View style={styles.employeeHeaderRow}>
+                                                        <Text style={styles.employeeName}>{employee.name}</Text>
+                                                        <View style={styles.employeeRatingBadge}>
+                                                            <Ionicons name="star" size={12} color="#D97706" />
+                                                            <Text style={styles.employeeRatingText}>{(employee.rating || 0).toFixed(1)}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={styles.employeeExperience}>{experienceLabel}</Text>
+                                                    {employee.bio ? (
+                                                        <Text style={styles.employeeBio} numberOfLines={3}>
+                                                            {employee.bio}
+                                                        </Text>
+                                                    ) : null}
+                                                    {Array.isArray(employee.skills) && employee.skills.length > 0 ? (
+                                                        <Text style={styles.employeeSkills} numberOfLines={1}>
+                                                            {employee.skills.join(' • ')}
+                                                        </Text>
+                                                    ) : null}
+                                                    <TouchableOpacity style={styles.employeeBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService, employee)}>
+                                                        <Text style={styles.employeeBookButtonText}>
+                                                            {isRTL ? 'احجز مع هذا المتخصص' : 'Book with this Professional'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            ) : null}
+
+                            <TouchableOpacity style={styles.serviceBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService)}>
                                 <Text style={styles.serviceBookButtonText}>{isRTL ? 'احجز هذه الخدمة' : 'Book This Service'}</Text>
                             </TouchableOpacity>
                         </View>
+                        )
                     ) : null}
                 </View>
             </Modal>
@@ -865,6 +969,100 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: colors.primaryDark,
         fontWeight: '600',
+    },
+    employeeSection: {
+        marginTop: spacing.sm,
+        gap: spacing.sm,
+    },
+    employeeSectionTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    employeeCard: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#FFFFFF',
+    },
+    employeeAvatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: colors.backgroundGray,
+    },
+    employeeAvatarPlaceholder: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+    },
+    employeeAvatarText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.lg,
+        fontWeight: '700',
+    },
+    employeeContent: {
+        flex: 1,
+        gap: 6,
+    },
+    employeeHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+    employeeName: {
+        flex: 1,
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    employeeRatingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: borderRadius.full,
+        backgroundColor: '#FEF3C7',
+    },
+    employeeRatingText: {
+        fontSize: fontSize.xs,
+        fontWeight: '700',
+        color: '#92400E',
+    },
+    employeeExperience: {
+        fontSize: fontSize.sm,
+        color: colors.primaryDark,
+        fontWeight: '600',
+    },
+    employeeBio: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 20,
+    },
+    employeeSkills: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+    },
+    employeeBookButton: {
+        alignSelf: 'flex-start',
+        backgroundColor: colors.backgroundGray,
+        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        marginTop: 2,
+    },
+    employeeBookButtonText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.primary,
     },
     serviceModalDescription: {
         fontSize: fontSize.md,

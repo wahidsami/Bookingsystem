@@ -151,6 +151,7 @@ export interface Service {
     maxPrice?: number;
     rawPrice?: number;
     finalPrice?: number;
+    employees?: Staff[];
 }
 
 export interface Product {
@@ -174,6 +175,9 @@ export interface Staff {
     role?: string;
     specialty?: string;
     avatar?: string;
+    image?: string;
+    bio?: string;
+    experience?: string;
     rating: number;
     skills: string[];
     aiScore?: number;
@@ -509,7 +513,10 @@ export const normalizeStaff = (staff: Partial<Staff> | null | undefined): Staff 
     name: toStringValue(staff?.name, 'Staff'),
     role: toOptionalString(staff?.role),
     specialty: toOptionalString(staff?.specialty),
-    avatar: toOptionalString(staff?.avatar),
+    avatar: toOptionalString(staff?.avatar || staff?.image),
+    image: toOptionalString(staff?.image || staff?.avatar),
+    bio: toOptionalString(staff?.bio),
+    experience: toOptionalString(staff?.experience),
     rating: toNumber(staff?.rating),
     skills: Array.isArray(staff?.skills)
         ? staff.skills.map((item) => toStringValue(item)).filter(Boolean)
@@ -1267,6 +1274,8 @@ class ApiClient {
                 role: member.role,
                 specialty: member.specialty,
                 avatar: member.avatar || member.photo,
+                bio: member.bio,
+                experience: member.experience,
                 rating: Number(member.rating || 0),
                 skills: Array.isArray(member.skills) ? member.skills : [],
             }))
