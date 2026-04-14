@@ -2,6 +2,7 @@ const db = require('../models');
 const { Op, fn, col } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
 const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
+const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
 const {
     buildSubscriptionInvoiceSnapshot,
     getAmountForBillingCycle,
@@ -43,6 +44,16 @@ function buildTenantPlanSnapshot(tenant, subscriptionRecord) {
         subscriptionStatus: null,
         billingCycle: null
     };
+}
+
+function buildTenantPaymentUrl(tenant, paymentToken) {
+    if (!paymentToken) return '';
+
+    const locale = tenant?.settings?.language === 'en' ? 'en' : 'ar';
+    const baseUrl = getTenantDashboardBaseUrl();
+    const paymentPath = `/${locale}/payment?token=${paymentToken}`;
+
+    return baseUrl ? `${baseUrl}${paymentPath}` : paymentPath;
 }
 
 /**
@@ -325,7 +336,6 @@ const approveTenant = async (req, res) => {
 
         const now = new Date();
         const paymentDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
-        const locale = tenant?.settings?.language === 'en' ? 'en' : 'ar';
         const amount = toNumber(subscription.amount, 0) > 0
             ? toNumber(subscription.amount, 0)
             : getAmountForBillingCycle(subscription.package, subscription.billingCycle);
@@ -382,10 +392,7 @@ const approveTenant = async (req, res) => {
 
         const billNumber = await generateBillNumber();
         const paymentToken = generatePaymentToken();
-        const baseUrl = getTenantDashboardBaseUrl();
-        const paymentUrl = baseUrl
-            ? `${baseUrl}/${locale}/payment?token=${paymentToken}`
-            : `/${locale}/payment?token=${paymentToken}`;
+        const paymentUrl = buildTenantPaymentUrl(tenant, paymentToken);
 
         const invoiceSnapshot = await buildSubscriptionInvoiceSnapshot({
             tenant,
@@ -509,6 +516,113 @@ const approveTenant = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to approve tenant',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Resend tenant subscription payment email
+ */
+const resendTenantPaymentEmail = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { billId } = req.body || {};
+
+        const tenant = await db.Tenant.findByPk(id);
+
+        if (!tenant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tenant not found'
+            });
+        }
+
+        const billWhere = {
+            tenantId: tenant.id,
+            status: { [Op.in]: PAYABLE_BILL_STATUSES }
+        };
+
+        if (billId) {
+            billWhere.id = billId;
+        }
+
+        const bill = await db.Bill.findOne({
+            where: billWhere,
+            include: [
+                { model: db.Tenant, as: 'tenant' },
+                {
+                    model: db.TenantSubscription,
+                    as: 'subscription',
+                    include: [{ model: db.SubscriptionPackage, as: 'package' }]
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!bill) {
+            return res.status(404).json({
+                success: false,
+                message: billId
+                    ? 'No payable invoice found for the selected bill'
+                    : 'No payable invoice found for this tenant'
+            });
+        }
+
+        if (!bill.paymentToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'This invoice does not have a payment link yet'
+            });
+        }
+
+        const paymentUrl = buildTenantPaymentUrl(tenant, bill.paymentToken);
+        const paymentDueAt = bill.paymentTokenExpiresAt || tenant.paymentDueAt || bill.dueDate || null;
+        const billingCycle = bill.planSnapshot?.billingCycle || bill.subscription?.billingCycle;
+        const packageName = bill.planSnapshot?.packageNameAr || bill.planSnapshot?.packageName || bill.subscription?.package?.name;
+
+        const { sendApprovalEmail } = require('../utils/emailService');
+        ensureInvoicePdf(bill).catch(err => {
+            console.error('[ResendPaymentEmail] Failed to generate invoice PDF:', err.message);
+        });
+
+        await sendApprovalEmail(tenant, {
+            paymentUrl,
+            paymentDueAt,
+            bill,
+            packageName,
+            billingCycle
+        });
+
+        await db.ActivityLog.create({
+            entityType: 'tenant',
+            entityId: tenant.id,
+            action: 'payment_email_resent',
+            performedByType: 'super_admin',
+            performedById: req.adminId,
+            performedByName: req.adminName,
+            details: {
+                billId: bill.id,
+                billNumber: bill.billNumber,
+                billStatus: bill.status
+            },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+
+        return res.json({
+            success: true,
+            message: `Payment email resent to ${tenant.email}`,
+            bill: {
+                ...serializeBill(bill, { includePaymentToken: true }),
+                paymentUrl
+            }
+        });
+    } catch (error) {
+        console.error('Resend tenant payment email error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to resend payment email',
             error: error.message
         });
     }
@@ -1132,6 +1246,7 @@ module.exports = {
     getPendingTenants,
     getTenantDetails,
     approveTenant,
+    resendTenantPaymentEmail,
     rejectTenant,
     requestMoreInfo,
     suspendTenant,

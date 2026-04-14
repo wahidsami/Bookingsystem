@@ -135,6 +135,7 @@ export default function ClientDetailsPage() {
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [billDocumentLoading, setBillDocumentLoading] = useState<string | null>(null);
   const [voidingBillId, setVoidingBillId] = useState<string | null>(null);
+  const [resendingPaymentEmailBillId, setResendingPaymentEmailBillId] = useState<string | null>(null);
   const [reconcileModalBill, setReconcileModalBill] = useState<Bill | null>(null);
   const [reconcileForm, setReconcileForm] = useState({
     paymentProvider: "manual_bank_transfer",
@@ -309,6 +310,43 @@ export default function ClientDetailsPage() {
       gatewayStatus: "admin_reconciled",
       notes: "",
     });
+  };
+
+  const handleResendPaymentEmail = async (bill: Bill) => {
+    const confirmed = await dialog.confirm({
+      title: "Resend Payment Email",
+      message: `This will resend the payment email for ${bill.billNumber} to the tenant's subscribed email address.`,
+      confirmText: "Resend Email",
+      cancelText: "Cancel",
+    });
+
+    if (!confirmed) return;
+
+    setResendingPaymentEmailBillId(bill.id);
+    try {
+      const response = await adminApi.resendTenantPaymentEmail(tenant!.id, bill.id);
+      if (response.success) {
+        if (response.bill && selectedBill?.id === bill.id) {
+          setSelectedBill(response.bill as Bill);
+        }
+        await loadTenantDetails();
+        await dialog.alert({
+          title: "Payment Email Sent",
+          message: response.message || `Payment email resent to ${tenant?.email || "the tenant"}.`,
+          tone: "success",
+          confirmText: "OK",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to resend payment email:", error);
+      await dialog.alert({
+        title: "Failed to Resend Email",
+        message: error instanceof Error ? error.message : "Failed to resend payment email",
+        tone: "danger",
+      });
+    } finally {
+      setResendingPaymentEmailBillId(null);
+    }
   };
 
   const handleReconcilePayment = async () => {
@@ -874,6 +912,16 @@ export default function ClientDetailsPage() {
                               Reconcile Payment
                             </button>
                           )}
+                          {(bill.status === "UNPAID" || bill.status === "FAILED") && (
+                            <button
+                              type="button"
+                              onClick={() => handleResendPaymentEmail(bill)}
+                              disabled={resendingPaymentEmailBillId === bill.id}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              {resendingPaymentEmailBillId === bill.id ? "Resending..." : "Resend Payment Email"}
+                            </button>
+                          )}
                           {canVoidBill(bill) && (
                             <button
                               type="button"
@@ -1237,6 +1285,16 @@ export default function ClientDetailsPage() {
                       className="btn btn-primary"
                     >
                       Reconcile Payment
+                    </button>
+                  )}
+                  {(selectedBill.status === "UNPAID" || selectedBill.status === "FAILED") && (
+                    <button
+                      type="button"
+                      onClick={() => handleResendPaymentEmail(selectedBill)}
+                      disabled={resendingPaymentEmailBillId === selectedBill.id}
+                      className="btn btn-secondary"
+                    >
+                      {resendingPaymentEmailBillId === selectedBill.id ? "Resending..." : "Resend Payment Email"}
                     </button>
                   )}
                   {canVoidBill(selectedBill) && (

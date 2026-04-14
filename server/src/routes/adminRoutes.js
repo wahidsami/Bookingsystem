@@ -55,6 +55,7 @@ router.get('/tenants/:tenantId/bills', requirePermission('tenants', 'view'), adm
 router.get('/tenants/:id/activities', requirePermission('tenants', 'view'), adminTenantsController.getTenantActivities);
 router.put('/tenants/:id', requirePermission('tenants', 'edit'), adminTenantsController.updateTenant);
 router.post('/tenants/:id/approve', requirePermission('tenants', 'approve'), adminTenantsController.approveTenant);
+router.post('/tenants/:id/resend-payment-email', requirePermission('tenants', 'edit'), adminTenantsController.resendTenantPaymentEmail);
 router.post('/tenants/:id/reject', requirePermission('tenants', 'approve'), adminTenantsController.rejectTenant);
 router.post('/tenants/:id/request-more-info', requirePermission('tenants', 'approve'), adminTenantsController.requestMoreInfo);
 router.post('/tenants/:id/suspend', requirePermission('tenants', 'edit'), adminTenantsController.suspendTenant);
