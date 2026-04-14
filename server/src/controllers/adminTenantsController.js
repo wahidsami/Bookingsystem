@@ -538,14 +538,12 @@ const resendTenantPaymentEmail = async (req, res) => {
             });
         }
 
-        const billWhere = {
-            tenantId: tenant.id,
-            status: { [Op.in]: PAYABLE_BILL_STATUSES }
-        };
-
-        if (billId) {
-            billWhere.id = billId;
-        }
+        const billWhere = billId
+            ? { id: billId, tenantId: tenant.id }
+            : {
+                tenantId: tenant.id,
+                status: { [Op.in]: PAYABLE_BILL_STATUSES }
+            };
 
         const bill = await db.Bill.findOne({
             where: billWhere,
@@ -557,7 +555,7 @@ const resendTenantPaymentEmail = async (req, res) => {
                     include: [{ model: db.SubscriptionPackage, as: 'package' }]
                 }
             ],
-            order: [['createdAt', 'DESC']]
+            order: billId ? undefined : [['createdAt', 'DESC']]
         });
 
         if (!bill) {
