@@ -223,9 +223,12 @@ class AdminApi {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/approve`, 'POST', { body: { notes } });
   }
 
-  async resendTenantPaymentEmail(id: string, billId?: string) {
+  async resendTenantPaymentEmail(id: string, billId?: string, ccEmail?: string) {
     return this.request<{ success: boolean; message: string; bill?: any }>(`/admin/tenants/${id}/resend-payment-email`, 'POST', {
-      body: billId ? { billId } : {}
+      body: {
+        ...(billId ? { billId } : {}),
+        ...(ccEmail ? { ccEmail } : {})
+      }
     });
   }
 

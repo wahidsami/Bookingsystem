@@ -28,7 +28,8 @@ const getResendClient = () => {
 /**
  * Send email using template
  * @param {Object} options - Email options
- * @param {string} options.to - Recipient email
+ * @param {string|string[]} options.to - Recipient email(s)
+ * @param {string|string[]} [options.cc] - CC recipient email(s)
  * @param {string} options.subject - Email subject
  * @param {string} options.template - Template name (welcome, approved, rejected)
  * @param {Object} options.data - Data to populate template
@@ -36,7 +37,7 @@ const getResendClient = () => {
  */
 const sendEmail = async (options) => {
     try {
-        const { to, subject, template, data } = options;
+        const { to, cc, subject, template, data } = options;
 
         const client = getResendClient();
         if (!client) {
@@ -85,6 +86,10 @@ const sendEmail = async (options) => {
             subject,
             html: htmlContent
         };
+
+        if (cc) {
+            payload.cc = Array.isArray(cc) ? cc : [cc];
+        }
 
         if (attachments.length > 0) {
             payload.attachments = attachments;
@@ -151,6 +156,7 @@ const sendApprovalEmail = async (tenantData, options = {}) => {
 
     return sendEmail({
         to: tenantData.email,
+        cc: options.cc,
         subject: locale === 'en'
             ? `Rifah account approved - invoice ${data.invoiceNumber}`
             : `تم قبول حساب رفاه - فاتورة ${data.invoiceNumber}`,

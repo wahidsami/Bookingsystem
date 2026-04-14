@@ -527,7 +527,7 @@ const approveTenant = async (req, res) => {
 const resendTenantPaymentEmail = async (req, res) => {
     try {
         const { id } = req.params;
-        const { billId } = req.body || {};
+        const { billId, ccEmail } = req.body || {};
 
         const tenant = await db.Tenant.findByPk(id);
 
@@ -585,6 +585,16 @@ const resendTenantPaymentEmail = async (req, res) => {
         const billingCycle = bill.planSnapshot?.billingCycle || bill.subscription?.billingCycle;
         const packageName = bill.planSnapshot?.packageNameAr || bill.planSnapshot?.packageName || bill.subscription?.package?.name;
         const wasExpired = bill.status === BILL_STATUS.EXPIRED;
+        const normalizedCcEmail = (ccEmail || '').toString().trim();
+
+        if (normalizedCcEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedCcEmail)) {
+            return res.status(400).json({
+                success: false,
+                message: 'CC email address is not valid'
+            });
+        }
+
+        const ccRecipients = normalizedCcEmail ? [normalizedCcEmail] : undefined;
 
         const [updatedTenant, updatedBill] = await db.sequelize.transaction(async (transaction) => {
             const updatePayload = {
@@ -627,6 +637,7 @@ const resendTenantPaymentEmail = async (req, res) => {
                     billStatusBefore: wasExpired ? BILL_STATUS.EXPIRED : bill.status,
                     billStatusAfter: wasExpired ? BILL_STATUS.UNPAID : bill.status,
                     paymentTokenRefreshed: shouldRefreshToken,
+                    ccEmail: normalizedCcEmail || null,
                     paymentDueAt
                 },
                 ipAddress: req.ip,
@@ -646,7 +657,8 @@ const resendTenantPaymentEmail = async (req, res) => {
             paymentDueAt,
             bill: updatedBill,
             packageName,
-            billingCycle
+            billingCycle,
+            cc: ccRecipients
         });
 
         return res.json({

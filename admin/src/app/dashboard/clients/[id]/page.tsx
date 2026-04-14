@@ -136,6 +136,9 @@ export default function ClientDetailsPage() {
   const [billDocumentLoading, setBillDocumentLoading] = useState<string | null>(null);
   const [voidingBillId, setVoidingBillId] = useState<string | null>(null);
   const [resendingPaymentEmailBillId, setResendingPaymentEmailBillId] = useState<string | null>(null);
+  const [resendEmailModalBill, setResendEmailModalBill] = useState<Bill | null>(null);
+  const [resendCcEnabled, setResendCcEnabled] = useState(false);
+  const [resendCcEmail, setResendCcEmail] = useState("wahidsami@gmail.com");
   const [reconcileModalBill, setReconcileModalBill] = useState<Bill | null>(null);
   const [reconcileForm, setReconcileForm] = useState({
     paymentProvider: "manual_bank_transfer",
@@ -317,19 +320,20 @@ export default function ClientDetailsPage() {
     });
   };
 
+  const openResendPaymentEmailModal = (bill: Bill) => {
+    setResendEmailModalBill(bill);
+    setResendCcEnabled(false);
+    setResendCcEmail("wahidsami@gmail.com");
+  };
+
   const handleResendPaymentEmail = async (bill: Bill) => {
-    const confirmed = await dialog.confirm({
-      title: "Resend Payment Email",
-      message: `This will resend the payment email for ${bill.billNumber} to the tenant's subscribed email address.`,
-      confirmText: "Resend Email",
-      cancelText: "Cancel",
-    });
-
-    if (!confirmed) return;
-
     setResendingPaymentEmailBillId(bill.id);
     try {
-      const response = await adminApi.resendTenantPaymentEmail(tenant!.id, bill.id);
+      const response = await adminApi.resendTenantPaymentEmail(
+        tenant!.id,
+        bill.id,
+        resendCcEnabled ? resendCcEmail.trim() : undefined
+      );
       if (response.success) {
         if (response.bill && selectedBill?.id === bill.id) {
           setSelectedBill(response.bill as Bill);
@@ -352,6 +356,22 @@ export default function ClientDetailsPage() {
     } finally {
       setResendingPaymentEmailBillId(null);
     }
+  };
+
+  const submitResendPaymentEmail = async () => {
+    if (!resendEmailModalBill) return;
+
+    if (resendCcEnabled && !resendCcEmail.trim()) {
+      await dialog.alert({
+        title: "Missing CC Email",
+        message: "Please enter a CC email address or turn off the CC option.",
+        tone: "danger",
+      });
+      return;
+    }
+
+    await handleResendPaymentEmail(resendEmailModalBill);
+    setResendEmailModalBill(null);
   };
 
   const handleReconcilePayment = async () => {
@@ -920,7 +940,7 @@ export default function ClientDetailsPage() {
                           {canResendPaymentEmail(bill) && (
                             <button
                               type="button"
-                              onClick={() => handleResendPaymentEmail(bill)}
+                              onClick={() => openResendPaymentEmailModal(bill)}
                               disabled={resendingPaymentEmailBillId === bill.id}
                               className="btn btn-secondary btn-sm"
                             >
@@ -1299,7 +1319,7 @@ export default function ClientDetailsPage() {
                   {canResendPaymentEmail(selectedBill) && (
                     <button
                       type="button"
-                      onClick={() => handleResendPaymentEmail(selectedBill)}
+                      onClick={() => openResendPaymentEmailModal(selectedBill)}
                       disabled={resendingPaymentEmailBillId === selectedBill.id}
                       className="btn btn-secondary"
                     >
@@ -1451,6 +1471,76 @@ export default function ClientDetailsPage() {
                     {reconcileLoading ? "Reconciling..." : "Mark Invoice as Paid"}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {resendEmailModalBill && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="card w-full max-w-xl">
+              <div className="card-header flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-primary-300 text-sm font-medium">Resend Payment Email</p>
+                  <h3 className="font-semibold text-white text-xl mt-1">
+                    {resendEmailModalBill.billNumber}
+                  </h3>
+                  <p className="text-dark-400 text-sm mt-1">
+                    Send the payment email again to the tenant. You can optionally CC a second address as a temporary check.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResendEmailModalBill(null)}
+                  className="btn btn-secondary btn-sm"
+                  disabled={resendingPaymentEmailBillId === resendEmailModalBill.id}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="card-body space-y-4">
+                <label className="flex items-center gap-3 rounded-xl border border-dark-600 bg-dark-700/40 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={resendCcEnabled}
+                    onChange={(e) => setResendCcEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-dark-500"
+                  />
+                  <span className="text-sm text-white">Send CC copy to a second email</span>
+                </label>
+
+                {resendCcEnabled && (
+                  <div>
+                    <label className="form-label">CC Email</label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      value={resendCcEmail}
+                      onChange={(e) => setResendCcEmail(e.target.value)}
+                      placeholder="wahidsami@gmail.com"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="card-footer flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResendEmailModalBill(null)}
+                  className="btn btn-secondary"
+                  disabled={resendingPaymentEmailBillId === resendEmailModalBill.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitResendPaymentEmail}
+                  className="btn btn-primary"
+                  disabled={resendingPaymentEmailBillId === resendEmailModalBill.id}
+                >
+                  {resendingPaymentEmailBillId === resendEmailModalBill.id ? "Sending..." : "Send Email"}
+                </button>
               </div>
             </div>
           </div>
