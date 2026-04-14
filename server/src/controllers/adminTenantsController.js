@@ -616,11 +616,12 @@ const resendTenantPaymentEmail = async (req, res) => {
             await db.ActivityLog.create({
                 entityType: 'tenant',
                 entityId: tenant.id,
-                action: 'payment_email_resent',
+                action: 'updated',
                 performedByType: 'super_admin',
                 performedById: req.adminId,
                 performedByName: req.adminName,
                 details: {
+                    event: 'payment_email_resent',
                     billId: bill.id,
                     billNumber: bill.billNumber,
                     billStatusBefore: wasExpired ? BILL_STATUS.EXPIRED : bill.status,
