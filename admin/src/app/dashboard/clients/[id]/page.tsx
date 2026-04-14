@@ -283,6 +283,11 @@ export default function ClientDetailsPage() {
     bill.status === "FAILED" ||
     bill.status === "EXPIRED";
 
+  const canResendPaymentEmail = (bill: Bill) =>
+    bill.status === "UNPAID" ||
+    bill.status === "FAILED" ||
+    bill.status === "EXPIRED";
+
   const openBillDocument = async (bill: Bill, type: "invoice" | "receipt") => {
     setBillDocumentLoading(`${bill.id}-${type}`);
     try {
@@ -912,14 +917,18 @@ export default function ClientDetailsPage() {
                               Reconcile Payment
                             </button>
                           )}
-                          {(bill.status === "UNPAID" || bill.status === "FAILED") && (
+                          {canResendPaymentEmail(bill) && (
                             <button
                               type="button"
                               onClick={() => handleResendPaymentEmail(bill)}
                               disabled={resendingPaymentEmailBillId === bill.id}
                               className="btn btn-secondary btn-sm"
                             >
-                              {resendingPaymentEmailBillId === bill.id ? "Resending..." : "Resend Payment Email"}
+                              {resendingPaymentEmailBillId === bill.id
+                                ? "Resending..."
+                                : bill.status === "EXPIRED"
+                                  ? "Reopen & Resend Email"
+                                  : "Resend Payment Email"}
                             </button>
                           )}
                           {canVoidBill(bill) && (
@@ -1287,14 +1296,18 @@ export default function ClientDetailsPage() {
                       Reconcile Payment
                     </button>
                   )}
-                  {(selectedBill.status === "UNPAID" || selectedBill.status === "FAILED") && (
+                  {canResendPaymentEmail(selectedBill) && (
                     <button
                       type="button"
                       onClick={() => handleResendPaymentEmail(selectedBill)}
                       disabled={resendingPaymentEmailBillId === selectedBill.id}
                       className="btn btn-secondary"
                     >
-                      {resendingPaymentEmailBillId === selectedBill.id ? "Resending..." : "Resend Payment Email"}
+                      {resendingPaymentEmailBillId === selectedBill.id
+                        ? "Resending..."
+                        : selectedBill.status === "EXPIRED"
+                          ? "Reopen & Resend Email"
+                          : "Resend Payment Email"}
                     </button>
                   )}
                   {canVoidBill(selectedBill) && (

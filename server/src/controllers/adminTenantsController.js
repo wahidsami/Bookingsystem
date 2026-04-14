@@ -2,7 +2,7 @@ const db = require('../models');
 const { Op, fn, col } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
 const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
-const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
+const { BILL_STATUS, PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
 const {
     buildSubscriptionInvoiceSnapshot,
     getAmountForBillingCycle,
@@ -564,57 +564,97 @@ const resendTenantPaymentEmail = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: billId
-                    ? 'No payable invoice found for the selected bill'
-                    : 'No payable invoice found for this tenant'
+                    ? 'No invoice found for the selected bill'
+                    : 'No invoice found for this tenant'
             });
         }
 
-        if (!bill.paymentToken) {
-            return res.status(400).json({
-                success: false,
-                message: 'This invoice does not have a payment link yet'
-            });
-        }
+        const now = new Date();
+        const shouldRefreshToken = bill.status === BILL_STATUS.EXPIRED
+            || !bill.paymentToken
+            || !bill.paymentTokenExpiresAt
+            || new Date(bill.paymentTokenExpiresAt) <= now;
 
-        const paymentUrl = buildTenantPaymentUrl(tenant, bill.paymentToken);
-        const paymentDueAt = bill.paymentTokenExpiresAt || tenant.paymentDueAt || bill.dueDate || null;
+        const paymentDueAt = shouldRefreshToken
+            ? new Date(now.getTime() + 48 * 60 * 60 * 1000)
+            : bill.paymentTokenExpiresAt || tenant.paymentDueAt || bill.dueDate || now;
+
+        const paymentToken = shouldRefreshToken
+            ? generatePaymentToken()
+            : bill.paymentToken;
+
+        const paymentUrl = buildTenantPaymentUrl(tenant, paymentToken);
         const billingCycle = bill.planSnapshot?.billingCycle || bill.subscription?.billingCycle;
         const packageName = bill.planSnapshot?.packageNameAr || bill.planSnapshot?.packageName || bill.subscription?.package?.name;
+        const wasExpired = bill.status === BILL_STATUS.EXPIRED;
+
+        const [updatedTenant, updatedBill] = await db.sequelize.transaction(async (transaction) => {
+            const updatePayload = {
+                paymentToken,
+                paymentTokenExpiresAt: paymentDueAt,
+                paymentFailureReason: null,
+                metadata: {
+                    ...(bill.metadata || {}),
+                    paymentEmailResentAt: now.toISOString(),
+                    paymentEmailResentBy: req.adminName,
+                    paymentEmailResentById: req.adminId,
+                    paymentEmailRefreshed: shouldRefreshToken
+                }
+            };
+
+            if (wasExpired) {
+                updatePayload.status = BILL_STATUS.UNPAID;
+            }
+
+            await bill.update(updatePayload, { transaction });
+
+            if (wasExpired) {
+                await tenant.update({
+                    status: 'payment_pending',
+                    paymentDueAt
+                }, { transaction });
+            }
+
+            await db.ActivityLog.create({
+                entityType: 'tenant',
+                entityId: tenant.id,
+                action: 'payment_email_resent',
+                performedByType: 'super_admin',
+                performedById: req.adminId,
+                performedByName: req.adminName,
+                details: {
+                    billId: bill.id,
+                    billNumber: bill.billNumber,
+                    billStatusBefore: wasExpired ? BILL_STATUS.EXPIRED : bill.status,
+                    billStatusAfter: wasExpired ? BILL_STATUS.UNPAID : bill.status,
+                    paymentTokenRefreshed: shouldRefreshToken,
+                    paymentDueAt
+                },
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
+            }, { transaction });
+
+            return [tenant, bill];
+        });
 
         const { sendApprovalEmail } = require('../utils/emailService');
-        ensureInvoicePdf(bill).catch(err => {
+        ensureInvoicePdf(updatedBill).catch(err => {
             console.error('[ResendPaymentEmail] Failed to generate invoice PDF:', err.message);
         });
 
-        await sendApprovalEmail(tenant, {
+        await sendApprovalEmail(updatedTenant, {
             paymentUrl,
             paymentDueAt,
-            bill,
+            bill: updatedBill,
             packageName,
             billingCycle
         });
 
-        await db.ActivityLog.create({
-            entityType: 'tenant',
-            entityId: tenant.id,
-            action: 'payment_email_resent',
-            performedByType: 'super_admin',
-            performedById: req.adminId,
-            performedByName: req.adminName,
-            details: {
-                billId: bill.id,
-                billNumber: bill.billNumber,
-                billStatus: bill.status
-            },
-            ipAddress: req.ip,
-            userAgent: req.headers['user-agent']
-        });
-
         return res.json({
             success: true,
-            message: `Payment email resent to ${tenant.email}`,
+            message: `Payment email resent to ${updatedTenant.email}`,
             bill: {
-                ...serializeBill(bill, { includePaymentToken: true }),
+                ...serializeBill(updatedBill, { includePaymentToken: true }),
                 paymentUrl
             }
         });
