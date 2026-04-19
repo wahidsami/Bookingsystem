@@ -17,6 +17,7 @@ import { differenceInCalendarDays } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { canRequestTimeOff } from '../../src/utils/capabilities';
+import { Appointment, getAppointmentsForDate } from '../../src/services/appointments';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
 import {
     addRiyadhDays,
@@ -43,6 +44,13 @@ const formatClock = (timeString: string) => {
     return `${formattedH}:${minutes} ${ampm}`;
 };
 
+const formatRiyadhTime = (value: string) =>
+    new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Riyadh',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(new Date(value));
+
 const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)}h`;
 
 export default function ScheduleScreen() {
@@ -52,8 +60,10 @@ export default function ScheduleScreen() {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [breaks, setBreaks] = useState<BreakWindow[]>([]);
     const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [selectedDateKey, setSelectedDateKey] = useState(getRiyadhDateKey());
     const [weekOffset, setWeekOffset] = useState(0);
+    const [appointmentsLoading, setAppointmentsLoading] = useState(true);
     const timeOffEnabled = canRequestTimeOff(user);
     const scheduleVisibilityWeeks = Math.min(Math.max(Number(user?.scheduleVisibilityWeeks || 1), 1), 4);
 
@@ -79,6 +89,19 @@ export default function ScheduleScreen() {
         }
     }, [weekStartKey]);
 
+    const loadAppointmentsForSelectedDate = useCallback(async () => {
+        try {
+            setAppointmentsLoading(true);
+            const data = await getAppointmentsForDate(selectedDateKey);
+            setAppointments(data);
+        } catch (error) {
+            console.error('Failed to load appointments for selected day', error);
+            setAppointments([]);
+        } finally {
+            setAppointmentsLoading(false);
+        }
+    }, [selectedDateKey]);
+
     useEffect(() => {
         if (!user) {
             setLoading(false);
@@ -87,6 +110,15 @@ export default function ScheduleScreen() {
         setLoading(true);
         loadData();
     }, [loadData, user]);
+
+    useEffect(() => {
+        if (!user) {
+            setAppointmentsLoading(false);
+            return;
+        }
+
+        loadAppointmentsForSelectedDate();
+    }, [loadAppointmentsForSelectedDate, user]);
 
     useEffect(() => {
         setSelectedDateKey(weekOffset === 0 ? getRiyadhDateKey() : weekStartKey);
@@ -143,6 +175,7 @@ export default function ScheduleScreen() {
 
     const selectedDayShiftMinutes = shiftsForSelectedDate.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
     const selectedDayBreakMinutes = breaksForSelectedDate.reduce((sum, item) => sum + Math.max(minutesBetween(item.startTime, item.endTime), 0), 0);
+    const appointmentsForSelectedDate = appointments;
 
     const upcomingTimeOff = timeOff
         .filter((item) => item.startDate > getRiyadhDateKey())
@@ -246,6 +279,54 @@ export default function ScheduleScreen() {
                         ))}
                     </View>
                 ) : null}
+
+                <View style={styles.appointmentsSection}>
+                    <Text style={styles.sectionTitle}>Appointments</Text>
+                    {appointmentsLoading ? (
+                        <View style={styles.infoCard}>
+                            <ActivityIndicator size="small" color="#8B5ADF" />
+                            <Text style={styles.infoCardText}>Loading appointments for this day...</Text>
+                        </View>
+                    ) : appointmentsForSelectedDate.length === 0 ? (
+                        <View style={styles.infoCard}>
+                            <Ionicons name="calendar-outline" size={18} color="#6b7280" />
+                            <Text style={styles.infoCardText}>No appointments for this day.</Text>
+                        </View>
+                    ) : (
+                        appointmentsForSelectedDate.map((appointment) => (
+                            <View key={appointment.id} style={styles.appointmentCard}>
+                                <View style={styles.appointmentTopRow}>
+                                    <View>
+                                <Text style={styles.appointmentTime}>
+                                    {formatRiyadhTime(appointment.startTime)} to {formatRiyadhTime(appointment.endTime)}
+                                </Text>
+                                        <Text style={styles.appointmentService}>
+                                            {appointment.service?.name_en || 'Service'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.appointmentBadges}>
+                                        <View style={[styles.badge, appointment.assignmentMode === 'customer_selected' ? styles.badgeSpecific : styles.badgeRecurring]}>
+                                            <Text style={[styles.badgeText, appointment.assignmentMode === 'customer_selected' ? styles.badgeSpecificText : styles.badgeRecurringText]}>
+                                                {appointment.assignmentMode === 'customer_selected' ? 'Customer picked staff' : 'Auto-assigned'}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.hoursBadge}>
+                                            <Text style={styles.hoursBadgeText}>
+                                                {appointment.paymentStatus === 'deposit_paid' ? 'Deposit' : appointment.paymentStatus === 'fully_paid' ? 'Paid' : 'On arrival'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                                <Text style={styles.appointmentCustomer}>
+                                    {appointment.user?.firstName || 'Customer'} {appointment.user?.lastName || ''}
+                                </Text>
+                                {appointment.notes ? (
+                                    <Text style={styles.appointmentNotes}>{appointment.notes}</Text>
+                                ) : null}
+                            </View>
+                        ))
+                    )}
+                </View>
             </>
         );
     };
@@ -727,6 +808,9 @@ const styles = StyleSheet.create({
     timeOffSection: {
         marginTop: 8,
     },
+    appointmentsSection: {
+        marginTop: 8,
+    },
     timeOffHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -805,6 +889,49 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     notesText: {
+        fontSize: 13,
+        color: '#6b7280',
+        marginTop: 8,
+        lineHeight: 18,
+    },
+    appointmentCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2,
+    },
+    appointmentTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    appointmentTime: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1f2937',
+        marginBottom: 4,
+    },
+    appointmentService: {
+        fontSize: 14,
+        color: '#6b7280',
+    },
+    appointmentBadges: {
+        alignItems: 'flex-end',
+        gap: 8,
+    },
+    appointmentCustomer: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1f2937',
+        marginTop: 10,
+    },
+    appointmentNotes: {
         fontSize: 13,
         color: '#6b7280',
         marginTop: 8,

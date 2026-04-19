@@ -58,11 +58,11 @@ const normalizeAppointment = (appointment: any): Appointment => {
 };
 
 /**
- * Fetch today's appointments for the logged-in staff
+ * Fetch appointments for a specific day for the logged-in staff
  */
-export const getTodayAppointments = async (): Promise<Appointment[]> => {
+export const getAppointmentsForDate = async (date: string): Promise<Appointment[]> => {
     try {
-        const response = await api.get(`/staff/appointments?date=${getTodayDateKey()}`);
+        const response = await api.get(`/staff/appointments?date=${date}`);
         if (response.data.success) {
             return Array.isArray(response.data.appointments)
                 ? response.data.appointments.map(normalizeAppointment)
@@ -73,6 +73,13 @@ export const getTodayAppointments = async (): Promise<Appointment[]> => {
         console.error('Error fetching today appointments:', error);
         throw error;
     }
+};
+
+/**
+ * Fetch today's appointments for the logged-in staff
+ */
+export const getTodayAppointments = async (): Promise<Appointment[]> => {
+    return getAppointmentsForDate(getTodayDateKey());
 };
 
 /**
