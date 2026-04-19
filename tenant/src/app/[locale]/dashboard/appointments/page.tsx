@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { CalendarView } from "@/components/CalendarView";
 import { tenantApi } from "@/lib/api";
@@ -79,6 +79,13 @@ function getCurrentMonthRange() {
   };
 }
 
+function getLocalDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
@@ -103,6 +110,8 @@ export default function AppointmentsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRequestKeyRef = useRef<string>("");
 
   const defaultMonthRange = getCurrentMonthRange();
   const hasActiveFilters =
@@ -126,14 +135,48 @@ export default function AppointmentsPage() {
     loadEmployees();
   }, []);
 
+  const selectedDateKey = useMemo(() => getLocalDateKey(selectedDate), [selectedDate]);
+  const requestKey = useMemo(() => {
+    const filterKey = [
+      viewMode,
+      selectedDateKey,
+      startDate,
+      endDate,
+      filterStaffId || '-',
+      filterServiceId || '-',
+      filterStatus || '-',
+      filterPaymentStatus || '-'
+    ].join('|');
+
+    return filterKey;
+  }, [viewMode, selectedDateKey, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
+
   useEffect(() => {
-    if (viewMode === 'calendar') {
-      loadAppointmentsBoard();
-      return;
+    if (requestTimerRef.current) {
+      clearTimeout(requestTimerRef.current);
     }
 
-    loadAppointments();
-  }, [viewMode, selectedDate, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
+    requestTimerRef.current = setTimeout(() => {
+      if (lastRequestKeyRef.current === requestKey) {
+        return;
+      }
+
+      lastRequestKeyRef.current = requestKey;
+
+      if (viewMode === 'calendar') {
+        loadAppointmentsBoard();
+        return;
+      }
+
+      loadAppointments();
+    }, viewMode === 'calendar' ? 180 : 120);
+
+    return () => {
+      if (requestTimerRef.current) {
+        clearTimeout(requestTimerRef.current);
+      }
+    };
+  }, [requestKey, viewMode]);
 
   const loadServices = async () => {
     try {
