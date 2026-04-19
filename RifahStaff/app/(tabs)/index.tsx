@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import api, { getImageUrl } from '../../src/services/api';
 import { canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { router } from 'expo-router';
+import { RIYADH_TIME_ZONE } from '../../src/utils/riyadhDate';
 
 export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
@@ -37,7 +38,11 @@ export default function TodayScreen() {
   // Format time as h:mm A
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: RIYADH_TIME_ZONE,
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
   };
 
   const loadAppointments = useCallback(async () => {
@@ -303,13 +308,21 @@ export default function TodayScreen() {
             <View>
               <Text style={styles.greeting}>
                 {(() => {
-                  const hour = new Date().getHours();
+                  const hour = Number(new Intl.DateTimeFormat('en-US', {
+                    timeZone: RIYADH_TIME_ZONE,
+                    hour: '2-digit',
+                    hour12: false,
+                  }).format(new Date()));
                   if (hour < 12) return t('home.goodMorning');
                   if (hour < 17) return t('home.goodAfternoon');
                   return t('home.goodEvening') || 'Good Evening';
                 })()}
               </Text>
-              <Text style={styles.name}>{user?.name?.split(' ')[0] || 'Staff'} {new Date().getHours() < 17 ? '☀️' : '🌙'}</Text>
+              <Text style={styles.name}>{user?.name?.split(' ')[0] || 'Staff'} {Number(new Intl.DateTimeFormat('en-US', {
+                timeZone: RIYADH_TIME_ZONE,
+                hour: '2-digit',
+                hour12: false,
+              }).format(new Date())) < 17 ? '☀️' : '🌙'}</Text>
             </View>
             <View style={styles.avatarContainer}>
               {user?.photo ? (

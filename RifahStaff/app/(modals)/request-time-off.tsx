@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { submitTimeOffRequest } from '../../src/services/schedule';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
+import { getRiyadhDateKey } from '../../src/utils/riyadhDate';
 
 export default function RequestTimeOffModal() {
     const { t } = useTranslation();
@@ -27,7 +28,7 @@ export default function RequestTimeOffModal() {
     const [showEndPicker, setShowEndPicker] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    const formatDate = (value: Date) => value.toISOString().split('T')[0];
+    const formatDate = (value: Date) => getRiyadhDateKey(value);
 
     const leaveTypes = [
         { value: 'vacation', label: t('timeOff.vacation') },

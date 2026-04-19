@@ -13,13 +13,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { addDays, differenceInCalendarDays, format, isSameDay, startOfWeek } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { canRequestTimeOff } from '../../src/utils/capabilities';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
-
-const getDateKey = (value: Date) => format(value, 'yyyy-MM-dd');
+import {
+    addRiyadhDays,
+    formatRiyadhLongDate,
+    formatRiyadhMonthDay,
+    formatRiyadhWeekdayShort,
+    getRiyadhDateKey,
+    getRiyadhWeekStartKey,
+    parseRiyadhDateKey,
+    parseRiyadhDateTime,
+} from '../../src/utils/riyadhDate';
 
 const minutesBetween = (startTime: string, endTime: string) => {
     const [startHour, startMinute] = startTime.split(':').map(Number);
@@ -44,22 +52,21 @@ export default function ScheduleScreen() {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [breaks, setBreaks] = useState<BreakWindow[]>([]);
     const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
-    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [selectedDateKey, setSelectedDateKey] = useState(getRiyadhDateKey());
     const [weekOffset, setWeekOffset] = useState(0);
     const timeOffEnabled = canRequestTimeOff(user);
     const scheduleVisibilityWeeks = Math.min(Math.max(Number(user?.scheduleVisibilityWeeks || 1), 1), 4);
 
-    const baseWeekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), []);
-    const weekStart = useMemo(() => addDays(baseWeekStart, weekOffset * 7), [baseWeekStart, weekOffset]);
-    const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-    const weekStartStr = getDateKey(weekStart);
+    const baseWeekStartKey = useMemo(() => getRiyadhWeekStartKey(), []);
+    const weekStartKey = useMemo(() => addRiyadhDays(baseWeekStartKey, weekOffset * 7), [baseWeekStartKey, weekOffset]);
+    const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addRiyadhDays(weekStartKey, i)), [weekStartKey]);
     const canGoPrev = weekOffset > 0;
     const canGoNext = weekOffset < scheduleVisibilityWeeks - 1;
 
     const loadData = useCallback(async () => {
         try {
-            const start = weekStartStr;
-            const end = getDateKey(addDays(new Date(weekStartStr), 6));
+            const start = weekStartKey;
+            const end = addRiyadhDays(weekStartKey, 6);
             const data = await getSchedule(start, end);
             setShifts(data.shifts);
             setBreaks(data.breaks);
@@ -70,7 +77,7 @@ export default function ScheduleScreen() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [weekStartStr]);
+    }, [weekStartKey]);
 
     useEffect(() => {
         if (!user) {
@@ -82,8 +89,8 @@ export default function ScheduleScreen() {
     }, [loadData, user]);
 
     useEffect(() => {
-        setSelectedDate(weekOffset === 0 ? new Date() : weekStart);
-    }, [weekOffset, weekStartStr]);
+        setSelectedDateKey(weekOffset === 0 ? getRiyadhDateKey() : weekStartKey);
+    }, [weekOffset, weekStartKey]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -115,24 +122,20 @@ export default function ScheduleScreen() {
         );
     };
 
-    const selectedDateKey = getDateKey(selectedDate);
     const shiftsForSelectedDate = shifts.filter((shift) => shift.date === selectedDateKey);
     const breaksForSelectedDate = breaks.filter((item) => item.date === selectedDateKey);
     const timeOffForSelectedDate = timeOff.filter((item) => item.startDate <= selectedDateKey && item.endDate >= selectedDateKey);
 
     const weekShiftMinutes = shifts.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
     const workingDays = new Set(shifts.map((shift) => shift.date)).size;
-    const timeOffDays = weekDays.filter((day) => {
-        const key = getDateKey(day);
-        return timeOff.some((item) => item.startDate <= key && item.endDate >= key);
-    }).length;
+    const timeOffDays = weekDays.filter((dayKey) => timeOff.some((item) => item.startDate <= dayKey && item.endDate >= dayKey)).length;
 
     const nextShift = useMemo(() => {
         const now = Date.now();
         return shifts
             .map((shift) => ({
                 ...shift,
-                startsAt: new Date(`${shift.date}T${shift.startTime}`).getTime()
+                startsAt: parseRiyadhDateTime(shift.date, shift.startTime).getTime()
             }))
             .filter((shift) => shift.startsAt >= now)
             .sort((a, b) => a.startsAt - b.startsAt)[0] || null;
@@ -142,17 +145,16 @@ export default function ScheduleScreen() {
     const selectedDayBreakMinutes = breaksForSelectedDate.reduce((sum, item) => sum + Math.max(minutesBetween(item.startTime, item.endTime), 0), 0);
 
     const upcomingTimeOff = timeOff
-        .filter((item) => item.startDate > getDateKey(new Date()))
+        .filter((item) => item.startDate > getRiyadhDateKey())
         .sort((a, b) => a.startDate.localeCompare(b.startDate));
     const activeTimeOff = timeOff
-        .filter((item) => item.startDate <= getDateKey(new Date()) && item.endDate >= getDateKey(new Date()))
+        .filter((item) => item.startDate <= getRiyadhDateKey() && item.endDate >= getRiyadhDateKey())
         .sort((a, b) => a.startDate.localeCompare(b.startDate));
     const pastTimeOff = timeOff
-        .filter((item) => item.endDate < getDateKey(new Date()))
+        .filter((item) => item.endDate < getRiyadhDateKey())
         .sort((a, b) => b.endDate.localeCompare(a.endDate));
 
-    const getDayState = (day: Date) => {
-        const key = getDateKey(day);
+    const getDayState = (key: string) => {
         if (timeOff.some((item) => item.startDate <= key && item.endDate >= key)) {
             return 'timeoff';
         }
@@ -268,7 +270,7 @@ export default function ScheduleScreen() {
                             </Text>
                         </View>
                         <Text style={styles.shiftLabel}>
-                            {item.startDate} to {item.endDate} • {differenceInCalendarDays(new Date(item.endDate), new Date(item.startDate)) + 1} day(s)
+                            {item.startDate} to {item.endDate} • {differenceInCalendarDays(parseRiyadhDateKey(item.endDate), parseRiyadhDateKey(item.startDate)) + 1} day(s)
                         </Text>
                         {item.reason ? <Text style={styles.notesText}>{item.reason}</Text> : null}
                         {allowCancel ? (
@@ -311,7 +313,7 @@ export default function ScheduleScreen() {
                     </View>
                     <View style={styles.statCard}>
                         <Text style={styles.statValue}>
-                            {nextShift ? format(new Date(`${nextShift.date}T${nextShift.startTime}`), 'EEE h:mm a') : 'None'}
+                            {nextShift ? `${formatRiyadhWeekdayShort(nextShift.date)} ${formatClock(nextShift.startTime)}` : 'None'}
                         </Text>
                         <Text style={styles.statLabel}>Next Shift</Text>
                     </View>
@@ -328,7 +330,7 @@ export default function ScheduleScreen() {
 
                     <View style={styles.weekNavigatorCenter}>
                         <Text style={styles.weekNavigatorTitle}>
-                            {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d')}
+                            {formatRiyadhMonthDay(weekStartKey)} - {formatRiyadhMonthDay(addRiyadhDays(weekStartKey, 6))}
                         </Text>
                         <Text style={styles.weekNavigatorSubtitle}>
                             Week {weekOffset + 1} of {scheduleVisibilityWeeks} visible week(s)
@@ -345,25 +347,25 @@ export default function ScheduleScreen() {
                 </View>
 
                 <View style={styles.calendarStrip}>
-                    {weekDays.map((day) => {
-                        const isSelected = isSameDay(day, selectedDate);
-                        const state = getDayState(day);
+                    {weekDays.map((dayKey) => {
+                        const isSelected = dayKey === selectedDateKey;
+                        const state = getDayState(dayKey);
                         return (
                             <TouchableOpacity
-                                key={getDateKey(day)}
+                                key={dayKey}
                                 style={[
                                     styles.dayCard,
                                     isSelected && styles.dayCardSelected,
                                     !isSelected && state === 'timeoff' && styles.dayCardTimeOff,
                                     !isSelected && state === 'working' && styles.dayCardWorking,
                                 ]}
-                                onPress={() => setSelectedDate(day)}
+                                onPress={() => setSelectedDateKey(dayKey)}
                             >
                                 <Text style={[styles.dayName, isSelected && styles.textSelected]}>
-                                    {format(day, 'EEE')}
+                                    {formatRiyadhWeekdayShort(dayKey)}
                                 </Text>
                                 <Text style={[styles.dayNumber, isSelected && styles.textSelected]}>
-                                    {format(day, 'd')}
+                                    {parseRiyadhDateKey(dayKey).getUTCDate()}
                                 </Text>
                                 <View style={[
                                     styles.dayStateDot,
@@ -380,7 +382,7 @@ export default function ScheduleScreen() {
                 <View style={styles.dayOverviewCard}>
                     <View style={styles.dayOverviewHeader}>
                         <View>
-                            <Text style={styles.dateTitle}>{format(selectedDate, 'EEEE, MMMM d')}</Text>
+                            <Text style={styles.dateTitle}>{formatRiyadhLongDate(selectedDateKey)}</Text>
                             <Text style={styles.dateSubtitle}>
                                 {shiftsForSelectedDate.length > 0
                                     ? `${shiftsForSelectedDate.length} shift(s) • ${formatDurationHours(selectedDayShiftMinutes)} total`

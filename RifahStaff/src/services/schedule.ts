@@ -1,4 +1,5 @@
 import api from './api';
+import { addRiyadhDays } from '../utils/riyadhDate';
 
 export interface Shift {
     id: string; // Synthetic ID for React keys
@@ -38,12 +39,11 @@ export interface ScheduleData {
 
 const buildDateRange = (startDate: string, endDate: string) => {
     const dates: string[] = [];
-    const cursor = new Date(`${startDate}T00:00:00`);
-    const limit = new Date(`${endDate}T00:00:00`);
+    let cursor = startDate;
 
-    while (cursor <= limit) {
-        dates.push(cursor.toISOString().split('T')[0]);
-        cursor.setDate(cursor.getDate() + 1);
+    while (cursor <= endDate) {
+        dates.push(cursor);
+        cursor = addRiyadhDays(cursor, 1);
     }
 
     return dates;

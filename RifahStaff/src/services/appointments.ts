@@ -1,4 +1,5 @@
 import api from './api';
+import { getRiyadhDateKey } from '../utils/riyadhDate';
 
 export interface Appointment {
     id: string;
@@ -27,7 +28,7 @@ export interface Appointment {
     };
 }
 
-const getTodayDateKey = () => new Date().toISOString().split('T')[0];
+const getTodayDateKey = () => getRiyadhDateKey();
 
 const normalizeAppointment = (appointment: any): Appointment => {
     const backendStatus = `${appointment?.status || ''}`;
