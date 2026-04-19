@@ -8,7 +8,8 @@ import {
     ActivityIndicator,
     RefreshControl,
     Platform,
-    Alert
+    Alert,
+    Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,9 +17,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { differenceInCalendarDays } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { canRequestTimeOff } from '../../src/utils/capabilities';
-import { Appointment, getAppointmentsForDate } from '../../src/services/appointments';
+import { canRequestTimeOff, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
+import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '../../src/services/appointments';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
+import { getImageUrl } from '../../src/services/api';
 import {
     addRiyadhDays,
     formatRiyadhLongDate,
@@ -44,13 +46,6 @@ const formatClock = (timeString: string) => {
     return `${formattedH}:${minutes} ${ampm}`;
 };
 
-const formatRiyadhTime = (value: string) =>
-    new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Riyadh',
-        hour: 'numeric',
-        minute: '2-digit',
-    }).format(new Date(value));
-
 const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)}h`;
 
 export default function ScheduleScreen() {
@@ -64,7 +59,10 @@ export default function ScheduleScreen() {
     const [selectedDateKey, setSelectedDateKey] = useState(getRiyadhDateKey());
     const [weekOffset, setWeekOffset] = useState(0);
     const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
     const timeOffEnabled = canRequestTimeOff(user);
+    const canSeeBookingNotes = canViewBookingNotes(user);
+    const canViewClientContext = canViewClients(user);
     const scheduleVisibilityWeeks = Math.min(Math.max(Number(user?.scheduleVisibilityWeeks || 1), 1), 4);
 
     const baseWeekStartKey = useMemo(() => getRiyadhWeekStartKey(), []);
@@ -101,6 +99,22 @@ export default function ScheduleScreen() {
             setAppointmentsLoading(false);
         }
     }, [selectedDateKey]);
+
+    const handleAppointmentStatusUpdate = async (id: string, newStatus: 'started' | 'completed' | 'no-show') => {
+        if (updatingId) {
+            return;
+        }
+
+        try {
+            setUpdatingId(id);
+            await updateAppointmentStatus(id, newStatus);
+            loadAppointmentsForSelectedDate();
+        } catch (error) {
+            console.error('Failed to update appointment status', error);
+        } finally {
+            setUpdatingId(null);
+        }
+    };
 
     useEffect(() => {
         if (!user) {
@@ -195,6 +209,33 @@ export default function ScheduleScreen() {
             return 'working';
         }
         return 'off';
+    };
+
+    const formatTime = (value: string) =>
+        new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Riyadh',
+            hour: 'numeric',
+            minute: '2-digit',
+        }).format(new Date(value));
+
+    const getUrgencyInfo = (item: Appointment): { label: string; color: string; background: string; priority: number } => {
+        if (item.status === 'started') {
+            return { label: 'In Service', color: '#92400e', background: '#fef3c7', priority: 0 };
+        }
+
+        if (['completed', 'no_show', 'cancelled'].includes(item.status)) {
+            return { label: 'Closed', color: '#4b5563', background: '#f3f4f6', priority: 4 };
+        }
+
+        const minutesToStart = Math.round((new Date(item.startTime).getTime() - Date.now()) / 60000);
+        if (minutesToStart < -10) {
+            return { label: 'Late', color: '#b91c1c', background: '#fee2e2', priority: 1 };
+        }
+        if (minutesToStart <= 30) {
+            return { label: 'Starting Soon', color: '#9a3412', background: '#ffedd5', priority: 2 };
+        }
+
+        return { label: 'Upcoming', color: '#1d4ed8', background: '#dbeafe', priority: 3 };
     };
 
     const renderSelectedDayContent = () => {
@@ -293,38 +334,135 @@ export default function ScheduleScreen() {
                             <Text style={styles.infoCardText}>No appointments for this day.</Text>
                         </View>
                     ) : (
-                        appointmentsForSelectedDate.map((appointment) => (
-                            <View key={appointment.id} style={styles.appointmentCard}>
-                                <View style={styles.appointmentTopRow}>
-                                    <View>
-                                <Text style={styles.appointmentTime}>
-                                    {formatRiyadhTime(appointment.startTime)} to {formatRiyadhTime(appointment.endTime)}
-                                </Text>
-                                        <Text style={styles.appointmentService}>
-                                            {appointment.service?.name_en || 'Service'}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.appointmentBadges}>
-                                        <View style={[styles.badge, appointment.assignmentMode === 'customer_selected' ? styles.badgeSpecific : styles.badgeRecurring]}>
-                                            <Text style={[styles.badgeText, appointment.assignmentMode === 'customer_selected' ? styles.badgeSpecificText : styles.badgeRecurringText]}>
-                                                {appointment.assignmentMode === 'customer_selected' ? 'Customer picked staff' : 'Auto-assigned'}
+                        appointmentsForSelectedDate.map((appointment) => {
+                            const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
+                            const amount = Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
+                            const urgency = getUrgencyInfo(appointment);
+                            const isStarted = appointment.status === 'started';
+                            const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
+
+                            return (
+                                <View key={appointment.id} style={[styles.appointmentCard, isCompleted && styles.appointmentCardCompleted]}>
+                                    <View style={styles.appointmentCardHeader}>
+                                        <View>
+                                            <Text style={styles.appointmentTime}>
+                                                {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
+                                            </Text>
+                                            <Text style={styles.appointmentDuration}>
+                                                {appointment.service?.duration || 0} min
                                             </Text>
                                         </View>
-                                        <View style={styles.hoursBadge}>
-                                            <Text style={styles.hoursBadgeText}>
-                                                {appointment.paymentStatus === 'deposit_paid' ? 'Deposit' : appointment.paymentStatus === 'fully_paid' ? 'Paid' : 'On arrival'}
-                                            </Text>
+                                        <View style={styles.appointmentCardBadges}>
+                                            <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
+                                                <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
+                                            </View>
+                                            <View style={styles.statusBadge}>
+                                                <Text style={[styles.statusText, appointment.status === 'started' && { color: '#fbbf24' }, appointment.status === 'completed' && { color: '#10b981' }, appointment.status === 'cancelled' && { color: '#ef4444' }]}>
+                                                    {appointment.status.toUpperCase().replace('_', ' ')}
+                                                </Text>
+                                            </View>
                                         </View>
                                     </View>
+
+                                    <View style={styles.appointmentCardBody}>
+                                        <View style={styles.appointmentCustomerRow}>
+                                            <View style={styles.appointmentAvatar}>
+                                                {appointment.user?.profileImage ? (
+                                                    <Image source={{ uri: getImageUrl(appointment.user.profileImage) }} style={styles.appointmentAvatarImage} />
+                                                ) : (
+                                                    <Text style={styles.appointmentAvatarInitial}>{customerInitial}</Text>
+                                                )}
+                                            </View>
+                                            <View style={styles.appointmentCustomerMeta}>
+                                                <Text style={styles.appointmentCustomerName}>
+                                                    {appointment.user?.firstName} {appointment.user?.lastName}
+                                                </Text>
+                                                <Text style={styles.appointmentBookingMeta}>
+                                                    Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.appointmentAmountBox}>
+                                                <Text style={styles.appointmentAmountText}>SAR {amount.toFixed(2)}</Text>
+                                            </View>
+                                        </View>
+
+                                        <Text style={styles.appointmentServiceName}>{appointment.service?.name_en || 'Service'}</Text>
+
+                                        <View style={styles.appointmentMetaRow}>
+                                            <View style={styles.appointmentMetaBadge}>
+                                                <Ionicons name="card-outline" size={13} color="#6b7280" />
+                                                <Text style={styles.appointmentMetaBadgeText}>{appointment.paymentStatus.replace(/_/g, ' ')}</Text>
+                                            </View>
+                                            {appointment.paymentMethod ? (
+                                                <View style={styles.appointmentMetaBadge}>
+                                                    <Ionicons name="wallet-outline" size={13} color="#6b7280" />
+                                                    <Text style={styles.appointmentMetaBadgeText}>{appointment.paymentMethod.replace(/_/g, ' ')}</Text>
+                                                </View>
+                                            ) : null}
+                                            <View style={styles.appointmentMetaBadge}>
+                                                <Ionicons name={appointment.assignmentMode === 'customer_selected' ? 'person-circle-outline' : 'sparkles-outline'} size={13} color="#6b7280" />
+                                                <Text style={styles.appointmentMetaBadgeText}>
+                                                    {appointment.assignmentMode === 'customer_selected' ? 'Customer picked staff' : 'Auto-assigned'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {canSeeBookingNotes && appointment.notes ? (
+                                            <View style={styles.appointmentNotesContainer}>
+                                                <Ionicons name="document-text-outline" size={14} color="#6b7280" />
+                                                <Text style={styles.appointmentNotesText} numberOfLines={2}>{appointment.notes}</Text>
+                                            </View>
+                                        ) : null}
+
+                                        {canViewClientContext && appointment.user?.id ? (
+                                            <TouchableOpacity
+                                                style={styles.appointmentClientButton}
+                                                onPress={() => router.push((`/client/${appointment.user?.id}` as any))}
+                                            >
+                                                <Ionicons name="person-circle-outline" size={16} color="#6d28d9" style={styles.appointmentClientButtonIcon} />
+                                                <Text style={styles.appointmentClientButtonText}>View Client</Text>
+                                            </TouchableOpacity>
+                                        ) : null}
+                                    </View>
+
+                                    {!isCompleted && appointment.status !== 'cancelled' ? (
+                                        <View style={styles.appointmentActions}>
+                                            {!isStarted ? (
+                                                <TouchableOpacity
+                                                    style={[styles.actionBtn, styles.startBtn, updatingId === appointment.id && { opacity: 0.6 }]}
+                                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'started')}
+                                                    disabled={!!updatingId}
+                                                >
+                                                    {updatingId === appointment.id
+                                                        ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
+                                                        : <Ionicons name="play" size={16} color="#ffffff" style={styles.btnIcon} />}
+                                                    <Text style={styles.btnTextWhite}>Start</Text>
+                                                </TouchableOpacity>
+                                            ) : (
+                                                <TouchableOpacity
+                                                    style={[styles.actionBtn, styles.completeBtn, updatingId === appointment.id && { opacity: 0.6 }]}
+                                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
+                                                    disabled={!!updatingId}
+                                                >
+                                                    {updatingId === appointment.id
+                                                        ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
+                                                        : <Ionicons name="checkmark-done" size={16} color="#ffffff" style={styles.btnIcon} />}
+                                                    <Text style={styles.btnTextWhite}>Complete</Text>
+                                                </TouchableOpacity>
+                                            )}
+
+                                            <TouchableOpacity
+                                                style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
+                                                onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
+                                                disabled={!!updatingId}
+                                            >
+                                                <Text style={styles.btnTextGray}>No Show</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : null}
                                 </View>
-                                <Text style={styles.appointmentCustomer}>
-                                    {appointment.user?.firstName || 'Customer'} {appointment.user?.lastName || ''}
-                                </Text>
-                                {appointment.notes ? (
-                                    <Text style={styles.appointmentNotes}>{appointment.notes}</Text>
-                                ) : null}
-                            </View>
-                        ))
+                            );
+                        })
                     )}
                 </View>
             </>
@@ -905,37 +1043,194 @@ const styles = StyleSheet.create({
         shadowRadius: 5,
         elevation: 2,
     },
-    appointmentTopRow: {
+    appointmentCardCompleted: {
+        opacity: 0.72,
+        backgroundColor: '#f9fafb',
+    },
+    appointmentCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         gap: 12,
     },
+    urgencyBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    urgencyText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    statusBadge: {
+        backgroundColor: '#f3f4f6',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginTop: 6,
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#6b7280',
+    },
     appointmentTime: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#1f2937',
+        color: '#8B5ADF',
         marginBottom: 4,
     },
-    appointmentService: {
-        fontSize: 14,
+    appointmentDuration: {
+        fontSize: 13,
         color: '#6b7280',
     },
-    appointmentBadges: {
+    appointmentCardBadges: {
         alignItems: 'flex-end',
         gap: 8,
     },
-    appointmentCustomer: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1f2937',
+    appointmentCardBody: {
         marginTop: 10,
     },
-    appointmentNotes: {
-        fontSize: 13,
+    appointmentCustomerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    appointmentAvatar: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#ede9fe',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        marginRight: 12,
+    },
+    appointmentAvatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    appointmentAvatarInitial: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#6d28d9',
+    },
+    appointmentCustomerMeta: {
+        flex: 1,
+    },
+    appointmentCustomerName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1f2937',
+    },
+    appointmentBookingMeta: {
+        fontSize: 12,
         color: '#6b7280',
-        marginTop: 8,
-        lineHeight: 18,
+        marginTop: 2,
+    },
+    appointmentAmountBox: {
+        backgroundColor: '#f3f4f6',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    appointmentAmountText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1f2937',
+    },
+    appointmentServiceName: {
+        fontSize: 15,
+        color: '#4b5563',
+    },
+    appointmentMetaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 10,
+    },
+    appointmentMetaBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f3f4f6',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    appointmentMetaBadgeText: {
+        fontSize: 12,
+        color: '#4b5563',
+        marginLeft: 6,
+        textTransform: 'capitalize',
+    },
+    appointmentNotesContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#fef3c7',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10,
+        alignItems: 'flex-start',
+    },
+    appointmentNotesText: {
+        fontSize: 13,
+        color: '#92400e',
+        marginLeft: 6,
+        flex: 1,
+    },
+    appointmentClientButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        marginTop: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#f5f3ff',
+        borderRadius: 999,
+    },
+    appointmentClientButtonIcon: {
+        marginRight: 6,
+    },
+    appointmentClientButtonText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#6d28d9',
+    },
+    appointmentActions: {
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderTopColor: '#f3f4f6',
+        paddingTop: 16,
+        gap: 12,
+    },
+    actionBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    startBtn: {
+        backgroundColor: '#8B5ADF',
+    },
+    completeBtn: {
+        backgroundColor: '#10b981',
+    },
+    noShowBtn: {
+        backgroundColor: '#f3f4f6',
+    },
+    btnIcon: {
+        marginRight: 6,
+    },
+    btnTextWhite: {
+        color: '#ffffff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    btnTextGray: {
+        color: '#4b5563',
+        fontWeight: '500',
+        fontSize: 14,
     },
     cancelButton: {
         flexDirection: 'row',
