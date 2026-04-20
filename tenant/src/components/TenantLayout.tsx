@@ -202,7 +202,6 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐", visible: hasPublicPageCustomization },
     { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: "⚙️" },
   ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
-  const currentSection = navigation.find((item) => isActive(item.href))?.name || t("dashboard");
 
   useEffect(() => {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
@@ -230,6 +229,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     }
     return pathname?.startsWith(href);
   };
+  const currentSection = navigation.find((item) => isActive(item.href))?.name || t("dashboard");
 
   const renderSidebarNavItem = (item: { name: string; href: string; icon: string; badgeCount?: number }) => {
     const active = isActive(item.href);
