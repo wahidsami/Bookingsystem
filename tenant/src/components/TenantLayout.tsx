@@ -270,10 +270,20 @@ export function TenantLayout({ children }: TenantLayoutProps) {
             ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
             : "text-gray-700 hover:bg-gray-100"
         }`}
-        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
       >
-        <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
-        {!sidebarCollapsed && <span className="flex-1 font-medium">{item.name}</span>}
+        {sidebarCollapsed ? (
+          <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+        ) : isRTL ? (
+          <>
+            <span className="flex-1 font-medium text-right">{item.name}</span>
+            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+          </>
+        ) : (
+          <>
+            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+            <span className="flex-1 font-medium">{item.name}</span>
+          </>
+        )}
         {!sidebarCollapsed && item.badgeCount ? (
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-bold ${
@@ -369,109 +379,210 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           style={{ gridArea: 'header' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
-          <div className="flex h-full items-center justify-between px-6" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-            <div className="flex items-center gap-3 min-w-0" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-              <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
-                <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
-                {currentDateTimeLabel}
-              </div>
-              <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-                  {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
-                </span>
-                <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
-              </div>
-            </div>
+          <div
+            className={`grid h-full items-center gap-4 px-6 ${isRTL ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
+          >
+            {isRTL ? (
+              <>
+                <div className="flex items-center justify-start gap-3" style={{ flexDirection: 'row' }}>
+                  <Link
+                    href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    {locale === 'ar' ? 'EN' : 'عربي'}
+                  </Link>
 
-            <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-              <Link
-                href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                {locale === 'ar' ? 'EN' : 'عربي'}
-              </Link>
+                  <div ref={userMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setUserMenuOpen((current) => !current)}
+                      className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
+                    >
+                      {user?.profileImage || user?.logo ? (
+                        <img
+                          src={user.profileImage ? getImageUrl(user.profileImage) : getImageUrl(user.logo)}
+                          alt={displayName}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
+                          {displayInitials}
+                        </div>
+                      )}
+                      <div className="min-w-0 text-right">
+                        <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
+                        <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
+                      </div>
+                      <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-              <div ref={userMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setUserMenuOpen((current) => !current)}
-                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
-                  style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                >
-                  {user?.profileImage || user?.logo ? (
-                    <img
-                      src={user.profileImage ? getImageUrl(user.profileImage) : getImageUrl(user.logo)}
-                      alt={displayName}
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
-                      {displayInitials}
-                    </div>
-                  )}
-                  <div className="min-w-0 text-left" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
-                    <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
+                    {userMenuOpen && (
+                      <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
+                        <div className="border-b border-gray-100 px-4 py-4">
+                          <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                          <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
+                        </div>
+                        <div className="p-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              router.push(`/${locale}/dashboard/settings`);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
+                            <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled
+                            title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                          >
+                            <LifebuoyIcon className="h-5 w-5 text-gray-400" />
+                            <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled
+                            title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                          >
+                            <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+                            <span>{locale === 'ar' ? 'حول' : 'About'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              logout();
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
+                            <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
+                </div>
 
-                {userMenuOpen && (
-                  <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
-                    <div className="border-b border-gray-100 px-4 py-4">
-                      <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                      <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
-                    </div>
-                    <div className="p-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          router.push(`/${locale}/dashboard/settings`);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                      >
-                        <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
-                        <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                      >
-                        <LifebuoyIcon className="h-5 w-5 text-gray-400" />
-                        <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                      >
-                        <InformationCircleIcon className="h-5 w-5 text-gray-400" />
-                        <span>{locale === 'ar' ? 'حول' : 'About'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          logout();
-                        }}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                      >
-                        <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
-                        <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
-                      </button>
-                    </div>
+                <div className="flex items-center justify-end gap-3 min-w-0">
+                  <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 text-right">
+                    <ClockIcon className="inline-block h-4 w-4 ml-2 align-[-2px]" />
+                    {currentDateTimeLabel}
                   </div>
-                )}
-              </div>
-            </div>
+                  <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
+                    <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-start gap-3 min-w-0">
+                  <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
+                    <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
+                    {currentDateTimeLabel}
+                  </div>
+                  <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
+                    </span>
+                    <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3">
+                  <Link
+                    href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    {locale === 'ar' ? 'EN' : 'عربي'}
+                  </Link>
+
+                  <div ref={userMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setUserMenuOpen((current) => !current)}
+                      className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
+                    >
+                      {user?.profileImage || user?.logo ? (
+                        <img
+                          src={user.profileImage ? getImageUrl(user.profileImage) : getImageUrl(user.logo)}
+                          alt={displayName}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
+                          {displayInitials}
+                        </div>
+                      )}
+                      <div className="min-w-0 text-left">
+                        <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
+                        <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
+                      </div>
+                      <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {userMenuOpen && (
+                      <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
+                        <div className="border-b border-gray-100 px-4 py-4">
+                          <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                          <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
+                        </div>
+                        <div className="p-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              router.push(`/${locale}/dashboard/settings`);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
+                            <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled
+                            title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                          >
+                            <LifebuoyIcon className="h-5 w-5 text-gray-400" />
+                            <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled
+                            title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                          >
+                            <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+                            <span>{locale === 'ar' ? 'حول' : 'About'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              logout();
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
+                            <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </header>
 
