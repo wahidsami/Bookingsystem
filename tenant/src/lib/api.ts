@@ -317,6 +317,47 @@ class TenantApiClient {
   }
 
   /**
+   * Tenant dashboard accounts
+   */
+  async getDashboardAccounts(): Promise<any> {
+    return this.get('/tenant/dashboard-accounts');
+  }
+
+  async createDashboardAccount(data: {
+    displayName: string;
+    email: string;
+    password?: string;
+    roleKey?: string;
+    permissions?: Record<string, boolean>;
+    isActive?: boolean;
+  }): Promise<any> {
+    return this.post('/tenant/dashboard-accounts', data);
+  }
+
+  async updateDashboardAccount(id: string, data: {
+    displayName?: string;
+    email?: string;
+    password?: string;
+    roleKey?: string;
+    permissions?: Record<string, boolean>;
+    isActive?: boolean;
+  }): Promise<any> {
+    return this.put(`/tenant/dashboard-accounts/${id}`, data);
+  }
+
+  async resetDashboardAccountPassword(id: string): Promise<any> {
+    return this.patch(`/tenant/dashboard-accounts/${id}/reset-password`, {});
+  }
+
+  async disableDashboardAccount(id: string): Promise<any> {
+    return this.delete(`/tenant/dashboard-accounts/${id}`);
+  }
+
+  async getDashboardAccountRoleOptions(): Promise<any> {
+    return this.get('/tenant/dashboard-accounts/role-options');
+  }
+
+  /**
    * Dashboard
    */
   async getBills(): Promise<{ success: boolean; bills: any[] }> {

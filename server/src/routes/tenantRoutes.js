@@ -24,6 +24,7 @@ const tenantPosController = require('../controllers/tenantPosController');
 const tenantMessagesController = require('../controllers/tenantMessagesController');
 const tenantPayrollController = require('../controllers/tenantPayrollController');
 const tenantNotificationController = require('../controllers/tenantNotificationController');
+const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const aiController = require('../controllers/tenant/aiController');
 const { authenticateTenant, checkTenantFeature } = require('../middleware/authTenant');
 const {
@@ -70,6 +71,7 @@ router.put('/resubmit-request', tenantRegistrationController.resubmitRequest);
 // Profile management
 router.get('/profile', tenantAuthController.getProfile);
 router.put('/profile', tenantAuthController.updateProfile);
+router.use('/dashboard-accounts', tenantDashboardAccountRoutes);
 
 // Dashboard stats and data
 router.get('/dashboard/stats', tenantDashboardController.getDashboardStats);

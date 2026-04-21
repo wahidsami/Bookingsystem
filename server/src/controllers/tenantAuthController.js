@@ -6,6 +6,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const db = require('../models');
+const { normalizeDashboardPermissions } = require('../utils/tenantDashboardPermissions');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -24,6 +25,17 @@ const generateAccessToken = (tenantId) => {
 };
 
 /**
+ * Generate dashboard account access token
+ */
+const generateAccountAccessToken = (tenantId, accountId) => {
+  return jwt.sign(
+    { id: tenantId, accountId, type: 'tenant_account' },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+};
+
+/**
  * Generate refresh token
  */
 const generateRefreshToken = (tenantId) => {
@@ -32,6 +44,85 @@ const generateRefreshToken = (tenantId) => {
     JWT_REFRESH_SECRET,
     { expiresIn: JWT_REFRESH_EXPIRES_IN }
   );
+};
+
+/**
+ * Generate dashboard account refresh token
+ */
+const generateAccountRefreshToken = (tenantId, accountId) => {
+  return jwt.sign(
+    { id: tenantId, accountId, type: 'tenant_account', isRefresh: true },
+    JWT_REFRESH_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES_IN }
+  );
+};
+
+const sanitizeDashboardAccount = (account) => {
+  if (!account) {
+    return null;
+  }
+
+  const json = account.toJSON ? account.toJSON() : { ...account };
+  delete json.password;
+  return {
+    ...json,
+    permissions: normalizeDashboardPermissions(json.permissions || {}, json.roleKey)
+  };
+};
+
+const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+
+const isMissingTenantDashboardAccountTableError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  const code = error?.original?.code || error?.parent?.code;
+
+  return (
+    code === '42P01' ||
+    message.includes('tenant_dashboard_accounts') ||
+    (message.includes('relation') && message.includes('does not exist'))
+  );
+};
+
+const findDashboardAccountByEmail = async (email) => {
+  try {
+    return await db.TenantDashboardAccount.findOne({
+      where: {
+        email
+      }
+    });
+  } catch (error) {
+    if (isMissingTenantDashboardAccountTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+const findDashboardAccountById = async (accountId) => {
+  try {
+    return await db.TenantDashboardAccount.findByPk(accountId);
+  } catch (error) {
+    if (isMissingTenantDashboardAccountTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+const getBlockedTenantMessage = (status) => {
+  return status === 'rejected'
+    ? 'Your account has been rejected. Please contact support.'
+    : status === 'suspended'
+      ? 'Your account has been suspended. Please contact support.'
+      : status === 'payment_expired'
+        ? 'Payment window expired. Please contact support.'
+        : `Account is ${status}. Please contact support.`;
+};
+
+const buildTenantResponse = (tenant) => {
+  const tenantData = tenant.toJSON();
+  delete tenantData.password;
+  return tenantData;
 };
 
 /**
@@ -50,35 +141,80 @@ const login = async (req, res) => {
       });
     }
 
-    // Find tenant by email
-    const tenant = await db.Tenant.findOne({ where: { email: email.toLowerCase() } });
+    const normalizedEmail = email.toLowerCase();
 
-    if (!tenant) {
+    // Try tenant owner login first
+    const tenant = await db.Tenant.findOne({ where: { email: normalizedEmail } });
+
+    if (tenant) {
+      if (blockedStatuses.includes(tenant.status)) {
+        return res.status(403).json({
+          success: false,
+          message: getBlockedTenantMessage(tenant.status),
+          status: tenant.status
+        });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, tenant.password);
+
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        });
+      }
+
+      tenant.lastLogin = new Date();
+      await tenant.save();
+
+      const accessToken = generateAccessToken(tenant.id);
+      const refreshToken = generateRefreshToken(tenant.id);
+
+      return res.json({
+        success: true,
+        message: 'Login successful',
+        accessToken,
+        refreshToken,
+        sessionType: 'tenant_owner',
+        tenant: buildTenantResponse(tenant),
+        account: null,
+        permissions: null
+      });
+    }
+
+    const dashboardAccount = await findDashboardAccountByEmail(normalizedEmail);
+
+    if (!dashboardAccount) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    // Block login for terminal/invalid statuses
-    const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
-    if (blockedStatuses.includes(tenant.status)) {
-      return res.status(403).json({
+    const accountTenant = await db.Tenant.findByPk(dashboardAccount.tenantId);
+    if (!accountTenant) {
+      return res.status(404).json({
         success: false,
-        message: tenant.status === 'rejected'
-          ? 'Your account has been rejected. Please contact support.'
-          : tenant.status === 'suspended'
-            ? 'Your account has been suspended. Please contact support.'
-            : tenant.status === 'payment_expired'
-              ? 'Payment window expired. Please contact support.'
-              : `Account is ${tenant.status}. Please contact support.`,
-        status: tenant.status
+        message: 'Tenant not found'
       });
     }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, tenant.password);
+    if (blockedStatuses.includes(accountTenant.status)) {
+      return res.status(403).json({
+        success: false,
+        message: getBlockedTenantMessage(accountTenant.status),
+        status: accountTenant.status
+      });
+    }
 
+    if (!dashboardAccount.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'This dashboard account is disabled'
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, dashboardAccount.password);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -86,24 +222,23 @@ const login = async (req, res) => {
       });
     }
 
-    // Update last login
-    tenant.lastLogin = new Date();
-    await tenant.save();
+    dashboardAccount.lastLoginAt = new Date();
+    dashboardAccount.lastLoginIP = req.ip;
+    await dashboardAccount.save();
 
-    // Generate tokens
-    const accessToken = generateAccessToken(tenant.id);
-    const refreshToken = generateRefreshToken(tenant.id);
+    const accessToken = generateAccountAccessToken(accountTenant.id, dashboardAccount.id);
+    const refreshToken = generateAccountRefreshToken(accountTenant.id, dashboardAccount.id);
+    const accountData = sanitizeDashboardAccount(dashboardAccount);
 
-    // Remove password from response
-    const tenantData = tenant.toJSON();
-    delete tenantData.password;
-
-    res.json({
+    return res.json({
       success: true,
       message: 'Login successful',
       accessToken,
       refreshToken,
-      tenant: tenantData
+      sessionType: 'tenant_account',
+      tenant: buildTenantResponse(accountTenant),
+      account: accountData,
+      permissions: accountData.permissions
     });
   } catch (error) {
     console.error('Tenant login error:', error);
@@ -158,7 +293,7 @@ const refreshToken = async (req, res) => {
     // Verify refresh token
     const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
 
-    if (decoded.type !== 'tenant' || !decoded.isRefresh) {
+    if ((decoded.type !== 'tenant' && decoded.type !== 'tenant_account') || !decoded.isRefresh) {
       return res.status(403).json({
         success: false,
         message: 'Invalid refresh token'
@@ -179,13 +314,33 @@ const refreshToken = async (req, res) => {
     if (blockedStatuses.includes(tenant.status)) {
       return res.status(403).json({
         success: false,
-        message: `Account is ${tenant.status}`,
+        message: getBlockedTenantMessage(tenant.status),
         status: tenant.status
       });
     }
 
-    // Generate new access token
-    const newAccessToken = generateAccessToken(tenant.id);
+    let newAccessToken;
+
+    if (decoded.type === 'tenant_account') {
+      if (!decoded.accountId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid tenant dashboard account token'
+        });
+      }
+
+      const dashboardAccount = await findDashboardAccountById(decoded.accountId);
+      if (!dashboardAccount || dashboardAccount.tenantId !== tenant.id || !dashboardAccount.isActive) {
+        return res.status(403).json({
+          success: false,
+          message: 'Tenant dashboard account is no longer valid'
+        });
+      }
+
+      newAccessToken = generateAccountAccessToken(tenant.id, dashboardAccount.id);
+    } else {
+      newAccessToken = generateAccessToken(tenant.id);
+    }
 
     res.json({
       success: true,
@@ -226,9 +381,14 @@ const getProfile = async (req, res) => {
       });
     }
 
+    const account = req.tenantAccount ? sanitizeDashboardAccount(req.tenantAccount) : null;
+
     res.json({
       success: true,
-      tenant
+      tenant,
+      account,
+      sessionType: account ? 'tenant_account' : 'tenant_owner',
+      permissions: account?.permissions || null
     });
   } catch (error) {
     console.error('Get tenant profile error:', error);

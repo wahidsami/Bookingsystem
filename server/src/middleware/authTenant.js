@@ -12,6 +12,18 @@ const {
   isFeatureEnabled,
   normalizePackageEntitlements
 } = require('../utils/packageEntitlements');
+const { normalizeDashboardPermissions } = require('../utils/tenantDashboardPermissions');
+
+const isMissingTenantDashboardAccountTableError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  const code = error?.original?.code || error?.parent?.code;
+
+  return (
+    code === '42P01' ||
+    message.includes('tenant_dashboard_accounts') ||
+    (message.includes('relation') && message.includes('does not exist'))
+  );
+};
 
 /**
  * Authenticate Tenant User (Required Auth)
@@ -34,8 +46,8 @@ const authenticateTenant = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Check if it's a tenant token (not platform user or admin)
-    if (decoded.type !== 'tenant') {
+    // Check if it's a tenant token or a tenant dashboard account token
+    if (decoded.type !== 'tenant' && decoded.type !== 'tenant_account') {
       return res.status(403).json({
         success: false,
         message: 'Invalid token type. Tenant access required.'
@@ -43,7 +55,8 @@ const authenticateTenant = async (req, res, next) => {
     }
 
     // Fetch tenant from database
-    const tenant = await db.Tenant.findByPk(decoded.id, {
+    const tenantId = decoded.id;
+    const tenant = await db.Tenant.findByPk(tenantId, {
       attributes: { exclude: ['password'] }
     });
 
@@ -63,10 +76,49 @@ const authenticateTenant = async (req, res, next) => {
       });
     }
 
+    let tenantAccount = null;
+    let dashboardPermissions = null;
+
+    if (decoded.type === 'tenant_account') {
+      if (!decoded.accountId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid tenant dashboard account token'
+        });
+      }
+
+      try {
+        tenantAccount = await db.TenantDashboardAccount.findByPk(decoded.accountId);
+      } catch (accountError) {
+        if (!isMissingTenantDashboardAccountTableError(accountError)) {
+          throw accountError;
+        }
+      }
+
+      if (!tenantAccount || tenantAccount.tenantId !== tenant.id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Tenant dashboard account not found'
+        });
+      }
+
+      if (!tenantAccount.isActive) {
+        return res.status(403).json({
+          success: false,
+          message: 'Tenant dashboard account is disabled'
+        });
+      }
+
+      dashboardPermissions = normalizeDashboardPermissions(tenantAccount.permissions || {}, tenantAccount.roleKey);
+    }
+
     // Attach tenant data to request
     req.tenantId = tenant.id;
     req.tenant = tenant;
-    req.userId = decoded.id; // For backward compatibility
+    req.tenantAccount = tenantAccount;
+    req.tenantAccountId = tenantAccount?.id || null;
+    req.dashboardPermissions = dashboardPermissions;
+    req.userId = decoded.type === 'tenant_account' ? tenantAccount.id : decoded.id; // For backward compatibility
     
     next();
   } catch (error) {
@@ -110,15 +162,30 @@ const optionalTenantAuth = async (req, res, next) => {
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    if (decoded.type === 'tenant') {
+    if (decoded.type === 'tenant' || decoded.type === 'tenant_account') {
       const tenant = await db.Tenant.findByPk(decoded.id, {
         attributes: { exclude: ['password'] }
       });
 
-      if (tenant && (tenant.status === 'active' || tenant.status === 'approved')) {
+      if (tenant && (tenant.status === 'active' || tenant.status === 'approved' || tenant.status === 'payment_pending')) {
         req.tenantId = tenant.id;
         req.tenant = tenant;
-        req.userId = decoded.id;
+        req.userId = decoded.type === 'tenant_account' ? decoded.accountId : decoded.id;
+
+        if (decoded.type === 'tenant_account' && decoded.accountId) {
+          try {
+            const tenantAccount = await db.TenantDashboardAccount.findByPk(decoded.accountId);
+            if (tenantAccount && tenantAccount.tenantId === tenant.id && tenantAccount.isActive) {
+              req.tenantAccount = tenantAccount;
+              req.tenantAccountId = tenantAccount.id;
+              req.dashboardPermissions = normalizeDashboardPermissions(tenantAccount.permissions || {}, tenantAccount.roleKey);
+            }
+          } catch (accountError) {
+            if (!isMissingTenantDashboardAccountTableError(accountError)) {
+              throw accountError;
+            }
+          }
+        }
       }
     }
 
@@ -235,11 +302,37 @@ const rateLimitTenant = (maxRequests = 100, windowMs = 60000) => {
   };
 };
 
+const requireTenantDashboardPermission = (permissionKey) => {
+  return (req, res, next) => {
+    if (!req.tenant) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    if (!req.tenantAccount) {
+      return next();
+    }
+
+    const permissions = req.dashboardPermissions || normalizeDashboardPermissions(req.tenantAccount.permissions || {}, req.tenantAccount.roleKey);
+    if (permissions[permissionKey]) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: 'You do not have permission to access this section'
+    });
+  };
+};
+
 module.exports = {
   authenticateTenant,
   optionalTenantAuth,
   checkTenantFeature,
   rateLimitTenant,
-  isFeatureEnabled
+  isFeatureEnabled,
+  requireTenantDashboardPermission
 };
 

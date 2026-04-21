@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
+import { TeamAccessSection } from '@/components/settings/TeamAccessSection';
+import { useTenantAuth } from '@/contexts/TenantAuthContext';
 import {
   BuildingOfficeIcon,
   ClockIcon,
@@ -14,6 +16,7 @@ import {
   PaintBrushIcon,
   PhotoIcon,
   CheckIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 
 interface WorkingDay {
@@ -36,6 +39,8 @@ export default function SettingsPage() {
   const t = useTranslations('Settings');
   const locale = useLocale();
   const isRTL = locale === 'ar';
+  const { permissions, sessionType } = useTenantAuth();
+  const canManageAccounts = sessionType === 'tenant_owner' || permissions?.manage_accounts === true;
 
   const [activeTab, setActiveTab] = useState('business');
   const [loading, setLoading] = useState(true);
@@ -351,6 +356,11 @@ export default function SettingsPage() {
     { id: 'notifications', icon: BellIcon, label: t('notifications') },
     { id: 'payment', icon: CreditCardIcon, label: t('payment') },
     { id: 'localization', icon: GlobeAltIcon, label: t('localization') },
+    ...(canManageAccounts ? [{
+      id: 'team',
+      icon: UserGroupIcon,
+      label: locale === 'ar' ? 'الفريق والصلاحيات' : 'Team & Access'
+    }] : []),
   ];
 
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -1230,6 +1240,10 @@ export default function SettingsPage() {
                   {saving ? t('saving') : t('save')}
                 </button>
               </div>
+            )}
+
+            {canManageAccounts && activeTab === 'team' && (
+              <TeamAccessSection />
             )}
           </div>
         </div>

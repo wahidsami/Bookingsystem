@@ -41,6 +41,10 @@ import {
   hasReportsEntitlement
 } from "@/lib/packageEntitlements";
 import { useRouter } from "next/navigation";
+import {
+  DASHBOARD_SECTION_PERMISSION_MAP,
+  hasDashboardPermission
+} from "@/lib/dashboardAccess";
 
 interface TenantLayoutProps {
   children: React.ReactNode;
@@ -54,7 +58,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
-  const { user, logout } = useTenantAuth();
+  const { user, logout, permissions, sessionType } = useTenantAuth();
   const t = useTranslations("Navigation");
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
@@ -130,7 +134,16 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const hasReports = canEvaluateEntitlements && hasReportsEntitlement(entitlements);
   const hasPublicPageCustomization = canEvaluateEntitlements && hasPublicPageCustomizationEntitlement(entitlements);
   const tenantTimeZone = user?.settings?.timezone || user?.timezone || 'Asia/Riyadh';
+  const isDashboardAccount = sessionType === 'tenant_account';
+  const canAccessPermission = (key?: string | null) => {
+    if (!key || !isDashboardAccount) return true;
+    if (key === DASHBOARD_SECTION_PERMISSION_MAP.settings && permissions?.manage_accounts) {
+      return true;
+    }
+    return hasDashboardPermission(permissions, key as any);
+  };
   const displayName =
+    user?.displayName ||
     user?.ownerNameEn ||
     user?.ownerName ||
     user?.contactPersonNameEn ||
@@ -329,53 +342,56 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     };
   }, []);
 
-  const navigation = useMemo(() => [
-    { name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon },
-    { name: t("services"), href: `/${locale}/dashboard/services`, icon: SparklesIcon },
-    { name: t("products"), href: `/${locale}/dashboard/products`, icon: ShoppingBagIcon, visible: hasProductsAndOrders },
-    { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon },
-    { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon },
-    { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon },
+  const navigationItems = useMemo(() => [
+    { name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
+    { name: t("services"), href: `/${locale}/dashboard/services`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.services },
+    { name: t("products"), href: `/${locale}/dashboard/products`, icon: ShoppingBagIcon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.products },
+    { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.employees },
+    { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.schedules },
+    { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.appointments },
     {
       name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections',
       href: `/${locale}/dashboard/pos`,
       icon: BanknotesIcon,
       badgeCount: posDueCount,
+      permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.pos
     },
-    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: Squares2X2Icon, visible: hasProductsAndOrders },
-    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals },
-    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: ChatBubbleLeftRightIcon, visible: hasInternalMessaging },
-    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications },
-    { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: UsersIcon },
-    { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon },
-    { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon },
-    { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon },
-    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll },
-    { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon },
-    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports },
-    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization },
-    { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon },
-  ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
+    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: Squares2X2Icon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.orders },
+    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP['hot-deals'] },
+    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: ChatBubbleLeftRightIcon, visible: hasInternalMessaging, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.messages },
+    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
+    { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: UsersIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.customers },
+    { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.bills },
+    { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.subscription },
+    { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.financial },
+    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.payroll },
+    { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reviews },
+    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reports },
+    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.mypage },
+    { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.settings },
+  ], [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
+  const navigation = navigationItems.filter((item) => item.visible !== false && canAccessPermission(item.permissionKey));
 
   useEffect(() => {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
 
     const restrictedRoutes = [
-      { href: `/${locale}/dashboard/products`, allowed: hasProductsAndOrders, feature: "productsAndOrders" },
-      { href: `/${locale}/dashboard/orders`, allowed: hasProductsAndOrders, feature: "productsAndOrders" },
-      { href: `/${locale}/dashboard/hot-deals`, allowed: hasHotDeals, feature: "hotDeals" },
-      { href: `/${locale}/dashboard/messages`, allowed: hasInternalMessaging, feature: "internalMessaging" },
-      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications, feature: "pushNotifications" },
-      { href: `/${locale}/dashboard/payroll`, allowed: hasPayroll, feature: "payroll" },
-      { href: `/${locale}/dashboard/reports`, allowed: hasReports, feature: "reports" },
-      { href: `/${locale}/dashboard/mypage`, allowed: hasPublicPageCustomization, feature: "publicPageCustomization" }
+      { href: `/${locale}/dashboard/products`, allowed: hasProductsAndOrders && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.products), feature: "productsAndOrders" },
+      { href: `/${locale}/dashboard/orders`, allowed: hasProductsAndOrders && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.orders), feature: "productsAndOrders" },
+      { href: `/${locale}/dashboard/hot-deals`, allowed: hasHotDeals && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP['hot-deals']), feature: "hotDeals" },
+      { href: `/${locale}/dashboard/messages`, allowed: hasInternalMessaging && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.messages), feature: "internalMessaging" },
+      { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.notifications), feature: "pushNotifications" },
+      { href: `/${locale}/dashboard/payroll`, allowed: hasPayroll && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.payroll), feature: "payroll" },
+      { href: `/${locale}/dashboard/reports`, allowed: hasReports && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.reports), feature: "reports" },
+      { href: `/${locale}/dashboard/mypage`, allowed: hasPublicPageCustomization && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.mypage), feature: "publicPageCustomization" },
+      { href: `/${locale}/dashboard/settings`, allowed: canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.settings), feature: "settings" }
     ];
 
     const blockedRoute = restrictedRoutes.find((route) => pathname.startsWith(route.href) && !route.allowed);
     if (blockedRoute) {
-      router.replace(`/${locale}/dashboard/subscription?lockedFeature=${blockedRoute.feature}`);
+      router.replace(`/${locale}/dashboard`);
     }
-  }, [entitlements, entitlementsLoadFailed, entitlementsLoaded, hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, pathname, router]);
+  }, [canAccessPermission, entitlements, entitlementsLoadFailed, entitlementsLoaded, locale, navigationItems, pathname, router]);
 
   const isActive = (href: string) => {
     if (href === `/${locale}/dashboard`) {
