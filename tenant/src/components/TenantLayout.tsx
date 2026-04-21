@@ -380,7 +380,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           dir={isRTL ? 'rtl' : 'ltr'}
         >
           <div
-            className={`grid h-full items-center gap-4 px-6 ${isRTL ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
+            className={`h-full items-center gap-4 px-6 ${isRTL ? 'flex flex-row-reverse justify-between' : 'grid grid-cols-[minmax(0,1fr)_auto]'}`}
           >
             {isRTL ? (
               <>
