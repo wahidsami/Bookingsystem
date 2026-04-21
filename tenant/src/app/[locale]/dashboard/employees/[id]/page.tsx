@@ -326,17 +326,53 @@ export default function EditEmployeePage() {
     setDashboardPermissions(nextPermissions);
   };
 
+  const resolveDashboardAccountId = async () => {
+    if (dashboardAccountId) {
+      return dashboardAccountId;
+    }
+
+    const lookupEmail = `${dashboardAccountEmail || savedEmail || formData.email || ''}`.trim().toLowerCase();
+    if (!lookupEmail) {
+      return null;
+    }
+
+    try {
+      const dashboardAccountsResponse = await tenantApi.getDashboardAccounts();
+      const dashboardAccounts = Array.isArray(dashboardAccountsResponse.accounts)
+        ? dashboardAccountsResponse.accounts
+        : [];
+      const account = dashboardAccounts.find((item: any) => {
+        const accountEmail = `${item.email || ''}`.trim().toLowerCase();
+        return accountEmail && accountEmail === lookupEmail;
+      });
+
+      if (account?.id) {
+        setDashboardAccountId(account.id);
+        setDashboardAccountEmail(account.email || lookupEmail);
+        setDashboardPermissions(
+          normalizeDashboardPermissions(account.permissions || {}, account.roleKey || dashboardRoleKey)
+        );
+        return account.id as string;
+      }
+    } catch (resolveErr) {
+      console.error("Failed to resolve dashboard account:", resolveErr);
+    }
+
+    return null;
+  };
+
   const handleDashboardInvite = async () => {
-    if (!dashboardAccountId) {
+    const targetAccountId = await resolveDashboardAccountId();
+    if (!targetAccountId) {
       setError(locale === 'ar'
-        ? 'احفظ الموظف أولاً قبل إرسال الدعوة.'
-        : 'Save the employee first before sending the invite.');
+        ? 'لم نتمكن من العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
+        : 'Unable to find the linked dashboard account for this team member.');
       return;
     }
 
     setDashboardInviteLoading(true);
     try {
-      const response = await tenantApi.sendDashboardAccountInvite(dashboardAccountId);
+      const response = await tenantApi.sendDashboardAccountInvite(targetAccountId);
       if (!response?.success) {
         throw new Error(response?.message || (locale === 'ar' ? 'تعذر إرسال الدعوة' : 'Failed to send invitation'));
       }
@@ -350,10 +386,11 @@ export default function EditEmployeePage() {
   };
 
   const handleDashboardResetPassword = async () => {
-    if (!dashboardAccountId) {
+    const targetAccountId = await resolveDashboardAccountId();
+    if (!targetAccountId) {
       setError(locale === 'ar'
-        ? 'احفظ الموظف أولاً قبل إعادة تعيين كلمة المرور.'
-        : 'Save the employee first before resetting the password.');
+        ? 'لم نتمكن من العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
+        : 'Unable to find the linked dashboard account for this team member.');
       return;
     }
 
@@ -365,7 +402,7 @@ export default function EditEmployeePage() {
 
     setDashboardResetLoading(true);
     try {
-      const response = await tenantApi.resetDashboardAccountPassword(dashboardAccountId);
+      const response = await tenantApi.resetDashboardAccountPassword(targetAccountId);
       if (!response?.success) {
         throw new Error(response?.message || (locale === 'ar' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
       }
@@ -940,35 +977,35 @@ export default function EditEmployeePage() {
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
                     <div className="font-medium text-gray-900">{locale === 'ar' ? 'الحساب المرتبط' : 'Linked account'}</div>
                     <div className="mt-1 break-all text-gray-700">
-                      {dashboardAccountEmail || savedEmail || formData.email || '-'}
+                        {dashboardAccountEmail || savedEmail || formData.email || '-'}
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        {dashboardAccountId
+                          ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
+                          : (locale === 'ar' ? 'سيتم ربط الحساب تلقائياً عند حفظ الموظف ويمكن استخدام الأزرار بعد ذلك.' : 'The dashboard account will be linked automatically after saving this employee.')}
+                      </div>
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      {dashboardAccountId
-                        ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
-                        : (locale === 'ar' ? 'احفظ الموظف مرة واحدة ليتم إنشاء الحساب المرتبط.' : 'Save the employee once to create the linked dashboard account.')}
-                    </div>
-                  </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDashboardInvite}
-                      disabled={dashboardInviteLoading || !dashboardAccountId}
-                      className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {dashboardInviteLoading
-                        ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
-                        : (locale === 'ar' ? 'إرسال دعوة' : 'Send invite')}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDashboardInvite}
+                        disabled={dashboardInviteLoading}
+                        className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {dashboardInviteLoading
+                          ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                          : (locale === 'ar' ? 'إرسال دعوة' : 'Send invite')}
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleDashboardResetPassword}
-                      disabled={dashboardResetLoading || !dashboardAccountId}
-                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {dashboardResetLoading
-                        ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
-                        : (locale === 'ar' ? 'إعادة كلمة المرور' : 'Reset password')}
+                      <button
+                        type="button"
+                        onClick={handleDashboardResetPassword}
+                        disabled={dashboardResetLoading}
+                        className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {dashboardResetLoading
+                          ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
+                          : (locale === 'ar' ? 'إعادة كلمة المرور' : 'Reset password')}
                     </button>
                   </div>
 
