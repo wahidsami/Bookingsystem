@@ -25,12 +25,39 @@ app.set('trust proxy', trustProxyValue);
 // ========================================
 // CORS Configuration - Environment-based
 // ========================================
+const normalizeOrigin = (value) => `${value || ''}`.trim().replace(/\/+$/, '');
+
+const allowedOriginPatterns = [
+    /^https:\/\/([a-z0-9-]+\.)?rifah\.sa$/i,
+    /^https:\/\/([a-z0-9-]+\.)?unifinitylab\.com$/i,
+    /^http:\/\/localhost(:\d+)?$/i,
+    /^http:\/\/127\.0\.0\.1(:\d+)?$/i,
+];
+
+const isAllowedOrigin = (origin) => {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) {
+        return false;
+    }
+
+    const envOrigins = (process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((item) => normalizeOrigin(item))
+        .filter(Boolean);
+
+    if (envOrigins.includes(normalizedOrigin)) {
+        return true;
+    }
+
+    return allowedOriginPatterns.some((pattern) => pattern.test(normalizedOrigin));
+};
+
 const getCorsOrigins = () => {
     const env = process.env.NODE_ENV || 'development';
 
     // Parse environment variable if it exists
     if (process.env.CORS_ORIGINS) {
-        const parsed = process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+        const parsed = process.env.CORS_ORIGINS.split(',').map(o => normalizeOrigin(o)).filter(Boolean);
         if (parsed.length > 0) return parsed;
     }
 
@@ -70,7 +97,17 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware - CORS with environment-based origins
 app.use(cors({
-    origin: getCorsOrigins(),
+    origin: (origin, callback) => {
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        if (isAllowedOrigin(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true
 }));
 
