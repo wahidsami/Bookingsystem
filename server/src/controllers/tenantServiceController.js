@@ -61,6 +61,7 @@ function calculateFinalPrice(rawPrice, taxRate, commissionRate) {
 
 const SERVICE_TARGET_GENDERS = new Set(['all', 'female', 'male']);
 const SERVICE_PRICE_TYPES = new Set(['free', 'fixed']);
+const SERVICE_EMPLOYEE_COMMISSION_TYPES = new Set(['fixed', 'percentage']);
 
 function normalizeServiceTargetGender(value) {
     const normalized = `${value ?? 'all'}`.trim().toLowerCase();
@@ -116,6 +117,93 @@ function parseServiceVariants(input) {
     } catch (error) {
         return [];
     }
+}
+
+function normalizeServiceEmployeeAssignment(input, index = 0) {
+    if (typeof input === 'string') {
+        const employeeId = input.trim();
+        if (!employeeId) {
+            return null;
+        }
+
+        return {
+            employeeId,
+            isAssigned: true,
+            hasCommission: false,
+            commissionType: 'percentage',
+            commissionValue: '',
+            isPrimary: index === 0
+        };
+    }
+
+    if (!input || typeof input !== 'object') {
+        return null;
+    }
+
+    const value = input;
+    const employeeId = `${value.employeeId || value.staffId || ''}`.trim();
+    if (!employeeId) {
+        return null;
+    }
+
+    const commissionTypeRaw = `${value.commissionType || 'percentage'}`.trim().toLowerCase();
+    const commissionType = SERVICE_EMPLOYEE_COMMISSION_TYPES.has(commissionTypeRaw) ? commissionTypeRaw : 'percentage';
+    const commissionValue = `${value.commissionValue ?? value.commissionRate ?? ''}`.trim();
+    const isAssigned = value.isAssigned === undefined ? true : value.isAssigned === true || value.isAssigned === 'true';
+    const hasCommission = value.hasCommission === true || value.hasCommission === 'true' || commissionValue !== '';
+
+    return {
+        employeeId,
+        isAssigned,
+        hasCommission,
+        commissionType,
+        commissionValue,
+        isPrimary: value.isPrimary === true || value.isPrimary === 'true'
+    };
+}
+
+function parseServiceEmployeeAssignments(input) {
+    if (!input) {
+        return [];
+    }
+
+    try {
+        const parsed = typeof input === 'string' ? JSON.parse(input) : input;
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .map((item, index) => normalizeServiceEmployeeAssignment(item, index))
+            .filter(Boolean);
+    } catch (error) {
+        return [];
+    }
+}
+
+function buildServiceEmployeeRows(serviceId, assignments) {
+    return assignments
+        .filter((assignment) => assignment.isAssigned)
+        .map((assignment, index) => {
+            const commissionValue = parseFloat(assignment.commissionValue || 0);
+            const hasCommission = assignment.hasCommission === true;
+            const commissionType = hasCommission ? assignment.commissionType : null;
+            const commissionValueNumber = hasCommission && Number.isFinite(commissionValue) && commissionValue >= 0
+                ? parseFloat(commissionValue.toFixed(2))
+                : null;
+
+            return {
+                serviceId,
+                staffId: assignment.employeeId,
+                isPrimary: index === 0 || assignment.isPrimary === true,
+                commissionRate: hasCommission && commissionType === 'percentage' && commissionValueNumber !== null
+                    ? commissionValueNumber
+                    : null,
+                commissionType,
+                commissionValue: commissionValueNumber,
+                notes: null
+            };
+        });
 }
 
 function calculateRawPriceFromFinalPrice(finalPrice, taxRate, commissionRate) {
@@ -220,7 +308,7 @@ exports.getServices = async (req, res) => {
                     model: db.Staff,
                     as: 'employees',
                     through: {
-                        attributes: ['commissionRate', 'isPrimary', 'notes']
+                        attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     },
                     attributes: ['id', 'name', 'photo', 'isActive']
                 }
@@ -262,7 +350,7 @@ exports.getService = async (req, res) => {
                     model: db.Staff,
                     as: 'employees',
                     through: {
-                        attributes: ['commissionRate', 'isPrimary', 'notes']
+                        attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     },
                     attributes: ['id', 'name', 'photo', 'isActive']
                 }
@@ -315,6 +403,7 @@ exports.createService = async (req, res) => {
             benefits, // JSON string or array of {en, ar} objects
             whatToExpect, // JSON string or array of {en, ar} objects
             variants,
+            employeeAssignments,
             hasOffer,
             offerDetails,
             hasGift,
@@ -410,30 +499,20 @@ exports.createService = async (req, res) => {
 
         const variantsArray = parseServiceVariants(variants);
 
-        // Parse employee IDs
-        let employeeIdsArray = [];
-        if (employeeIds) {
-            try {
-                employeeIdsArray = typeof employeeIds === 'string' ? JSON.parse(employeeIds) : employeeIds;
-                if (!Array.isArray(employeeIdsArray)) {
-                    employeeIdsArray = [];
-                }
-            } catch (e) {
-                employeeIdsArray = [];
-            }
-        }
+        const parsedEmployeeAssignments = parseServiceEmployeeAssignments(employeeAssignments || employeeIds);
+        const selectedEmployeeAssignments = parsedEmployeeAssignments.filter((assignment) => assignment.isAssigned);
 
         // Validate employees belong to tenant
-        if (employeeIdsArray.length > 0) {
+        if (selectedEmployeeAssignments.length > 0) {
             const validEmployees = await db.Staff.findAll({
                 where: {
-                    id: { [Op.in]: employeeIdsArray },
+                    id: { [Op.in]: selectedEmployeeAssignments.map((assignment) => assignment.employeeId) },
                     tenantId
                 },
                 transaction
             });
 
-            if (validEmployees.length !== employeeIdsArray.length) {
+            if (validEmployees.length !== selectedEmployeeAssignments.length) {
                 await transaction.rollback();
                 return res.status(400).json({
                     success: false,
@@ -479,16 +558,8 @@ exports.createService = async (req, res) => {
         }, { transaction });
 
         // Assign employees to service
-        if (employeeIdsArray.length > 0) {
-            const serviceEmployeeData = employeeIdsArray.map((staffId, index) => ({
-                serviceId: service.id,
-                staffId: staffId,
-                isPrimary: index === 0, // First employee is primary
-                commissionRate: null, // Use default from staff
-                notes: null
-            }));
-
-            await db.ServiceEmployee.bulkCreate(serviceEmployeeData, { transaction });
+        if (selectedEmployeeAssignments.length > 0) {
+            await db.ServiceEmployee.bulkCreate(buildServiceEmployeeRows(service.id, selectedEmployeeAssignments), { transaction });
         }
 
         // Reload service with employees
@@ -498,7 +569,7 @@ exports.createService = async (req, res) => {
                     model: db.Staff,
                     as: 'employees',
                     through: {
-                        attributes: ['commissionRate', 'isPrimary', 'notes']
+                        attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     }
                 }
             ],
@@ -554,6 +625,7 @@ exports.updateService = async (req, res) => {
             benefits,
             whatToExpect,
             variants,
+            employeeAssignments,
             hasOffer,
             offerDetails,
             hasGift,
@@ -661,30 +733,22 @@ exports.updateService = async (req, res) => {
             variantsArray = parseServiceVariants(variants);
         }
 
-        // Parse employee IDs
-        let employeeIdsArray = [];
-        if (employeeIds !== undefined) {
-            try {
-                employeeIdsArray = typeof employeeIds === 'string' ? JSON.parse(employeeIds) : employeeIds;
-                if (!Array.isArray(employeeIdsArray)) {
-                    employeeIdsArray = [];
-                }
-            } catch (e) {
-                employeeIdsArray = [];
-            }
-        }
+        const parsedEmployeeAssignments = employeeAssignments !== undefined
+            ? parseServiceEmployeeAssignments(employeeAssignments)
+            : parseServiceEmployeeAssignments(employeeIds);
+        const selectedEmployeeAssignments = parsedEmployeeAssignments.filter((assignment) => assignment.isAssigned);
 
         // Validate employees belong to tenant
-        if (employeeIdsArray.length > 0) {
+        if (selectedEmployeeAssignments.length > 0) {
             const validEmployees = await db.Staff.findAll({
                 where: {
-                    id: { [Op.in]: employeeIdsArray },
+                    id: { [Op.in]: selectedEmployeeAssignments.map((assignment) => assignment.employeeId) },
                     tenantId
                 },
                 transaction
             });
 
-            if (validEmployees.length !== employeeIdsArray.length) {
+            if (validEmployees.length !== selectedEmployeeAssignments.length) {
                 await transaction.rollback();
                 return res.status(400).json({
                     success: false,
@@ -737,7 +801,7 @@ exports.updateService = async (req, res) => {
         await service.save({ transaction });
 
         // Update employee assignments
-        if (employeeIds !== undefined) {
+        if (employeeAssignments !== undefined || employeeIds !== undefined) {
             // Remove existing assignments
             await db.ServiceEmployee.destroy({
                 where: { serviceId: service.id },
@@ -745,16 +809,8 @@ exports.updateService = async (req, res) => {
             });
 
             // Create new assignments
-            if (employeeIdsArray.length > 0) {
-                const serviceEmployeeData = employeeIdsArray.map((staffId, index) => ({
-                    serviceId: service.id,
-                    staffId: staffId,
-                    isPrimary: index === 0,
-                    commissionRate: null,
-                    notes: null
-                }));
-
-                await db.ServiceEmployee.bulkCreate(serviceEmployeeData, { transaction });
+            if (selectedEmployeeAssignments.length > 0) {
+                await db.ServiceEmployee.bulkCreate(buildServiceEmployeeRows(service.id, selectedEmployeeAssignments), { transaction });
             }
         }
 
@@ -765,7 +821,7 @@ exports.updateService = async (req, res) => {
                     model: db.Staff,
                     as: 'employees',
                     through: {
-                        attributes: ['commissionRate', 'isPrimary', 'notes']
+                        attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     }
                 }
             ],

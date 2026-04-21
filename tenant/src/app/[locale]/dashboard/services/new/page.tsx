@@ -11,6 +11,12 @@ import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 import { ServiceEditorFrame, ServiceEditorSection } from "@/components/ServiceEditorFrame";
 import { ServicePricingVariantsSection, ServiceVariant } from "@/components/ServicePricingVariantsSection";
+import { ServiceTeamSection } from "@/components/ServiceTeamSection";
+import {
+  buildServiceEmployeeAssignments,
+  getSelectedServiceEmployeeIds,
+  type ServiceEmployeeAssignment
+} from "@/components/serviceEmployeeAssignments";
 
 interface ServiceCategory {
   id: string;
@@ -24,6 +30,8 @@ interface ServiceCategory {
 interface Employee {
   id: string;
   name: string;
+  photo?: string | null;
+  position?: string | null;
   isActive: boolean;
 }
 
@@ -52,6 +60,8 @@ export default function NewServicePage() {
   });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [employeeAssignments, setEmployeeAssignments] = useState<ServiceEmployeeAssignment[]>([]);
+  const [teamAssignmentsReady, setTeamAssignmentsReady] = useState(false);
   const [formData, setFormData] = useState({
     name_en: "",
     name_ar: "",
@@ -122,6 +132,7 @@ export default function NewServicePage() {
       const response = await tenantApi.getEmployees({ isActive: true }); // Only active employees
       if (response.success) {
         setEmployees(response.employees || []);
+        setTeamAssignmentsReady(true);
       }
     } catch (err) {
       console.error("Failed to load employees:", err);
@@ -228,17 +239,6 @@ export default function NewServicePage() {
     }));
   };
 
-  const handleEmployeeToggle = (employeeId: string) => {
-    setFormData(prev => {
-      const currentIds = prev.employeeIds;
-      if (currentIds.includes(employeeId)) {
-        return { ...prev, employeeIds: currentIds.filter(id => id !== employeeId) };
-      } else {
-        return { ...prev, employeeIds: [...currentIds, employeeId] };
-      }
-    });
-  };
-
   const handlePriceTypeChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -246,6 +246,25 @@ export default function NewServicePage() {
       finalPrice: value === "free" ? "0" : prev.finalPrice
     }));
   };
+
+  useEffect(() => {
+    if (!teamAssignmentsReady || employees.length === 0) {
+      return;
+    }
+
+    setEmployeeAssignments((current) => {
+      if (current.length > 0) {
+        return current;
+      }
+
+      return buildServiceEmployeeAssignments(employees, []);
+    });
+  }, [employees, teamAssignmentsReady]);
+
+  const selectedEmployeeIds = useMemo(
+    () => getSelectedServiceEmployeeIds(employeeAssignments),
+    [employeeAssignments]
+  );
 
   const serviceSections = useMemo(() => {
     const basicFields = [
@@ -258,7 +277,7 @@ export default function NewServicePage() {
       formData.duration.trim()
     ];
     const basicFilled = basicFields.filter(Boolean).length;
-    const teamFilled = formData.employeeIds.length > 0 ? 1 : 0;
+    const teamFilled = selectedEmployeeIds.length > 0 ? 1 : 0;
     const optionsFilled = [imagePreview, formData.hasOffer, formData.hasGift].some(Boolean) ? 1 : 0;
     const settingsFilled = [formData.isActive, formData.availableInCenter, formData.availableHomeVisit].some(Boolean) ? 1 : 0;
 
@@ -272,7 +291,7 @@ export default function NewServicePage() {
       {
         id: "service-team",
         label: locale === "ar" ? "الفريق" : "Team",
-        progressLabel: formData.employeeIds.length > 0 ? "1/1" : "0/1",
+        progressLabel: selectedEmployeeIds.length > 0 ? "1/1" : "0/1",
         progressPercent: teamFilled * 100,
       },
       {
@@ -293,7 +312,7 @@ export default function NewServicePage() {
     formData.availableInCenter,
     formData.category,
     formData.duration,
-    formData.employeeIds.length,
+    selectedEmployeeIds.length,
     formData.finalPrice,
     formData.hasGift,
     formData.hasOffer,
@@ -365,7 +384,7 @@ export default function NewServicePage() {
       }
 
       // Employees
-      submitData.append("employeeIds", JSON.stringify(formData.employeeIds));
+      submitData.append("employeeAssignments", JSON.stringify(employeeAssignments));
 
       // Status
       submitData.append("isActive", formData.isActive.toString());
@@ -726,6 +745,7 @@ export default function NewServicePage() {
                   finalPrice={formData.finalPrice}
                   duration={formData.duration}
                   globalSettings={globalSettings}
+                  employeeAssignments={employeeAssignments}
                   variants={variants}
                   onPriceTypeChange={handlePriceTypeChange}
                   onFinalPriceChange={(value) => setFormData(prev => ({ ...prev, finalPrice: value }))}
@@ -735,33 +755,43 @@ export default function NewServicePage() {
               </div>
             </div>
 
-            {/* Service Availability */}
+            {/* Team */}
             <div className="card" id="service-team">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("serviceAvailability")}
-              </h3>
+              <ServiceTeamSection
+                locale={locale}
+                isRTL={isRTL}
+                employees={employees}
+                assignments={employeeAssignments}
+                onAssignmentsChange={setEmployeeAssignments}
+              />
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="availableInCenter"
-                    checked={formData.availableInCenter}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{t("availableInCenter")}</label>
-                </div>
+              <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <h3 className="mb-4 text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar' ? 'التوفر' : 'Availability'}
+                </h3>
 
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="availableHomeVisit"
-                    checked={formData.availableHomeVisit}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{t("availableHomeVisit")}</label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      name="availableInCenter"
+                      checked={formData.availableInCenter}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-primary focus:ring-primary"
+                    />
+                    <label className="font-medium text-gray-700">{t("availableInCenter")}</label>
+                  </div>
+
+                  <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="checkbox"
+                      name="availableHomeVisit"
+                      checked={formData.availableHomeVisit}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-primary focus:ring-primary"
+                    />
+                    <label className="font-medium text-gray-700">{t("availableHomeVisit")}</label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1020,37 +1050,6 @@ export default function NewServicePage() {
                   </span>
                 </label>
               </div>
-            </div>
-
-            {/* Employee Assignment */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("assignEmployees")} <span className="text-red-500">*</span>
-              </h3>
-
-              {employees.length === 0 ? (
-                <p className="text-gray-600 text-sm" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("noEmployees")} <Link href={`/${locale}/dashboard/employees/new`} className="text-primary underline">{t("addEmployee")}</Link>
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {employees.map((employee) => (
-                    <label
-                      key={employee.id}
-                      className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.employeeIds.includes(employee.id)}
-                        onChange={() => handleEmployeeToggle(employee.id)}
-                        className="w-4 h-4 text-primary focus:ring-primary"
-                      />
-                      <span className="text-sm font-medium text-gray-900">{employee.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Offers Section */}

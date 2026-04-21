@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react";
 import { Currency } from "@/components/Currency";
 import {
+  calculateServiceTeamCommission,
+  type ServiceEmployeeAssignment,
+} from "@/components/serviceEmployeeAssignments";
+import {
   ChevronDownIcon,
   EllipsisVerticalIcon,
   EyeIcon,
@@ -24,6 +28,8 @@ type Breakdown = {
   tax: number;
   final: number;
   total: number;
+  teamCommission: number;
+  netAfterTeamCommission: number;
 };
 
 interface ServicePricingVariantsSectionProps {
@@ -36,6 +42,7 @@ interface ServicePricingVariantsSectionProps {
     taxRate: number;
     serviceCommissionRate: number;
   };
+  employeeAssignments: ServiceEmployeeAssignment[];
   variants: ServiceVariant[];
   onPriceTypeChange: (value: string) => void;
   onFinalPriceChange: (value: string) => void;
@@ -50,12 +57,15 @@ function calculateBreakdown(finalPrice: string, globalSettings: { taxRate: numbe
   const commission = raw * (globalSettings.serviceCommissionRate / 100);
   const tax = raw * (globalSettings.taxRate / 100);
   const total = raw + commission + tax;
+  const teamCommission = 0;
   return {
     raw,
     commission,
     tax,
     final,
-    total
+    total,
+    teamCommission,
+    netAfterTeamCommission: total
   };
 }
 
@@ -66,6 +76,7 @@ export function ServicePricingVariantsSection({
   finalPrice,
   duration,
   globalSettings,
+  employeeAssignments,
   variants,
   onPriceTypeChange,
   onFinalPriceChange,
@@ -83,7 +94,15 @@ export function ServicePricingVariantsSection({
     isActive: true
   });
 
-  const mainBreakdown = useMemo(() => calculateBreakdown(finalPrice, globalSettings), [finalPrice, globalSettings]);
+  const mainBreakdown = useMemo(() => {
+    const breakdown = calculateBreakdown(finalPrice, globalSettings);
+    const teamCommission = calculateServiceTeamCommission(breakdown.final, employeeAssignments);
+    return {
+      ...breakdown,
+      teamCommission,
+      netAfterTeamCommission: breakdown.total - teamCommission
+    };
+  }, [employeeAssignments, finalPrice, globalSettings]);
 
   const addVariant = () => {
     const trimmedDescription = newVariant.description.trim();
@@ -288,9 +307,13 @@ export function ServicePricingVariantsSection({
                 <span className="text-gray-600">{locale === 'ar' ? 'السعر الأساسي' : 'Base price'}</span>
                 <span className="text-gray-900"><Currency amount={mainBreakdown.raw} /></span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">{locale === 'ar' ? 'عمولة الفريق' : 'Team commission'}</span>
+                <span className="text-red-600">- <Currency amount={mainBreakdown.teamCommission} /></span>
+              </div>
               <div className="flex items-center justify-between border-t border-primary/20 pt-2">
-                <span className="font-semibold text-gray-900">{locale === 'ar' ? 'الإجمالي المحسوب' : 'Calculated total'}</span>
-                <span className="font-bold text-primary"><Currency amount={mainBreakdown.total} /></span>
+                <span className="font-semibold text-gray-900">{locale === 'ar' ? 'الصافي بعد عمولة الفريق' : 'Net after team commission'}</span>
+                <span className="font-bold text-primary"><Currency amount={mainBreakdown.netAfterTeamCommission} /></span>
               </div>
             </div>
           </div>
@@ -374,22 +397,32 @@ export function ServicePricingVariantsSection({
                   </div>
 
                   {showBreakdown ? (
-                    <div className="mt-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">{locale === 'ar' ? 'العمولة' : 'Commission'}</span>
-                        <span className="text-gray-900"><Currency amount={breakdown.commission} /></span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">{locale === 'ar' ? 'الضريبة' : 'Tax'}</span>
-                        <span className="text-gray-900"><Currency amount={breakdown.tax} /></span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">{locale === 'ar' ? 'السعر الأساسي' : 'Base price'}</span>
-                        <span className="text-gray-900"><Currency amount={breakdown.raw} /></span>
-                      </div>
-                    </div>
-                  ) : null}
+              <div className="mt-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">{locale === 'ar' ? 'العمولة' : 'Commission'}</span>
+                  <span className="text-gray-900"><Currency amount={breakdown.commission} /></span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">{locale === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                  <span className="text-gray-900"><Currency amount={breakdown.tax} /></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">{locale === 'ar' ? 'السعر الأساسي' : 'Base price'}</span>
+                  <span className="text-gray-900"><Currency amount={breakdown.raw} /></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">{locale === 'ar' ? 'عمولة الفريق' : 'Team commission'}</span>
+                  <span className="text-red-600">- <Currency amount={calculateServiceTeamCommission(breakdown.final, employeeAssignments)} /></span>
+                </div>
+                <div className="flex items-center justify-between border-t border-primary/20 pt-2">
+                  <span className="font-semibold text-gray-900">{locale === 'ar' ? 'الصافي' : 'Net'}</span>
+                  <span className="font-bold text-primary">
+                    <Currency amount={breakdown.total - calculateServiceTeamCommission(breakdown.final, employeeAssignments)} />
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
               );
             })}
           </div>
@@ -403,7 +436,7 @@ export function ServicePricingVariantsSection({
       {showVariantModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
-            <div className={`mb-5 flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`mb-5 flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
               <div>
                 <h4 className="text-xl font-semibold text-gray-900">
                   {locale === 'ar' ? 'إضافة متغير' : 'Add variant'}

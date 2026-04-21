@@ -37,6 +37,16 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             comment: 'Custom commission rate for this employee on this service (overrides default)'
         },
+        commissionType: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+            comment: 'Commission type for this service assignment: fixed or percentage'
+        },
+        commissionValue: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: true,
+            comment: 'Commission value for this service assignment'
+        },
         isPrimary: {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
