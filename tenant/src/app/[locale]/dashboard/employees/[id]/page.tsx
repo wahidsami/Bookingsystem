@@ -364,6 +364,21 @@ export default function EditEmployeePage() {
     return null;
   };
 
+  const formatDashboardAccountIssue = (rawMessage?: string | null) => {
+    const message = `${rawMessage || ''}`.toLowerCase();
+    const isTenantCollision = message.includes('tenant account') || message.includes('already used by a tenant');
+
+    if (isTenantCollision) {
+      return locale === 'ar'
+        ? 'هذا البريد مستخدم بالفعل لحساب المركز. استخدم بريداً إلكترونياً مختلفاً لإنشاء حساب لوحة التحكم.'
+        : 'This email is already used by the tenant owner account. Use a different email to create the dashboard account.';
+    }
+
+    return rawMessage || (locale === 'ar'
+      ? 'تعذر إنشاء حساب لوحة التحكم.'
+      : 'Failed to create the dashboard account.');
+  };
+
   const ensureDashboardAccount = async (): Promise<{ accountId: string | null; errorMessage: string | null }> => {
     const existingAccountId = await resolveDashboardAccountId();
     if (existingAccountId) {
@@ -402,20 +417,15 @@ export default function EditEmployeePage() {
       console.error("Failed to create dashboard account on demand:", createErr);
       return {
         accountId: null,
-        errorMessage:
-          createErr instanceof Error && createErr.message
-            ? createErr.message
-            : locale === 'ar'
-              ? 'تعذر إنشاء حساب لوحة التحكم.'
-              : 'Failed to create the dashboard account.'
+        errorMessage: formatDashboardAccountIssue(
+          createErr instanceof Error ? createErr.message : null
+        )
       };
     }
 
     return {
       accountId: null,
-      errorMessage: locale === 'ar'
-        ? 'تعذر إنشاء حساب لوحة التحكم.'
-        : 'Failed to create the dashboard account.'
+      errorMessage: formatDashboardAccountIssue()
     };
   };
 
@@ -1069,12 +1079,14 @@ export default function EditEmployeePage() {
                     <div className="mt-1 break-all text-gray-700">
                         {dashboardAccountEmail || savedEmail || formData.email || '-'}
                       </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        {dashboardAccountId
-                          ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
-                          : (locale === 'ar' ? 'سيتم ربط الحساب تلقائياً عند حفظ الموظف ويمكن استخدام الأزرار بعد ذلك.' : 'The dashboard account will be linked automatically after saving this employee.')}
+                        <div className="mt-2 text-xs text-gray-500">
+                          {dashboardAccountId
+                            ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
+                          : (locale === 'ar'
+                            ? 'إذا كان البريد المستخدم مرتبطاً بحساب المركز، ستحتاج إلى بريد مختلف لإنشاء حساب لوحة التحكم.'
+                            : 'If this email is already used by the tenant account, you will need a different email to create the dashboard account.')}
+                        </div>
                       </div>
-                    </div>
 
                     <div className="flex flex-wrap gap-2">
                       <button
