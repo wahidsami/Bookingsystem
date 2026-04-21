@@ -35,6 +35,7 @@ type EmployeeScheduleDraftShift = {
   endDate: string | null;
   label: string | null;
   isActive: boolean;
+  isDraft?: boolean;
 };
 
 export default function NewEmployeePage() {
@@ -258,7 +259,7 @@ export default function NewEmployeePage() {
       if (createdEmployeeId && scheduleDraft.length > 0) {
         const scheduleResults = await Promise.allSettled(
           scheduleDraft
-            .filter((shift) => shift.dayOfWeek !== null)
+            .filter((shift) => shift.dayOfWeek !== null && shift.isDraft !== true)
             .map((shift) =>
               tenantApi.createEmployeeShift(createdEmployeeId, {
                 dayOfWeek: shift.dayOfWeek,

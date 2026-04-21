@@ -16,6 +16,7 @@ type ShiftRecord = {
   endDate: string | null;
   label: string | null;
   isActive: boolean;
+  isDraft?: boolean;
 };
 
 interface EmployeeWeeklyScheduleEditorProps {
@@ -43,6 +44,13 @@ const WEEK_DAYS = [
 
 const DEFAULT_START = "09:00";
 const DEFAULT_END = "18:00";
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const totalMinutes = index * 30;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return value;
+});
 
 function normalizeShift(shift: Partial<ShiftRecord>): ShiftRecord {
   return {
@@ -55,7 +63,8 @@ function normalizeShift(shift: Partial<ShiftRecord>): ShiftRecord {
     startDate: shift.startDate ?? null,
     endDate: shift.endDate ?? null,
     label: shift.label ?? null,
-    isActive: shift.isActive !== false
+    isActive: shift.isActive !== false,
+    isDraft: shift.isDraft === true
   };
 }
 
@@ -331,9 +340,11 @@ export function EmployeeWeeklyScheduleEditor({
         }
 
         setShiftsAndMirror((current) =>
-          current.map((shift) =>
-            shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
-          )
+          current
+            .filter((shift) => !(shift.dayOfWeek === dayOfWeek && shift.isDraft))
+            .map((shift) =>
+              shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
+            )
         );
         return;
       }
@@ -369,9 +380,11 @@ export function EmployeeWeeklyScheduleEditor({
           )
         );
         setShiftsAndMirror((current) =>
-          current.map((shift) =>
-            shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
-          )
+          current
+            .filter((shift) => !(shift.dayOfWeek === dayOfWeek && shift.isDraft))
+            .map((shift) =>
+              shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
+            )
         );
       } catch (err: any) {
         console.error("Failed to disable day:", err);
@@ -445,6 +458,68 @@ export function EmployeeWeeklyScheduleEditor({
     } finally {
       setSavingKey(null);
     }
+  };
+
+  const createDraftSubShift = (dayOfWeek: number) => {
+    const draftShift = normalizeShift({
+      id: `draft-${dayOfWeek}-${Date.now()}`,
+      dayOfWeek,
+      startTime: DEFAULT_START,
+      endTime: DEFAULT_END,
+      isRecurring: true,
+      isActive: true,
+      isDraft: true
+    });
+
+    setShiftsAndMirror((current) => [...current, draftShift]);
+  };
+
+  const saveShiftRow = async (shift: ShiftRecord) => {
+    if (shift.isDraft) {
+      if (!shift.dayOfWeek && shift.dayOfWeek !== 0) {
+        return;
+      }
+
+      if (isDraftMode) {
+        setShiftsAndMirror((current) =>
+          current.map((item) => (item.id === shift.id ? { ...item, isDraft: false } : item))
+        );
+        return;
+      }
+
+      if (!employeeId) return;
+
+      setSavingKey(shift.id);
+      try {
+        const response = await tenantApi.createEmployeeShift(employeeId, {
+          dayOfWeek: shift.dayOfWeek,
+          specificDate: null,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          isRecurring: true,
+          startDate: sharedStartDate || null,
+          endDate: sharedEndDate || null,
+          label: shift.label?.trim() || undefined
+        });
+
+        const createdShift = normalizeShift(response?.shift || response?.data?.shift || { ...shift, isDraft: false });
+        setShiftsAndMirror((current) =>
+          current.map((item) => (item.id === shift.id ? { ...createdShift, isDraft: false } : item))
+        );
+      } catch (err: any) {
+        console.error("Failed to save draft shift:", err);
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر حفظ الوردية" : "Failed to save shift",
+          message: err?.message || (locale === "ar" ? "تعذر حفظ الوردية الجديدة." : "We could not save the new shift."),
+          tone: "danger"
+        });
+      } finally {
+        setSavingKey(null);
+      }
+      return;
+    }
+
+    await persistShift(shift.id);
   };
 
   const oneTimeShiftCount = shifts.filter((shift) => shift.isRecurring === false || shift.specificDate).length;
@@ -524,145 +599,180 @@ export function EmployeeWeeklyScheduleEditor({
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-[1fr] gap-0 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 lg:grid-cols-[220px,1.2fr,1.2fr,1fr,72px]">
+        <div className="grid grid-cols-[1.3fr,1fr,1fr,0.9fr,0.9fr] gap-0 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
           <div>{locale === "ar" ? "اليوم" : "Day"}</div>
-          <div>{locale === "ar" ? "الحالة" : "Status"}</div>
-          <div>{locale === "ar" ? "من / إلى" : "From / To"}</div>
-          <div>{locale === "ar" ? "النطاق" : "Date range"}</div>
-          <div className={isRTL ? "text-left lg:text-right" : "text-right"}>{locale === "ar" ? "إجراءات" : "Actions"}</div>
+          <div className="text-center">{locale === "ar" ? "من" : "From"}</div>
+          <div className="text-center">{locale === "ar" ? "إلى" : "To"}</div>
+          <div className="text-center">{locale === "ar" ? "إضافة فرعية" : "Add sub"}</div>
+          <div className={isRTL ? "text-left" : "text-right"}>{locale === "ar" ? "إجراءات" : "Actions"}</div>
         </div>
 
         <div className="divide-y divide-gray-100">
           {WEEK_DAYS.map((day) => {
             const dayShifts = groupedShifts.get(day.value) || [];
-            const enabled = dayShifts.some((shift) => shift.isActive !== false);
+            const activeShifts = dayShifts.filter((shift) => shift.isActive !== false);
+            const mainShift = activeShifts.find((shift) => !shift.isDraft) || activeShifts[0] || null;
+            const draftShiftsForDay = dayShifts.filter((shift) => shift.isDraft);
+            const enabled = activeShifts.length > 0 || draftShiftsForDay.length > 0;
 
             return (
               <div key={day.value} className="p-4 lg:p-5">
-                <div className={`grid gap-4 ${isRTL ? 'lg:grid-cols-[1.2fr,1fr,1fr,1.1fr,auto]' : 'lg:grid-cols-[220px,1.2fr,1.2fr,1fr,72px]'}`}>
+                <div className="grid gap-4 lg:grid-cols-[1.3fr,1fr,1fr,0.9fr,0.9fr]">
                   <div className="flex items-start gap-3">
-                    <label className={`mt-1 inline-flex items-center ${isRTL ? 'flex-row-reverse gap-2' : 'gap-2'}`}>
-                      <input
-                        type="checkbox"
-                        checked={enabled}
-                        onChange={(event) => void handleToggleDay(day.value, event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        disabled={Boolean(savingKey)}
-                      />
-                    </label>
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(event) => void handleToggleDay(day.value, event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      disabled={Boolean(savingKey)}
+                    />
                     <div>
                       <div className="font-semibold text-gray-900">
                         {locale === "ar" ? day.labelAr : day.labelEn}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {dayShifts.length
+                        {enabled
                           ? (locale === "ar" ? `${dayShifts.length} وردية` : `${dayShifts.length} shift${dayShifts.length === 1 ? "" : "s"}`)
                           : (locale === "ar" ? "غير عامل" : "Not working")}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-start">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {enabled
-                        ? (locale === "ar" ? "نشط" : "Active")
-                        : (locale === "ar" ? "غير عامل" : "Not working")}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {enabled && dayShifts.length > 0 ? (
-                      dayShifts.map((shift) => (
-                        <div key={shift.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                          <div className={`grid gap-3 ${isRTL ? 'lg:grid-cols-[1fr,1fr,1fr,auto]' : 'lg:grid-cols-[1fr,1fr,1fr,auto]'}`}>
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                                {locale === "ar" ? "من" : "From"}
-                              </label>
-                              <input
-                                type="time"
-                                value={shift.startTime}
-                                onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, startTime: event.target.value }))}
-                                onBlur={() => void persistShift(shift.id)}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                                disabled={Boolean(savingKey)}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                                {locale === "ar" ? "إلى" : "To"}
-                              </label>
-                              <input
-                                type="time"
-                                value={shift.endTime}
-                                onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, endTime: event.target.value }))}
-                                onBlur={() => void persistShift(shift.id)}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                                disabled={Boolean(savingKey)}
-                              />
-                            </div>
-                            <div className={`flex items-end ${isRTL ? 'justify-start' : 'justify-end'}`}>
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteShift(shift.id)}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
-                                disabled={Boolean(savingKey)}
-                                aria-label={locale === "ar" ? "حذف الوردية" : "Delete shift"}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 grid gap-3 lg:grid-cols-[1.5fr,1fr]">
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                                {locale === "ar" ? "وصف الوردية" : "Shift label"}
-                              </label>
-                              <input
-                                type="text"
-                                value={shift.label || ""}
-                                onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, label: event.target.value }))}
-                                onBlur={() => void persistShift(shift.id)}
-                                placeholder={locale === "ar" ? "مثال: وردية صباحية" : "e.g. Morning shift"}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                                disabled={Boolean(savingKey)}
-                                style={{ textAlign: isRTL ? 'right' : 'left' }}
-                              />
-                            </div>
-                            <div className="flex items-center justify-start lg:justify-end">
-                              {savingKey === shift.id ? (
-                                <span className="text-xs font-semibold text-primary">
-                                  {locale === "ar" ? "جارٍ الحفظ..." : "Saving..."}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-gray-500">
-                                  {locale === "ar" ? "يحفظ تلقائياً عند الخروج من الحقول" : "Auto-saves when you leave a field"}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                  <div>
+                    {enabled && mainShift ? (
+                      <select
+                        value={mainShift.startTime}
+                        onChange={(event) => updateLocalShift(mainShift.id, (current) => ({ ...current, startTime: event.target.value }))}
+                        onBlur={() => void saveShiftRow(mainShift)}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                        disabled={Boolean(savingKey)}
+                      >
+                        {TIME_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-500">
+                      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-500">
                         {locale === "ar" ? "غير عامل" : "Not working"}
                       </div>
                     )}
                   </div>
 
-                  <div className={`flex items-start ${isRTL ? 'justify-start' : 'justify-end'}`}>
+                  <div>
+                    {enabled && mainShift ? (
+                      <select
+                        value={mainShift.endTime}
+                        onChange={(event) => updateLocalShift(mainShift.id, (current) => ({ ...current, endTime: event.target.value }))}
+                        onBlur={() => void saveShiftRow(mainShift)}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                        disabled={Boolean(savingKey)}
+                      >
+                        {TIME_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-500">
+                        {locale === "ar" ? "غير عامل" : "Not working"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={`flex items-start ${isRTL ? 'justify-start' : 'justify-center'}`}>
                     <button
                       type="button"
-                      onClick={() => void createShiftForDay(day.value)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90"
-                      disabled={Boolean(savingKey)}
+                      onClick={() => createDraftSubShift(day.value)}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
+                      disabled={Boolean(savingKey) || !enabled}
+                      aria-label={locale === "ar" ? "إضافة وردية فرعية" : "Add sub shift"}
                     >
-                      <PlusIcon className="h-4 w-4" />
-                      {locale === "ar" ? "إضافة وردية" : "Add shift"}
+                      <PlusIcon className="h-5 w-5" />
                     </button>
                   </div>
+
+                  <div className={`flex items-start ${isRTL ? 'justify-start' : 'justify-end'}`}>
+                    {enabled && mainShift ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteShift(mainShift.id)}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
+                        disabled={Boolean(savingKey)}
+                        aria-label={locale === "ar" ? "حذف الوردية" : "Delete shift"}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
+
+                {enabled && draftShiftsForDay.length > 0 ? (
+                  <div className="mt-4 space-y-3 border-t border-dashed border-gray-200 pt-4">
+                    {draftShiftsForDay.map((shift) => (
+                      <div key={shift.id} className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[1.1fr,1fr,1fr,0.8fr,0.8fr]">
+                        <div className="flex items-center gap-3">
+                          <div className="h-px w-10 bg-gray-300" />
+                          <input
+                            type="text"
+                            value={shift.label || ""}
+                            onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, label: event.target.value }))}
+                            placeholder={locale === "ar" ? "عنوان الوردية" : "Shift title"}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                            disabled={Boolean(savingKey)}
+                            style={{ textAlign: isRTL ? 'right' : 'left' }}
+                          />
+                        </div>
+
+                        <select
+                          value={shift.startTime}
+                          onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, startTime: event.target.value }))}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                          disabled={Boolean(savingKey)}
+                        >
+                          {TIME_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={shift.endTime}
+                          onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, endTime: event.target.value }))}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                          disabled={Boolean(savingKey)}
+                        >
+                          {TIME_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => void saveShiftRow(shift)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
+                            disabled={Boolean(savingKey)}
+                            aria-label={locale === "ar" ? "حفظ الوردية الفرعية" : "Save sub shift"}
+                          >
+                            <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 10l4 4 8-8" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteShift(shift.id)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
+                            disabled={Boolean(savingKey)}
+                            aria-label={locale === "ar" ? "حذف الوردية الفرعية" : "Delete sub shift"}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             );
           })}
