@@ -67,6 +67,8 @@ export default function EditServicePage() {
   const [employeeAssignments, setEmployeeAssignments] = useState<ServiceEmployeeAssignment[]>([]);
   const [serviceEmployeeAssignments, setServiceEmployeeAssignments] = useState<ServiceEmployeeAssignment[]>([]);
   const [teamAssignmentsReady, setTeamAssignmentsReady] = useState(false);
+  const [teamAssignmentsHydrated, setTeamAssignmentsHydrated] = useState(false);
+  const [serviceLoaded, setServiceLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name_en: "",
     name_ar: "",
@@ -180,6 +182,8 @@ export default function EditServicePage() {
             }))
           )
         );
+        setServiceLoaded(true);
+        setTeamAssignmentsHydrated(false);
 
         setVariants(Array.isArray(service.variants) ? service.variants : []);
 
@@ -190,11 +194,13 @@ export default function EditServicePage() {
         }
       } else {
         setError(response.message || "Failed to load service");
+        setServiceLoaded(true);
         setTeamAssignmentsReady(true);
       }
     } catch (err: any) {
       console.error("Failed to load service:", err);
       setError(err.message || "Failed to load service");
+      setServiceLoaded(true);
     } finally {
       setLoading(false);
     }
@@ -295,14 +301,17 @@ export default function EditServicePage() {
   };
 
   useEffect(() => {
-    if (!teamAssignmentsReady || employees.length === 0) {
+    if (!teamAssignmentsReady || employees.length === 0 || !serviceLoaded) {
       return;
     }
 
-    setEmployeeAssignments(
-      buildServiceEmployeeAssignments(employees, serviceEmployeeAssignments)
-    );
-  }, [employees, serviceEmployeeAssignments, teamAssignmentsReady]);
+    if (teamAssignmentsHydrated) {
+      return;
+    }
+
+    setEmployeeAssignments(buildServiceEmployeeAssignments(employees, serviceEmployeeAssignments));
+    setTeamAssignmentsHydrated(true);
+  }, [employees, serviceEmployeeAssignments, serviceLoaded, teamAssignmentsHydrated, teamAssignmentsReady]);
 
   const selectedEmployeeIds = useMemo(
     () => getSelectedServiceEmployeeIds(employeeAssignments),
