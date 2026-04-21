@@ -38,6 +38,7 @@
   },
   "Navigation": {
     "dashboard": "Dashboard",
+    "catalog": "Catalog",
     "services": "Services",
     "products": "Products",
     "employees": "Teams",

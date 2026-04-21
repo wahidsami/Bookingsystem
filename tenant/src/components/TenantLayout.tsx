@@ -19,6 +19,7 @@ import {
   Cog6ToothIcon,
   ChatBubbleLeftRightIcon,
   DocumentTextIcon,
+  FolderIcon,
   GlobeAltIcon,
   HomeIcon,
   InformationCircleIcon,
@@ -51,6 +52,26 @@ interface TenantLayoutProps {
 }
 
 type NavIcon = React.ComponentType<{ className?: string }>;
+type NavigationLeafItem = {
+  kind: "link";
+  name: string;
+  href: string;
+  icon: NavIcon;
+  badgeCount?: number;
+  visible?: boolean;
+  permissionKey?: string | null;
+};
+
+type NavigationGroupItem = {
+  kind: "group";
+  key: string;
+  name: string;
+  icon: NavIcon;
+  visible?: boolean;
+  children: NavigationLeafItem[];
+};
+
+type NavigationItem = NavigationLeafItem | NavigationGroupItem;
 
 export function TenantLayout({ children }: TenantLayoutProps) {
   const pathname = usePathname();
@@ -71,6 +92,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
+  const [expandedNavGroups, setExpandedNavGroups] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -342,35 +364,61 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     };
   }, []);
 
-  const navigationItems = useMemo(() => [
-    { name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
-    { name: t("services"), href: `/${locale}/dashboard/services`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.services },
-    { name: t("products"), href: `/${locale}/dashboard/products`, icon: ShoppingBagIcon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.products },
-    { name: t("teams"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.employees },
-    { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.schedules },
-    { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.appointments },
-    {
-      name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections',
-      href: `/${locale}/dashboard/pos`,
-      icon: BanknotesIcon,
-      badgeCount: posDueCount,
-      permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.pos
-    },
-    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: Squares2X2Icon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.orders },
-    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP['hot-deals'] },
-    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: ChatBubbleLeftRightIcon, visible: hasInternalMessaging, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.messages },
-    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
-    { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: UsersIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.customers },
-    { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.bills },
-    { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.subscription },
-    { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.financial },
-    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.payroll },
-    { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reviews },
-    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reports },
-    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.mypage },
-    { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.settings },
-  ], [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
-  const navigation = navigationItems.filter((item) => item.visible !== false && canAccessPermission(item.permissionKey));
+  const catalogChildren = useMemo<NavigationLeafItem[]>(() => {
+    return [
+      { kind: "link", name: t("services"), href: `/${locale}/dashboard/services`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.services },
+      { kind: "link", name: t("products"), href: `/${locale}/dashboard/products`, icon: ShoppingBagIcon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.products },
+      { kind: "link", name: t("orders"), href: `/${locale}/dashboard/orders`, icon: Squares2X2Icon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.orders }
+    ];
+  }, [hasProductsAndOrders, locale, t]);
+
+  const navigationItems = useMemo<NavigationItem[]>(() => {
+    const catalogVisible = catalogChildren.some((child) => child.visible !== false && canAccessPermission(child.permissionKey));
+
+    return [
+      { kind: "link", name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
+      {
+        kind: "group",
+        key: "catalog",
+        name: t("catalog"),
+        icon: FolderIcon,
+        visible: catalogVisible,
+        children: catalogChildren
+      },
+      { kind: "link", name: t("teams"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.employees },
+      { kind: "link", name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.schedules },
+      { kind: "link", name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.appointments },
+      {
+        kind: "link",
+        name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections',
+        href: `/${locale}/dashboard/pos`,
+        icon: BanknotesIcon,
+        badgeCount: posDueCount,
+        permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.pos
+      },
+      { kind: "link", name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP['hot-deals'] },
+      { kind: "link", name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: ChatBubbleLeftRightIcon, visible: hasInternalMessaging, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.messages },
+      { kind: "link", name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
+      { kind: "link", name: t("customers"), href: `/${locale}/dashboard/customers`, icon: UsersIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.customers },
+      { kind: "link", name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.bills },
+      { kind: "link", name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.subscription },
+      { kind: "link", name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.financial },
+      { kind: "link", name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.payroll },
+      { kind: "link", name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reviews },
+      { kind: "link", name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reports },
+      { kind: "link", name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.mypage },
+      { kind: "link", name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.settings },
+    ];
+  }, [canAccessPermission, catalogChildren, hasHotDeals, hasInternalMessaging, hasPayroll, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
+  const navigation = navigationItems.filter((item) => item.visible !== false && (item.kind === "group" || canAccessPermission(item.permissionKey)));
+  const mobileNavigation = useMemo(() => {
+    return navigation.flatMap((item) => {
+      if (item.kind === "group") {
+        return item.children.filter((child) => child.visible !== false && canAccessPermission(child.permissionKey));
+      }
+      return [item];
+    });
+  }, [canAccessPermission, navigation]);
 
   useEffect(() => {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
@@ -399,7 +447,38 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     }
     return pathname?.startsWith(href);
   };
-  const currentSection = navigation.find((item) => isActive(item.href))?.name || t("dashboard");
+
+  const findActiveNavigationItem = (items: NavigationItem[]): NavigationLeafItem | NavigationGroupItem | undefined => {
+    for (const item of items) {
+      if (item.kind === "group") {
+        const activeChild = findActiveNavigationItem(item.children);
+        if (activeChild) {
+          return activeChild;
+        }
+        continue;
+      }
+
+      if (isActive(item.href)) {
+        return item;
+      }
+    }
+
+    return undefined;
+  };
+
+  useEffect(() => {
+    const catalogIsActive = catalogChildren.some((child) => isActive(child.href));
+    if (!catalogIsActive || expandedNavGroups.catalog !== undefined) {
+      return;
+    }
+
+    setExpandedNavGroups((current) => ({
+      ...current,
+      catalog: true
+    }));
+  }, [catalogChildren, expandedNavGroups.catalog]);
+
+  const currentSection = findActiveNavigationItem(navigation)?.name || t("dashboard");
   const sidebarWidth = sidebarCollapsed ? 88 : 280;
   const shellGridStyle = {
     gridTemplateRows: '88px minmax(0, 1fr)',
@@ -411,7 +490,17 @@ export function TenantLayout({ children }: TenantLayoutProps) {
       : '"logo header" "sidebar content"',
   } as React.CSSProperties;
 
-  const renderSidebarNavItem = (item: { name: string; href: string; icon: NavIcon; badgeCount?: number }) => {
+  const toggleNavGroup = (key: string) => {
+    setExpandedNavGroups((current) => ({
+      ...current,
+      [key]: !(current[key] ?? false)
+    }));
+  };
+
+  const renderSidebarNavItem = (
+    item: { name: string; href: string; icon: NavIcon; badgeCount?: number },
+    options?: { nested?: boolean }
+  ) => {
     const active = isActive(item.href);
     const Icon = item.icon;
     return (
@@ -420,7 +509,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         href={item.href}
         title={sidebarCollapsed ? item.name : undefined}
         aria-label={item.name}
-        className={`group relative flex items-center rounded-xl transition-all ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${
+        className={`group relative flex items-center rounded-xl transition-all ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${!sidebarCollapsed && options?.nested ? (isRTL ? 'mr-3' : 'ml-3') : ''} ${
           active
             ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
             : "text-gray-700 hover:bg-gray-100"
@@ -454,6 +543,57 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           </span>
         ) : null}
       </Link>
+    );
+  };
+
+  const renderSidebarGroupItem = (item: NavigationGroupItem) => {
+    const active = item.children.some((child) => isActive(child.href));
+    const expanded = expandedNavGroups[item.key] ?? active;
+    const Icon = item.icon;
+
+    return (
+      <div key={item.key} className="space-y-1">
+        <button
+          type="button"
+          title={sidebarCollapsed ? item.name : undefined}
+          aria-label={item.name}
+          onClick={() => {
+            if (sidebarCollapsed) {
+              setSidebarCollapsed(false);
+            }
+            toggleNavGroup(item.key);
+          }}
+          className={`group relative flex w-full items-center rounded-xl transition-all ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${
+            active
+              ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          {sidebarCollapsed ? (
+            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+          ) : isRTL ? (
+            <>
+              <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-gray-400'}`} />
+              <span className="flex-1 font-medium text-right">{item.name}</span>
+              <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+            </>
+          ) : (
+            <>
+              <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+              <span className="flex-1 font-medium">{item.name}</span>
+              <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-gray-400'}`} />
+            </>
+          )}
+        </button>
+
+        {!sidebarCollapsed && expanded ? (
+          <div className={`space-y-1 ${isRTL ? 'mr-3' : 'ml-3'}`}>
+            {item.children
+              .filter((child) => child.visible !== false && canAccessPermission(child.permissionKey))
+              .map((child) => renderSidebarNavItem(child, { nested: true }))}
+          </div>
+        ) : null}
+      </div>
     );
   };
 
@@ -760,7 +900,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           dir={isRTL ? 'rtl' : 'ltr'}
         >
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {navigation.map((item) => renderSidebarNavItem(item))}
+            {navigation.map((item) => item.kind === "group" ? renderSidebarGroupItem(item) : renderSidebarNavItem(item))}
           </nav>
         </aside>
 
@@ -776,7 +916,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
       {/* Mobile Bottom Navigation */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="grid grid-cols-5 gap-1 p-2">
-          {navigation.slice(0, 5).map((item) => {
+          {mobileNavigation.slice(0, 5).map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
             return (

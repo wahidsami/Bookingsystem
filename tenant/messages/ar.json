@@ -38,6 +38,7 @@
   },
   "Navigation": {
     "dashboard": "لوحة التحكم",
+    "catalog": "الكتالوج",
     "services": "الخدمات",
     "products": "المنتجات",
     "employees": "الفرق",
