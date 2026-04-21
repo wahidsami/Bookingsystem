@@ -78,8 +78,6 @@ export default function EditServicePage() {
     category: "General",
     duration: "30",
     includes: [] as string[],
-    benefits: [] as { en: string, ar: string }[],
-    whatToExpect: [] as { en: string, ar: string }[],
     hasOffer: false,
     offerDetails: "",
     offerFrom: "",
@@ -95,8 +93,6 @@ export default function EditServicePage() {
     availableHomeVisit: false
   });
   const [newInclude, setNewInclude] = useState("");
-  const [newBenefit, setNewBenefit] = useState({ en: "", ar: "" });
-  const [newWhatToExpect, setNewWhatToExpect] = useState({ en: "", ar: "" });
   const [variants, setVariants] = useState<ServiceVariant[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -157,8 +153,6 @@ export default function EditServicePage() {
           category: service.category || "General",
           duration: service.duration?.toString() || "30",
           includes: service.includes || [],
-          benefits: service.benefits || [],
-          whatToExpect: service.whatToExpect || [],
           hasOffer: service.hasOffer || false,
           offerDetails: service.offerDetails || "",
           offerFrom: service.offerFrom ? String(service.offerFrom).slice(0, 10) : "",
@@ -292,40 +286,6 @@ export default function EditServicePage() {
     }));
   };
 
-  const handleAddBenefit = () => {
-    if (newBenefit.en.trim() && newBenefit.ar.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        benefits: [...prev.benefits, { en: newBenefit.en.trim(), ar: newBenefit.ar.trim() }]
-      }));
-      setNewBenefit({ en: "", ar: "" });
-    }
-  };
-
-  const handleRemoveBenefit = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      benefits: prev.benefits.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleAddWhatToExpect = () => {
-    if (newWhatToExpect.en.trim() && newWhatToExpect.ar.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        whatToExpect: [...prev.whatToExpect, { en: newWhatToExpect.en.trim(), ar: newWhatToExpect.ar.trim() }]
-      }));
-      setNewWhatToExpect({ en: "", ar: "" });
-    }
-  };
-
-  const handleRemoveWhatToExpect = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      whatToExpect: prev.whatToExpect.filter((_, i) => i !== index)
-    }));
-  };
-
   const handlePriceTypeChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -443,8 +403,6 @@ export default function EditServicePage() {
       submitData.append("category", formData.category);
       submitData.append("duration", formData.duration);
       submitData.append("includes", JSON.stringify(formData.includes));
-      submitData.append("benefits", JSON.stringify(formData.benefits));
-      submitData.append("whatToExpect", JSON.stringify(formData.whatToExpect));
       submitData.append("variants", JSON.stringify(variants));
 
       // Offers
@@ -537,8 +495,6 @@ export default function EditServicePage() {
           name_ar: hasArabic ? prev.name_ar : (aiData.name_ar || prev.name_ar),
           description_en: prev.description_en || aiData.description_en || '',
           description_ar: prev.description_ar || aiData.description_ar || '',
-          benefits: aiData.benefits?.length ? [...prev.benefits, ...aiData.benefits] : prev.benefits,
-          whatToExpect: aiData.whatToExpect?.length ? [...prev.whatToExpect, ...aiData.whatToExpect] : prev.whatToExpect,
         }));
       } else {
         setError(response.message || 'Failed to generate AI content');
@@ -575,48 +531,6 @@ export default function EditServicePage() {
           ...prev,
           [targetField]: response.translatedText
         }));
-      } else {
-        setError(response.message || "Failed to translate text");
-      }
-    } catch (err: any) {
-      console.error("Translation Error:", err);
-      setError(err.message || "Failed to translate text");
-    } finally {
-      setTranslatingField(null);
-    }
-  };
-
-  const handleTranslateArrayItem = async (
-    arrayName: 'benefits' | 'whatToExpect',
-    index: number,
-    sourceLang: 'en' | 'ar',
-    targetLangName: 'English' | 'Arabic'
-  ) => {
-    if (!hasAIFeature) return;
-
-    const item = formData[arrayName][index];
-    const sourceText = item[sourceLang];
-    if (!sourceText) return;
-
-    const targetLangCode = sourceLang === 'en' ? 'ar' : 'en';
-    setTranslatingField(`${arrayName}_${index}_${targetLangCode}`);
-    setError("");
-
-    try {
-      const response = await tenantApi.translateTextAI({
-        text: sourceText,
-        targetLanguage: targetLangName
-      });
-
-      if (response.success && response.translatedText) {
-        setFormData(prev => {
-          const newArray = [...prev[arrayName]];
-          newArray[index] = {
-            ...newArray[index],
-            [targetLangCode]: response.translatedText
-          };
-          return { ...prev, [arrayName]: newArray };
-        });
       } else {
         setError(response.message || "Failed to translate text");
       }
