@@ -60,6 +60,7 @@ function calculateFinalPrice(rawPrice, taxRate, commissionRate) {
 }
 
 const SERVICE_TARGET_GENDERS = new Set(['all', 'female', 'male']);
+const SERVICE_PRICE_TYPES = new Set(['free', 'fixed']);
 
 function normalizeServiceTargetGender(value) {
     const normalized = `${value ?? 'all'}`.trim().toLowerCase();
@@ -68,6 +69,53 @@ function normalizeServiceTargetGender(value) {
     }
 
     return SERVICE_TARGET_GENDERS.has(normalized) ? normalized : 'all';
+}
+
+function normalizeServicePriceType(value) {
+    const normalized = `${value ?? 'fixed'}`.trim().toLowerCase();
+    if (!normalized) {
+        return 'fixed';
+    }
+
+    return SERVICE_PRICE_TYPES.has(normalized) ? normalized : 'fixed';
+}
+
+function normalizeServiceVariant(variant) {
+    if (!variant || typeof variant !== 'object') {
+        return null;
+    }
+
+    const description = `${variant.description ?? ''}`.trim();
+    const duration = parseInt(variant.duration, 10);
+    const finalPrice = parseFloat(variant.finalPrice ?? variant.price ?? 0);
+
+    return {
+        description,
+        duration: Number.isFinite(duration) && duration > 0 ? duration : 30,
+        finalPrice: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0,
+        isActive: variant.isActive === undefined || variant.isActive === null
+            ? true
+            : variant.isActive === true || variant.isActive === 'true'
+    };
+}
+
+function parseServiceVariants(input) {
+    if (!input) {
+        return [];
+    }
+
+    try {
+        const parsed = typeof input === 'string' ? JSON.parse(input) : input;
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .map(normalizeServiceVariant)
+            .filter(Boolean);
+    } catch (error) {
+        return [];
+    }
 }
 
 function calculateRawPriceFromFinalPrice(finalPrice, taxRate, commissionRate) {
@@ -259,12 +307,14 @@ exports.createService = async (req, res) => {
             rawPrice,
             taxRate,
             commissionRate,
+            priceType,
             targetGender,
             category,
             duration,
             includes, // JSON string or array
             benefits, // JSON string or array of {en, ar} objects
             whatToExpect, // JSON string or array of {en, ar} objects
+            variants,
             hasOffer,
             offerDetails,
             hasGift,
@@ -286,12 +336,13 @@ exports.createService = async (req, res) => {
         }
 
         const targetGenderValue = normalizeServiceTargetGender(targetGender);
+        const priceTypeValue = normalizeServicePriceType(priceType);
         const rawPriceValue = rawPrice !== undefined && `${rawPrice}`.trim() !== '' ? parseFloat(rawPrice) : null;
         const finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' ? parseFloat(finalPrice) : null;
         const hasValidRawPrice = rawPriceValue !== null && !Number.isNaN(rawPriceValue) && rawPriceValue >= 0;
         const hasValidFinalPrice = finalPriceValue !== null && !Number.isNaN(finalPriceValue) && finalPriceValue >= 0;
 
-        if (!hasValidRawPrice && !hasValidFinalPrice) {
+        if (priceTypeValue !== 'free' && !hasValidRawPrice && !hasValidFinalPrice) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -307,7 +358,10 @@ exports.createService = async (req, res) => {
         let derivedRawPrice;
         let derivedFinalPrice;
 
-        if (hasValidFinalPrice) {
+        if (priceTypeValue === 'free') {
+            derivedRawPrice = 0;
+            derivedFinalPrice = 0;
+        } else if (hasValidFinalPrice) {
             derivedFinalPrice = parseFloat(finalPriceValue.toFixed(2));
             derivedRawPrice = calculateRawPriceFromFinalPrice(derivedFinalPrice, finalTaxRate, finalCommissionRate);
         } else {
@@ -353,6 +407,8 @@ exports.createService = async (req, res) => {
                 whatToExpectArray = [];
             }
         }
+
+        const variantsArray = parseServiceVariants(variants);
 
         // Parse employee IDs
         let employeeIdsArray = [];
@@ -404,12 +460,14 @@ exports.createService = async (req, res) => {
             taxRate: finalTaxRate,
             commissionRate: finalCommissionRate,
             finalPrice: derivedFinalPrice,
+            priceType: priceTypeValue,
             targetGender: targetGenderValue,
             category: category || 'general',
             duration: duration ? parseInt(duration) : 30,
             includes: includesArray,
             benefits: benefitsArray,
             whatToExpect: whatToExpectArray,
+            variants: variantsArray,
             hasOffer: hasOffer === true || hasOffer === 'true',
             offerDetails: offerDetails || null,
             hasGift: hasGift === true || hasGift === 'true',
@@ -488,12 +546,14 @@ exports.updateService = async (req, res) => {
             finalPrice,
             rawPrice,
             // taxRate and commissionRate are ignored - always use global settings
+            priceType,
             targetGender,
             category,
             duration,
             includes,
             benefits,
             whatToExpect,
+            variants,
             hasOffer,
             offerDetails,
             hasGift,
@@ -528,13 +588,14 @@ exports.updateService = async (req, res) => {
         const finalCommissionRate = tenantSettings.commissionRate;
 
         const targetGenderValue = normalizeServiceTargetGender(targetGender || service.targetGender || 'all');
+        const priceTypeValue = normalizeServicePriceType(priceType || service.priceType || 'fixed');
 
         const rawPriceValue = rawPrice !== undefined && `${rawPrice}`.trim() !== '' ? parseFloat(rawPrice) : null;
         const finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' ? parseFloat(finalPrice) : null;
         const hasValidRawPrice = rawPriceValue !== null && !Number.isNaN(rawPriceValue) && rawPriceValue >= 0;
         const hasValidFinalPrice = finalPriceValue !== null && !Number.isNaN(finalPriceValue) && finalPriceValue >= 0;
 
-        if (!hasValidRawPrice && !hasValidFinalPrice) {
+        if (priceTypeValue !== 'free' && !hasValidRawPrice && !hasValidFinalPrice) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -545,7 +606,10 @@ exports.updateService = async (req, res) => {
         let updatedRawPrice;
         let derivedFinalPrice;
 
-        if (hasValidFinalPrice) {
+        if (priceTypeValue === 'free') {
+            updatedRawPrice = 0;
+            derivedFinalPrice = 0;
+        } else if (hasValidFinalPrice) {
             derivedFinalPrice = parseFloat(finalPriceValue.toFixed(2));
             updatedRawPrice = calculateRawPriceFromFinalPrice(derivedFinalPrice, finalTaxRate, finalCommissionRate);
         } else {
@@ -592,6 +656,11 @@ exports.updateService = async (req, res) => {
             }
         }
 
+        let variantsArray = service.variants || [];
+        if (variants !== undefined) {
+            variantsArray = parseServiceVariants(variants);
+        }
+
         // Parse employee IDs
         let employeeIdsArray = [];
         if (employeeIds !== undefined) {
@@ -630,6 +699,7 @@ exports.updateService = async (req, res) => {
         if (description_en !== undefined) service.description_en = description_en || null;
         if (description_ar !== undefined) service.description_ar = description_ar || null;
         if (rawPrice !== undefined || finalPrice !== undefined) service.rawPrice = updatedRawPrice;
+        if (priceType !== undefined) service.priceType = priceTypeValue;
         // Always update tax and commission rates from global settings (admin-controlled)
         service.taxRate = finalTaxRate;
         service.commissionRate = finalCommissionRate;
@@ -640,6 +710,7 @@ exports.updateService = async (req, res) => {
         service.includes = includesArray;
         service.benefits = benefitsArray;
         service.whatToExpect = whatToExpectArray;
+        if (variants !== undefined) service.variants = variantsArray;
         if (hasOffer !== undefined) service.hasOffer = hasOffer === true || hasOffer === 'true';
         if (offerDetails !== undefined) service.offerDetails = offerDetails || null;
         if (hasGift !== undefined) service.hasGift = hasGift === true || hasGift === 'true';

@@ -110,6 +110,12 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 30
         },
+        priceType: {
+            type: DataTypes.STRING(20),
+            allowNull: false,
+            defaultValue: 'fixed',
+            comment: 'Service pricing mode: free or fixed'
+        },
         targetGender: {
             type: DataTypes.STRING(20),
             allowNull: false,
@@ -140,6 +146,12 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true, // Allow null for existing data
             defaultValue: 0.00,
             comment: 'Final price = rawPrice + (rawPrice * taxRate/100) + (rawPrice * commissionRate/100)'
+        },
+        variants: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            defaultValue: [],
+            comment: 'Array of service variants with description, duration, price, and active state'
         },
         // Legacy pricing (for backward compatibility)
         basePrice: {

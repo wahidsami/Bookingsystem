@@ -10,6 +10,7 @@ import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 import { ServiceEditorFrame, ServiceEditorSection } from "@/components/ServiceEditorFrame";
+import { ServicePricingVariantsSection, ServiceVariant } from "@/components/ServicePricingVariantsSection";
 
 interface ServiceCategory {
   id: string;
@@ -58,6 +59,7 @@ export default function EditServicePage() {
     name_ar: "",
     description_en: "",
     description_ar: "",
+    priceType: "fixed",
     finalPrice: "",
     targetGender: "all",
     category: "General",
@@ -81,6 +83,7 @@ export default function EditServicePage() {
   const [newInclude, setNewInclude] = useState("");
   const [newBenefit, setNewBenefit] = useState({ en: "", ar: "" });
   const [newWhatToExpect, setNewWhatToExpect] = useState({ en: "", ar: "" });
+  const [variants, setVariants] = useState<ServiceVariant[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
@@ -134,6 +137,7 @@ export default function EditServicePage() {
           name_ar: service.name_ar || "",
           description_en: service.description_en || "",
           description_ar: service.description_ar || "",
+          priceType: service.priceType || "fixed",
           finalPrice: service.finalPrice?.toString() || "",
           targetGender: service.targetGender || "all",
           category: service.category || "General",
@@ -154,6 +158,8 @@ export default function EditServicePage() {
           availableInCenter: service.availableInCenter !== undefined ? service.availableInCenter : true,
           availableHomeVisit: service.availableHomeVisit !== undefined ? service.availableHomeVisit : false
         });
+
+        setVariants(Array.isArray(service.variants) ? service.variants : []);
 
         if (service.image) {
           const imageUrl = getImageUrl(service.image);
@@ -289,30 +295,12 @@ export default function EditServicePage() {
     });
   };
 
-  const calculatePricingFromFinal = () => {
-    const final = parseFloat(formData.finalPrice || "0");
-    const multiplier = 1 + (globalSettings.serviceCommissionRate / 100) + (globalSettings.taxRate / 100);
-    const raw = multiplier > 0 ? final / multiplier : 0;
-    const commission = raw * (globalSettings.serviceCommissionRate / 100);
-    const tax = raw * (globalSettings.taxRate / 100);
-    const total = raw + commission + tax;
-    return {
-      final,
-      raw,
-      commission,
-      tax,
-      total
-    };
-  };
-  const getPricingBreakdown = () => {
-    const pricing = calculatePricingFromFinal();
-    return {
-      raw: pricing.raw,
-      commission: pricing.commission,
-      tax: pricing.tax,
-      final: pricing.final,
-      total: pricing.total
-    };
+  const handlePriceTypeChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      priceType: value,
+      finalPrice: value === "free" ? "0" : prev.finalPrice
+    }));
   };
 
   const serviceSections = useMemo(() => {
@@ -321,6 +309,7 @@ export default function EditServicePage() {
       formData.name_ar.trim(),
       formData.category.trim(),
       formData.targetGender.trim(),
+      formData.priceType.trim(),
       formData.finalPrice.trim(),
       formData.duration.trim()
     ];
@@ -333,8 +322,8 @@ export default function EditServicePage() {
       {
         id: "service-basic",
         label: locale === "ar" ? "المعلومات الأساسية" : "Basic information",
-        progressLabel: `${basicFilled}/6`,
-        progressPercent: (basicFilled / 6) * 100,
+        progressLabel: `${basicFilled}/7`,
+        progressPercent: (basicFilled / 7) * 100,
       },
       {
         id: "service-team",
@@ -396,6 +385,7 @@ export default function EditServicePage() {
       if (formData.description_ar) submitData.append("description_ar", formData.description_ar);
 
       // Pricing (tax and commission rates are controlled by admin, not sent from frontend)
+      submitData.append("priceType", formData.priceType);
       submitData.append("finalPrice", formData.finalPrice);
       submitData.append("targetGender", formData.targetGender);
 
@@ -405,6 +395,7 @@ export default function EditServicePage() {
       submitData.append("includes", JSON.stringify(formData.includes));
       submitData.append("benefits", JSON.stringify(formData.benefits));
       submitData.append("whatToExpect", JSON.stringify(formData.whatToExpect));
+      submitData.append("variants", JSON.stringify(variants));
 
       // Offers
       submitData.append("hasOffer", formData.hasOffer.toString());
@@ -785,6 +776,20 @@ export default function EditServicePage() {
                     <option value="male">{t("maleOnly")}</option>
                   </select>
                 </div>
+
+                <ServicePricingVariantsSection
+                  locale={locale}
+                  isRTL={isRTL}
+                  priceType={formData.priceType}
+                  finalPrice={formData.finalPrice}
+                  duration={formData.duration}
+                  globalSettings={globalSettings}
+                  variants={variants}
+                  onPriceTypeChange={handlePriceTypeChange}
+                  onFinalPriceChange={(value) => setFormData(prev => ({ ...prev, finalPrice: value }))}
+                  onDurationChange={(value) => setFormData(prev => ({ ...prev, duration: value }))}
+                  onVariantsChange={setVariants}
+                />
               </div>
             </div>
 
@@ -1072,98 +1077,6 @@ export default function EditServicePage() {
                     {imagePreview ? t("changeImage") : t("uploadImage")}
                   </span>
                 </label>
-              </div>
-            </div>
-
-            {/* Pricing Section */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'التسعير' : 'Pricing'}
-              </h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("finalPrice")} (SAR) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="finalPrice"
-                    value={formData.finalPrice}
-                    onChange={handleChange}
-                    required
-                    min="0"
-                    step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                  <p className="text-xs text-gray-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("finalPriceHint")}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {t("taxRate")} (%)
-                    </label>
-                    <input
-                      type="number"
-                      value={globalSettings.taxRate}
-                      disabled
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 opacity-60 cursor-not-allowed"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
-                    <p className="text-xs text-gray-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {locale === 'ar' ? 'يتم التحكم به من لوحة الإدارة' : 'Controlled by admin'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {t("commissionRate")} (%)
-                    </label>
-                    <input
-                      type="number"
-                      value={globalSettings.serviceCommissionRate}
-                      disabled
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 opacity-60 cursor-not-allowed"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
-                    <p className="text-xs text-gray-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {locale === 'ar' ? 'يتم التحكم به من لوحة الإدارة' : 'Controlled by admin'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Final Price Display: derive base price, tax, and commission from the final customer price */}
-                {formData.finalPrice && (() => {
-                  const b = getPricingBreakdown();
-                  return (
-                    <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">{t("finalPrice")}</span>
-                        <span className="font-semibold"><Currency amount={b.final} /></span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">{t("commission")} ({globalSettings.serviceCommissionRate}%)</span>
-                        <span className="text-sm"><Currency amount={b.commission} /></span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">{t("tax")} ({globalSettings.taxRate}% of base)</span>
-                        <span className="text-sm"><Currency amount={b.tax} /></span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2 text-gray-500 text-sm">
-                        <span>{t("rawPrice")}</span>
-                        <span><Currency amount={b.raw} /></span>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-primary/20">
-                        <span className="font-bold text-gray-900">{locale === 'ar' ? 'المجموع المحسوب' : 'Calculated total'}</span>
-                        <span className="font-bold text-primary text-xl"><Currency amount={b.total} /></span>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
 
