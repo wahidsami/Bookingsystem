@@ -88,18 +88,6 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: [],
             comment: 'Array of sub-service items (e.g., ["Shampoo", "Blow-dry"])'
         },
-        benefits: {
-            type: DataTypes.JSONB,
-            allowNull: true,
-            defaultValue: [],
-            comment: 'Array of benefit objects with en and ar properties: [{en: "Benefit 1", ar: "فائدة 1"}, ...]'
-        },
-        whatToExpect: {
-            type: DataTypes.JSONB,
-            allowNull: true,
-            defaultValue: [],
-            comment: 'Array of "What to Expect" items with en and ar properties: [{en: "Expectation 1", ar: "توقع 1"}, ...]'
-        },
         category: {
             type: DataTypes.STRING,
             allowNull: false,

@@ -420,8 +420,6 @@ exports.createService = async (req, res) => {
             category,
             duration,
             includes, // JSON string or array
-            benefits, // JSON string or array of {en, ar} objects
-            whatToExpect, // JSON string or array of {en, ar} objects
             variants,
             paymentOptions,
             employeeAssignments,
@@ -492,32 +490,6 @@ exports.createService = async (req, res) => {
             }
         }
 
-        // Parse benefits (can be JSON string or array)
-        let benefitsArray = [];
-        if (benefits) {
-            try {
-                benefitsArray = typeof benefits === 'string' ? JSON.parse(benefits) : benefits;
-                if (!Array.isArray(benefitsArray)) {
-                    benefitsArray = [];
-                }
-            } catch (e) {
-                benefitsArray = [];
-            }
-        }
-
-        // Parse whatToExpect (can be JSON string or array)
-        let whatToExpectArray = [];
-        if (whatToExpect) {
-            try {
-                whatToExpectArray = typeof whatToExpect === 'string' ? JSON.parse(whatToExpect) : whatToExpect;
-                if (!Array.isArray(whatToExpectArray)) {
-                    whatToExpectArray = [];
-                }
-            } catch (e) {
-                whatToExpectArray = [];
-            }
-        }
-
         const variantsArray = parseServiceVariants(variants);
         const paymentOptionsArray = parseServicePaymentOptions(paymentOptions);
 
@@ -566,8 +538,6 @@ exports.createService = async (req, res) => {
             category: category || 'general',
             duration: duration ? parseInt(duration) : 30,
             includes: includesArray,
-            benefits: benefitsArray,
-            whatToExpect: whatToExpectArray,
             variants: variantsArray,
             paymentOptions: paymentOptionsArray,
             hasOffer: hasOffer === true || hasOffer === 'true',
@@ -645,8 +615,6 @@ exports.updateService = async (req, res) => {
             category,
             duration,
             includes,
-            benefits,
-            whatToExpect,
             variants,
             paymentOptions,
             employeeAssignments,
@@ -726,32 +694,6 @@ exports.updateService = async (req, res) => {
             }
         }
 
-        // Parse benefits
-        let benefitsArray = service.benefits || [];
-        if (benefits !== undefined) {
-            try {
-                benefitsArray = typeof benefits === 'string' ? JSON.parse(benefits) : benefits;
-                if (!Array.isArray(benefitsArray)) {
-                    benefitsArray = [];
-                }
-            } catch (e) {
-                benefitsArray = service.benefits || [];
-            }
-        }
-
-        // Parse whatToExpect
-        let whatToExpectArray = service.whatToExpect || [];
-        if (whatToExpect !== undefined) {
-            try {
-                whatToExpectArray = typeof whatToExpect === 'string' ? JSON.parse(whatToExpect) : whatToExpect;
-                if (!Array.isArray(whatToExpectArray)) {
-                    whatToExpectArray = [];
-                }
-            } catch (e) {
-                whatToExpectArray = service.whatToExpect || [];
-            }
-        }
-
         let variantsArray = service.variants || [];
         if (variants !== undefined) {
             variantsArray = parseServiceVariants(variants);
@@ -799,8 +741,6 @@ exports.updateService = async (req, res) => {
         if (category !== undefined) service.category = category;
         if (duration !== undefined) service.duration = parseInt(duration);
         service.includes = includesArray;
-        service.benefits = benefitsArray;
-        service.whatToExpect = whatToExpectArray;
         if (variants !== undefined) service.variants = variantsArray;
         if (paymentOptions !== undefined) service.paymentOptions = paymentOptionsArray;
         if (hasOffer !== undefined) service.hasOffer = hasOffer === true || hasOffer === 'true';

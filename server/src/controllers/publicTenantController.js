@@ -498,9 +498,7 @@ exports.getPublicServices = async (req, res) => {
                 'variants',
                 'paymentOptions',
                 'availableInCenter',
-                'availableHomeVisit',
-                'benefits',
-                'whatToExpect'
+                'availableHomeVisit'
             ],
             order: [['createdAt', 'DESC']]
         });
@@ -551,9 +549,7 @@ exports.getPublicService = async (req, res) => {
                 'variants',
                 'paymentOptions',
                 'availableInCenter',
-                'availableHomeVisit',
-                'benefits',
-                'whatToExpect'
+                'availableHomeVisit'
             ],
             include: [
                 {
