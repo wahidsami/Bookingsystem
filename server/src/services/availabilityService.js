@@ -6,6 +6,10 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const {
+    parseServiceVariants,
+    resolveServiceVariant
+} = require('../utils/serviceVariant');
 
 class AvailabilityService {
     /**
@@ -18,7 +22,7 @@ class AvailabilityService {
      * @param {string} date - Date in YYYY-MM-DD format
      * @returns {Promise<Object>} Available slots with metadata
      */
-    async getAvailableSlots(tenantId, { serviceId, staffId, date }) {
+    async getAvailableSlots(tenantId, { serviceId, staffId, date, variantId }) {
         if (!serviceId || !date) {
             throw new Error('serviceId and date are required');
         }
@@ -30,13 +34,22 @@ class AvailabilityService {
             throw new Error('Service does not belong to this tenant');
         }
 
+        const serviceVariant = resolveServiceVariant(
+            parseServiceVariants(service.variants || []),
+            variantId
+        );
+
+        if (variantId && !serviceVariant) {
+            throw new Error('Service variant not found');
+        }
+
         // Get tenant settings for booking configuration
         const tenantSettings = await this._getTenantSettings(tenantId);
         const stepSize = tenantSettings.booking?.slotInterval || 15; // Default 15 minutes
         const timezone = tenantSettings.timezone || 'Asia/Riyadh';
 
         // Service duration and buffers
-        const duration = service.duration || 30; // minutes
+        const duration = serviceVariant?.duration || service.duration || 30; // minutes
         const bufferBefore = service.bufferBefore || tenantSettings.booking?.defaultBufferBefore || 0;
         const bufferAfter = service.bufferAfter || tenantSettings.booking?.defaultBufferAfter || 0;
         const totalSlotLength = duration + bufferBefore + bufferAfter; // Total minutes
@@ -53,7 +66,8 @@ class AvailabilityService {
                 bufferAfter,
                 totalSlotLength,
                 stepSize,
-                timezone
+                timezone,
+                serviceVariant?.id || null
             );
         }
 
@@ -67,7 +81,8 @@ class AvailabilityService {
             bufferAfter,
             totalSlotLength,
             stepSize,
-            timezone
+            timezone,
+            serviceVariant?.id || null
         );
     }
 
@@ -75,7 +90,7 @@ class AvailabilityService {
      * Get available slots for a specific staff member
      * @private
      */
-    async _getSlotsForStaff(tenantId, serviceId, staffId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh') {
+    async _getSlotsForStaff(tenantId, serviceId, staffId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null) {
         // Validate staff exists and can perform service
         const staff = await db.Staff.findByPk(staffId);
         if (!staff) throw new Error('Staff not found');
@@ -165,7 +180,7 @@ class AvailabilityService {
      * Get available slots for any eligible staff (for "Any Staff" selection)
      * @private
      */
-    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh') {
+    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null) {
         // Get all staff who can perform this service
         const serviceEmployees = await db.ServiceEmployee.findAll({
             where: { serviceId }
@@ -209,13 +224,14 @@ class AvailabilityService {
                     serviceId,
                     staff.id,
                     date,
-                    duration,
-                    bufferBefore,
-                    bufferAfter,
-                    totalSlotLength,
-                    stepSize,
-                    timezone
-                );
+                duration,
+                bufferBefore,
+                bufferAfter,
+                totalSlotLength,
+                stepSize,
+                timezone,
+                variantId
+            );
                 
                 // Add staff info to each slot
                 result.slots.forEach(slot => {

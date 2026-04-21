@@ -90,8 +90,23 @@ function normalizeServiceVariant(variant) {
     const description = `${variant.description ?? ''}`.trim();
     const duration = parseInt(variant.duration, 10);
     const finalPrice = parseFloat(variant.finalPrice ?? variant.price ?? 0);
+    const id = `${variant.id ?? ''}`.trim();
+    const fallbackPayload = JSON.stringify({
+        description: description.toLowerCase(),
+        duration: Number.isFinite(duration) && duration > 0 ? duration : 30,
+        finalPrice: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0,
+        isActive: variant.isActive === undefined || variant.isActive === null
+            ? true
+            : variant.isActive === true || variant.isActive === 'true'
+    });
+    let fallbackHash = 0;
+    for (let index = 0; index < fallbackPayload.length; index += 1) {
+        fallbackHash = ((fallbackHash << 5) - fallbackHash) + fallbackPayload.charCodeAt(index);
+        fallbackHash |= 0;
+    }
 
     return {
+        id: id || `variant-${Math.abs(fallbackHash).toString(36)}`,
         description,
         duration: Number.isFinite(duration) && duration > 0 ? duration : 30,
         finalPrice: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0,

@@ -152,7 +152,16 @@ export interface Service {
     rawPrice?: number;
     finalPrice?: number;
     paymentOptions?: Array<'at-center' | 'online-full' | 'booking-fee'>;
+    variants?: ServiceVariant[];
     employees?: Staff[];
+}
+
+export interface ServiceVariant {
+    id: string;
+    description: string;
+    duration: number;
+    finalPrice: number;
+    isActive: boolean;
 }
 
 export interface Product {
@@ -192,6 +201,10 @@ export interface Booking {
     serviceId: string;
     staffId: string;
     platformUserId: string;
+    serviceVariantId?: string | null;
+    serviceVariantName?: string | null;
+    serviceVariantDescription?: string | null;
+    serviceVariantDuration?: number | null;
     startTime: string;
     endTime: string;
     status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'cancelled' | 'completed' | 'no_show';
@@ -476,6 +489,40 @@ export const normalizeTenant = (tenant: Partial<Tenant> | null | undefined): Ten
     } : undefined,
 });
 
+export const normalizeServiceVariant = (variant: unknown): ServiceVariant | null => {
+    if (!variant || typeof variant !== 'object') {
+        return null;
+    }
+
+    const source = variant as Record<string, unknown>;
+    const description = toStringValue(source.description).trim();
+    const duration = toNumber(source.duration, 30);
+    const finalPrice = toNumber(source.finalPrice ?? source.price);
+    const isActive = source.isActive === undefined || source.isActive === null
+        ? true
+        : toBoolean(source.isActive, true);
+    const id = toOptionalString(source.id);
+    const fallbackPayload = JSON.stringify({
+        description: description.toLowerCase(),
+        duration,
+        finalPrice,
+        isActive
+    });
+    let fallbackHash = 0;
+    for (let index = 0; index < fallbackPayload.length; index += 1) {
+        fallbackHash = ((fallbackHash << 5) - fallbackHash) + fallbackPayload.charCodeAt(index);
+        fallbackHash |= 0;
+    }
+
+    return {
+        id: id || `variant-${Math.abs(fallbackHash).toString(36)}`,
+        description,
+        duration,
+        finalPrice,
+        isActive,
+    };
+};
+
 export const normalizeService = (service: Partial<Service> | null | undefined): Service => ({
     id: toStringValue(service?.id),
     tenantId: toOptionalString(service?.tenantId),
@@ -491,11 +538,16 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
     rawPrice: toNumber(service?.rawPrice),
     finalPrice: toNumber(service?.finalPrice),
     paymentOptions: Array.isArray((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions)
-        ? (service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions
+        ? ((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions as unknown[])
             .map((option) => toStringValue(option).trim().toLowerCase())
             .filter((option): option is 'at-center' | 'online-full' | 'booking-fee' =>
                 ['at-center', 'online-full', 'booking-fee'].includes(option))
         : undefined,
+    variants: Array.isArray((service as Partial<Service> & { variants?: unknown }).variants)
+        ? ((service as Partial<Service> & { variants?: unknown }).variants as unknown[])
+            .map((variant) => normalizeServiceVariant(variant))
+            .filter((variant): variant is ServiceVariant => Boolean(variant))
+        : [],
 });
 
 export const normalizeProduct = (product: Partial<Product> | null | undefined): Product => ({
@@ -547,6 +599,12 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
         serviceId: toStringValue(appointment?.serviceId || normalizedService?.id),
         staffId: toStringValue(appointment?.staffId || normalizedStaff?.id),
         platformUserId: toStringValue(appointment?.platformUserId),
+        serviceVariantId: toOptionalString(appointment?.serviceVariantId),
+        serviceVariantName: toOptionalString(appointment?.serviceVariantName),
+        serviceVariantDescription: toOptionalString(appointment?.serviceVariantDescription),
+        serviceVariantDuration: appointment?.serviceVariantDuration !== undefined
+            ? toNumber(appointment.serviceVariantDuration)
+            : undefined,
         startTime: toStringValue(appointment?.startTime),
         endTime: toStringValue(appointment?.endTime),
         status: (appointment?.status as Booking['status']) || 'pending',
@@ -1325,9 +1383,16 @@ export interface ServiceCategory {
     isActive: boolean;
 }
 
-export const getServicePrice = (service: Partial<Service> | null | undefined): number => {
+export const getServicePrice = (
+    service: Partial<Service> | null | undefined,
+    variant?: Partial<ServiceVariant> | null
+): number => {
     if (!service) {
-        return 0;
+        return variant ? toNumber(variant.finalPrice) : 0;
+    }
+
+    if (variant) {
+        return toNumber(variant.finalPrice);
     }
 
     const candidate = service.finalPrice

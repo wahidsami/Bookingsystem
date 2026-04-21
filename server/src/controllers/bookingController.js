@@ -10,7 +10,7 @@ const { SERVICE_PAYMENT_METHOD_RULES } = require('../utils/tenantPaymentSettings
  */
 const searchAvailability = async (req, res) => {
     try {
-        const { serviceId, staffId, date, tenantId } = req.body;
+        const { serviceId, staffId, date, tenantId, variantId } = req.body;
 
         if (!serviceId || !date) {
             return res.status(400).json({
@@ -35,7 +35,8 @@ const searchAvailability = async (req, res) => {
         const result = await availabilityService.getAvailableSlots(finalTenantId, {
             serviceId,
             staffId: staffId || null, // null = any staff
-            date
+            date,
+            variantId: variantId || null
         });
 
         res.json({
@@ -101,7 +102,7 @@ const getRecommendations = async (req, res) => {
  */
 const createBooking = async (req, res) => {
     try {
-        const { serviceId, staffId, requestedStaffId, startTime, tenantId, notes, paymentMethod } = req.body;
+        const { serviceId, staffId, requestedStaffId, startTime, tenantId, notes, paymentMethod, variantId } = req.body;
         const platformUserId = req.userId; // From auth middleware
 
         // Validation
@@ -139,6 +140,7 @@ const createBooking = async (req, res) => {
         // staffId is optional - if not provided, system will auto-assign best available staff
         const appointment = await bookingService.createBooking({
             serviceId,
+            variantId: variantId || null,
             staffId: staffId || null, // null = "Any Staff"
             requestedStaffId: requestedStaffId || null,
             platformUserId,
@@ -241,6 +243,10 @@ const getBooking = async (req, res) => {
                 id: appointment.id,
                 service: appointment.Service,
                 staff: appointment.Staff,
+                serviceVariantId: appointment.serviceVariantId,
+                serviceVariantName: appointment.serviceVariantName,
+                serviceVariantDescription: appointment.serviceVariantDescription,
+                serviceVariantDuration: appointment.serviceVariantDuration,
                 startTime: appointment.startTime,
                 endTime: appointment.endTime,
                 status: appointment.status,

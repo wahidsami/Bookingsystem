@@ -49,6 +49,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [selectedStaff, setSelectedStaff] = useState<Staff | null>(
         route.params?.selectedStaff ? normalizeStaff(route.params.selectedStaff) : null
     ); // null = Any
+    const selectedVariant = route.params?.selectedVariant || null;
     const [staffList, setStaffList] = useState<Staff[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [selectedTime, setSelectedTime] = useState<SlotItem | null>(null);
@@ -135,7 +136,9 @@ export function BookingFlow({ route, navigation }: BookingProps) {
         service?.paymentOptions,
     ]);
 
-    const servicePrice = getServicePrice(service);
+    const servicePrice = getServicePrice(service, selectedVariant);
+    const selectedVariantLabel = selectedVariant?.description || null;
+    const selectedVariantDuration = selectedVariant?.duration || service.duration;
     const bookingFeeAmount = paymentSettings.serviceDepositMode === 'percentage'
         ? Math.min(servicePrice, parseFloat((servicePrice * (paymentSettings.serviceDepositPercentage / 100)).toFixed(2)))
         : Math.min(servicePrice, paymentSettings.serviceDepositFixedAmount);
@@ -189,6 +192,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     serviceId: service.id,
                     date: format(selectedDate, 'yyyy-MM-dd'),
                     staffId: selectedStaff?.id || undefined,
+                    variantId: selectedVariant?.id || undefined,
                 }
             );
             const available = (response.slots || []).filter(s => s.available);
@@ -240,6 +244,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 startTime: selectedTime.startTime,
                 notes: bookingNote.trim() || undefined,
                 paymentMethod: selectedPaymentMethod,
+                variantId: selectedVariant?.id || undefined,
             });
 
             const appointmentId = response.appointment?.id;
@@ -389,6 +394,12 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     <Text style={styles.summaryLabel}>Service</Text>
                     <Text style={styles.summaryValue}>{isRTL ? service.name_ar : service.name_en}</Text>
                 </View>
+                {selectedVariantLabel ? (
+                    <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>{language === 'ar' ? 'النسخة' : 'Variant'}</Text>
+                        <Text style={styles.summaryValue}>{selectedVariantLabel}</Text>
+                    </View>
+                ) : null}
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Specialist</Text>
                     <Text style={styles.summaryValue}>{selectedStaff ? selectedStaff.name : (selectedTime?.staffName || 'Any Professional')}</Text>
@@ -403,6 +414,12 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                         {selectedTime ? format(new Date(selectedTime.startTime), 'HH:mm') : ''}
                     </Text>
                 </View>
+                {selectedVariantDuration ? (
+                    <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>{language === 'ar' ? 'المدة' : 'Duration'}</Text>
+                        <Text style={styles.summaryValue}>{selectedVariantDuration} min</Text>
+                    </View>
+                ) : null}
                 <View style={[styles.summaryRow, styles.totalRow]}>
                     <Text style={styles.totalLabel}>Total</Text>
                     <Text style={styles.totalValue}>{servicePrice.toFixed(2)} SAR</Text>

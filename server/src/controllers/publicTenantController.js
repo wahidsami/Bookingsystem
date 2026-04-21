@@ -15,6 +15,9 @@ const {
     normalizeServicePaymentOptions,
     resolvePublicOrderPaymentMethod
 } = require('../utils/tenantPaymentSettings');
+const {
+    parseServiceVariants
+} = require('../utils/serviceVariant');
 const { createAppointmentTransaction } = require('../services/paymentTransactionLedgerService');
 
 const BUSINESS_TYPE_META = {
@@ -492,6 +495,7 @@ exports.getPublicServices = async (req, res) => {
                 'finalPrice',
                 'duration',
                 'image',
+                'variants',
                 'paymentOptions',
                 'availableInCenter',
                 'availableHomeVisit',
@@ -501,9 +505,15 @@ exports.getPublicServices = async (req, res) => {
             order: [['createdAt', 'DESC']]
         });
 
+        const serviceRows = services.map((service) => {
+            const serviceData = service.toJSON();
+            serviceData.variants = parseServiceVariants(serviceData.variants || []);
+            return serviceData;
+        });
+
         res.json({
             success: true,
-            services
+            services: serviceRows
         });
     } catch (error) {
         console.error('Get public services error:', error);
@@ -538,6 +548,7 @@ exports.getPublicService = async (req, res) => {
                 'finalPrice',
                 'duration',
                 'image',
+                'variants',
                 'paymentOptions',
                 'availableInCenter',
                 'availableHomeVisit',
@@ -564,6 +575,7 @@ exports.getPublicService = async (req, res) => {
 
         // Map staff photo to image for frontend compatibility
         const serviceData = service.toJSON();
+        serviceData.variants = parseServiceVariants(serviceData.variants || []);
         if (serviceData.employees && Array.isArray(serviceData.employees)) {
             serviceData.employees = serviceData.employees.map((employee) => {
                 const employeeData = { ...employee };
@@ -830,6 +842,7 @@ exports.createPublicBooking = async (req, res) => {
         const { tenantId } = req.params;
         const {
             serviceId,
+            variantId,
             staffId, // Optional - null means "Any Staff"
             date,
             time,
@@ -900,6 +913,7 @@ exports.createPublicBooking = async (req, res) => {
         // This handles all validation, conflict checking, pricing, etc.
         const appointment = await bookingService.createBooking({
             serviceId,
+            variantId: variantId || null,
             staffId: staffId || null, // null = "Any Staff"
             requestedStaffId: staffId || null,
             platformUserId: platformUser.id,
@@ -1027,6 +1041,9 @@ exports.createPublicBooking = async (req, res) => {
                     endTime: appointment.endTime,
                     status: appointment.status,
                     paymentStatus: appointment.paymentStatus,
+                    serviceVariantId: appointment.serviceVariantId,
+                    serviceVariantName: appointment.serviceVariantName,
+                    serviceVariantDuration: appointment.serviceVariantDuration,
                     service: {
                         id: service.id,
                         name_en: service.name_en,

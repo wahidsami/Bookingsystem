@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 export type ServiceVariant = {
+  id?: string;
   description: string;
   duration: string;
   finalPrice: string;
@@ -69,6 +70,14 @@ function calculateBreakdown(finalPrice: string, globalSettings: { taxRate: numbe
   };
 }
 
+const createVariantId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `variant-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 export function ServicePricingVariantsSection({
   locale,
   isRTL,
@@ -116,6 +125,7 @@ export function ServicePricingVariantsSection({
     onVariantsChange([
       ...variants,
       {
+        id: createVariantId(),
         description: trimmedDescription,
         duration: trimmedDuration,
         finalPrice: trimmedPrice,
@@ -349,7 +359,7 @@ export function ServicePricingVariantsSection({
               const showBreakdown = variantBreakdownIndex === index;
 
               return (
-                <div key={`${variant.description}-${index}`} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div key={variant.id || `${variant.description}-${index}`} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className={`flex items-start justify-between gap-4 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-900">

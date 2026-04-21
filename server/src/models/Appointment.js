@@ -156,6 +156,26 @@ module.exports = (sequelize, DataTypes) => {
             },
             comment: 'Tenant ID for faster queries (denormalized)'
         },
+        serviceVariantId: {
+            type: DataTypes.STRING(120),
+            allowNull: true,
+            comment: 'Selected service variant identifier'
+        },
+        serviceVariantName: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+            comment: 'Selected service variant label or description'
+        },
+        serviceVariantDescription: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+            comment: 'Selected service variant description snapshot'
+        },
+        serviceVariantDuration: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            comment: 'Selected service variant duration snapshot'
+        },
         startTime: {
             type: DataTypes.DATE,
             allowNull: false

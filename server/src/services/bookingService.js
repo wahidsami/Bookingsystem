@@ -8,6 +8,11 @@ const {
     assertServicePaymentMethodAllowed,
     calculateServiceDeposit
 } = require('../utils/tenantPaymentSettings');
+const {
+    calculateRawPriceFromFinalPrice,
+    parseServiceVariants,
+    resolveServiceVariant
+} = require('../utils/serviceVariant');
 
 const formatNotificationDate = (value) => {
     const date = new Date(value);
@@ -40,7 +45,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -76,6 +81,14 @@ class BookingService {
         }
         if (!service.isActive) throw new Error('Service is not active');
 
+        const serviceVariant = resolveServiceVariant(
+            parseServiceVariants(service.variants || []),
+            variantId
+        );
+        if (variantId && !serviceVariant) {
+            throw new Error('Service variant not found');
+        }
+
         // Validate platform user exists and is active
         const platformUser = await db.PlatformUser.findByPk(platformUserId, { transaction: finalTransaction });
         if (!platformUser) throw new Error('Platform user not found');
@@ -88,7 +101,7 @@ class BookingService {
             transaction: finalTransaction
         });
         const tenantPaymentSettings = await getTenantPaymentSettings(tenantId, { transaction: finalTransaction });
-        assertServicePaymentMethodAllowed(normalizedPaymentMethod, tenantPaymentSettings);
+        assertServicePaymentMethodAllowed(normalizedPaymentMethod, tenantPaymentSettings, service.paymentOptions);
 
         const bookingSettings = tenantSettings?.bookingSettings || {};
         const allowAnyStaff = bookingSettings.allowAnyStaff !== false; // Default true
@@ -134,7 +147,7 @@ class BookingService {
             throw new Error('Invalid start time format');
         }
 
-        const duration = service.duration || 30; // Default 30 minutes
+        const duration = serviceVariant?.duration || service.duration || 30; // Default 30 minutes
         const end = new Date(start.getTime() + duration * 60000);
 
         // Validate start time is in the future (allow 1 hour buffer for same-day bookings)
@@ -174,7 +187,19 @@ class BookingService {
         }
 
         // ========== PRICING CALCULATION ==========
-        const pricing = db.Appointment.calculateRevenueBreakdown(service, staff);
+        const pricingSource = serviceVariant
+            ? {
+                ...service.toJSON(),
+                rawPrice: calculateRawPriceFromFinalPrice(
+                    serviceVariant.finalPrice,
+                    service.taxRate,
+                    service.commissionRate
+                ),
+                finalPrice: serviceVariant.finalPrice,
+                duration
+            }
+            : service;
+        const pricing = db.Appointment.calculateRevenueBreakdown(pricingSource, staff);
         const bookingSplit = normalizedPaymentMethod === 'booking-fee'
             ? calculateServiceDeposit(pricing.price, tenantPaymentSettings)
             : {
@@ -221,6 +246,10 @@ class BookingService {
                 employeeCommissionRate: pricing.employeeCommissionRate,
                 employeeCommission: pricing.employeeCommission,
                 notes: normalizedNotes || null,
+                serviceVariantId: serviceVariant?.id || null,
+                serviceVariantName: serviceVariant?.description || null,
+                serviceVariantDescription: serviceVariant?.description || null,
+                serviceVariantDuration: serviceVariant?.duration || null,
                 status: 'confirmed',
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING,
                 paymentMethod: normalizedPaymentMethod,

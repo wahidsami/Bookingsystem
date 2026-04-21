@@ -4,7 +4,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { api, Tenant, Service, Staff, Product, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
+import { api, Tenant, Service, ServiceVariant, Staff, Product, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -33,7 +33,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
-    const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[] }) | null>(null);
+    const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[]; variants?: ServiceVariant[] }) | null>(null);
     const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
     const { itemCount, addToCart, clearCart } = useCart();
 
@@ -288,7 +288,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         setSelectedServiceLoading(true);
 
         try {
-            const serviceRes = await api.get<{ success: boolean; service: Service & { employees?: Staff[] } }>(
+            const serviceRes = await api.get<{ success: boolean; service: Service & { employees?: Staff[]; variants?: ServiceVariant[] } }>(
                 `/public/tenant/${tenant?.id || tenantId}/services/${service.id}`
             );
 
@@ -312,13 +312,59 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         setSelectedServiceDetails(service);
     };
 
-    const handleBookService = (service: Service, staff?: Staff | null) => {
+    const handleBookService = (service: Service, staff?: Staff | null, variant?: ServiceVariant | null) => {
         closeServiceDetails();
         navigation.navigate('Booking', {
             service,
             tenant,
             selectedStaff: staff || undefined,
+            selectedVariant: variant || undefined,
         });
+    };
+
+    const renderServiceVariants = (service: Service & { variants?: ServiceVariant[] }) => {
+        const activeVariants = Array.isArray(service.variants)
+            ? service.variants.filter((variant) => variant?.isActive !== false)
+            : [];
+
+        if (activeVariants.length === 0) {
+            return null;
+        }
+
+        return (
+            <View style={styles.variantSection}>
+                <Text style={styles.employeeSectionTitle}>
+                    {isRTL ? 'النسخ المتاحة' : 'Available Variants'}
+                </Text>
+                {activeVariants.map((variant) => {
+                    const variantPrice = getServicePrice(service, variant);
+
+                    return (
+                        <View key={variant.id} style={styles.variantCard}>
+                            <View style={styles.variantHeaderRow}>
+                                <View style={styles.variantTitleWrap}>
+                                    <Text style={styles.variantTitle}>
+                                        {variant.description || (isRTL ? 'متغير' : 'Variant')}
+                                    </Text>
+                                    <Text style={styles.variantMeta}>
+                                        {(variant.duration || service.duration)} mins
+                                    </Text>
+                                </View>
+                                <Text style={styles.variantPrice}>{variantPrice.toFixed(2)} SAR</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.variantBookButton}
+                                onPress={() => handleBookService(service, undefined, variant)}
+                            >
+                                <Text style={styles.variantBookButtonText}>
+                                    {isRTL ? 'احجز هذه النسخة' : 'Book this Variant'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    );
+                })}
+            </View>
+        );
     };
 
     const renderHero = () => {
@@ -647,6 +693,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 {getServiceDescription(selectedServiceDetails || selectedService) || 'Service details will appear here soon.'}
                             </Text>
 
+                            {renderServiceVariants(selectedServiceDetails || selectedService)}
+
                             {(selectedServiceDetails?.employees || []).length > 0 ? (
                                 <View style={styles.employeeSection}>
                                     <Text style={styles.employeeSectionTitle}>
@@ -974,6 +1022,54 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
         gap: spacing.sm,
     },
+    variantSection: {
+        marginTop: spacing.sm,
+        gap: spacing.sm,
+    },
+    variantCard: {
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        padding: spacing.md,
+        gap: spacing.sm,
+    },
+    variantHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: spacing.sm,
+    },
+    variantTitleWrap: {
+        flex: 1,
+        gap: 2,
+    },
+    variantTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    variantMeta: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+    },
+    variantPrice: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    variantBookButton: {
+        alignSelf: 'flex-start',
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+    },
+    variantBookButtonText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
     employeeSectionTitle: {
         fontSize: fontSize.lg,
         fontWeight: '700',
@@ -1068,6 +1164,7 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         color: colors.textSecondary,
         lineHeight: 24,
+        marginBottom: spacing.sm,
     },
     serviceBookButton: {
         marginTop: spacing.sm,
