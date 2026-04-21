@@ -306,12 +306,12 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </div>
       </header>
 
-      <div className="hidden lg:flex min-h-screen">
+      <div className="hidden lg:flex min-h-screen" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
         <aside
           className={`sticky top-0 h-screen flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
             isRTL ? 'border-l' : 'border-r'
           }`}
-          style={{ width: sidebarCollapsed ? 88 : 280, order: isRTL ? 2 : 1 }}
+          style={{ width: sidebarCollapsed ? 88 : 280 }}
         >
           <div
             className="h-[88px] border-b border-gray-200 bg-gradient-to-r from-primary/5 to-secondary/5 px-4"
@@ -364,7 +364,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           </nav>
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col" style={{ order: isRTL ? 1 : 2 }}>
+        <main className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 h-[88px] border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm">
             <div className="flex h-full items-center justify-between px-6" style={{ flexDirection: isRTL ? 'row' : 'row' }}>
               <div className="flex items-center gap-3 min-w-0" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
