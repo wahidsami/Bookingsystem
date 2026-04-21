@@ -278,7 +278,7 @@ export default function EmployeesPage() {
 
       <div className={`card mb-6 ${isRTL ? "text-right" : ""}`}>
         <div className={`flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between ${isRTL ? "xl:flex-row-reverse" : ""}`}>
-          <div className={`flex flex-1 flex-wrap items-center gap-3 ${isRTL ? "justify-start xl:justify-end" : "justify-start"}`}>
+          <div className={`grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)_auto_auto] xl:items-center ${isRTL ? "xl:[direction:rtl]" : ""}`}>
             <input
               type="text"
               placeholder={t("searchPlaceholder")}
@@ -287,7 +287,7 @@ export default function EmployeesPage() {
                 setSearchTerm(event.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full min-w-[220px] flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
               style={{ textAlign: isRTL ? "right" : "left" }}
             />
 
@@ -297,7 +297,7 @@ export default function EmployeesPage() {
                 setListFilter(event.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full min-w-[250px] px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              className="w-full min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               style={{ textAlign: isRTL ? "right" : "left" }}
             >
               {listFilterOptions.map((option) => (
