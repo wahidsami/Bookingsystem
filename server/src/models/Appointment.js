@@ -21,6 +21,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'tenant',
                 required: false
             });
+            Appointment.belongsTo(models.BookingSession, {
+                foreignKey: 'bookingSessionId',
+                as: 'bookingSession',
+                required: false
+            });
             // Keep Customer for backward compatibility (will be deprecated)
             Appointment.belongsTo(models.Customer, {
                 foreignKey: 'customerId',
@@ -175,6 +180,26 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: true,
             comment: 'Selected service variant duration snapshot'
+        },
+        bookingSessionId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'booking_sessions',
+                key: 'id'
+            },
+            comment: 'Shared booking session for multi-service checkouts'
+        },
+        bookingReference: {
+            type: DataTypes.STRING(40),
+            allowNull: true,
+            comment: 'Shared reference for a group of linked appointments'
+        },
+        bookingItemIndex: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: 'Zero-based index of the item within a booking session'
         },
         startTime: {
             type: DataTypes.DATE,
@@ -339,6 +364,14 @@ module.exports = (sequelize, DataTypes) => {
             {
                 fields: ['platformUserId', 'startTime'],
                 name: 'idx_platform_user_time'
+            },
+            {
+                fields: ['bookingSessionId'],
+                name: 'idx_appointments_booking_session_id'
+            },
+            {
+                fields: ['bookingReference'],
+                name: 'idx_appointments_booking_reference'
             },
             // Index for tenant-based queries
             {
