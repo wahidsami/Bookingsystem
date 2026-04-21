@@ -795,44 +795,7 @@ export default function EditEmployeePage() {
         onSectionSelect={scrollToSection}
       >
       <form id="employee-editor-form" onSubmit={handleSubmit} noValidate className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
-          <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
-              </p>
-            </div>
-            <div className="space-y-2">
-              {editorSections.map((item) => {
-                const active = activeSection === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => scrollToSection(item.id)}
-                    className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
-                      active
-                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <span className="font-medium">{item.label}</span>
-                      <span className="text-xs font-semibold text-gray-500">{item.progressLabel}</span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${Math.max(0, Math.min(100, item.progressPercent))}%` }}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
-
-          <div className="space-y-6">
+        <div className="space-y-6">
             <section id="employee-section-basic" className={`${activeSection === 'basic' ? 'card scroll-mt-6' : 'hidden'}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
@@ -1367,7 +1330,6 @@ export default function EditEmployeePage() {
               )}
             </section>
           </div>
-        </div>
       </form>
       </EmployeeEditorFrame>
     </TenantLayout>
