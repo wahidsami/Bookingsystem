@@ -78,7 +78,6 @@ export default function EditEmployeePage() {
   const [dashboardPermissions, setDashboardPermissions] = useState<Record<string, boolean>>(
     normalizeDashboardPermissions({}, 'custom')
   );
-  const [dashboardPermissionsLoading, setDashboardPermissionsLoading] = useState(false);
   const [dashboardInviteLoading, setDashboardInviteLoading] = useState(false);
   const [dashboardResetLoading, setDashboardResetLoading] = useState(false);
   const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
@@ -318,37 +317,13 @@ export default function EditEmployeePage() {
     }
   };
 
-  const handleDashboardPermissionChange = async (key: string, checked: boolean) => {
-    const accountId = dashboardAccountId;
-    if (!accountId) {
-      setError(locale === 'ar'
-        ? 'احفظ الموظف أولاً لتظهر حسابات لوحة التحكم.'
-        : 'Save the employee first so the dashboard account can be managed.');
-      return;
-    }
-
+  const handleDashboardPermissionChange = (key: string, checked: boolean) => {
     const nextPermissions = {
       ...dashboardPermissions,
       [key]: checked
     };
 
     setDashboardPermissions(nextPermissions);
-    setDashboardPermissionsLoading(true);
-    try {
-      const response = await tenantApi.updateDashboardAccount(accountId, {
-        permissions: nextPermissions
-      });
-
-      if (!response?.success) {
-        throw new Error(response?.message || (locale === 'ar' ? 'تعذر تحديث الصلاحيات' : 'Failed to update permissions'));
-      }
-    } catch (err: any) {
-      console.error("Failed to update dashboard permissions:", err);
-      setError(err.message || (locale === 'ar' ? 'تعذر تحديث الصلاحيات' : 'Failed to update permissions'));
-      setDashboardPermissions(prev => ({ ...prev, [key]: !checked }));
-    } finally {
-      setDashboardPermissionsLoading(false);
-    }
   };
 
   const handleDashboardInvite = async () => {
@@ -424,6 +399,9 @@ export default function EditEmployeePage() {
       submitData.append("commissionRate", formData.commissionRate || "0");
       submitData.append("scheduleVisibilityWeeks", formData.scheduleVisibilityWeeks || "1");
       submitData.append("isActive", formData.isActive.toString());
+      if (!isServiceProvider) {
+        submitData.append("dashboardPermissions", JSON.stringify(dashboardPermissions));
+      }
       // Note: workingHours removed - use Schedules section to manage employee schedules
 
       // Append photo only if a new one is selected
@@ -1006,11 +984,6 @@ export default function EditEmployeePage() {
                             : 'These permissions apply to dashboard accounts only.'}
                         </p>
                       </div>
-                      {dashboardPermissionsLoading && (
-                        <span className="text-xs font-medium text-primary">
-                          {locale === 'ar' ? 'جارٍ الحفظ...' : 'Saving...'}
-                        </span>
-                      )}
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1027,7 +1000,6 @@ export default function EditEmployeePage() {
                               type="checkbox"
                               checked={checked}
                               onChange={(event) => handleDashboardPermissionChange(key, event.target.checked)}
-                              disabled={!dashboardAccountId || dashboardPermissionsLoading}
                               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
                             />
                           </label>

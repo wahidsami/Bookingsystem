@@ -180,6 +180,7 @@ const syncTenantDashboardAccount = async ({
     nextEmail = null,
     displayName = '',
     position = null,
+    permissions = null,
     password = null,
     transaction
 }) => {
@@ -234,7 +235,7 @@ const syncTenantDashboardAccount = async ({
     const roleKey = Object.keys(DASHBOARD_ROLE_PRESETS).includes(normalizedPosition)
         ? normalizedPosition
         : 'custom';
-    const permissions = normalizeDashboardPermissions({}, roleKey);
+    const normalizedPermissions = normalizeDashboardPermissions(permissions || {}, roleKey);
     const finalDisplayName = String(displayName || '').trim() || nextNormalized;
     const temporaryPassword = !existingAccount && !password ? generateTemporaryStaffPassword() : null;
     const finalPassword = password || temporaryPassword;
@@ -243,7 +244,7 @@ const syncTenantDashboardAccount = async ({
         const updates = {
             displayName: finalDisplayName,
             roleKey,
-            permissions,
+            permissions: normalizedPermissions,
             isActive: true,
             passwordResetRequired: !password
         };
@@ -272,7 +273,7 @@ const syncTenantDashboardAccount = async ({
         password: finalPassword,
         displayName: finalDisplayName,
         roleKey,
-        permissions,
+        permissions: normalizedPermissions,
         isActive: true,
         passwordResetRequired: true
     }, { transaction });
@@ -848,6 +849,7 @@ exports.createEmployee = async (req, res) => {
             commissionRate,
             scheduleVisibilityWeeks,
             staffAppPassword,
+            dashboardPermissions,
             workingHours, // Deprecated - kept for backward compatibility
             isActive = true
         } = req.body;
@@ -879,6 +881,22 @@ exports.createEmployee = async (req, res) => {
         const normalizedEmail = email && email.trim() ? normalizeEmail(email) : null;
         const positionValue = `${position ?? ''}`.trim();
         const normalizedPosition = normalizeEmployeePosition(positionValue);
+        let parsedDashboardPermissions = null;
+        if (dashboardPermissions !== undefined) {
+            if (typeof dashboardPermissions === 'string' && dashboardPermissions.trim()) {
+                try {
+                    parsedDashboardPermissions = JSON.parse(dashboardPermissions);
+                } catch (parseError) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: 'dashboardPermissions must be valid JSON'
+                    });
+                }
+            } else if (dashboardPermissions && typeof dashboardPermissions === 'object') {
+                parsedDashboardPermissions = dashboardPermissions;
+            }
+        }
         const parsedScheduleVisibilityWeeks = parseScheduleVisibilityWeeks(scheduleVisibilityWeeks, 1);
         if (!positionValue) {
             await transaction.rollback();
@@ -1173,6 +1191,7 @@ exports.createEmployee = async (req, res) => {
                 nextEmail: normalizedEmail,
                 displayName: name.trim(),
                 position: normalizedPosition,
+                permissions: parsedDashboardPermissions,
                 password: accessPassword,
                 transaction
             })
@@ -1258,6 +1277,7 @@ exports.updateEmployee = async (req, res) => {
             commissionRate,
             scheduleVisibilityWeeks,
             staffAppPassword,
+            dashboardPermissions,
             workingHours,
             isActive
         } = req.body;
@@ -1301,6 +1321,22 @@ exports.updateEmployee = async (req, res) => {
         }
 
         const previousEmail = employee.email;
+        let parsedDashboardPermissions = null;
+        if (dashboardPermissions !== undefined) {
+            if (typeof dashboardPermissions === 'string' && dashboardPermissions.trim()) {
+                try {
+                    parsedDashboardPermissions = JSON.parse(dashboardPermissions);
+                } catch (parseError) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: 'dashboardPermissions must be valid JSON'
+                    });
+                }
+            } else if (dashboardPermissions && typeof dashboardPermissions === 'object') {
+                parsedDashboardPermissions = dashboardPermissions;
+            }
+        }
 
         // Parse skills if provided
         if (skills !== undefined) {
@@ -1375,6 +1411,7 @@ exports.updateEmployee = async (req, res) => {
                 nextEmail: employee.email,
                 displayName: employee.name,
                 position: employee.position,
+                permissions: parsedDashboardPermissions,
                 password: accessPassword,
                 transaction
             })
@@ -1384,6 +1421,7 @@ exports.updateEmployee = async (req, res) => {
                 nextEmail: null,
                 displayName: employee.name,
                 position: employee.position,
+                permissions: null,
                 transaction
             });
 
