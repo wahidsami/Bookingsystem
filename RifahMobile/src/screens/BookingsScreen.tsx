@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -23,6 +23,18 @@ import { useFocusEffect } from '@react-navigation/native';
 import { bookingNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 
+interface BookingGroup {
+    key: string;
+    bookingReference?: string | null;
+    bookingSessionId?: string | null;
+    tenant?: Booking['tenant'];
+    items: Booking[];
+    status: Booking['status'];
+    startTime: string;
+    totalPrice: number;
+    payableNowTotal: number;
+}
+
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const { showLogin } = useAppSession();
@@ -32,7 +44,7 @@ export function BookingsScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-    const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+    const [selectedBookingGroup, setSelectedBookingGroup] = useState<BookingGroup | null>(null);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -68,6 +80,37 @@ export function BookingsScreen({ navigation }: any) {
         loadBookings();
     };
 
+    const groupedBookings = useMemo<BookingGroup[]>(() => {
+        const map = new Map<string, BookingGroup>();
+
+        bookings.forEach((booking) => {
+            const key = booking.bookingReference || booking.bookingSessionId || booking.id;
+            const existing = map.get(key) || {
+                key,
+                bookingReference: booking.bookingReference,
+                bookingSessionId: booking.bookingSessionId,
+                tenant: booking.tenant,
+                items: [],
+                status: booking.status,
+                startTime: booking.startTime,
+                totalPrice: 0,
+                payableNowTotal: 0,
+            };
+
+            existing.items.push(booking);
+            existing.totalPrice += Number(booking.price || 0);
+            existing.payableNowTotal += getBookingOutstandingAmount(booking);
+
+            if (booking.startTime && (!existing.startTime || new Date(booking.startTime).getTime() < new Date(existing.startTime).getTime())) {
+                existing.startTime = booking.startTime;
+            }
+
+            map.set(key, existing);
+        });
+
+        return Array.from(map.values()).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    }, [bookings]);
+
     const handleCancel = async (id: string) => {
         Alert.alert(
             t('cancelBooking'),
@@ -94,7 +137,7 @@ export function BookingsScreen({ navigation }: any) {
     };
 
     const getBookingNumber = (booking: Booking) =>
-        booking.bookingNumber || booking.id.slice(0, 8).toUpperCase();
+        booking.bookingNumber || booking.bookingReference || booking.id.slice(0, 8).toUpperCase();
 
     const getServiceName = (booking: Booking) => {
         const service = booking.Service || booking.service;
@@ -139,15 +182,17 @@ export function BookingsScreen({ navigation }: any) {
         }
     };
 
-    const renderBookingCard = ({ item }: { item: Booking }) => {
+    const renderBookingCard = ({ item }: { item: BookingGroup }) => {
         const isArabic = language === 'ar';
+        const representative = item.items[0];
         const dateDate = new Date(item.startTime);
+        const serviceCount = item.items.length;
 
         return (
             <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.9}
-                onPress={() => setSelectedBooking(item)}
+                onPress={() => setSelectedBookingGroup(item)}
             >
                 {/* Header: Salon Info */}
                 <View style={styles.cardHeader}>
@@ -182,11 +227,24 @@ export function BookingsScreen({ navigation }: any) {
                 {/* Body: Service Info */}
                 <View style={styles.cardBody}>
                     <Text style={styles.bookingNumberLabel}>
-                        {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(item)}
+                        {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(representative)}
                     </Text>
-                    <Text style={styles.serviceName}>{getServiceName(item)}</Text>
-                    {!!getServiceVariantLabel(item) && (
-                        <Text style={styles.variantLabel}>{getServiceVariantLabel(item)}</Text>
+                    <Text style={styles.serviceName}>
+                        {serviceCount > 1
+                            ? (language === 'ar' ? `${serviceCount} خدمات مرتبطة` : `${serviceCount} linked services`)
+                            : getServiceName(representative)}
+                    </Text>
+                    {serviceCount === 1 && !!getServiceVariantLabel(representative) && (
+                        <Text style={styles.variantLabel}>{getServiceVariantLabel(representative)}</Text>
+                    )}
+                    {serviceCount > 1 && (
+                        <Text style={styles.variantLabel}>
+                            {item.items
+                                .slice(0, 2)
+                                .map((booking) => `${getServiceName(booking)}${getServiceVariantLabel(booking) ? ` · ${getServiceVariantLabel(booking)}` : ''}`)
+                                .join('\n')}
+                            {item.items.length > 2 ? `\n${language === 'ar' ? '...وغيرها' : '...and more'}` : ''}
+                        </Text>
                     )}
                     <View style={styles.dateTimeRow}>
                         <Text style={styles.dateIcon}>📅</Text>
@@ -200,41 +258,29 @@ export function BookingsScreen({ navigation }: any) {
                             {format(dateDate, 'h:mm a', { locale: isArabic ? ar : enUS })}
                         </Text>
                     </View>
-                    {item.Staff && (
+                    {representative.Staff && (
                         <View style={styles.staffRow}>
                             <Text style={styles.staffLabel}>{t('specialist')}: </Text>
-                            <Text style={styles.staffName}>{item.Staff.name}</Text>
+                            <Text style={styles.staffName}>{representative.Staff.name}</Text>
                         </View>
                     )}
                 </View>
 
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
-                    <Text style={styles.price}>{Number(item.price || 0).toFixed(2)} SAR</Text>
+                    <Text style={styles.price}>{item.totalPrice.toFixed(2)} SAR</Text>
+                    <Text style={styles.variantLabel}>
+                        {language === 'ar'
+                            ? `يدفع الآن: ${item.payableNowTotal.toFixed(2)} SAR`
+                            : `Due now: ${item.payableNowTotal.toFixed(2)} SAR`}
+                    </Text>
                     <View style={styles.actions}>
-                        {bookingNeedsPayment(item.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(item.status) && activeTab === 'upcoming' && (
-                            <TouchableOpacity
-                                style={styles.payButton}
-                                onPress={() => (navigation as any).navigate('Payment', {
-                                    appointmentId: item.id,
-                                    amount: getBookingOutstandingAmount(item),
-                                    tenantId: item.tenantId || item.tenant?.id,
-                                    paymentChoice: item.paymentStatus === 'pending' && item.paymentMethod === 'booking-fee'
-                                        ? 'booking-fee'
-                                        : undefined,
-                                })}
-                            >
-                                <Text style={styles.payButtonText}>{t('payNow')}</Text>
-                            </TouchableOpacity>
-                        )}
-                        {['confirmed', 'pending'].includes(item.status) && activeTab === 'upcoming' && (
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => handleCancel(item.id)}
-                            >
-                                <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity
+                            style={styles.payButton}
+                            onPress={() => setSelectedBookingGroup(item)}
+                        >
+                            <Text style={styles.payButtonText}>{language === 'ar' ? 'عرض التفاصيل' : 'View Details'}</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -284,11 +330,11 @@ export function BookingsScreen({ navigation }: any) {
             </View>
 
             {/* List */}
-            {bookings.length > 0 ? (
+            {groupedBookings.length > 0 ? (
                 <FlatList
-                    data={bookings}
+                    data={groupedBookings}
                     renderItem={renderBookingCard}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => item.key}
                     contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding }]}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -316,10 +362,10 @@ export function BookingsScreen({ navigation }: any) {
             )}
 
             <Modal
-                visible={!!selectedBooking}
+                visible={!!selectedBookingGroup}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setSelectedBooking(null)}
+                onRequestClose={() => setSelectedBookingGroup(null)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
@@ -330,92 +376,125 @@ export function BookingsScreen({ navigation }: any) {
                             <View style={styles.modalHeader}>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.modalTitle}>
-                                        {language === 'ar' ? 'تفاصيل الحجز' : 'Appointment Details'}
+                                        {language === 'ar' ? 'تفاصيل الحجز' : 'Booking Details'}
                                     </Text>
-                                    {selectedBooking && (
+                                    {selectedBookingGroup && (
                                         <Text style={styles.modalReference}>
-                                            {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(selectedBooking)}
+                                            {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(selectedBookingGroup.items[0])}
                                         </Text>
                                     )}
                                 </View>
                                 <TouchableOpacity
                                     style={styles.modalCloseButton}
-                                    onPress={() => setSelectedBooking(null)}
+                                    onPress={() => setSelectedBookingGroup(null)}
                                 >
                                     <Text style={styles.modalCloseText}>×</Text>
                                 </TouchableOpacity>
                             </View>
 
-                            {selectedBooking && (
+                            {selectedBookingGroup && (
                                 <View style={styles.modalBody}>
                                     <View style={styles.detailRow}>
                                         <Text style={styles.detailLabel}>{language === 'ar' ? 'المركز' : 'Center'}</Text>
-                                        <Text style={styles.detailValue}>{selectedBooking.tenant?.name || '-'}</Text>
+                                        <Text style={styles.detailValue}>{selectedBookingGroup.tenant?.name || '-'}</Text>
                                     </View>
                                     <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الخدمة' : 'Service'}</Text>
-                                        <Text style={styles.detailValue}>{getServiceName(selectedBooking)}</Text>
-                                    </View>
-                                    {selectedBooking.serviceVariantName && (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>{language === 'ar' ? 'نوع الخدمة' : 'Service Variant'}</Text>
-                                            <Text style={styles.detailValue}>{selectedBooking.serviceVariantName}</Text>
-                                        </View>
-                                    )}
-                                    {selectedBooking.serviceVariantDuration ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>{language === 'ar' ? 'مدة النوع' : 'Variant Duration'}</Text>
-                                            <Text style={styles.detailValue}>{selectedBooking.serviceVariantDuration} min</Text>
-                                        </View>
-                                    ) : null}
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الموظف' : 'Employee'}</Text>
-                                        <Text style={styles.detailValue}>{getStaffName(selectedBooking)}</Text>
+                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'عدد الخدمات' : 'Services'}</Text>
+                                        <Text style={styles.detailValue}>{selectedBookingGroup.items.length}</Text>
                                     </View>
                                     <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'التاريخ' : 'Date'}</Text>
+                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الموعد الأول' : 'First time'}</Text>
                                         <Text style={styles.detailValue}>
-                                            {format(new Date(selectedBooking.startTime), 'eeee, d MMMM yyyy', {
+                                            {format(new Date(selectedBookingGroup.startTime), 'eeee, d MMMM yyyy', {
                                                 locale: language === 'ar' ? ar : enUS,
                                             })}
                                         </Text>
                                     </View>
                                     <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الوقت' : 'Time'}</Text>
-                                        <Text style={styles.detailValue}>
-                                            {format(new Date(selectedBooking.startTime), 'h:mm a', {
-                                                locale: language === 'ar' ? ar : enUS,
-                                            })}
-                                        </Text>
+                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text>
+                                        <Text style={styles.detailValue}>{selectedBookingGroup.totalPrice.toFixed(2)} SAR</Text>
                                     </View>
                                     <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'حالة الحجز' : 'Booking Status'}</Text>
-                                        <Text style={styles.detailValue}>
-                                            {getStatusText(selectedBooking.status, t, language)}
-                                        </Text>
+                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'يدفع الآن' : 'Due now'}</Text>
+                                        <Text style={styles.detailValue}>{selectedBookingGroup.payableNowTotal.toFixed(2)} SAR</Text>
                                     </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'حالة الدفع' : 'Payment Status'}</Text>
-                                        <Text style={styles.detailValue}>
-                                            {getPaymentStatusText(selectedBooking.paymentStatus)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'السعر' : 'Amount'}</Text>
-                                        <Text style={styles.detailValue}>{Number(selectedBooking.price || 0).toFixed(2)} SAR</Text>
-                                    </View>
-                                    {selectedBooking.paymentMethod && (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>{language === 'ar' ? 'طريقة الدفع' : 'Payment Method'}</Text>
-                                            <Text style={styles.detailValue}>{selectedBooking.paymentMethod}</Text>
+
+                                    <Text style={styles.modalSectionTitle}>{language === 'ar' ? 'العناصر' : 'Items'}</Text>
+                                    {selectedBookingGroup.items.map((booking) => (
+                                        <View key={booking.id} style={styles.groupItemCard}>
+                                            <View style={styles.detailRow}>
+                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الخدمة' : 'Service'}</Text>
+                                                <Text style={styles.detailValue}>{getServiceName(booking)}</Text>
+                                            </View>
+                                            {booking.serviceVariantName && (
+                                                <View style={styles.detailRow}>
+                                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'النوع' : 'Variant'}</Text>
+                                                    <Text style={styles.detailValue}>{booking.serviceVariantName}</Text>
+                                                </View>
+                                            )}
+                                            <View style={styles.detailRow}>
+                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الوقت' : 'Time'}</Text>
+                                                <Text style={styles.detailValue}>
+                                                    {format(new Date(booking.startTime), 'PPP p', {
+                                                        locale: language === 'ar' ? ar : enUS,
+                                                    })}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.detailRow}>
+                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الموظف' : 'Employee'}</Text>
+                                                <Text style={styles.detailValue}>{getStaffName(booking)}</Text>
+                                            </View>
+                                            <View style={styles.detailRow}>
+                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الحالة' : 'Status'}</Text>
+                                                <Text style={styles.detailValue}>{getStatusText(booking.status, t, language)}</Text>
+                                            </View>
+                                            <View style={styles.detailRow}>
+                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'حالة الدفع' : 'Payment Status'}</Text>
+                                                <Text style={styles.detailValue}>{getPaymentStatusText(booking.paymentStatus)}</Text>
+                                            </View>
+                                            <View style={styles.detailRow}>
+                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'السعر' : 'Amount'}</Text>
+                                                <Text style={styles.detailValue}>{Number(booking.price || 0).toFixed(2)} SAR</Text>
+                                            </View>
+                                            {booking.paymentMethod && (
+                                                <View style={styles.detailRow}>
+                                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'طريقة الدفع' : 'Payment Method'}</Text>
+                                                    <Text style={styles.detailValue}>{booking.paymentMethod}</Text>
+                                                </View>
+                                            )}
+                                            {booking.notes && (
+                                                <View style={styles.notesBlock}>
+                                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Text>
+                                                    <Text style={styles.notesText}>{booking.notes}</Text>
+                                                </View>
+                                            )}
+
+                                            {bookingNeedsPayment(booking.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(booking.status) && activeTab === 'upcoming' && (
+                                                <TouchableOpacity
+                                                    style={styles.payButton}
+                                                    onPress={() => (navigation as any).navigate('Payment', {
+                                                        appointmentId: booking.id,
+                                                        amount: getBookingOutstandingAmount(booking),
+                                                        tenantId: booking.tenantId || booking.tenant?.id,
+                                                        paymentChoice: booking.paymentStatus === 'pending' && booking.paymentMethod === 'booking-fee'
+                                                            ? 'booking-fee'
+                                                            : undefined,
+                                                    })}
+                                                >
+                                                    <Text style={styles.payButtonText}>{t('payNow')}</Text>
+                                                </TouchableOpacity>
+                                            )}
+
+                                            {['confirmed', 'pending'].includes(booking.status) && activeTab === 'upcoming' && (
+                                                <TouchableOpacity
+                                                    style={styles.cancelButton}
+                                                    onPress={() => handleCancel(booking.id)}
+                                                >
+                                                    <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
-                                    )}
-                                    {selectedBooking.notes && (
-                                        <View style={styles.notesBlock}>
-                                            <Text style={styles.detailLabel}>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Text>
-                                            <Text style={styles.notesText}>{selectedBooking.notes}</Text>
-                                        </View>
-                                    )}
+                                    ))}
                                 </View>
                             )}
                         </ScrollView>
@@ -726,6 +805,21 @@ const styles = StyleSheet.create({
     modalBody: {
         gap: spacing.md,
         paddingBottom: spacing.xl,
+    },
+    modalSectionTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+        marginTop: spacing.sm,
+        marginBottom: spacing.xs,
+    },
+    groupItemCard: {
+        gap: spacing.sm,
+        padding: spacing.md,
+        borderRadius: borderRadius.md,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     detailRow: {
         padding: spacing.md,

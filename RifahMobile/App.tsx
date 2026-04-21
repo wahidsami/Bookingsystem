@@ -12,6 +12,7 @@ import { RegisterScreen } from './src/screens/RegisterScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LanguageProvider, useLanguage } from './src/contexts/LanguageContext';
 import { CartProvider } from './src/contexts/CartContext';
+import { ServiceBookingCartProvider } from './src/contexts/ServiceBookingCartContext';
 import { getLanguage } from './src/utils/language';
 import { hasCompletedOnboarding, markOnboardingComplete } from './src/utils/onboarding';
 import { colors } from './src/theme/colors';
@@ -163,7 +164,7 @@ function AppContent() {
   }
 
   return (
-    <AppSessionProvider
+      <AppSessionProvider
       value={{
         isAuthenticated,
         login: handleLoginSuccess,
@@ -237,20 +238,22 @@ function AppContent() {
       ) : null}
 
       {currentScreen === 'home' ? (
-        <NavigationContainer
-          ref={navigationRef}
-          onReady={() => {
-            consumePendingNotificationCampaignId()
-              .then((pendingNotification) => {
-                if (pendingNotification) {
-                  navigateToNotifications();
-                }
-              })
-              .catch(() => undefined);
-          }}
-        >
-          <RootNavigator />
-        </NavigationContainer>
+        <ServiceBookingCartProvider>
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={() => {
+              consumePendingNotificationCampaignId()
+                .then((pendingNotification) => {
+                  if (pendingNotification) {
+                    navigateToNotifications();
+                  }
+                })
+                .catch(() => undefined);
+            }}
+          >
+            <RootNavigator />
+          </NavigationContainer>
+        </ServiceBookingCartProvider>
       ) : null}
     </AppSessionProvider>
   );

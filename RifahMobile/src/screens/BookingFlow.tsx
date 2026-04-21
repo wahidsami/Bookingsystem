@@ -9,6 +9,7 @@ import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { ServiceBookingCartItem, useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 
 interface BookingProps {
     route: any;
@@ -42,6 +43,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const { t, isRTL, language } = useLanguage();
     const { showLogin } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
+    const { addItem } = useServiceBookingCart();
     const [step, setStep] = useState<BookingStep>('staff');
     const [loading, setLoading] = useState(false);
 
@@ -294,6 +296,65 @@ export function BookingFlow({ route, navigation }: BookingProps) {
         }
     };
 
+    const handleAddToCart = () => {
+        if (!selectedTime) {
+            Alert.alert('Select a Time', 'Please select an available time slot');
+            return;
+        }
+
+        const bookingCartItem: ServiceBookingCartItem = {
+            id: `${service.id}-${selectedTime.startTime}-${Date.now()}`,
+            tenantId: tenant.id,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                name_en: tenant.name_en,
+                name_ar: tenant.name_ar,
+                slug: tenant.slug,
+                logo: tenant.logo,
+            },
+            service,
+            variant: selectedVariant || null,
+            staff: selectedStaff || null,
+            requestedStaffId: selectedStaff?.id || null,
+            staffId: selectedTime.staffId || selectedStaff?.id || null,
+            startTime: selectedTime.startTime,
+            notes: bookingNote.trim() || undefined,
+            paymentMethod: selectedPaymentMethod,
+            totalPrice: servicePrice,
+            payableNowAmount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : selectedPaymentMethod === 'online-full' ? servicePrice : 0,
+        };
+
+        const result = addItem(bookingCartItem);
+        if (!result.success) {
+            Alert.alert(
+                language === 'ar' ? 'تنبيه' : 'Notice',
+                language === 'ar'
+                    ? 'السلة الحالية تخص مركزاً آخر. أفرغ السلة أو أكمل الحجز الحالي أولاً.'
+                    : 'Your current booking cart belongs to another tenant. Please clear it or finish that booking first.'
+            );
+            return;
+        }
+
+        Alert.alert(
+            language === 'ar' ? 'تمت الإضافة' : 'Added to cart',
+            language === 'ar'
+                ? 'تم حفظ الخدمة في سلة الحجز.'
+                : 'This service was saved to your booking cart.',
+            [
+                {
+                    text: language === 'ar' ? 'عرض السلة' : 'View Cart',
+                    onPress: () => navigation.navigate('ServiceBookingCart'),
+                },
+                {
+                    text: language === 'ar' ? 'متابعة' : 'Continue',
+                    style: 'cancel',
+                    onPress: () => navigation.goBack(),
+                },
+            ]
+        );
+    };
+
     const renderStaffSelection = () => (
         <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Select Specialist</Text>
@@ -514,15 +575,26 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             </ScrollView>
 
             <View style={[styles.footer, { paddingBottom: bottomInset }]}>
-                <TouchableOpacity style={styles.primaryButton} onPress={step === 'review' ? handleBooking : handleNext}>
-                    {loading ? (
-                        <ActivityIndicator color="white" />
-                    ) : (
-                        <Text style={styles.buttonText}>
-                            {step === 'review' ? 'Confirm Booking' : t('next')}
-                        </Text>
-                    )}
-                </TouchableOpacity>
+                {step === 'review' ? (
+                    <>
+                        <TouchableOpacity style={styles.secondaryButton} onPress={handleAddToCart} disabled={loading}>
+                            <Text style={styles.secondaryButtonText}>
+                                {language === 'ar' ? 'إضافة للسلة' : 'Add to Cart'}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.primaryButton} onPress={handleBooking} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <Text style={styles.buttonText}>{language === 'ar' ? 'تأكيد الحجز' : 'Confirm Booking'}</Text>
+                            )}
+                        </TouchableOpacity>
+                    </>
+                ) : (
+                    <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+                        <Text style={styles.buttonText}>{t('next')}</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -790,12 +862,29 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         borderTopWidth: 1,
         borderTopColor: colors.border,
+        flexDirection: 'row',
+        gap: spacing.sm,
     },
     primaryButton: {
+        flex: 1,
         backgroundColor: colors.primary,
         paddingVertical: spacing.md,
         borderRadius: borderRadius.lg,
         alignItems: 'center',
+    },
+    secondaryButton: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.primary,
+    },
+    secondaryButtonText: {
+        color: colors.primary,
+        fontSize: fontSize.md,
+        fontWeight: 'bold',
     },
     buttonText: {
         color: 'white',

@@ -7,6 +7,7 @@ import { TenantScreen } from '../screens/TenantScreen';
 import { BookingFlow } from '../screens/BookingFlow';
 import { HotDealDetailScreen } from '../screens/HotDealDetailScreen';
 import { CartScreen } from '../screens/CartScreen';
+import { ServiceBookingCartScreen } from '../screens/ServiceBookingCartScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { BrowseScreen } from '../screens/BrowseScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
@@ -32,6 +33,7 @@ export function RootNavigator() {
             <Stack.Screen name="Payment" component={PaymentScreen} />
             <Stack.Screen name="HotDealDetail" component={HotDealDetailScreen} />
             <Stack.Screen name="Cart" component={CartScreen} />
+            <Stack.Screen name="ServiceBookingCart" component={ServiceBookingCartScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Browse" component={BrowseScreen} />

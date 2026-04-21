@@ -900,20 +900,12 @@ exports.createPublicBooking = async (req, res) => {
                 };
             });
 
-            const multiPaymentMethods = new Set(normalizedItems.map((item) => item.paymentMethod || 'at-center'));
-            if (multiPaymentMethods.size > 1 || !multiPaymentMethods.has('at-center')) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Multi-service bookings currently support pay at center only.'
-                });
-            }
-
-            const { session, appointments } = await bookingService.createBookingSession({
+            const { session, appointments, paymentSummary } = await bookingService.createBookingSession({
                 tenantId,
                 platformUserId: platformUser.id,
                 items: normalizedItems,
                 notes: specialRequests || null,
-                paymentMethod: 'at-center'
+                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center'
             });
 
             res.json({
@@ -923,6 +915,7 @@ exports.createPublicBooking = async (req, res) => {
                     bookingId: session.id,
                     bookingReference: session.bookingReference,
                     bookingSessionId: session.id,
+                    paymentSummary,
                     appointments: appointments.map((appointment) => ({
                         id: appointment.id,
                         bookingNumber: appointment.bookingNumber,

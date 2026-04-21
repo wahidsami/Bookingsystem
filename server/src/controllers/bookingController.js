@@ -3,6 +3,11 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const { SERVICE_PAYMENT_METHOD_RULES } = require('../utils/tenantPaymentSettings');
 
+const normalizeBookingItemPaymentMethod = (value) => {
+    const normalized = `${value || 'at-center'}`.trim().toLowerCase();
+    return SERVICE_PAYMENT_METHOD_RULES[normalized] ? normalized : null;
+};
+
 /**
  * Search for available slots
  * POST /api/v1/bookings/search
@@ -102,8 +107,114 @@ const getRecommendations = async (req, res) => {
  */
 const createBooking = async (req, res) => {
     try {
-        const { serviceId, staffId, requestedStaffId, startTime, tenantId, notes, paymentMethod, variantId } = req.body;
+        const {
+            serviceId,
+            staffId,
+            requestedStaffId,
+            startTime,
+            tenantId,
+            notes,
+            paymentMethod,
+            variantId
+        } = req.body;
         const platformUserId = req.userId; // From auth middleware
+        const bookingItems = Array.isArray(req.body.items) ? req.body.items : [];
+
+        let finalTenantId = tenantId || req.tenantId;
+        
+        if (!finalTenantId) {
+            const firstBookingServiceId = bookingItems[0]?.serviceId || serviceId;
+            if (firstBookingServiceId) {
+                const service = await db.Service.findByPk(firstBookingServiceId);
+                if (service && service.tenantId) {
+                    finalTenantId = service.tenantId;
+                }
+            }
+        }
+
+        if (!finalTenantId) {
+            // If no tenantId provided, try to get from service
+            const service = await db.Service.findByPk(serviceId);
+            if (service && service.tenantId) {
+                finalTenantId = service.tenantId;
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'tenantId is required. Please specify which salon you are booking at.'
+                });
+            }
+        }
+
+        if (bookingItems.length > 0) {
+            const normalizedItems = bookingItems.map((item, index) => {
+                const rawStartTime = item.startTime
+                    || (item.date && item.time ? new Date(`${item.date}T${item.time}`).toISOString() : null)
+                    || null;
+                const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
+
+                if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
+                    throw new Error(`Invalid start time for booking item ${index + 1}`);
+                }
+
+                const normalizedPaymentMethod = normalizeBookingItemPaymentMethod(item.paymentMethod || paymentMethod);
+                if (!normalizedPaymentMethod) {
+                    throw new Error(`Invalid payment method for booking item ${index + 1}`);
+                }
+
+                return {
+                    serviceId: item.serviceId,
+                    variantId: item.variantId || null,
+                    staffId: item.staffId || null,
+                    requestedStaffId: item.requestedStaffId || item.staffId || null,
+                    startTime: parsedStartTime.toISOString(),
+                    notes: item.notes || notes || null,
+                    paymentMethod: normalizedPaymentMethod,
+                    assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined)
+                };
+            });
+
+            const { session, appointments, paymentSummary } = await bookingService.createBookingSession({
+                tenantId: finalTenantId,
+                platformUserId,
+                items: normalizedItems,
+                notes: notes || null,
+                paymentMethod: normalizedItems[0]?.paymentMethod || 'at-center'
+            });
+
+            const fullAppointments = await db.Appointment.findAll({
+                where: {
+                    bookingSessionId: session.id
+                },
+                include: [
+                    { model: db.Service, as: 'service' },
+                    { model: db.Staff, as: 'staff' },
+                    {
+                        model: db.PlatformUser,
+                        as: 'user',
+                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
+                    }
+                ],
+                order: [['bookingItemIndex', 'ASC']]
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Booking created successfully',
+                bookingSession: {
+                    id: session.id,
+                    bookingReference: session.bookingReference,
+                    paymentMethod: session.paymentMethod,
+                    itemCount: session.itemCount,
+                    subtotal: session.subtotal,
+                    taxAmount: session.taxAmount,
+                    platformFee: session.platformFee,
+                    totalAmount: session.totalAmount,
+                    paymentSummary
+                },
+                appointments: fullAppointments,
+                appointment: fullAppointments[0] || null
+            });
+        }
 
         // Validation
         if (!serviceId || !startTime) {
@@ -118,22 +229,6 @@ const createBooking = async (req, res) => {
                 success: false,
                 message: 'Invalid payment method selected for this booking'
             });
-        }
-
-        // Get tenantId from request body or use default
-        let finalTenantId = tenantId || req.tenantId;
-        
-        // If no tenantId provided, try to get from service
-        if (!finalTenantId) {
-            const service = await db.Service.findByPk(serviceId);
-            if (service && service.tenantId) {
-                finalTenantId = service.tenantId;
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    message: 'tenantId is required. Please specify which salon you are booking at.'
-                });
-            }
         }
 
         // Use unified booking service

@@ -389,6 +389,14 @@ class BookingService {
             if (platformUser.isBanned) throw new Error('User account is banned');
 
             const normalizedNotes = typeof notes === 'string' ? notes.trim() : '';
+            const normalizedMethods = items
+                .map((item) => `${item?.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase())
+                .filter(Boolean);
+            const distinctMethods = Array.from(new Set(normalizedMethods));
+            const sessionPaymentMethod = distinctMethods.length > 1
+                ? 'mixed'
+                : (distinctMethods[0] || `${paymentMethod || 'at-center'}`.trim().toLowerCase());
+
             const session = await db.BookingSession.create({
                 tenantId,
                 platformUserId,
@@ -398,7 +406,7 @@ class BookingService {
                 taxAmount: 0,
                 platformFee: 0,
                 totalAmount: 0,
-                paymentMethod: paymentMethod || items[0]?.paymentMethod || null,
+                paymentMethod: sessionPaymentMethod,
                 notes: normalizedNotes || null
             }, { transaction: finalTransaction });
 
@@ -407,6 +415,9 @@ class BookingService {
             let taxAmount = 0;
             let platformFee = 0;
             let totalAmount = 0;
+            let atCenterAmount = 0;
+            let onlineFullAmount = 0;
+            let bookingFeeAmount = 0;
 
             for (let index = 0; index < items.length; index += 1) {
                 const item = items[index] || {};
@@ -431,6 +442,15 @@ class BookingService {
                 taxAmount += parseFloat(appointment.taxAmount || 0);
                 platformFee += parseFloat(appointment.platformFee || 0);
                 totalAmount += parseFloat(appointment.price || 0);
+
+                const itemPaymentMethod = `${item.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase();
+                if (itemPaymentMethod === 'online-full') {
+                    onlineFullAmount += parseFloat(appointment.price || 0);
+                } else if (itemPaymentMethod === 'booking-fee') {
+                    bookingFeeAmount += parseFloat(appointment.depositAmount || 0);
+                } else {
+                    atCenterAmount += parseFloat(appointment.price || 0);
+                }
             }
 
             await session.update({
@@ -440,6 +460,14 @@ class BookingService {
                 platformFee: parseFloat(platformFee.toFixed(2)),
                 totalAmount: parseFloat(totalAmount.toFixed(2))
             }, { transaction: finalTransaction });
+
+            const paymentSummary = {
+                atCenterAmount: parseFloat(atCenterAmount.toFixed(2)),
+                onlineFullAmount: parseFloat(onlineFullAmount.toFixed(2)),
+                bookingFeeAmount: parseFloat(bookingFeeAmount.toFixed(2)),
+                totalAmount: parseFloat(totalAmount.toFixed(2)),
+                itemCount: appointments.length
+            };
 
             if (shouldCommit) {
                 await finalTransaction.commit();
@@ -467,7 +495,8 @@ class BookingService {
 
             return {
                 session,
-                appointments
+                appointments,
+                paymentSummary
             };
         } catch (error) {
             if (shouldCommit && finalTransaction && !finalTransaction.finished) {

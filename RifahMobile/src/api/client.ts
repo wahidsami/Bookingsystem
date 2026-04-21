@@ -198,6 +198,9 @@ export interface Staff {
 export interface Booking {
     id: string;
     bookingNumber?: string | null;
+    bookingSessionId?: string | null;
+    bookingReference?: string | null;
+    bookingItemIndex?: number | null;
     serviceId: string;
     staffId: string;
     platformUserId: string;
@@ -596,6 +599,11 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
     return {
         id: toStringValue(appointment?.id),
         bookingNumber: toOptionalString(appointment?.bookingNumber),
+        bookingSessionId: toOptionalString(appointment?.bookingSessionId),
+        bookingReference: toOptionalString(appointment?.bookingReference),
+        bookingItemIndex: appointment?.bookingItemIndex !== undefined
+            ? toNumber(appointment.bookingItemIndex)
+            : undefined,
         serviceId: toStringValue(appointment?.serviceId || normalizedService?.id),
         staffId: toStringValue(appointment?.staffId || normalizedStaff?.id),
         platformUserId: toStringValue(appointment?.platformUserId),
