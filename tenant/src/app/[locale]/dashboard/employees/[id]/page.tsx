@@ -91,6 +91,7 @@ export default function EditEmployeePage() {
   const [existingPhoto, setExistingPhoto] = useState<string | null>(null);
   const [tenantTaxRate, setTenantTaxRate] = useState(15);
   const [savedEmail, setSavedEmail] = useState("");
+  const [staffAppPassword, setStaffAppPassword] = useState("");
   const isServiceProvider = `${formData.position || ''}`.trim() === 'service_provider';
   const [dashboardAccountId, setDashboardAccountId] = useState<string | null>(null);
   const [dashboardAccountEmail, setDashboardAccountEmail] = useState("");
@@ -157,19 +158,41 @@ export default function EditEmployeePage() {
     const hasScheduleRows = scheduleSummary.activeDays > 0 || scheduleSummary.recurringShifts > 0 || scheduleSummary.oneTimeShifts > 0;
     const scheduleFilled = hasScheduleRows ? scheduleFields.filter(Boolean).length : 0;
     const accessFields = isServiceProvider
-      ? [appEnabled || Boolean(savedEmail)]
+      ? [staffAppPassword.trim().length >= 8]
       : [Object.values(dashboardPermissions).some(Boolean)];
 
     return {
-      basic: { filled: basicFields.filter(Boolean).length, total: basicFields.length },
-      bio: { filled: bioFields.filter(Boolean).length, total: bioFields.length },
-      finance: { filled: financeFields.filter(Boolean).length, total: financeFields.length },
+      basic: {
+        filled: basicFields.filter(Boolean).length,
+        total: basicFields.length,
+        label: `${basicFields.filter(Boolean).length}/${basicFields.length}`
+      },
+      bio: {
+        filled: bioFields.filter(Boolean).length,
+        total: bioFields.length,
+        label: bioFields.filter(Boolean).length > 0
+          ? `${bioFields.filter(Boolean).length}/${bioFields.length}`
+          : (locale === 'ar' ? 'اختياري' : 'Optional')
+      },
+      finance: {
+        filled: financeFields.filter(Boolean).length,
+        total: financeFields.length,
+        label: financeFields.filter(Boolean).length > 0
+          ? `${financeFields.filter(Boolean).length}/${financeFields.length}`
+          : (locale === 'ar' ? 'اختياري' : 'Optional')
+      },
       schedule: {
         filled: scheduleFilled,
         total: scheduleFields.length,
         label: hasScheduleRows ? `${scheduleFilled}/${scheduleFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional')
       },
-      access: { filled: accessFields.filter(Boolean).length, total: accessFields.length }
+      access: {
+        filled: accessFields.filter(Boolean).length,
+        total: accessFields.length,
+        label: accessFields.filter(Boolean).length > 0
+          ? `${accessFields.filter(Boolean).length}/${accessFields.length}`
+          : (locale === 'ar' ? 'اختياري' : 'Optional')
+      }
     };
   }, [
     appEnabled,
@@ -772,110 +795,113 @@ export default function EditEmployeePage() {
         onSectionSelect={scrollToSection}
       >
       <form id="employee-editor-form" onSubmit={handleSubmit} noValidate className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Basic Information */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
-              </h3>
+        <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
+          <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+                {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
+              </p>
+            </div>
+            <div className="space-y-2">
+              {editorSections.map((item) => {
+                const active = activeSection === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollToSection(item.id)}
+                    className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
+                      active
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <span className="font-medium">{item.label}</span>
+                      <span className="text-xs font-semibold text-gray-500">{item.progressLabel}</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${Math.max(0, Math.min(100, item.progressPercent))}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="space-y-6">
+            <section id="employee-section-basic" className={`${activeSection === 'basic' ? 'card scroll-mt-6' : 'hidden'}`}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الحقول الأساسية المطلوبة لإكمال الملف.' : 'Required fields to identify this team member.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {sectionProgress.basic.label}
+                </span>
+              </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("name")} <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {t("email")} <span className="text-gray-400">({t("optional")})</span>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("email")} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {t("phone")} <span className="text-gray-400">({t("optional")})</span>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("phone")} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("nationality")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
-                  <select
-                    name="nationality"
-                    value={formData.nationality}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  >
-                    <option value="">{t("selectNationality")}</option>
-                    {NATIONALITIES.map(nat => (
-                      <option key={nat} value={nat}>{nat}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("nationality")} <span className="text-red-500">*</span>
+                    </label>
+                    <select name="nationality" value={formData.nationality} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <option value="">{t("selectNationality")}</option>
+                      {NATIONALITIES.map((nat) => (
+                        <option key={nat} value={nat}>{nat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar' ? 'الجنس' : 'Gender'} <span className="text-red-500">*</span>
+                    </label>
+                    <select name="gender" value={formData.gender} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {EMPLOYEE_GENDERS.map((option) => (
+                        <option key={option.value || 'gender-placeholder'} value={option.value}>
+                          {option.label[locale as 'ar' | 'en'] || option.label.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'الجنس' : 'Gender'} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  >
-                    {EMPLOYEE_GENDERS.map((option) => (
-                      <option key={option.value || 'gender-placeholder'} value={option.value}>
-                        {option.label[locale as 'ar' | 'en'] || option.label.en}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'الوظيفة / المسمى الوظيفي' : 'Position / Job Title'} <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="position"
-                    value={formData.position}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  >
+                  <select name="position" value={formData.position} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {EMPLOYEE_POSITIONS.map((option) => (
                       <option key={option.value || 'placeholder'} value={option.value}>
                         {option.label[locale as 'ar' | 'en'] || option.label.en}
@@ -888,24 +914,35 @@ export default function EditEmployeePage() {
                       : 'This title decides whether the team member uses the staff app or a dashboard account.'}
                   </p>
                 </div>
+              </div>
+            </section>
 
+            <section id="employee-section-bio" className={`${activeSection === 'bio' ? 'card scroll-mt-6' : 'hidden'}`}>
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("bio")} <span className="text-gray-400">({t("optional")})</span>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'السيرة الذاتية' : 'Biography'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'أضف ملخصاً مهنياً ومهاراته ولغاته وصورته.' : 'Add a short bio, skills, spoken languages, and a profile image.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  {sectionProgress.bio.label}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("bio")}
                   </label>
-                  <textarea
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
+                  <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("experience")} <span className="text-gray-400">({t("optional")})</span>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("experience")}
                   </label>
                   <input
                     type="text"
@@ -913,67 +950,51 @@ export default function EditEmployeePage() {
                     value={formData.experience}
                     onChange={handleChange}
                     placeholder={locale === 'ar' ? 'مثال: 5 سنوات' : 'e.g., 5 years'}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Skills */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("skills")}
-              </h3>
-
-              <div className="space-y-4">
-                <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="text"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
-                    placeholder={locale === 'ar' ? 'أضف مهارة...' : 'Add a skill...'}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSkill}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    {t("addSkill")}
-                  </button>
-                </div>
-
-                {formData.skills.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.skills.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 bg-primary/10 text-primary rounded-full flex items-center gap-2"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                      >
-                        {skill}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill)}
-                          className="text-primary hover:text-primary/70"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("skills")}
+                  </label>
+                  <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="text"
+                      value={newSkill}
+                      onChange={(e) => setNewSkill(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
+                      placeholder={locale === 'ar' ? 'أضف مهارة...' : 'Add a skill...'}
+                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                      style={{ textAlign: isRTL ? 'right' : 'left' }}
+                    />
+                    <button type="button" onClick={handleAddSkill} className="rounded-lg bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90">
+                      {t("addSkill")}
+                    </button>
                   </div>
-                )}
+
+                  {formData.skills.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {formData.skills.map((skill, idx) => (
+                        <span key={idx} className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-primary" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                          {skill}
+                          <button type="button" onClick={() => handleRemoveSkill(skill)} className="text-primary hover:text-primary/70">
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <h4 className="mb-3 text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'اللغات المتحدثة' : 'Spoken languages'}
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {EMPLOYEE_LANGUAGE_OPTIONS.map((option) => {
-                      const checked = formData.spokenLanguages?.includes(option.value) || false;
+                      const checked = formData.spokenLanguages.includes(option.value);
                       return (
                         <label key={option.value} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
                           <span className="text-sm font-medium text-gray-700">
@@ -990,68 +1011,72 @@ export default function EditEmployeePage() {
                     })}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Note: Working Hours removed - use Schedules section to manage employee schedules */}
-          </div>
-
-          {/* Right Column - Photo & Financial */}
-          <div className="space-y-6">
-            {/* Photo Upload */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("photo")}
-              </h3>
-
-              <div className="space-y-4">
-                {photoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPhotoFile(null);
-                        setPhotoPreview(existingPhoto);
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-                    >
-                      ×
-                    </button>
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {t("photo")}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'صورة واضحة تساعد على التعرّف على الموظف.' : 'A clear profile image helps identify the team member.'}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                      {sectionProgress.bio.label}
+                    </span>
                   </div>
-                ) : (
-                  <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="text-6xl">📷</span>
+
+                  <div className="space-y-4">
+                    {photoPreview ? (
+                      <div className="relative">
+                        <img src={photoPreview} alt="Preview" className="h-64 w-full rounded-lg object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoFile(null);
+                            setPhotoPreview(existingPhoto);
+                          }}
+                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex h-64 w-full items-center justify-center rounded-lg bg-gray-100">
+                        <span className="text-6xl">📷</span>
+                      </div>
+                    )}
+
+                    <label className="block">
+                      <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                      <span className="btn btn-secondary w-full cursor-pointer text-center">
+                        {photoPreview && photoPreview !== existingPhoto ? t("changePhoto") : t("uploadPhoto")}
+                      </span>
+                    </label>
                   </div>
-                )}
-
-                <label className="block">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    className="hidden"
-                  />
-                  <span className="btn btn-secondary w-full text-center cursor-pointer">
-                    {photoPreview && photoPreview !== existingPhoto ? t("changePhoto") : t("uploadPhoto")}
-                  </span>
-                </label>
+                </div>
               </div>
-            </div>
+            </section>
 
-            {/* Financial Information */}
-            <div id="employee-section-finance" className={`${activeSection === 'finance' ? 'card scroll-mt-6' : 'hidden'}`}>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المالية' : 'Finance'}
-              </h3>
+            <section id="employee-section-finance" className={`${activeSection === 'finance' ? 'card scroll-mt-6' : 'hidden'}`}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'المالية' : 'Finance'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الراتب والضريبة تظهر هنا مع معاينة سريعة للقيمة النهائية.' : 'Salary and VAT preview live here.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {sectionProgress.finance.label}
+                </span>
+              </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("salary")} (SAR) <span className="text-gray-400">({t("optional")})</span>
                   </label>
                   <input
@@ -1061,7 +1086,7 @@ export default function EditEmployeePage() {
                     onChange={handleChange}
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
@@ -1103,15 +1128,21 @@ export default function EditEmployeePage() {
                   <div className="rounded-lg bg-white p-3 text-sm text-gray-600">
                     <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span>{locale === 'ar' ? 'الراتب قبل الضريبة' : 'Salary before VAT'}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                      <span className="font-semibold text-gray-900">
+                        <Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                      </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span>{locale === 'ar' ? 'قيمة الضريبة التقديرية' : 'Estimated VAT'}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                      <span className="font-semibold text-gray-900">
+                        <Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                      </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span className="font-medium text-gray-700">{locale === 'ar' ? 'الإجمالي التقريبي' : 'Estimated total'}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                      <span className="font-semibold text-gray-900">
+                        <Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                      </span>
                     </div>
                     <p className="mt-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {locale === 'ar'
@@ -1119,27 +1150,9 @@ export default function EditEmployeePage() {
                         : `VAT is estimated using the current tenant tax rate of ${tenantTaxRate}%.`}
                     </p>
                   </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <div>
-                        <h4 className="font-medium text-gray-800">{locale === 'ar' ? 'حالة الحساب' : 'Account status'}</h4>
-                        <p className="text-sm text-gray-500">{locale === 'ar' ? 'يحدد ما إذا كان الموظف نشطاً حالياً في النظام.' : 'Controls whether this employee is active in the system.'}</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          name="isActive"
-                          checked={formData.isActive}
-                          onChange={handleChange}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                      </label>
-                    </div>
-                  </div>
-
+                </div>
               </div>
+            </section>
 
             <section id="employee-section-schedule" className={`${activeSection === 'schedule' ? 'card scroll-mt-6 space-y-4' : 'hidden'}`}>
               <div className="flex items-start justify-between gap-3">
@@ -1154,7 +1167,7 @@ export default function EditEmployeePage() {
                   </p>
                 </div>
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                  {`${sectionProgress.schedule.filled}/${sectionProgress.schedule.total}`}
+                  {sectionProgress.schedule.label}
                 </span>
               </div>
 
@@ -1226,251 +1239,135 @@ export default function EditEmployeePage() {
               </div>
             </section>
 
-            {isServiceProvider ? (
-              <>
-                {/* App Access Management */}
-            <div id="employee-section-access" className={`${activeSection === 'access' ? 'card scroll-mt-6' : 'hidden'}`}>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'وصول التطبيق' : 'App Access'}
+            <section id="employee-section-access" className={`${activeSection === 'access' ? 'card scroll-mt-6' : 'hidden'}`}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الصلاحيات' : 'Access'}
                   </h3>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        <p className="font-medium text-gray-800">{locale === 'ar' ? 'تفعيل الوصول للتطبيق' : 'Enable Mobile App Access'}</p>
-                        <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف باستخدام تطبيق RifahStaff' : 'Allow staff to use the RifahStaff mobile app'}</p>
-                      </div>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={handleToggleAppAccess}
-                          disabled={appAccessLoading}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${appEnabled ? 'bg-primary' : 'bg-gray-200'} ${appAccessLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${appEnabled ? (isRTL ? '-translate-x-5' : 'translate-x-5') : 'translate-x-0'}`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <hr className="border-gray-100" />
-
-                    <div className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={handleSendInvite}
-                        disabled={inviteLoading || !savedEmail}
-                        className="w-full px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
-                      >
-                        {inviteLoading ? (
-                          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          locale === 'ar' ? 'إرسال دعوة التطبيق (بريد إلكتروني)' : 'Send App Invite (Email)'
-                        )}
-                      </button>
-
-                      {appEnabled && (
-                        <button
-                          type="button"
-                          onClick={handleResetPassword}
-                          disabled={resetLoading || !savedEmail}
-                          className="w-full px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
-                        >
-                          {resetLoading ? (
-                            <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            locale === 'ar' ? 'طلب إعادة تعيين كلمة المرور' : 'Request Password Reset'
-                          )}
-                        </button>
-                      )}
-
-                      {!savedEmail && (
-                        <p className="text-xs text-red-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          {locale === 'ar'
-                            ? 'احفظ الموظف بعنوان بريد إلكتروني أولاً لتفعيل التطبيق أو إرسال الدعوة.'
-                            : 'Save the employee with an email address first to enable app access or send invites.'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {isServiceProvider
+                      ? (locale === 'ar'
+                        ? 'هذا العضو يستخدم تطبيق الموظفين. هنا نضبط وصول التطبيق وكلمة المرور الأولية.'
+                        : 'This role uses the staff app. Configure mobile access and the initial password here.')
+                      : (locale === 'ar'
+                        ? 'هذا العضو لا يستخدم تطبيق الموظفين. هنا نمنح صلاحيات لوحة التحكم.'
+                        : 'This role does not use the staff app. Use this section to manage dashboard access.')}
+                  </p>
                 </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {sectionProgress.access.label}
+                </span>
+              </div>
 
-                {/* Permissions Matrix */}
-                <div className="card lg:col-span-2">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4 flex justify-between items-center" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', textAlign: isRTL ? 'right' : 'left' }}>
-                    <span>{locale === 'ar' ? 'صلاحيات الموظف' : 'Staff Permissions'}</span>
-                    {permissionsLoading && <span className="text-sm font-normal text-primary animate-pulse">{locale === 'ar' ? 'جاري الحفظ...' : 'Saving...'}</span>}
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <p className="font-medium text-gray-800">💰 {locale === 'ar' ? 'عرض الأرباح' : 'View Earnings'}</p>
-                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'تمكين الموظف من رؤية راتبه والعمولات والإكراميات.' : 'Let this staff see their payroll, commission, and tips.'}</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={permissions.view_earnings} onChange={(e) => handlePermissionChange('view_earnings', e.target.checked)} />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <p className="font-medium text-gray-800">⭐ {locale === 'ar' ? 'عرض التقييمات' : 'View Reviews'}</p>
-                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح برؤية تقييمات العملاء لهذا الموظف.' : 'Let this staff see reviews left by customers.'}</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={permissions.view_reviews} onChange={(e) => handlePermissionChange('view_reviews', e.target.checked)} />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <p className="font-medium text-gray-800">✍️ {locale === 'ar' ? 'الرد على التقييمات' : 'Reply to Reviews'}</p>
-                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للرد بشكل عام على تقييمات العملاء.' : 'Let this staff post public replies to reviews.'}</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={permissions.reply_reviews} onChange={(e) => handlePermissionChange('reply_reviews', e.target.checked)} />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <p className="font-medium text-gray-800">👥 {locale === 'ar' ? 'عرض العملاء الدائمين' : 'View Clients'}</p>
-                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح بمعرفة سجل العملاء ومؤشراتهم.' : 'Let this staff see repeat clients and customer context.'}</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={permissions.view_clients} onChange={(e) => handlePermissionChange('view_clients', e.target.checked)} />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <p className="font-medium text-gray-800">📝 {locale === 'ar' ? 'عرض ملاحظات الحجوزات' : 'View Booking Notes'}</p>
-                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف برؤية الملاحظات التي يضيفها العميل مع الحجز.' : 'Let this staff see notes that customers add while booking.'}</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={permissions.view_booking_notes} onChange={(e) => handlePermissionChange('view_booking_notes', e.target.checked)} />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-            <div id="employee-section-access" className={`${activeSection === 'access' ? 'card scroll-mt-6' : 'hidden'}`}>
-                <div className="mb-4 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {locale === 'ar' ? 'صلاحيات لوحة التحكم' : 'Dashboard Permissions'}
-                    </h3>
-                    <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {locale === 'ar'
-                        ? 'هذا العضو لا يستخدم تطبيق الموظفين. هنا نمنح صلاحيات الأقسام الخاصة بلوحة التحكم.'
-                        : 'This role does not use the staff app. Use this section to manage dashboard section access.'}
-                    </p>
-                  </div>
-                  <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                    {dashboardRoleLabel}
-                  </div>
-                </div>
-
+              {isServiceProvider ? (
                 <div className="space-y-4">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div>
+                        <h4 className="font-medium text-gray-800">{locale === 'ar' ? 'تفعيل الوصول للتطبيق' : 'Enable Mobile App Access'}</h4>
+                        <p className="text-sm text-gray-500">{locale === 'ar' ? 'سيتم إنشاء حساب تطبيق الموظف عند حفظ الملف.' : 'A staff app account will be created when the employee is saved.'}</p>
+                      </div>
+                      <div className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                        {locale === 'ar' ? 'مفعل تلقائياً' : 'Auto-managed'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar' ? 'كلمة مرور أولية للتطبيق' : 'Initial app password'}
+                    </label>
+                    <input
+                      type="password"
+                      value={staffAppPassword}
+                      onChange={(e) => setStaffAppPassword(e.target.value)}
+                      placeholder={locale === 'ar' ? 'اتركه فارغاً لإنشاء كلمة مرور تلقائياً' : 'Leave blank to auto-generate'}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                      style={{ textAlign: isRTL ? 'right' : 'left' }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div>
+                        <h4 className="font-medium text-gray-800">{locale === 'ar' ? 'دور لوحة التحكم' : 'Dashboard role'}</h4>
+                        <p className="text-sm text-gray-500">
+                          {locale === 'ar'
+                            ? `سيتم إنشاء الحساب كـ ${dashboardRoleLabel}.`
+                            : `The dashboard account will use the ${dashboardRoleLabel} preset.`}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600">
+                        {dashboardRoleLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {DASHBOARD_PERMISSION_KEYS.filter((key) => key !== 'view_dashboard').map((key) => {
+                      const checked = dashboardPermissions[key] === true;
+                      const label = SECTION_PERMISSION_LABELS[key];
+
+                      return (
+                        <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
+                          <span className="text-sm font-medium text-gray-700">
+                            {isRTL ? label.ar : label.en}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => handleDashboardPermissionChange(key, event.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
                     <div className="font-medium text-gray-900">{locale === 'ar' ? 'الحساب المرتبط' : 'Linked account'}</div>
                     <div className="mt-1 break-all text-gray-700">
-                        {dashboardAccountEmail || savedEmail || formData.email || '-'}
-                      </div>
-                        <div className="mt-2 text-xs text-gray-500">
-                          {dashboardAccountId
-                            ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
-                          : (locale === 'ar'
-                            ? 'إذا كان البريد المستخدم مرتبطاً بحساب المركز، ستحتاج إلى بريد مختلف لإنشاء حساب لوحة التحكم.'
-                            : 'If this email is already used by the tenant account, you will need a different email to create the dashboard account.')}
-                        </div>
-                      </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleDashboardInvite}
-                        disabled={dashboardInviteLoading}
-                        className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {dashboardInviteLoading
-                          ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
-                          : (locale === 'ar' ? 'إرسال دعوة' : 'Send invite')}
-                    </button>
-                      <button
-                        type="button"
-                        onClick={handleDashboardResetPassword}
-                        disabled={dashboardResetLoading}
-                        className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {dashboardResetLoading
-                          ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
-                          : (locale === 'ar' ? 'إعادة كلمة المرور' : 'Reset password')}
-                    </button>
+                      {dashboardAccountEmail || savedEmail || formData.email || '-'}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {dashboardAccountId
+                        ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
+                        : (locale === 'ar'
+                          ? 'إذا كان البريد المستخدم مرتبطاً بحساب المركز، ستحتاج إلى بريد مختلف لإنشاء حساب لوحة التحكم.'
+                          : 'If this email is already used by the tenant account, you will need a different email to create the dashboard account.')}
+                    </div>
                   </div>
 
-                  <div className="rounded-2xl border border-gray-200 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <div>
-                        <h4 className="text-sm font-semibold text-gray-900">
-                          {locale === 'ar' ? 'صلاحيات الأقسام' : 'Section permissions'}
-                        </h4>
-                        <p className="text-xs text-gray-500">
-                          {locale === 'ar'
-                            ? 'تُستخدم هذه الصلاحيات لحسابات لوحة التحكم فقط.'
-                            : 'These permissions apply to dashboard accounts only.'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {DASHBOARD_PERMISSION_KEYS.filter((key) => key !== 'view_dashboard').map((key) => {
-                        const checked = dashboardPermissions[key] === true;
-                        const label = SECTION_PERMISSION_LABELS[key];
-
-                        return (
-                          <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
-                            <span className="text-sm font-medium text-gray-700">
-                              {isRTL ? label.ar : label.en}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(event) => handleDashboardPermissionChange(key, event.target.checked)}
-                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
-                            />
-                          </label>
-                        );
-                      })}
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDashboardInvite}
+                      disabled={dashboardInviteLoading}
+                      className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {dashboardInviteLoading
+                        ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                        : (locale === 'ar' ? 'إرسال دعوة' : 'Send invite')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDashboardResetPassword}
+                      disabled={dashboardResetLoading}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {dashboardResetLoading
+                        ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
+                        : (locale === 'ar' ? 'إعادة كلمة المرور' : 'Reset password')}
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
-
+              )}
+            </section>
           </div>
         </div>
-        </div>
-        </div>
-
       </form>
       </EmployeeEditorFrame>
     </TenantLayout>
