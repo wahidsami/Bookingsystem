@@ -1,3 +1,5 @@
+import { isServiceProviderPosition } from "@/lib/employeePositions";
+
 export type ServiceEmployeeAssignment = {
   employeeId: string;
   isAssigned: boolean;
@@ -12,12 +14,10 @@ export type ServiceAssignmentEmployee = {
   position?: string | null;
 };
 
-const SERVICE_PROVIDER_ROLE = "service provider";
 const COMMISSION_TYPES = new Set(["fixed", "percentage"]);
 
 export function isServiceProviderEmployee(employee?: ServiceAssignmentEmployee | null) {
-  const position = `${employee?.position ?? ""}`.trim().toLowerCase();
-  return position === SERVICE_PROVIDER_ROLE || position.includes(SERVICE_PROVIDER_ROLE);
+  return isServiceProviderPosition(employee?.position);
 }
 
 export function createDefaultServiceEmployeeAssignment(employeeId: string, isPrimary = false): ServiceEmployeeAssignment {
