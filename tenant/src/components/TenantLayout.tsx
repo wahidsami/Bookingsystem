@@ -10,12 +10,25 @@ import { getImageUrl, tenantApi } from "@/lib/api";
 import {
   ArrowRightOnRectangleIcon,
   Bars3Icon,
+  BanknotesIcon,
+  BellIcon,
+  CalendarDaysIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
   Cog6ToothIcon,
+  ChatBubbleLeftRightIcon,
+  DocumentTextIcon,
+  GlobeAltIcon,
+  HomeIcon,
   InformationCircleIcon,
   LifebuoyIcon,
+  MegaphoneIcon,
+  ShoppingBagIcon,
+  SparklesIcon,
+  UserGroupIcon,
+  UsersIcon,
+  Squares2X2Icon,
   ChevronDownIcon
 } from "@heroicons/react/24/outline";
 import {
@@ -32,6 +45,8 @@ import { useRouter } from "next/navigation";
 interface TenantLayoutProps {
   children: React.ReactNode;
 }
+
+type NavIcon = React.ComponentType<{ className?: string }>;
 
 export function TenantLayout({ children }: TenantLayoutProps) {
   const pathname = usePathname();
@@ -176,31 +191,31 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   }, []);
 
   const navigation = useMemo(() => [
-    { name: t("dashboard"), href: `/${locale}/dashboard`, icon: "📊" },
-    { name: t("services"), href: `/${locale}/dashboard/services`, icon: "✨" },
-    { name: t("products"), href: `/${locale}/dashboard/products`, icon: "🛍️", visible: hasProductsAndOrders },
-    { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: "👥" },
-    { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: "📅" },
-    { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: "📅" },
+    { name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon },
+    { name: t("services"), href: `/${locale}/dashboard/services`, icon: SparklesIcon },
+    { name: t("products"), href: `/${locale}/dashboard/products`, icon: ShoppingBagIcon, visible: hasProductsAndOrders },
+    { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon },
+    { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon },
+    { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon },
     {
       name: locale === 'ar' ? 'نقطة البيع / التحصيل' : 'POS / Collections',
       href: `/${locale}/dashboard/pos`,
-      icon: "🏷️",
+      icon: BanknotesIcon,
       badgeCount: posDueCount,
     },
-    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: "📦", visible: hasProductsAndOrders },
-    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: "🔥", visible: hasHotDeals },
-    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: "📬", visible: hasInternalMessaging },
-    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: "🔔", visible: hasPushNotifications },
-    { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: "🤝" },
-    { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: "🧾" },
-    { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: "📋" },
-    { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: "💰" },
-    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: "💳", visible: hasPayroll },
-    { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: "⭐" },
-    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: "📈", visible: hasReports },
-    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: "🌐", visible: hasPublicPageCustomization },
-    { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: "⚙️" },
+    { name: t("orders"), href: `/${locale}/dashboard/orders`, icon: Squares2X2Icon, visible: hasProductsAndOrders },
+    { name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals },
+    { name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: ChatBubbleLeftRightIcon, visible: hasInternalMessaging },
+    { name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications },
+    { name: t("customers"), href: `/${locale}/dashboard/customers`, icon: UsersIcon },
+    { name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon },
+    { name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon },
+    { name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon },
+    { name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll },
+    { name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon },
+    { name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports },
+    { name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization },
+    { name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon },
   ].filter((item) => item.visible !== false), [hasHotDeals, hasInternalMessaging, hasPayroll, hasProductsAndOrders, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
 
   useEffect(() => {
@@ -231,8 +246,9 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   };
   const currentSection = navigation.find((item) => isActive(item.href))?.name || t("dashboard");
 
-  const renderSidebarNavItem = (item: { name: string; href: string; icon: string; badgeCount?: number }) => {
+  const renderSidebarNavItem = (item: { name: string; href: string; icon: NavIcon; badgeCount?: number }) => {
     const active = isActive(item.href);
+    const Icon = item.icon;
     return (
       <Link
         key={item.name}
@@ -246,7 +262,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         }`}
         style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
       >
-        <span className="text-xl">{item.icon}</span>
+        <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
         {!sidebarCollapsed && <span className="flex-1 font-medium">{item.name}</span>}
         {!sidebarCollapsed && item.badgeCount ? (
           <span
@@ -290,12 +306,12 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </div>
       </header>
 
-      <div className="hidden lg:flex min-h-screen" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+      <div className="hidden lg:flex min-h-screen">
         <aside
           className={`sticky top-0 h-screen flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
             isRTL ? 'border-l' : 'border-r'
           }`}
-          style={{ width: sidebarCollapsed ? 88 : 280 }}
+          style={{ width: sidebarCollapsed ? 88 : 280, order: isRTL ? 2 : 1 }}
         >
           <div
             className="h-[88px] border-b border-gray-200 bg-gradient-to-r from-primary/5 to-secondary/5 px-4"
@@ -348,9 +364,9 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           </nav>
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-w-0 flex-1 flex-col" style={{ order: isRTL ? 1 : 2 }}>
           <header className="sticky top-0 z-40 h-[88px] border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm">
-            <div className="flex h-full items-center justify-between px-6" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <div className="flex h-full items-center justify-between px-6" style={{ flexDirection: isRTL ? 'row' : 'row' }}>
               <div className="flex items-center gap-3 min-w-0" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
                   <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
@@ -386,11 +402,11 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                         className="h-10 w-10 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
-                        {displayInitials}
-                      </div>
-                    )}
-                    <div className="min-w-0 text-left" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
+                      {displayInitials}
+                    </div>
+                  )}
+                  <div className="min-w-0 text-left" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
                       <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
                     </div>
@@ -533,6 +549,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         <div className="grid grid-cols-5 gap-1 p-2">
           {navigation.slice(0, 5).map((item) => {
             const active = isActive(item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.name}
@@ -540,7 +557,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
                 className={`relative flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${active ? "bg-primary/10 text-primary" : "text-gray-600"
                   }`}
               >
-                <span className="text-xl">{item.icon}</span>
+                <Icon className={`h-5 w-5 ${active ? 'text-primary' : 'text-gray-500'}`} />
                 <span className="text-xs font-medium truncate w-full text-center">
                   {item.name}
                 </span>
