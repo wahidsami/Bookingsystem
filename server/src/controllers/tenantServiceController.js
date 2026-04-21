@@ -59,6 +59,30 @@ function calculateFinalPrice(rawPrice, taxRate, commissionRate) {
     return parseFloat((raw + tax + commission).toFixed(2));
 }
 
+const SERVICE_TARGET_GENDERS = new Set(['all', 'female', 'male']);
+
+function normalizeServiceTargetGender(value) {
+    const normalized = `${value ?? 'all'}`.trim().toLowerCase();
+    if (!normalized) {
+        return 'all';
+    }
+
+    return SERVICE_TARGET_GENDERS.has(normalized) ? normalized : 'all';
+}
+
+function calculateRawPriceFromFinalPrice(finalPrice, taxRate, commissionRate) {
+    const final = parseFloat(finalPrice || 0);
+    const tax = parseFloat(taxRate || 15) / 100;
+    const commission = parseFloat(commissionRate || 10) / 100;
+    const multiplier = 1 + tax + commission;
+
+    if (!Number.isFinite(final) || !Number.isFinite(multiplier) || multiplier <= 0) {
+        return 0;
+    }
+
+    return parseFloat((final / multiplier).toFixed(2));
+}
+
 /**
  * Get global settings for default commission and tax rates
  * Now uses admin-controlled global settings instead of tenant-specific
@@ -231,9 +255,11 @@ exports.createService = async (req, res) => {
             name_ar,
             description_en,
             description_ar,
+            finalPrice,
             rawPrice,
             taxRate,
             commissionRate,
+            targetGender,
             category,
             duration,
             includes, // JSON string or array
@@ -259,11 +285,17 @@ exports.createService = async (req, res) => {
             });
         }
 
-        if (!rawPrice || rawPrice < 0) {
+        const targetGenderValue = normalizeServiceTargetGender(targetGender);
+        const rawPriceValue = rawPrice !== undefined && `${rawPrice}`.trim() !== '' ? parseFloat(rawPrice) : null;
+        const finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' ? parseFloat(finalPrice) : null;
+        const hasValidRawPrice = rawPriceValue !== null && !Number.isNaN(rawPriceValue) && rawPriceValue >= 0;
+        const hasValidFinalPrice = finalPriceValue !== null && !Number.isNaN(finalPriceValue) && finalPriceValue >= 0;
+
+        if (!hasValidRawPrice && !hasValidFinalPrice) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: 'Valid raw price is required'
+                message: 'Valid final price is required'
             });
         }
 
@@ -272,8 +304,16 @@ exports.createService = async (req, res) => {
         const finalTaxRate = tenantSettings.taxRate;
         const finalCommissionRate = tenantSettings.commissionRate;
 
-        // Calculate final price
-        const finalPrice = calculateFinalPrice(rawPrice, finalTaxRate, finalCommissionRate);
+        let derivedRawPrice;
+        let derivedFinalPrice;
+
+        if (hasValidFinalPrice) {
+            derivedFinalPrice = parseFloat(finalPriceValue.toFixed(2));
+            derivedRawPrice = calculateRawPriceFromFinalPrice(derivedFinalPrice, finalTaxRate, finalCommissionRate);
+        } else {
+            derivedRawPrice = parseFloat(rawPriceValue.toFixed(2));
+            derivedFinalPrice = calculateFinalPrice(derivedRawPrice, finalTaxRate, finalCommissionRate);
+        }
 
         // Parse includes (can be JSON string or array)
         let includesArray = [];
@@ -360,10 +400,11 @@ exports.createService = async (req, res) => {
             description_en: description_en || null,
             description_ar: description_ar || null,
             image: imagePath,
-            rawPrice: parseFloat(rawPrice),
+            rawPrice: derivedRawPrice,
             taxRate: finalTaxRate,
             commissionRate: finalCommissionRate,
-            finalPrice: finalPrice,
+            finalPrice: derivedFinalPrice,
+            targetGender: targetGenderValue,
             category: category || 'general',
             duration: duration ? parseInt(duration) : 30,
             includes: includesArray,
@@ -444,8 +485,10 @@ exports.updateService = async (req, res) => {
             name_ar,
             description_en,
             description_ar,
+            finalPrice,
             rawPrice,
             // taxRate and commissionRate are ignored - always use global settings
+            targetGender,
             category,
             duration,
             includes,
@@ -484,9 +527,31 @@ exports.updateService = async (req, res) => {
         const finalTaxRate = tenantSettings.taxRate;
         const finalCommissionRate = tenantSettings.commissionRate;
 
-        // Calculate final price if rawPrice changed
-        const updatedRawPrice = rawPrice !== undefined ? parseFloat(rawPrice) : (service.rawPrice || 0);
-        const finalPrice = calculateFinalPrice(updatedRawPrice, finalTaxRate, finalCommissionRate);
+        const targetGenderValue = normalizeServiceTargetGender(targetGender || service.targetGender || 'all');
+
+        const rawPriceValue = rawPrice !== undefined && `${rawPrice}`.trim() !== '' ? parseFloat(rawPrice) : null;
+        const finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' ? parseFloat(finalPrice) : null;
+        const hasValidRawPrice = rawPriceValue !== null && !Number.isNaN(rawPriceValue) && rawPriceValue >= 0;
+        const hasValidFinalPrice = finalPriceValue !== null && !Number.isNaN(finalPriceValue) && finalPriceValue >= 0;
+
+        if (!hasValidRawPrice && !hasValidFinalPrice) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Valid final price is required'
+            });
+        }
+
+        let updatedRawPrice;
+        let derivedFinalPrice;
+
+        if (hasValidFinalPrice) {
+            derivedFinalPrice = parseFloat(finalPriceValue.toFixed(2));
+            updatedRawPrice = calculateRawPriceFromFinalPrice(derivedFinalPrice, finalTaxRate, finalCommissionRate);
+        } else {
+            updatedRawPrice = parseFloat(rawPriceValue.toFixed(2));
+            derivedFinalPrice = calculateFinalPrice(updatedRawPrice, finalTaxRate, finalCommissionRate);
+        }
 
         // Parse includes
         let includesArray = service.includes || [];
@@ -564,11 +629,12 @@ exports.updateService = async (req, res) => {
         if (name_ar !== undefined) service.name_ar = name_ar;
         if (description_en !== undefined) service.description_en = description_en || null;
         if (description_ar !== undefined) service.description_ar = description_ar || null;
-        if (rawPrice !== undefined) service.rawPrice = parseFloat(rawPrice);
+        if (rawPrice !== undefined || finalPrice !== undefined) service.rawPrice = updatedRawPrice;
         // Always update tax and commission rates from global settings (admin-controlled)
         service.taxRate = finalTaxRate;
         service.commissionRate = finalCommissionRate;
-        service.finalPrice = finalPrice; // Always recalculate
+        service.finalPrice = derivedFinalPrice; // Always recalculate
+        if (targetGender !== undefined) service.targetGender = targetGenderValue;
         if (category !== undefined) service.category = category;
         if (duration !== undefined) service.duration = parseInt(duration);
         service.includes = includesArray;

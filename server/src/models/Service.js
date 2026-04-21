@@ -110,6 +110,12 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 30
         },
+        targetGender: {
+            type: DataTypes.STRING(20),
+            allowNull: false,
+            defaultValue: 'all',
+            comment: 'Who the service is intended for: all, female, or male'
+        },
         // Pricing fields
         rawPrice: {
             type: DataTypes.DECIMAL(10, 2),

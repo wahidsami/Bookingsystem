@@ -23,6 +23,7 @@ interface Service {
   description_en?: string;
   description_ar?: string;
   image?: string;
+  targetGender?: 'all' | 'female' | 'male';
   rawPrice: number;
   taxRate: number;
   commissionRate: number;
@@ -152,6 +153,17 @@ export default function ServicesPage() {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const getTargetAudienceLabel = (targetGender?: string) => {
+    switch (targetGender) {
+      case 'female':
+        return t("femaleOnly");
+      case 'male':
+        return t("maleOnly");
+      default:
+        return t("allGenders");
+    }
   };
 
   return (
@@ -333,12 +345,11 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              {/* Pricing: (raw + platform fee), then tax = 15% of that sum */}
+              {/* Pricing summary */}
               {(() => {
                 const raw = Number(service.rawPrice) || 0;
-                const platformFee = raw * ((Number(service.commissionRate) || 10) / 100);
-                const subtotalBeforeTax = raw + platformFee;
-                const taxAmount = subtotalBeforeTax * ((Number(service.taxRate) || 15) / 100);
+                const commissionAmount = raw * ((Number(service.commissionRate) || 10) / 100);
+                const taxAmount = raw * ((Number(service.taxRate) || 15) / 100);
                 return (
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -347,14 +358,10 @@ export default function ServicesPage() {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">{t("commission")} ({service.commissionRate}%)</span>
-                      <span className="text-gray-700"><Currency amount={platformFee} /></span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>{t("subtotalBeforeTax") || "Subtotal"}</span>
-                      <span><Currency amount={subtotalBeforeTax} /></span>
+                      <span className="text-gray-700"><Currency amount={commissionAmount} /></span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t("tax")} ({service.taxRate}% of subtotal)</span>
+                      <span className="text-gray-600">{t("tax")} ({service.taxRate}% of base)</span>
                       <span className="text-gray-700"><Currency amount={taxAmount} /></span>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-gray-200">
@@ -364,6 +371,14 @@ export default function ServicesPage() {
                   </div>
                 );
               })()}
+
+              {service.targetGender && (
+                <div className={`mb-4 flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    {getTargetAudienceLabel(service.targetGender)}
+                  </span>
+                </div>
+              )}
 
               {/* Includes */}
               {service.includes && service.includes.length > 0 && (

@@ -55,7 +55,8 @@ export default function NewServicePage() {
     name_ar: "",
     description_en: "",
     description_ar: "",
-    rawPrice: "",
+    finalPrice: "",
+    targetGender: "all",
     category: "",
     duration: "30",
     includes: [] as string[],
@@ -234,20 +235,30 @@ export default function NewServicePage() {
     });
   };
 
-  // Final price: (raw + platform fee) then 15% tax on that sum
-  const calculateFinalPrice = () => {
-    const raw = parseFloat(formData.rawPrice || "0");
-    const platformFee = raw * (globalSettings.serviceCommissionRate / 100);
-    const subtotalBeforeTax = raw + platformFee;
-    const tax = subtotalBeforeTax * (globalSettings.taxRate / 100);
-    return subtotalBeforeTax + tax;
+  const calculatePricingFromFinal = () => {
+    const final = parseFloat(formData.finalPrice || "0");
+    const multiplier = 1 + (globalSettings.serviceCommissionRate / 100) + (globalSettings.taxRate / 100);
+    const raw = multiplier > 0 ? final / multiplier : 0;
+    const commission = raw * (globalSettings.serviceCommissionRate / 100);
+    const tax = raw * (globalSettings.taxRate / 100);
+    const total = raw + commission + tax;
+    return {
+      final,
+      raw,
+      commission,
+      tax,
+      total
+    };
   };
   const getPricingBreakdown = () => {
-    const raw = parseFloat(formData.rawPrice || "0");
-    const platformFee = raw * (globalSettings.serviceCommissionRate / 100);
-    const subtotalBeforeTax = raw + platformFee;
-    const tax = subtotalBeforeTax * (globalSettings.taxRate / 100);
-    return { raw, platformFee, subtotalBeforeTax, tax, final: subtotalBeforeTax + tax };
+    const pricing = calculatePricingFromFinal();
+    return {
+      raw: pricing.raw,
+      commission: pricing.commission,
+      tax: pricing.tax,
+      final: pricing.final,
+      total: pricing.total
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -265,7 +276,8 @@ export default function NewServicePage() {
       if (formData.description_ar) submitData.append("description_ar", formData.description_ar);
 
       // Pricing (tax and commission rates are controlled by admin, not sent from frontend)
-      submitData.append("rawPrice", formData.rawPrice);
+      submitData.append("finalPrice", formData.finalPrice);
+      submitData.append("targetGender", formData.targetGender);
 
       // Service details
       submitData.append("category", formData.category);
@@ -644,6 +656,24 @@ export default function NewServicePage() {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("targetAudience")} <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="targetGender"
+                    value={formData.targetGender}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    <option value="all">{t("allGenders")}</option>
+                    <option value="female">{t("femaleOnly")}</option>
+                    <option value="male">{t("maleOnly")}</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -943,12 +973,12 @@ export default function NewServicePage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("rawPrice")} (SAR) <span className="text-red-500">*</span>
+                    {t("finalPrice")} (SAR) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
-                    name="rawPrice"
-                    value={formData.rawPrice}
+                    name="finalPrice"
+                    value={formData.finalPrice}
                     onChange={handleChange}
                     required
                     min="0"
@@ -956,6 +986,9 @@ export default function NewServicePage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
+                  <p className="text-xs text-gray-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("finalPriceHint")}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -992,30 +1025,30 @@ export default function NewServicePage() {
                   </div>
                 </div>
 
-                {/* Final Price Display: (raw + platform fee), then tax = 15% of that sum */}
-                {formData.rawPrice && (() => {
+                {/* Final Price Display: derive base price, tax, and commission from the final customer price */}
+                {formData.finalPrice && (() => {
                   const b = getPricingBreakdown();
                   return (
                     <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">{t("rawPrice")}</span>
-                        <span className="font-semibold"><Currency amount={b.raw} /></span>
+                        <span className="text-sm text-gray-600">{t("finalPrice")}</span>
+                        <span className="font-semibold"><Currency amount={b.final} /></span>
                       </div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-gray-600">{t("commission")} ({globalSettings.serviceCommissionRate}%)</span>
-                        <span className="text-sm"><Currency amount={b.platformFee} /></span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2 text-gray-500 text-sm">
-                        <span>{t("subtotalBeforeTax") || "Subtotal (raw + platform fee)"}</span>
-                        <span><Currency amount={b.subtotalBeforeTax} /></span>
+                        <span className="text-sm"><Currency amount={b.commission} /></span>
                       </div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">{t("tax")} ({globalSettings.taxRate}% of subtotal)</span>
+                        <span className="text-sm text-gray-600">{t("tax")} ({globalSettings.taxRate}% of base)</span>
                         <span className="text-sm"><Currency amount={b.tax} /></span>
                       </div>
+                      <div className="flex items-center justify-between mb-2 text-gray-500 text-sm">
+                        <span>{t("rawPrice")}</span>
+                        <span><Currency amount={b.raw} /></span>
+                      </div>
                       <div className="flex items-center justify-between pt-2 border-t border-primary/20">
-                        <span className="font-bold text-gray-900">{t("finalPrice")}</span>
-                        <span className="font-bold text-primary text-xl"><Currency amount={b.final} /></span>
+                        <span className="font-bold text-gray-900">{locale === 'ar' ? 'المجموع المحسوب' : 'Calculated total'}</span>
+                        <span className="font-bold text-primary text-xl"><Currency amount={b.total} /></span>
                       </div>
                     </div>
                   );
