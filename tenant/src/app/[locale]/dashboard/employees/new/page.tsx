@@ -637,7 +637,7 @@ export default function NewEmployeePage() {
                     {locale === 'ar' ? 'المالية' : 'Finance'}
                   </h3>
                   <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'الراتب والعمولات تظهر هنا مع احتساب الضريبة.' : 'Salary, commissions, and VAT preview live here.'}
+                    {locale === 'ar' ? 'الراتب والضريبة تظهر هنا مع معاينة سريعة للقيمة النهائية.' : 'Salary and VAT preview live here.'}
                   </p>
                 </div>
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -658,24 +658,6 @@ export default function NewEmployeePage() {
                     required
                     min="0"
                     step="0.01"
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("commission")} (%) <span className="text-gray-400">({t("optional")})</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="commissionRate"
-                    value={formData.commissionRate}
-                    onChange={handleChange}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    placeholder="0"
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
