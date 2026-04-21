@@ -35,6 +35,15 @@ const parseScheduleVisibilityWeeks = (value, fallback = 1) => {
     return parsed;
 };
 
+const normalizeStoredDashboardPermissions = (permissions, position) => {
+    const normalizedPosition = normalizeEmployeePosition(position);
+    const roleKey = Object.keys(DASHBOARD_ROLE_PRESETS).includes(normalizedPosition)
+        ? normalizedPosition
+        : 'custom';
+
+    return normalizeDashboardPermissions(permissions || {}, roleKey);
+};
+
 const generateTemporaryStaffPassword = () => {
     const suffix = crypto.randomBytes(4).toString('hex').toUpperCase();
     return `Rifah!${suffix}`;
@@ -368,6 +377,7 @@ exports.getEmployees = async (req, res) => {
                 'bio',
                 'experience',
                 'skills',
+                'dashboardPermissions',
                 'photo',
                 'rating',
                 'totalBookings',
@@ -420,6 +430,7 @@ exports.getEmployee = async (req, res) => {
                 'bio',
                 'experience',
                 'skills',
+                'dashboardPermissions',
                 'photo',
                 'rating',
                 'totalBookings',
@@ -1172,6 +1183,7 @@ exports.createEmployee = async (req, res) => {
             bio: bio && bio.trim() ? bio.trim() : null,
             experience: experience && experience.trim() ? experience.trim() : null,
             skills: skillsForDB, // JavaScript array - JSONB should handle this correctly
+            dashboardPermissions: normalizeStoredDashboardPermissions(parsedDashboardPermissions, normalizedPosition),
             photo: photoPath,
             salary: salaryNum,
             commissionRate: commissionRate ? parseFloat(commissionRate) : 0.00,
@@ -1388,6 +1400,20 @@ exports.updateEmployee = async (req, res) => {
         if (scheduleVisibilityWeeks !== undefined) employee.scheduleVisibilityWeeks = parsedScheduleVisibilityWeeks;
         if (isActive !== undefined) employee.isActive = isActive === true || isActive === 'true';
 
+        const isServiceProvider = employee.position === 'service_provider';
+
+        if (!isServiceProvider) {
+            employee.dashboardPermissions = normalizeStoredDashboardPermissions(
+                parsedDashboardPermissions !== null ? parsedDashboardPermissions : employee.dashboardPermissions,
+                employee.position
+            );
+        } else if (parsedDashboardPermissions !== null) {
+            employee.dashboardPermissions = normalizeStoredDashboardPermissions(
+                parsedDashboardPermissions,
+                employee.position
+            );
+        }
+
         // Handle photo upload
         if (req.file) {
             // Delete old photo if exists
@@ -1403,7 +1429,6 @@ exports.updateEmployee = async (req, res) => {
         }
 
         const accessPassword = staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null;
-        const isServiceProvider = employee.position === 'service_provider';
         const staffAppAccess = isServiceProvider
             ? await syncStaffAuthAccount({
                 tenantId,

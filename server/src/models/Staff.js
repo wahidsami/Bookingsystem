@@ -122,6 +122,12 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: [],
             comment: 'Array of skills (e.g., ["Haircut", "Coloring", "Styling"])'
         },
+        dashboardPermissions: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: {},
+            comment: 'Dashboard section permissions for non-service-provider employee accounts'
+        },
         photo: {
             type: DataTypes.STRING,
             allowNull: true,

@@ -36,6 +36,7 @@ interface Employee {
   salary: number;
   commissionRate: number;
   scheduleVisibilityWeeks?: number;
+  dashboardPermissions?: Record<string, boolean>;
   // workingHours removed - use Schedules section instead
   isActive: boolean;
   app_enabled?: boolean;
@@ -141,7 +142,9 @@ export default function EditEmployeePage() {
         setSavedEmail(emp.email || "");
         setDashboardAccountId(null);
         setDashboardAccountEmail(emp.email || "");
-        setDashboardPermissions(normalizeDashboardPermissions({}, dashboardRoleKey));
+        setDashboardPermissions(
+          normalizeDashboardPermissions(emp.dashboardPermissions || {}, dashboardRoleKey)
+        );
 
         if (emp.photo) {
           setExistingPhoto(getImageUrl(emp.photo));
@@ -361,15 +364,20 @@ export default function EditEmployeePage() {
     return null;
   };
 
-  const ensureDashboardAccount = async () => {
+  const ensureDashboardAccount = async (): Promise<{ accountId: string | null; errorMessage: string | null }> => {
     const existingAccountId = await resolveDashboardAccountId();
     if (existingAccountId) {
-      return existingAccountId;
+      return { accountId: existingAccountId, errorMessage: null };
     }
 
     const lookupEmail = `${dashboardAccountEmail || savedEmail || formData.email || ''}`.trim().toLowerCase();
     if (!lookupEmail) {
-      return null;
+      return {
+        accountId: null,
+        errorMessage: locale === 'ar'
+          ? 'يرجى إضافة بريد إلكتروني للموظف أولاً.'
+          : 'Please add an employee email first.'
+      };
     }
 
     try {
@@ -388,23 +396,37 @@ export default function EditEmployeePage() {
         setDashboardPermissions(
           normalizeDashboardPermissions(account.permissions || dashboardPermissions, account.roleKey || dashboardRoleKey)
         );
-        return account.id as string;
+        return { accountId: account.id as string, errorMessage: null };
       }
     } catch (createErr) {
       console.error("Failed to create dashboard account on demand:", createErr);
+      return {
+        accountId: null,
+        errorMessage:
+          createErr instanceof Error && createErr.message
+            ? createErr.message
+            : locale === 'ar'
+              ? 'تعذر إنشاء حساب لوحة التحكم.'
+              : 'Failed to create the dashboard account.'
+      };
     }
 
-    return null;
+    return {
+      accountId: null,
+      errorMessage: locale === 'ar'
+        ? 'تعذر إنشاء حساب لوحة التحكم.'
+        : 'Failed to create the dashboard account.'
+    };
   };
 
   const handleDashboardInvite = async () => {
-    const targetAccountId = await ensureDashboardAccount();
+    const { accountId: targetAccountId, errorMessage } = await ensureDashboardAccount();
     if (!targetAccountId) {
       await dialog.alert({
         title: locale === 'ar' ? 'تعذر تنفيذ الدعوة' : 'Invite unavailable',
         message: locale === 'ar'
-          ? 'لم نتمكن من إنشاء أو العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
-          : 'We could not create or find the linked dashboard account for this team member.',
+          ? `لم نتمكن من إنشاء أو العثور على حساب لوحة التحكم المرتبط بهذا العضو.${errorMessage ? `\n\n${errorMessage}` : ''}`
+          : `We could not create or find the linked dashboard account for this team member.${errorMessage ? `\n\n${errorMessage}` : ''}`,
         tone: 'danger'
       });
       return;
@@ -438,13 +460,13 @@ export default function EditEmployeePage() {
   };
 
   const handleDashboardResetPassword = async () => {
-    const targetAccountId = await ensureDashboardAccount();
+    const { accountId: targetAccountId, errorMessage } = await ensureDashboardAccount();
     if (!targetAccountId) {
       await dialog.alert({
         title: locale === 'ar' ? 'تعذر إعادة التعيين' : 'Reset unavailable',
         message: locale === 'ar'
-          ? 'لم نتمكن من إنشاء أو العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
-          : 'We could not create or find the linked dashboard account for this team member.',
+          ? `لم نتمكن من إنشاء أو العثور على حساب لوحة التحكم المرتبط بهذا العضو.${errorMessage ? `\n\n${errorMessage}` : ''}`
+          : `We could not create or find the linked dashboard account for this team member.${errorMessage ? `\n\n${errorMessage}` : ''}`,
         tone: 'danger'
       });
       return;
