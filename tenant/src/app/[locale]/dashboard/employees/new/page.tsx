@@ -38,6 +38,12 @@ type EmployeeScheduleDraftShift = {
   isDraft?: boolean;
 };
 
+type ScheduleSummary = {
+  activeDays: number;
+  recurringShifts: number;
+  oneTimeShifts: number;
+};
+
 export default function NewEmployeePage() {
   const t = useTranslations("Employees");
   const params = useParams();
@@ -73,6 +79,11 @@ export default function NewEmployeePage() {
     normalizeDashboardPermissions({}, 'custom')
   );
   const [scheduleDraft, setScheduleDraft] = useState<EmployeeScheduleDraftShift[]>([]);
+  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary>({
+    activeDays: 0,
+    recurringShifts: 0,
+    oneTimeShifts: 0
+  });
   const [scheduleStartDate, setScheduleStartDate] = useState("");
   const [scheduleEndDate, setScheduleEndDate] = useState("");
   const [newSkill, setNewSkill] = useState("");
@@ -176,8 +187,8 @@ export default function NewEmployeePage() {
     const financeFilled = financeFields.filter(Boolean).length;
 
     const scheduleFields = [formData.scheduleVisibilityWeeks.trim(), scheduleStartDate.trim(), scheduleEndDate.trim()];
-    const hasDraftSchedule = scheduleDraft.some((shift) => shift.dayOfWeek !== null);
-    const scheduleFilled = scheduleFields.filter(Boolean).length + (hasDraftSchedule ? 1 : 0);
+    const hasScheduleRows = scheduleSummary.activeDays > 0 || scheduleSummary.recurringShifts > 0 || scheduleSummary.oneTimeShifts > 0;
+    const scheduleFilled = hasScheduleRows ? scheduleFields.filter(Boolean).length : 0;
 
     const accessFields = isServiceProvider
       ? [staffAppPassword.trim().length >= 8]
@@ -191,11 +202,11 @@ export default function NewEmployeePage() {
       schedule: {
         filled: scheduleFilled,
         total: scheduleFields.length,
-        label: scheduleFilled > 0 ? `${scheduleFilled}/${scheduleFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional')
+        label: hasScheduleRows ? `${scheduleFilled}/${scheduleFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional')
       },
       access: { filled: accessFilled, total: accessFields.length, label: accessFilled > 0 ? `${accessFilled}/${accessFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') }
     };
-  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, scheduleDraft, scheduleStartDate, scheduleEndDate, staffAppPassword]);
+  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, scheduleSummary.activeDays, scheduleSummary.oneTimeShifts, scheduleSummary.recurringShifts, scheduleStartDate, scheduleEndDate, staffAppPassword]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId as typeof activeSection);
@@ -812,6 +823,7 @@ export default function NewEmployeePage() {
                   onDraftShiftsChange={setScheduleDraft}
                   sharedStartDate={scheduleStartDate || null}
                   sharedEndDate={scheduleEndDate || null}
+                  onSummaryChange={setScheduleSummary}
                 />
               </div>
             </section>

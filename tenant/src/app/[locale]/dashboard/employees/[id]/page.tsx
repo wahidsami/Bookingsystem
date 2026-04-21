@@ -48,6 +48,12 @@ interface Employee {
   app_enabled?: boolean;
 }
 
+type ScheduleSummary = {
+  activeDays: number;
+  recurringShifts: number;
+  oneTimeShifts: number;
+};
+
 export default function EditEmployeePage() {
     const dialog = useAppDialog();
   const t = useTranslations("Employees");
@@ -95,6 +101,11 @@ export default function EditEmployeePage() {
   const [dashboardResetLoading, setDashboardResetLoading] = useState(false);
   const [scheduleStartDate, setScheduleStartDate] = useState("");
   const [scheduleEndDate, setScheduleEndDate] = useState("");
+  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary>({
+    activeDays: 0,
+    recurringShifts: 0,
+    oneTimeShifts: 0
+  });
   const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
   const dashboardRoleLabel = ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)
     ? (locale === 'ar'
@@ -143,6 +154,8 @@ export default function EditEmployeePage() {
     ];
     const financeFields = [salaryValue > 0];
     const scheduleFields = [formData.scheduleVisibilityWeeks.trim(), scheduleStartDate.trim(), scheduleEndDate.trim()];
+    const hasScheduleRows = scheduleSummary.activeDays > 0 || scheduleSummary.recurringShifts > 0 || scheduleSummary.oneTimeShifts > 0;
+    const scheduleFilled = hasScheduleRows ? scheduleFields.filter(Boolean).length : 0;
     const accessFields = isServiceProvider
       ? [appEnabled || Boolean(savedEmail)]
       : [Object.values(dashboardPermissions).some(Boolean)];
@@ -151,7 +164,11 @@ export default function EditEmployeePage() {
       basic: { filled: basicFields.filter(Boolean).length, total: basicFields.length },
       bio: { filled: bioFields.filter(Boolean).length, total: bioFields.length },
       finance: { filled: financeFields.filter(Boolean).length, total: financeFields.length },
-      schedule: { filled: scheduleFields.filter(Boolean).length, total: scheduleFields.length },
+      schedule: {
+        filled: scheduleFilled,
+        total: scheduleFields.length,
+        label: hasScheduleRows ? `${scheduleFilled}/${scheduleFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional')
+      },
       access: { filled: accessFields.filter(Boolean).length, total: accessFields.length }
     };
   }, [
@@ -174,7 +191,10 @@ export default function EditEmployeePage() {
     savedEmail,
     salaryValue,
     scheduleStartDate,
-    scheduleEndDate
+    scheduleEndDate,
+    scheduleSummary.activeDays,
+    scheduleSummary.oneTimeShifts,
+    scheduleSummary.recurringShifts
   ]); 
 
   const editorSections: EmployeeEditorSection[] = [
@@ -199,7 +219,7 @@ export default function EditEmployeePage() {
     {
       id: 'schedule',
       label: locale === 'ar' ? 'الجدول' : 'Schedule',
-      progressLabel: `${sectionProgress.schedule.filled}/${sectionProgress.schedule.total}`,
+      progressLabel: sectionProgress.schedule.label,
       progressPercent: Math.round((sectionProgress.schedule.filled / sectionProgress.schedule.total) * 100)
     },
     {
@@ -1187,6 +1207,7 @@ export default function EditEmployeePage() {
                     setScheduleStartDate(startDate || "");
                     setScheduleEndDate(endDate || "");
                   }}
+                  onSummaryChange={setScheduleSummary}
                 />
               </div>
             </section>

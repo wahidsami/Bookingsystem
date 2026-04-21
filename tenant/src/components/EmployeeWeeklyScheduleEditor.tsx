@@ -30,6 +30,11 @@ interface EmployeeWeeklyScheduleEditorProps {
   sharedStartDate?: string | null;
   sharedEndDate?: string | null;
   onSharedRangeChange?: (range: { startDate: string | null; endDate: string | null }) => void;
+  onSummaryChange?: (summary: {
+    activeDays: number;
+    recurringShifts: number;
+    oneTimeShifts: number;
+  }) => void;
 }
 
 const WEEK_DAYS = [
@@ -92,7 +97,8 @@ export function EmployeeWeeklyScheduleEditor({
   onDraftShiftsChange,
   sharedStartDate = null,
   sharedEndDate = null,
-  onSharedRangeChange
+  onSharedRangeChange,
+  onSummaryChange
 }: EmployeeWeeklyScheduleEditorProps) {
   const dialog = useAppDialog();
   const [loading, setLoading] = useState(false);
@@ -523,6 +529,14 @@ export function EmployeeWeeklyScheduleEditor({
   };
 
   const oneTimeShiftCount = shifts.filter((shift) => shift.isRecurring === false || shift.specificDate).length;
+
+  useEffect(() => {
+    onSummaryChange?.({
+      activeDays,
+      recurringShifts: totalRecurringShifts,
+      oneTimeShifts: oneTimeShiftCount
+    });
+  }, [activeDays, oneTimeShiftCount, onSummaryChange, totalRecurringShifts]);
 
   if (!employeeId && !isDraftMode) {
     return (
