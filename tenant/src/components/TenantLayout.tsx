@@ -458,7 +458,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 lg:h-dvh lg:overflow-hidden">
       {/* Mobile Header */}
       <header className="lg:hidden bg-white/90 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div
@@ -482,9 +482,9 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </div>
       </header>
 
-      <div className="hidden lg:grid min-h-screen" style={{ ...shellGridStyle, direction: 'ltr' }}>
+      <div className="hidden lg:grid" style={{ ...shellGridStyle, direction: 'ltr', height: '100dvh', overflow: 'hidden' }}>
         <div
-          className="border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="h-full overflow-hidden border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
           style={{ gridArea: 'logo' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -531,7 +531,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </div>
 
         <header
-          className="border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="h-full overflow-hidden border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
           style={{ gridArea: 'header' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -753,9 +753,9 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </header>
 
         <aside
-          className={`sticky top-[88px] h-[calc(100vh-88px)] flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
-            isRTL ? 'border-l' : 'border-r'
-          }`}
+          className={`h-full flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
+              isRTL ? 'border-l' : 'border-r'
+            }`}
           style={{ gridArea: 'sidebar' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -764,7 +764,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           </nav>
         </aside>
 
-        <main className="min-w-0" style={{ gridArea: 'content' }} dir={isRTL ? 'rtl' : 'ltr'}>
+        <main className="min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
           <div className="p-4 lg:p-8">
             <div className="mx-auto w-full max-w-[1600px]">
               {children}
