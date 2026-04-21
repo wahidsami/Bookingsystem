@@ -361,12 +361,52 @@ export default function EditEmployeePage() {
     return null;
   };
 
+  const ensureDashboardAccount = async () => {
+    const existingAccountId = await resolveDashboardAccountId();
+    if (existingAccountId) {
+      return existingAccountId;
+    }
+
+    const lookupEmail = `${dashboardAccountEmail || savedEmail || formData.email || ''}`.trim().toLowerCase();
+    if (!lookupEmail) {
+      return null;
+    }
+
+    try {
+      const response = await tenantApi.createDashboardAccount({
+        displayName: `${formData.name || lookupEmail}`.trim(),
+        email: lookupEmail,
+        roleKey: dashboardRoleKey,
+        permissions: dashboardPermissions,
+        isActive: true
+      });
+
+      const account = response?.account;
+      if (response?.success && account?.id) {
+        setDashboardAccountId(account.id);
+        setDashboardAccountEmail(account.email || lookupEmail);
+        setDashboardPermissions(
+          normalizeDashboardPermissions(account.permissions || dashboardPermissions, account.roleKey || dashboardRoleKey)
+        );
+        return account.id as string;
+      }
+    } catch (createErr) {
+      console.error("Failed to create dashboard account on demand:", createErr);
+    }
+
+    return null;
+  };
+
   const handleDashboardInvite = async () => {
-    const targetAccountId = await resolveDashboardAccountId();
+    const targetAccountId = await ensureDashboardAccount();
     if (!targetAccountId) {
-      setError(locale === 'ar'
-        ? 'لم نتمكن من العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
-        : 'Unable to find the linked dashboard account for this team member.');
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر تنفيذ الدعوة' : 'Invite unavailable',
+        message: locale === 'ar'
+          ? 'لم نتمكن من إنشاء أو العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
+          : 'We could not create or find the linked dashboard account for this team member.',
+        tone: 'danger'
+      });
       return;
     }
 
@@ -376,21 +416,37 @@ export default function EditEmployeePage() {
       if (!response?.success) {
         throw new Error(response?.message || (locale === 'ar' ? 'تعذر إرسال الدعوة' : 'Failed to send invitation'));
       }
-      alert(locale === 'ar' ? 'تم إرسال الدعوة بنجاح.' : 'Invitation sent successfully.');
+      await dialog.alert({
+        title: locale === 'ar' ? 'تم إرسال الدعوة' : 'Invitation sent',
+        message: locale === 'ar'
+          ? 'تم إرسال دعوة حساب لوحة التحكم بنجاح.'
+          : 'The dashboard account invitation was sent successfully.',
+        tone: 'success'
+      });
     } catch (err: any) {
       console.error("Failed to send dashboard invite:", err);
-      setError(err.message || (locale === 'ar' ? 'تعذر إرسال الدعوة' : 'Failed to send invitation'));
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر إرسال الدعوة' : 'Failed to send invitation',
+        message: err.message || (locale === 'ar'
+          ? 'حدث خطأ أثناء إرسال الدعوة.'
+          : 'An error occurred while sending the invitation.'),
+        tone: 'danger'
+      });
     } finally {
       setDashboardInviteLoading(false);
     }
   };
 
   const handleDashboardResetPassword = async () => {
-    const targetAccountId = await resolveDashboardAccountId();
+    const targetAccountId = await ensureDashboardAccount();
     if (!targetAccountId) {
-      setError(locale === 'ar'
-        ? 'لم نتمكن من العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
-        : 'Unable to find the linked dashboard account for this team member.');
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر إعادة التعيين' : 'Reset unavailable',
+        message: locale === 'ar'
+          ? 'لم نتمكن من إنشاء أو العثور على حساب لوحة التحكم المرتبط بهذا العضو.'
+          : 'We could not create or find the linked dashboard account for this team member.',
+        tone: 'danger'
+      });
       return;
     }
 
@@ -406,10 +462,22 @@ export default function EditEmployeePage() {
       if (!response?.success) {
         throw new Error(response?.message || (locale === 'ar' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
       }
-      alert(locale === 'ar' ? 'تمت إعادة تعيين كلمة المرور.' : 'Password reset successfully.');
+      await dialog.alert({
+        title: locale === 'ar' ? 'تمت إعادة التعيين' : 'Password reset',
+        message: locale === 'ar'
+          ? `تمت إعادة تعيين كلمة المرور بنجاح.${response?.temporaryPassword ? `\n\nكلمة المرور المؤقتة: ${response.temporaryPassword}` : ''}`
+          : `The password was reset successfully.${response?.temporaryPassword ? `\n\nTemporary password: ${response.temporaryPassword}` : ''}`,
+        tone: 'success'
+      });
     } catch (err: any) {
       console.error("Failed to reset dashboard password:", err);
-      setError(err.message || (locale === 'ar' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر إعادة التعيين' : 'Reset failed',
+        message: err.message || (locale === 'ar'
+          ? 'حدث خطأ أثناء إعادة تعيين كلمة المرور.'
+          : 'An error occurred while resetting the password.'),
+        tone: 'danger'
+      });
     } finally {
       setDashboardResetLoading(false);
     }
