@@ -961,8 +961,10 @@ export default function EditServicePage() {
 
           </div>
 
-          {/* Right Column - Image & Status */}
+          {/* Right Column - Section Extras */}
           <div className="space-y-6">
+            {activeSection === "service-options" && (
+              <>
             {/* Image Upload */}
             <div className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -1157,6 +1159,11 @@ export default function EditServicePage() {
               </div>
             </div>
 
+              </>
+            )}
+
+            {activeSection === "service-settings" && (
+              <>
             {/* Status */}
             <div className="card">
               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
@@ -1170,6 +1177,8 @@ export default function EditServicePage() {
                 <label className="font-medium text-gray-700">{t("isActive")}</label>
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
         </form>
