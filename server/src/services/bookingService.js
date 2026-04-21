@@ -45,7 +45,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -111,6 +111,9 @@ class BookingService {
         const normalizedRequestedStaffId = requestedStaffId || null;
         const customerSelectedSpecificStaff = Boolean(normalizedRequestedStaffId);
         let finalStaffId = staffId || normalizedRequestedStaffId;
+
+        const finalAssignmentMode = assignmentMode
+            || (customerSelectedSpecificStaff ? 'customer_selected' : 'auto_assigned');
 
         if (!finalStaffId) {
             // Check if "Any Staff" is allowed
@@ -236,7 +239,7 @@ class BookingService {
                 tenantId, // Store tenantId for faster queries
                 startTime: start,
                 endTime: end,
-                assignmentMode: customerSelectedSpecificStaff ? 'customer_selected' : 'auto_assigned',
+                assignmentMode: finalAssignmentMode,
                 price: pricing.price,
                 rawPrice: pricing.rawPrice,
                 taxAmount: pricing.taxAmount,

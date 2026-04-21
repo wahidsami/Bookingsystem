@@ -129,6 +129,7 @@ router.get('/appointments', tenantAppointmentController.getAppointments);
 router.get('/appointments/calendar', tenantAppointmentController.getCalendarAppointments);
 router.get('/appointments/board', tenantAppointmentController.getAppointmentsBoard);
 router.get('/appointments/stats', tenantAppointmentController.getAppointmentStats);
+router.post('/appointments', tenantAppointmentController.createAppointment);
 router.get('/appointments/:id', tenantAppointmentController.getAppointment);
 router.patch('/appointments/:id/status', tenantAppointmentController.updateAppointmentStatus);
 router.patch('/appointments/:id/payment', tenantAppointmentController.updatePaymentStatus);

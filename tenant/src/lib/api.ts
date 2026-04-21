@@ -1055,6 +1055,29 @@ class TenantApiClient {
     return this.get(`/tenant/appointments${query ? `?${query}` : ''}`);
   }
 
+  async createAppointment(data: {
+    serviceId: string;
+    variantId?: string | null;
+    staffId?: string | null;
+    requestedStaffId?: string | null;
+    startTime: string;
+    notes?: string;
+    paymentMethod?: string;
+    platformUserId?: string;
+    customer?: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      password: string;
+      gender?: string | null;
+      dateOfBirth?: string | null;
+    } | null;
+    assignmentMode?: string;
+  }): Promise<any> {
+    return this.post('/tenant/appointments', data);
+  }
+
   /**
    * Order Management
    */

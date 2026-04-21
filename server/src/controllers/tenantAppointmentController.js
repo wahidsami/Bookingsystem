@@ -10,6 +10,7 @@ const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatu
 const pushNotificationService = require('../services/pushNotificationService');
 const bookingService = require('../services/bookingService');
 const { calculateSplitPayment } = require('../services/splitPaymentService');
+const userService = require('../services/userService');
 const {
     createAppointmentTransaction,
     resolveLedgerPaymentMethod
@@ -80,6 +81,164 @@ function buildBreakDateTime(date, timeValue) {
     const safeTime = `${timeValue}`.slice(0, 8);
     return `${date}T${safeTime}`;
 }
+
+async function resolveAppointmentCustomer({ platformUserId, customer, transaction }) {
+    if (platformUserId) {
+        const existingUser = await db.PlatformUser.findByPk(platformUserId, { transaction });
+        if (!existingUser) {
+            throw new Error('Customer not found');
+        }
+        if (!existingUser.isActive) {
+            throw new Error('Customer account is inactive');
+        }
+        if (existingUser.isBanned) {
+            throw new Error('Customer account is banned');
+        }
+        return existingUser;
+    }
+
+    const normalizedCustomer = customer || {};
+    const firstName = `${normalizedCustomer.firstName || ''}`.trim();
+    const lastName = `${normalizedCustomer.lastName || ''}`.trim();
+    const email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
+    const phone = `${normalizedCustomer.phone || ''}`.trim();
+    const password = `${normalizedCustomer.password || ''}`;
+
+    if (!firstName || !lastName || !email || !phone || !password) {
+        throw new Error('Customer details are required when no existing customer is selected');
+    }
+
+    const existingUser = await userService.findUserByEmailOrPhone(email, phone);
+    if (existingUser) {
+        if (!existingUser.isActive) {
+            throw new Error('Customer account is inactive');
+        }
+        if (existingUser.isBanned) {
+            throw new Error('Customer account is banned');
+        }
+
+        const updates = {};
+        if (!existingUser.firstName && firstName) updates.firstName = firstName;
+        if (!existingUser.lastName && lastName) updates.lastName = lastName;
+        if (!existingUser.gender && normalizedCustomer.gender) updates.gender = normalizedCustomer.gender;
+        if (!existingUser.dateOfBirth && normalizedCustomer.dateOfBirth) updates.dateOfBirth = normalizedCustomer.dateOfBirth;
+
+        if (Object.keys(updates).length > 0) {
+            await existingUser.update(updates, { transaction });
+        }
+
+        return existingUser;
+    }
+
+    return await db.PlatformUser.create({
+        email,
+        phone,
+        password,
+        firstName,
+        lastName,
+        gender: normalizedCustomer.gender || null,
+        dateOfBirth: normalizedCustomer.dateOfBirth || null,
+        emailVerified: false,
+        phoneVerified: false,
+        isActive: true
+    }, { transaction });
+}
+
+/**
+ * Create a new appointment from the tenant dashboard
+ * POST /api/v1/tenant/appointments
+ */
+exports.createAppointment = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const {
+            serviceId,
+            variantId,
+            staffId,
+            requestedStaffId,
+            startTime,
+            notes,
+            paymentMethod,
+            platformUserId,
+            customer,
+            assignmentMode
+        } = req.body || {};
+
+        if (!serviceId || !startTime) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'serviceId and startTime are required'
+            });
+        }
+
+        const customerUser = await resolveAppointmentCustomer({
+            platformUserId,
+            customer,
+            transaction
+        });
+
+        const appointment = await bookingService.createBooking({
+            serviceId,
+            variantId: variantId || null,
+            staffId: staffId || null,
+            requestedStaffId: requestedStaffId || null,
+            platformUserId: customerUser.id,
+            tenantId,
+            startTime,
+            notes,
+            paymentMethod,
+            assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined)
+        }, { transaction });
+
+        const fullAppointment = await db.Appointment.findByPk(appointment.id, {
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar', 'duration', 'category', 'image', 'paymentOptions'],
+                    required: true
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'name', 'photo', 'phone', 'email'],
+                    required: true
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'gender', ['profileImage', 'photo']],
+                    required: false
+                }
+            ],
+            transaction
+        });
+
+        await transaction.commit();
+
+        res.status(201).json({
+            success: true,
+            message: 'Appointment created successfully',
+            appointment: fullAppointment
+        });
+    } catch (error) {
+        try {
+            if (transaction && !transaction.finished) {
+                await transaction.rollback();
+            }
+        } catch (rollbackError) {
+            console.warn('Create appointment rollback warning:', rollbackError.message);
+        }
+        console.error('Create appointment error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create appointment',
+            error: error.message
+        });
+    }
+};
 
 /**
  * Get all appointments for the authenticated tenant
