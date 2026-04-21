@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { EmployeeEditorFrame, type EmployeeEditorSection } from "@/components/EmployeeEditorFrame";
 import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
 import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
 import {
@@ -59,6 +60,7 @@ export default function EditEmployeePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [activeSection, setActiveSection] = useState<'basic' | 'bio' | 'finance' | 'schedule' | 'access'>('basic');
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -120,6 +122,94 @@ export default function EditEmployeePage() {
     view_booking_notes: false
   });
   const [permissionsLoading, setPermissionsLoading] = useState(false);
+
+  const sectionProgress = useMemo(() => {
+    const basicFields = [
+      formData.name.trim(),
+      formData.email.trim(),
+      formData.phone.trim(),
+      formData.nationality.trim(),
+      formData.gender.trim(),
+      formData.position.trim()
+    ];
+    const bioFields = [
+      formData.bio.trim(),
+      formData.experience.trim(),
+      formData.skills.length > 0,
+      Array.isArray(formData.spokenLanguages) && formData.spokenLanguages.length > 0,
+      Boolean(photoPreview || existingPhoto)
+    ];
+    const financeFields = [salaryValue > 0];
+    const scheduleFields = [formData.scheduleVisibilityWeeks.trim()];
+    const accessFields = isServiceProvider
+      ? [appEnabled || Boolean(savedEmail)]
+      : [Object.values(dashboardPermissions).some(Boolean)];
+
+    return {
+      basic: { filled: basicFields.filter(Boolean).length, total: basicFields.length },
+      bio: { filled: bioFields.filter(Boolean).length, total: bioFields.length },
+      finance: { filled: financeFields.filter(Boolean).length, total: financeFields.length },
+      schedule: { filled: scheduleFields.filter(Boolean).length, total: scheduleFields.length },
+      access: { filled: accessFields.filter(Boolean).length, total: accessFields.length }
+    };
+  }, [
+    appEnabled,
+    dashboardPermissions,
+    existingPhoto,
+    formData.bio,
+    formData.email,
+    formData.experience,
+    formData.gender,
+    formData.name,
+    formData.nationality,
+    formData.phone,
+    formData.position,
+    formData.scheduleVisibilityWeeks,
+    formData.skills.length,
+    formData.spokenLanguages.length,
+    isServiceProvider,
+    photoPreview,
+    savedEmail,
+    salaryValue
+  ]);
+
+  const editorSections: EmployeeEditorSection[] = [
+    {
+      id: 'basic',
+      label: locale === 'ar' ? 'المعلومات الأساسية' : 'Basic information',
+      progressLabel: `${sectionProgress.basic.filled}/${sectionProgress.basic.total}`,
+      progressPercent: Math.round((sectionProgress.basic.filled / sectionProgress.basic.total) * 100)
+    },
+    {
+      id: 'bio',
+      label: locale === 'ar' ? 'السيرة الذاتية' : 'Biography',
+      progressLabel: `${sectionProgress.bio.filled}/${sectionProgress.bio.total}`,
+      progressPercent: Math.round((sectionProgress.bio.filled / sectionProgress.bio.total) * 100)
+    },
+    {
+      id: 'finance',
+      label: locale === 'ar' ? 'المالية' : 'Finance',
+      progressLabel: `${sectionProgress.finance.filled}/${sectionProgress.finance.total}`,
+      progressPercent: Math.round((sectionProgress.finance.filled / sectionProgress.finance.total) * 100)
+    },
+    {
+      id: 'schedule',
+      label: locale === 'ar' ? 'الجدول' : 'Schedule',
+      progressLabel: `${sectionProgress.schedule.filled}/${sectionProgress.schedule.total}`,
+      progressPercent: Math.round((sectionProgress.schedule.filled / sectionProgress.schedule.total) * 100)
+    },
+    {
+      id: 'access',
+      label: locale === 'ar' ? 'الصلاحيات' : 'Access',
+      progressLabel: `${sectionProgress.access.filled}/${sectionProgress.access.total}`,
+      progressPercent: Math.round((sectionProgress.access.filled / sectionProgress.access.total) * 100)
+    }
+  ];
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId as typeof activeSection);
+    document.getElementById(`employee-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   useEffect(() => {
     if (id) {
@@ -628,32 +718,23 @@ export default function EditEmployeePage() {
 
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("edit")} {t("title")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {locale === 'ar' ? 'تعديل معلومات الموظف' : 'Edit employee information'}
-            </p>
-          </div>
-          <Link href={`/${locale}/dashboard/employees`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
-        </div>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Form - Same as new page */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <EmployeeEditorFrame
+        locale={locale}
+        isRTL={isRTL}
+        title={`${t("edit")} ${t("title")}`}
+        subtitle={locale === 'ar' ? 'تعديل معلومات الموظف' : 'Edit employee information'}
+        cancelHref={`/${locale}/dashboard/employees`}
+        saveLabel={t("save")}
+        loadingLabel={t("loading")}
+        cancelLabel={t("cancel")}
+        formId="employee-editor-form"
+        loading={saving}
+        error={error}
+        sections={editorSections}
+        activeSection={activeSection}
+        onSectionSelect={scrollToSection}
+      >
+      <form id="employee-editor-form" onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
@@ -926,7 +1007,7 @@ export default function EditEmployeePage() {
             </div>
 
             {/* Financial Information */}
-            <div className="card">
+            <div id="employee-section-basic" className="card scroll-mt-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'المعلومات المالية' : 'Financial Information'}
               </h3>
@@ -1047,7 +1128,7 @@ export default function EditEmployeePage() {
             </div>
 
             {/* Active Status */}
-            <div className="card">
+            <div id="employee-section-bio" className="card scroll-mt-6">
               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <input
                   type="checkbox"
@@ -1063,7 +1144,7 @@ export default function EditEmployeePage() {
             {isServiceProvider ? (
               <>
                 {/* App Access Management */}
-                <div className="card">
+            <div id="employee-section-finance" className="card scroll-mt-6">
                   <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'وصول التطبيق' : 'App Access'}
                   </h3>
@@ -1206,7 +1287,7 @@ export default function EditEmployeePage() {
                 </div>
               </>
             ) : (
-              <div className="card">
+            <div id="employee-section-access" className="card scroll-mt-6">
                 <div className="mb-4 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -1304,20 +1385,8 @@ export default function EditEmployeePage() {
         </div>
         </div>
 
-        {/* Form Actions */}
-        <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <Link href={`/${locale}/dashboard/employees`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn btn-primary flex-1"
-          >
-            {saving ? t("loading") : t("save")}
-          </button>
-        </div>
       </form>
+      </EmployeeEditorFrame>
     </TenantLayout>
   );
 }
