@@ -96,6 +96,27 @@ redisService.initRedis();
 const PORT = process.env.PORT || 5000;
 
 // Middleware - CORS with environment-based origins
+app.use((req, res, next) => {
+    const requestOrigin = req.headers.origin;
+
+    if (requestOrigin && isAllowedOrigin(requestOrigin)) {
+        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+        res.setHeader(
+            'Access-Control-Allow-Headers',
+            req.headers['access-control-request-headers'] || 'Content-Type,Authorization,X-Requested-With,Accept,Origin'
+        );
+    }
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+
+    next();
+});
+
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) {
@@ -106,9 +127,10 @@ app.use(cors({
             return callback(null, true);
         }
 
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+        return callback(null, false);
     },
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 204
 }));
 
 // Serve uploaded files FIRST (before helmet) with proper CORS headers
