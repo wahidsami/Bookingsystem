@@ -62,6 +62,10 @@ const ensureEmailAvailability = async (email, tenantId, excludeAccountId = null)
 };
 
 const isValidRoleKey = (roleKey) => ROLE_OPTIONS.some((option) => option.value === roleKey);
+const normalizeRoleKey = (roleKey) => {
+  const normalized = String(roleKey || '').trim().toLowerCase();
+  return isValidRoleKey(normalized) ? normalized : 'custom';
+};
 
 const writeActivityLog = async ({ req, tenantId, accountId, action, details, previousValue, newValue }) => {
   try {
@@ -134,26 +138,21 @@ exports.createAccount = async (req, res) => {
       });
     }
 
-    if (!isValidRoleKey(roleKey)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid role selected'
-      });
-    }
+    const normalizedRoleKey = normalizeRoleKey(roleKey);
 
     const normalizedEmail = normalizeEmail(email);
     await ensureEmailAvailability(normalizedEmail, tenantId);
 
     const temporaryPassword = password ? null : generateTemporaryPassword();
     const finalPassword = password || temporaryPassword;
-    const normalizedPermissions = normalizeDashboardPermissions(permissions, roleKey);
+    const normalizedPermissions = normalizeDashboardPermissions(permissions, normalizedRoleKey);
 
     const account = await db.TenantDashboardAccount.create({
       tenantId,
       displayName: String(displayName).trim(),
       email: normalizedEmail,
       password: finalPassword,
-      roleKey,
+      roleKey: normalizedRoleKey,
       permissions: normalizedPermissions,
       isActive: isActive === true || isActive === 'true',
       passwordResetRequired: !password
@@ -166,7 +165,7 @@ exports.createAccount = async (req, res) => {
       action: 'created',
       details: {
         event: 'dashboard_account_created',
-        roleKey
+        roleKey: normalizedRoleKey
       },
       newValue: sanitizeAccount(account)
     });
@@ -213,15 +212,9 @@ exports.updateAccount = async (req, res) => {
       updates.email = normalizedEmail;
     }
     if (req.body.roleKey !== undefined) {
-      if (!isValidRoleKey(req.body.roleKey)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid role selected'
-        });
-      }
-      updates.roleKey = req.body.roleKey;
+      updates.roleKey = normalizeRoleKey(req.body.roleKey);
       if (req.body.permissions === undefined) {
-        updates.permissions = normalizeDashboardPermissions({}, req.body.roleKey);
+        updates.permissions = normalizeDashboardPermissions({}, updates.roleKey);
       }
     }
     if (req.body.permissions !== undefined) {
