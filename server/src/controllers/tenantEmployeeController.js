@@ -165,7 +165,8 @@ const syncStaffAuthAccount = async ({
     });
 };
 
-const buildDashboardAccountPayload = ({ email, hasAccount, temporaryPassword = null, passwordUpdated = false, accountRemoved = false, needsEmail = false }) => ({
+const buildDashboardAccountPayload = ({ accountId = null, email, hasAccount, temporaryPassword = null, passwordUpdated = false, accountRemoved = false, needsEmail = false }) => ({
+    accountId,
     email,
     hasAccount,
     temporaryPassword,
@@ -213,6 +214,7 @@ const syncTenantDashboardAccount = async ({
         }
 
         return buildDashboardAccountPayload({
+            accountId: previousAccount?.id || nextAccount?.id || null,
             email: null,
             hasAccount: false,
             accountRemoved: Boolean(existingAccount)
@@ -225,6 +227,7 @@ const syncTenantDashboardAccount = async ({
         }
 
         return buildDashboardAccountPayload({
+            accountId: previousAccount?.id || nextAccount?.id || null,
             email: null,
             hasAccount: false,
             accountRemoved: Boolean(existingAccount),
@@ -260,6 +263,7 @@ const syncTenantDashboardAccount = async ({
         await existingAccount.update(updates, { transaction });
 
         return buildDashboardAccountPayload({
+            accountId: existingAccount.id,
             email: nextNormalized,
             hasAccount: true,
             passwordUpdated: Boolean(password),
@@ -267,7 +271,7 @@ const syncTenantDashboardAccount = async ({
         });
     }
 
-    await db.TenantDashboardAccount.create({
+    const createdAccount = await db.TenantDashboardAccount.create({
         tenantId,
         email: nextNormalized,
         password: finalPassword,
@@ -279,6 +283,7 @@ const syncTenantDashboardAccount = async ({
     }, { transaction });
 
     return buildDashboardAccountPayload({
+        accountId: createdAccount.id,
         email: nextNormalized,
         hasAccount: true,
         temporaryPassword,
@@ -1185,19 +1190,28 @@ exports.createEmployee = async (req, res) => {
                 transaction
             })
             : null;
-        const dashboardAccess = !isServiceProvider
-            ? await syncTenantDashboardAccount({
-                tenantId,
-                nextEmail: normalizedEmail,
-                displayName: name.trim(),
-                position: normalizedPosition,
-                permissions: parsedDashboardPermissions,
-                password: accessPassword,
-                transaction
-            })
-            : null;
 
         await transaction.commit();
+
+        let dashboardAccess = null;
+        if (!isServiceProvider) {
+            const dashboardTransaction = await db.sequelize.transaction();
+            try {
+                dashboardAccess = await syncTenantDashboardAccount({
+                    tenantId,
+                    nextEmail: normalizedEmail,
+                    displayName: name.trim(),
+                    position: normalizedPosition,
+                    permissions: parsedDashboardPermissions,
+                    password: accessPassword,
+                    transaction: dashboardTransaction
+                });
+                await dashboardTransaction.commit();
+            } catch (dashboardError) {
+                await dashboardTransaction.rollback();
+                console.error('Dashboard account sync error (create employee):', dashboardError);
+            }
+        }
 
         res.status(201).json({
             success: true,
@@ -1404,29 +1418,38 @@ exports.updateEmployee = async (req, res) => {
                 nextEmail: null,
                 transaction
             });
-        const dashboardAccess = !isServiceProvider
-            ? await syncTenantDashboardAccount({
-                tenantId,
-                previousEmail,
-                nextEmail: employee.email,
-                displayName: employee.name,
-                position: employee.position,
-                permissions: parsedDashboardPermissions,
-                password: accessPassword,
-                transaction
-            })
-            : await syncTenantDashboardAccount({
-                tenantId,
-                previousEmail,
-                nextEmail: null,
-                displayName: employee.name,
-                position: employee.position,
-                permissions: null,
-                transaction
-            });
+        let dashboardAccess = null;
 
         await employee.save({ transaction });
         await transaction.commit();
+
+        const dashboardTransaction = await db.sequelize.transaction();
+        try {
+            dashboardAccess = !isServiceProvider
+                ? await syncTenantDashboardAccount({
+                    tenantId,
+                    previousEmail,
+                    nextEmail: employee.email,
+                    displayName: employee.name,
+                    position: employee.position,
+                    permissions: parsedDashboardPermissions,
+                    password: accessPassword,
+                    transaction: dashboardTransaction
+                })
+                : await syncTenantDashboardAccount({
+                    tenantId,
+                    previousEmail,
+                    nextEmail: null,
+                    displayName: employee.name,
+                    position: employee.position,
+                    permissions: null,
+                    transaction: dashboardTransaction
+                });
+            await dashboardTransaction.commit();
+        } catch (dashboardError) {
+            await dashboardTransaction.rollback();
+            console.error('Dashboard account sync error (update employee):', dashboardError);
+        }
 
         res.json({
             success: true,
