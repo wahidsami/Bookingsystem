@@ -372,6 +372,7 @@ export default function EditServicePage() {
   ]) as ServiceEditorSection[];
 
   const [activeSection, setActiveSection] = useState("service-basic");
+  const isVisibleSection = (sectionId: string) => activeSection === sectionId;
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
     const target = document.getElementById(sectionId);
@@ -578,7 +579,7 @@ export default function EditServicePage() {
             {/* Left Column - Main Info */}
             <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
-            <div className="card" id="service-basic">
+            <div className={`${isVisibleSection("service-basic") ? "card" : "hidden"}`} id="service-basic">
               <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
@@ -761,7 +762,7 @@ export default function EditServicePage() {
             </div>
 
             {/* Team */}
-            <div className="card" id="service-team">
+            <div className={`${isVisibleSection("service-team") ? "card" : "hidden"}`} id="service-team">
               <ServiceTeamSection
                 locale={locale}
                 isRTL={isRTL}
@@ -802,7 +803,7 @@ export default function EditServicePage() {
             </div>
 
             {/* Includes Section */}
-            <div className="card" id="service-options">
+            <div className={`${isVisibleSection("service-options") ? "card" : "hidden"}`} id="service-options">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("includes")} <span className="text-gray-400">({t("optional")})</span>
               </h3>
@@ -843,7 +844,7 @@ export default function EditServicePage() {
             </div>
 
             {/* Settings */}
-            <div className="card" id="service-settings">
+            <div className={`${isVisibleSection("service-settings") ? "card" : "hidden"}`} id="service-settings">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'الإعدادات' : 'Settings'}
               </h3>
