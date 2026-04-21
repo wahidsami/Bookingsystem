@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { API_BASE_URL, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
@@ -9,6 +9,7 @@ import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
+import { ServiceEditorFrame, ServiceEditorSection } from "@/components/ServiceEditorFrame";
 
 interface ServiceCategory {
   id: string;
@@ -261,6 +262,72 @@ export default function NewServicePage() {
     };
   };
 
+  const serviceSections = useMemo(() => {
+    const basicFields = [
+      formData.name_en.trim(),
+      formData.name_ar.trim(),
+      formData.category.trim(),
+      formData.targetGender.trim(),
+      formData.finalPrice.trim(),
+      formData.duration.trim()
+    ];
+    const basicFilled = basicFields.filter(Boolean).length;
+    const teamFilled = formData.employeeIds.length > 0 ? 1 : 0;
+    const optionsFilled = [imagePreview, formData.hasOffer, formData.hasGift].some(Boolean) ? 1 : 0;
+    const settingsFilled = [formData.isActive, formData.availableInCenter, formData.availableHomeVisit].some(Boolean) ? 1 : 0;
+
+    return [
+      {
+        id: "service-basic",
+        label: locale === "ar" ? "المعلومات الأساسية" : "Basic information",
+        progressLabel: `${basicFilled}/6`,
+        progressPercent: (basicFilled / 6) * 100,
+      },
+      {
+        id: "service-team",
+        label: locale === "ar" ? "الفريق" : "Team",
+        progressLabel: formData.employeeIds.length > 0 ? "1/1" : "0/1",
+        progressPercent: teamFilled * 100,
+      },
+      {
+        id: "service-options",
+        label: locale === "ar" ? "خيارات الخدمة" : "Service options",
+        progressLabel: optionsFilled ? "1/1" : "Optional",
+        progressPercent: optionsFilled ? 100 : 0,
+      },
+      {
+        id: "service-settings",
+        label: locale === "ar" ? "الإعدادات" : "Settings",
+        progressLabel: settingsFilled ? "1/1" : "Optional",
+        progressPercent: settingsFilled ? 100 : 0,
+      },
+    ];
+  }, [
+    formData.availableHomeVisit,
+    formData.availableInCenter,
+    formData.category,
+    formData.duration,
+    formData.employeeIds.length,
+    formData.finalPrice,
+    formData.hasGift,
+    formData.hasOffer,
+    formData.isActive,
+    formData.name_ar,
+    formData.name_en,
+    formData.targetGender,
+    imagePreview,
+    locale
+  ]) as ServiceEditorSection[];
+
+  const [activeSection, setActiveSection] = useState("service-basic");
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const target = document.getElementById(sectionId);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -478,39 +545,28 @@ export default function NewServicePage() {
 
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("addService")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {locale === 'ar' ? 'أضف خدمة جديدة إلى الكتالوج' : 'Add a new service to your catalog'}
-            </p>
-          </div>
-          <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <Link href={`/${locale}/dashboard/services`} className="btn btn-secondary">
-              {t("cancel")}
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
+      <ServiceEditorFrame
+        locale={locale}
+        isRTL={isRTL}
+        title={t("addService")}
+        subtitle={locale === 'ar' ? 'أضف خدمة جديدة إلى الكتالوج' : 'Add a new service to your catalog'}
+        cancelHref={`/${locale}/dashboard/services`}
+        saveLabel={t("save")}
+        loadingLabel={t("loading")}
+        cancelLabel={t("cancel")}
+        formId="service-editor-form"
+        loading={loading}
+        error={error}
+        sections={serviceSections}
+        activeSection={activeSection}
+        onSectionSelect={scrollToSection}
+      >
+        <form id="service-editor-form" onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Main Info */}
+            <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
-            <div className="card">
+            <div className="card" id="service-basic">
               <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
@@ -678,7 +734,7 @@ export default function NewServicePage() {
             </div>
 
             {/* Service Availability */}
-            <div className="card">
+            <div className="card" id="service-team">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("serviceAvailability")}
               </h3>
@@ -709,7 +765,7 @@ export default function NewServicePage() {
             </div>
 
             {/* Includes Section */}
-            <div className="card">
+            <div className="card" id="service-options">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("includes")} <span className="text-gray-400">({t("optional")})</span>
               </h3>
@@ -750,7 +806,7 @@ export default function NewServicePage() {
             </div>
 
             {/* Benefits List */}
-            <div className="card">
+            <div className="card" id="service-settings">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("benefitsList")} <span className="text-gray-400">({t("optional")})</span>
               </h3>
@@ -1251,21 +1307,8 @@ export default function NewServicePage() {
             </div>
           </div>
         </div>
-
-        {/* Form Actions */}
-        <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <Link href={`/${locale}/dashboard/services`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
-          <button
-            type="submit"
-            disabled={loading || formData.employeeIds.length === 0}
-            className="btn btn-primary flex-1"
-          >
-            {loading ? t("loading") : t("save")}
-          </button>
-        </div>
-      </form>
+        </form>
+      </ServiceEditorFrame>
     </TenantLayout>
   );
 }
