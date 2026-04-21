@@ -769,6 +769,86 @@ export default function NewServicePage() {
               </div>
             </div>
 
+            {/* Gifts Section */}
+            <div className={`${isVisibleSection("service-options") ? "card" : "hidden"}`}>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {t("gifts")}
+              </h3>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <input
+                    type="checkbox"
+                    name="hasGift"
+                    checked={formData.hasGift}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <label className="font-medium text-gray-700">{t("hasGift")}</label>
+                </div>
+
+                {formData.hasGift && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {t("giftType")} <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="giftType"
+                        value={formData.giftType}
+                        onChange={handleChange}
+                        required={formData.hasGift}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      >
+                        <option value="text">{t("giftTypeText")}</option>
+                        <option value="product">{t("giftTypeProduct")}</option>
+                      </select>
+                    </div>
+
+                    {formData.giftType === "text" ? (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {t("giftDetails")} <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          name="giftDetails"
+                          value={formData.giftDetails}
+                          onChange={handleChange}
+                          required={formData.hasGift && formData.giftType === "text"}
+                          rows={3}
+                          placeholder={t("giftDetailsPlaceholder")}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {t("selectProduct")} <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="giftProductId"
+                          value={formData.giftProductId}
+                          onChange={(e) => setFormData(prev => ({ ...prev, giftProductId: e.target.value }))}
+                          required={formData.hasGift && formData.giftType === "product"}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        >
+                          <option value="">{t("selectProductPlaceholder")}</option>
+                          {products.map(product => (
+                            <option key={product.id} value={product.id}>
+                              {locale === 'ar' ? product.name_ar : product.name_en} - <Currency amount={product.price} />
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Settings */}
             <div className={`${isVisibleSection("service-settings") ? "card" : "hidden"}`} id="service-settings">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -999,86 +1079,6 @@ export default function NewServicePage() {
                     </div>
                     {formData.offerFrom && formData.offerTo && formData.offerTo < formData.offerFrom && (
                       <p className="text-sm text-red-600">{locale === "ar" ? "تاريخ النهاية يجب أن يكون بعد تاريخ البداية" : "Offer end date must be after start date"}</p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Gifts Section */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("gifts")}
-              </h3>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="hasGift"
-                    checked={formData.hasGift}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{t("hasGift")}</label>
-                </div>
-
-                {formData.hasGift && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        {t("giftType")} <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="giftType"
-                        value={formData.giftType}
-                        onChange={handleChange}
-                        required={formData.hasGift}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      >
-                        <option value="text">{t("giftTypeText")}</option>
-                        <option value="product">{t("giftTypeProduct")}</option>
-                      </select>
-                    </div>
-
-                    {formData.giftType === "text" ? (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          {t("giftDetails")} <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          name="giftDetails"
-                          value={formData.giftDetails}
-                          onChange={handleChange}
-                          required={formData.hasGift && formData.giftType === "text"}
-                          rows={3}
-                          placeholder={t("giftDetailsPlaceholder")}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          style={{ textAlign: isRTL ? 'right' : 'left' }}
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          {t("selectProduct")} <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          name="giftProductId"
-                          value={formData.giftProductId}
-                          onChange={(e) => setFormData(prev => ({ ...prev, giftProductId: e.target.value }))}
-                          required={formData.hasGift && formData.giftType === "product"}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          style={{ textAlign: isRTL ? 'right' : 'left' }}
-                        >
-                          <option value="">{t("selectProductPlaceholder")}</option>
-                          {products.map(product => (
-                            <option key={product.id} value={product.id}>
-                              {locale === 'ar' ? product.name_ar : product.name_en} - <Currency amount={product.price} />
-                            </option>
-                          ))}
-                        </select>
-                      </div>
                     )}
                   </>
                 )}
