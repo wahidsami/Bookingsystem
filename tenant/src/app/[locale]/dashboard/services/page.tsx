@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import {
+  ArrowPathIcon,
+  PhotoIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  PowerIcon,
+  TrashIcon,
+  UsersIcon
+} from "@heroicons/react/24/outline";
 
 interface Employee {
   id: string;
@@ -36,59 +45,54 @@ interface Service {
   hasGift: boolean;
   giftType?: 'text' | 'product';
   giftDetails?: string;
+  availableInCenter?: boolean;
+  availableHomeVisit?: boolean;
   isActive: boolean;
   employees?: Employee[];
   createdAt: string;
 }
 
-const CATEGORIES = [
-  "Hair Services",
-  "Facial & Skin Care",
-  "Massage & Body",
-  "Nail Services",
-  "Makeup",
-  "Bridal Services",
-  "General"
-];
+type ServiceFilterMode =
+  | "all"
+  | "active"
+  | "inactive"
+  | "female"
+  | "male"
+  | "all-genders"
+  | "center"
+  | "home-visit"
+  | "has-offer"
+  | "has-gift"
+  | "az"
+  | "za"
+  | "newest"
+  | "oldest";
 
 export default function ServicesPage() {
-    const dialog = useAppDialog();
+  const dialog = useAppDialog();
   const t = useTranslations("Services");
   const params = useParams();
-  const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
 
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
-  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterMode, setFilterMode] = useState<ServiceFilterMode>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [error, setError] = useState("");
   const [limits, setLimits] = useState<any>(null);
 
   useEffect(() => {
     loadServices();
-  }, [filterActive, filterCategory, searchTerm]);
+  }, []);
 
   const loadServices = async () => {
     try {
       setLoading(true);
       setError("");
-
-      const params: any = {};
-      if (filterActive !== undefined) {
-        params.isActive = filterActive;
-      }
-      if (filterCategory) {
-        params.category = filterCategory;
-      }
-      if (searchTerm) {
-        params.search = searchTerm;
-      }
-
       const [response, limitsData] = await Promise.all([
-        tenantApi.getServices(params),
+        tenantApi.getServices(),
         tenantApi.getSubscriptionLimits().catch(() => null)
       ]);
 
@@ -104,7 +108,7 @@ export default function ServicesPage() {
         const servicesList = data.services || data.data?.services || [];
         setServices(servicesList);
 
-        if (servicesList.length === 0 && !filterActive && !filterCategory && !searchTerm) {
+        if (servicesList.length === 0) {
           console.log("No services found. Response:", response);
         }
       } else {
@@ -136,13 +140,70 @@ export default function ServicesPage() {
     try {
       const response = await tenantApi.deleteService(id);
       if (response.success) {
-        loadServices();
+        await dialog.alert({
+          title: locale === 'ar' ? 'تم الحذف' : 'Deleted',
+          message: locale === 'ar' ? `تم حذف الخدمة "${serviceName}" بنجاح.` : `Service "${serviceName}" was deleted successfully.`,
+          tone: "success"
+        });
+        await loadServices();
       } else {
-        alert(response.message || t("deleteError"));
+        await dialog.alert({
+          title: locale === 'ar' ? 'تعذر الحذف' : 'Delete failed',
+          message: response.message || t("deleteError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to delete service:", err);
-      alert(err.message || t("deleteError"));
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر الحذف' : 'Delete failed',
+        message: err.message || t("deleteError"),
+        tone: "danger"
+      });
+    }
+  };
+
+  const handleToggleActive = async (service: Service) => {
+    const nextIsActive = !service.isActive;
+    const confirmed = await dialog.confirm(
+      locale === "ar"
+        ? `هل تريد ${nextIsActive ? "تفعيل" : "إيقاف"} الخدمة "${service.name_ar || service.name_en}"؟`
+        : `Do you want to ${nextIsActive ? "activate" : "deactivate"} service "${service.name_en || service.name_ar}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const submitData = new FormData();
+      submitData.append("isActive", nextIsActive.toString());
+      submitData.append("finalPrice", String(service.finalPrice ?? 0));
+
+      const response = await tenantApi.updateService(service.id, submitData);
+      if (response.success) {
+        await dialog.alert({
+          title: locale === "ar" ? "تم التحديث" : "Updated",
+          message: locale === "ar"
+            ? `تم ${nextIsActive ? "تفعيل" : "إيقاف"} الخدمة بنجاح.`
+            : `Service was ${nextIsActive ? "activated" : "deactivated"} successfully.`,
+          tone: "success"
+        });
+        await loadServices();
+      } else {
+        await dialog.alert({
+          title: locale === "ar" ? "فشل التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to update service status:", err);
+      await dialog.alert({
+        title: locale === "ar" ? "فشل التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     }
   };
 
@@ -166,286 +227,351 @@ export default function ServicesPage() {
     }
   };
 
+  const filterOptions = useMemo(() => ([
+    { value: "all", label: locale === "ar" ? "كل الخدمات" : "All services" },
+    { value: "active", label: t("activeOnly") },
+    { value: "inactive", label: t("inactiveOnly") },
+    { value: "all-genders", label: t("allGenders") },
+    { value: "female", label: t("femaleOnly") },
+    { value: "male", label: t("maleOnly") },
+    { value: "center", label: t("availableInCenter") },
+    { value: "home-visit", label: t("availableHomeVisit") },
+    { value: "has-offer", label: t("hasOfferOnly") },
+    { value: "has-gift", label: t("hasGiftOnly") },
+    { value: "az", label: locale === "ar" ? "ترتيب أ-ي" : "Sort A-Z" },
+    { value: "za", label: locale === "ar" ? "ترتيب ي-أ" : "Sort Z-A" },
+    { value: "newest", label: locale === "ar" ? "الأحدث" : "Newest" },
+    { value: "oldest", label: locale === "ar" ? "الأقدم" : "Oldest" }
+  ]), [locale, t]);
+
+  const servicesAfterGlobalFilters = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const filtered = services.filter((service) => {
+      const serviceName = `${service.name_en || ""} ${service.name_ar || ""} ${service.description_en || ""} ${service.description_ar || ""}`.toLowerCase();
+      if (term && !serviceName.includes(term)) return false;
+
+      switch (filterMode) {
+        case "active":
+          return service.isActive;
+        case "inactive":
+          return !service.isActive;
+        case "female":
+          return service.targetGender === "female";
+        case "male":
+          return service.targetGender === "male";
+        case "all-genders":
+          return !service.targetGender || service.targetGender === "all";
+        case "center":
+          return service.availableInCenter !== false;
+        case "home-visit":
+          return service.availableHomeVisit === true;
+        case "has-offer":
+          return service.hasOffer;
+        case "has-gift":
+          return service.hasGift;
+        default:
+          return true;
+      }
+    });
+
+    const sorted = [...filtered];
+    switch (filterMode) {
+      case "az":
+        sorted.sort((a, b) => (locale === "ar" ? (a.name_ar || "").localeCompare(b.name_ar || "") : (a.name_en || "").localeCompare(b.name_en || "")));
+        break;
+      case "za":
+        sorted.sort((a, b) => (locale === "ar" ? (b.name_ar || "").localeCompare(a.name_ar || "") : (b.name_en || "").localeCompare(a.name_en || "")));
+        break;
+      case "newest":
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case "oldest":
+        sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        break;
+      default:
+        break;
+    }
+
+    return sorted;
+  }, [filterMode, locale, searchTerm, services]);
+
+  const categories = useMemo(() => {
+    const map = new Map<string, number>();
+    servicesAfterGlobalFilters.forEach((service) => {
+      const category = (service.category || "").trim() || t("uncategorized");
+      map.set(category, (map.get(category) || 0) + 1);
+    });
+
+    const entries = Array.from(map.entries()).sort((a, b) => {
+      if (a[0] === t("uncategorized")) return 1;
+      if (b[0] === t("uncategorized")) return -1;
+      return a[0].localeCompare(b[0]);
+    });
+
+    return [
+      { key: "all", name: t("allCategories"), count: servicesAfterGlobalFilters.length },
+      ...entries.map(([name, count]) => ({ key: name, name, count }))
+    ];
+  }, [servicesAfterGlobalFilters, t]);
+
+  const visibleServices = useMemo(() => {
+    if (selectedCategory === "all") {
+      return servicesAfterGlobalFilters;
+    }
+    return servicesAfterGlobalFilters.filter((service) => ((service.category || "").trim() || t("uncategorized")) === selectedCategory);
+  }, [selectedCategory, servicesAfterGlobalFilters, t]);
+
+  const currentCategoryLabel = useMemo(() => {
+    return categories.find((category) => category.key === selectedCategory)?.name || t("allCategories");
+  }, [categories, selectedCategory, t]);
+
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("title")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("subtitle")}
-            </p>
+      <div className="mb-6 animate-fade-in space-y-4">
+        <div className={`flex items-start justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className="space-y-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            <h2 className="text-3xl font-bold text-gray-900">{t("title")}</h2>
+            <p className="text-sm text-gray-600">{t("subtitle")}</p>
           </div>
-          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            {limits && (
-              <div className="text-sm px-3 py-1 bg-gray-100 rounded-lg whitespace-nowrap">
-                <span className="text-gray-500">{isRTL ? 'الحد المسموح:' : 'Limit:'} </span>
-                <span className={`font-medium ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
-                  {limits.current} / {limits.limit}
-                </span>
+          {limits && (
+            <div className={`rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm ${isRTL ? 'text-right' : 'text-left'}`}>
+              <div className="text-gray-500">{locale === 'ar' ? 'الحد المسموح' : 'Limit'}</div>
+              <div className={`font-semibold ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
+                {limits.current} / {limits.limit}
               </div>
-            )}
-            <Link
-              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/services/new`}
-              className={`btn btn-primary ${limits && !limits.allowed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-              onClick={(e) => {
-                if (limits && !limits.allowed) {
-                  e.preventDefault();
-                  alert(isRTL ? 'تم الوصول للحد الأقصى לבاقتك' : 'You have reached your subscription limit');
-                }
-              }}
-            >
-              <span className="mr-2">{isRTL ? '➕' : ''}</span>
-              {t("addService")}
-              <span className="ml-2">{!isRTL ? '➕' : ''}</span>
-            </Link>
+            </div>
+          )}
+        </div>
+
+        <div className={`card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between ${isRTL ? 'lg:flex-row-reverse' : ''}`}>
+          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder={t("searchPlaceholder")}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                style={{ textAlign: isRTL ? 'right' : 'left' }}
+              />
+            </div>
+            <div className="w-full lg:w-72">
+              <select
+                value={filterMode}
+                onChange={(e) => setFilterMode(e.target.value as ServiceFilterMode)}
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                style={{ textAlign: isRTL ? 'right' : 'left' }}
+              >
+                {filterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          <Link
+            href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/services/new`}
+            className={`btn btn-primary inline-flex items-center gap-2 whitespace-nowrap ${limits && !limits.allowed ? 'pointer-events-none opacity-50' : ''}`}
+            onClick={(e) => {
+              if (limits && !limits.allowed) {
+                e.preventDefault();
+                dialog.alert({
+                  title: locale === 'ar' ? 'الحد وصل' : 'Limit reached',
+                  message: locale === 'ar' ? 'تم الوصول للحد الأقصى في الباقة الحالية.' : 'You have reached your current package limit.',
+                  tone: 'danger'
+                });
+              }
+            }}
+          >
+            <PlusIcon className="h-5 w-5" />
+            <span>{t("addService")}</span>
+          </Link>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className={`card mb-6 ${isRTL ? 'text-right' : ''}`}>
-        <div className={`flex flex-col md:flex-row gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
-          {/* Search */}
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder={t("searchPlaceholder")}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            />
-          </div>
-
-          {/* Category Filter */}
-          <div className="w-full md:w-48">
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            >
-              <option value="">{t("allCategories")}</option>
-              {CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Active Filter */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterActive(undefined)}
-              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === undefined
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("all")}
-            </button>
-            <button
-              onClick={() => setFilterActive(true)}
-              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === true
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("active")}
-            </button>
-            <button
-              onClick={() => setFilterActive(false)}
-              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === false
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("inactive")}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Loading State */}
       {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="mt-4 text-gray-600">{t("loading")}</p>
+        <div className="flex items-center justify-center py-20">
+          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <ArrowPathIcon className="h-5 w-5 animate-spin text-primary" />
+            <p className="text-sm text-gray-600">{t("loading")}</p>
+          </div>
         </div>
       ) : services.length === 0 ? (
-        <div className="card text-center py-12">
-          <div className="text-6xl mb-4">💇</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noServices")}</h3>
-          <p className="text-gray-600 mb-6">{t("noServicesDesc")}</p>
-          <Link href={`/${locale}/dashboard/services/new`} className="btn btn-primary">
-            {t("addFirstService")}
+        <div className="card flex flex-col items-center justify-center py-16 text-center">
+          <PhotoIcon className="mb-4 h-14 w-14 text-gray-300" />
+          <h3 className="text-xl font-semibold text-gray-900">{t("noServices")}</h3>
+          <p className="mt-2 max-w-md text-sm text-gray-600">{t("noServicesDesc")}</p>
+          <Link href={`/${locale}/dashboard/services/new`} className="btn btn-primary mt-6 inline-flex items-center gap-2">
+            <PlusIcon className="h-5 w-5" />
+            <span>{t("addFirstService")}</span>
           </Link>
         </div>
       ) : (
-        /* Services Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((service) => (
-            <div key={service.id} className="card hover:shadow-xl transition-shadow">
-              {/* Service Image */}
-              <div className="relative mb-4">
-                <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
-                  {service.image ? (
-                    <img
-                      src={getImageUrl(service.image)}
-                      alt={locale === 'ar' ? service.name_ar : service.name_en}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-6xl">💇</span>
-                  )}
-                </div>
-                {service.hasOffer && (
-                  <div className={`absolute top-2 ${isRTL ? 'left-2' : 'right-2'} px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded`}>
-                    🎉 {t("offer")}
-                  </div>
-                )}
-                {service.hasGift && (
-                  <div className={`absolute top-2 ${isRTL ? 'right-2' : 'left-2'} px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded`}>
-                    🎁 {t("gift")}
-                  </div>
-                )}
-                <div
-                  className={`absolute bottom-2 ${isRTL ? 'right-2' : 'left-2'} w-6 h-6 rounded-full border-2 border-white ${service.isActive ? 'bg-green-500' : 'bg-gray-400'
-                    }`}
-                  title={service.isActive ? t("active") : t("inactive")}
-                ></div>
-              </div>
-
-              {/* Service Info */}
-              <div className="mb-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {locale === 'ar' ? service.name_ar : service.name_en}
-                </h3>
-                {service.category && (
-                  <p className="text-sm text-gray-600 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    📂 {service.category}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 text-sm text-gray-600 mb-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <span>⏱️ {formatDuration(service.duration)}</span>
-                  {service.employees && service.employees.length > 0 && (
-                    <span>👥 {service.employees.length} {t("employees")}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Pricing summary */}
-              {(() => {
-                const raw = Number(service.rawPrice) || 0;
-                const commissionAmount = raw * ((Number(service.commissionRate) || 10) / 100);
-                const taxAmount = raw * ((Number(service.taxRate) || 15) / 100);
-                return (
-                  <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t("rawPrice")}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={raw} /></span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t("commission")} ({service.commissionRate}%)</span>
-                      <span className="text-gray-700"><Currency amount={commissionAmount} /></span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t("tax")} ({service.taxRate}% of base)</span>
-                      <span className="text-gray-700"><Currency amount={taxAmount} /></span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                      <span className="font-semibold text-gray-900">{t("finalPrice")}</span>
-                      <span className="font-bold text-primary text-lg"><Currency amount={service.finalPrice} /></span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {service.targetGender && (
-                <div className={`mb-4 flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                    {getTargetAudienceLabel(service.targetGender)}
-                  </span>
-                </div>
-              )}
-
-              {/* Includes */}
-              {service.includes && service.includes.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-gray-600 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("includes")}:
-                  </p>
-                  <div className={`flex flex-wrap gap-1 ${isRTL ? 'justify-end' : ''}`}>
-                    {service.includes.slice(0, 3).map((item, index) => (
-                      <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                        {item}
-                      </span>
-                    ))}
-                    {service.includes.length > 3 && (
-                      <span className="text-xs text-gray-500">+{service.includes.length - 3}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Employees */}
-              {service.employees && service.employees.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-gray-600 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("assignedEmployees")}:
-                  </p>
-                  <div className={`flex flex-wrap gap-2 ${isRTL ? 'justify-end' : ''}`}>
-                    {service.employees.slice(0, 3).map((emp) => (
-                      <div key={emp.id} className="flex items-center gap-1">
-                        {emp.photo ? (
-                          <img
-                            src={getImageUrl(emp.photo)}
-                            alt={emp.name}
-                            className="w-6 h-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs">
-                            {emp.name.charAt(0)}
-                          </div>
-                        )}
-                        <span className="text-xs text-gray-700">{emp.name}</span>
-                      </div>
-                    ))}
-                    {service.employees.length > 3 && (
-                      <span className="text-xs text-gray-500">+{service.employees.length - 3}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <Link
-                  href={`/${locale}/dashboard/services/${service.id}`}
-                  className="flex-1 btn btn-secondary text-center"
-                >
-                  {t("edit")}
-                </Link>
-                <button
-                  onClick={() => handleDelete(service.id, locale === 'ar' ? service.name_ar : service.name_en)}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  {t("delete")}
-                </button>
-              </div>
+        <div className={`grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] ${isRTL ? 'lg:[direction:rtl]' : ''}`}>
+          <aside className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              <h3 className="text-lg font-bold text-gray-900">{locale === 'ar' ? 'الفئات' : 'Categories'}</h3>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {categories.length - 1}
+              </span>
             </div>
-          ))}
+            <div className="space-y-2">
+              {categories.map((category) => {
+                const active = selectedCategory === category.key;
+                return (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => setSelectedCategory(category.key)}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                      active
+                        ? 'border-primary bg-primary/5 text-primary shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                  >
+                    <span className="font-medium">{category.name}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
+                      {category.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <h3 className="text-xl font-bold text-gray-900">{currentCategoryLabel}</h3>
+                <p className="text-sm text-gray-600">
+                  {visibleServices.length} {locale === 'ar' ? 'خدمة' : 'services'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadServices()}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <ArrowPathIcon className="h-4 w-4" />
+                <span>{locale === 'ar' ? 'تحديث' : 'Refresh'}</span>
+              </button>
+            </div>
+
+            {visibleServices.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-gray-200 py-16 text-center">
+                <PhotoIcon className="h-14 w-14 text-gray-300" />
+                <h4 className="mt-4 text-lg font-semibold text-gray-900">{t("noServices")}</h4>
+                <p className="mt-2 text-sm text-gray-600">{t("noServicesDesc")}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleServices.map((service) => (
+                  <div
+                    key={service.id}
+                    className="rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm transition hover:shadow-md"
+                  >
+                    <div className={`flex flex-col gap-4 xl:flex-row xl:items-center ${isRTL ? 'xl:flex-row-reverse' : ''}`}>
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
+                          {service.image ? (
+                            <img
+                              src={getImageUrl(service.image)}
+                              alt={locale === 'ar' ? service.name_ar : service.name_en}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <PhotoIcon className="h-8 w-8 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="truncate text-lg font-bold text-gray-900">
+                                {locale === 'ar' ? service.name_ar : service.name_en}
+                              </h4>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                                  ⏱ {formatDuration(service.duration)}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                                  <UsersIcon className={`${isRTL ? 'ml-1' : 'mr-1'} h-4 w-4`} />
+                                  {service.employees?.length || 0} {t("performers")}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                                  {getTargetAudienceLabel(service.targetGender)}
+                                </span>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${service.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                                  {service.isActive ? t("active") : t("inactive")}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                                <span>{locale === 'ar' ? 'الفئة' : 'Category'}: {(service.category || "").trim() || t("uncategorized")}</span>
+                                {service.hasOffer && <span>• {t("offer")}</span>}
+                                {service.hasGift && <span>• {t("gift")}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center justify-between gap-4 xl:flex-col xl:items-end">
+                        <div className="text-right">
+                          <div className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                            {t("finalPrice")}
+                          </div>
+                          <div className="text-2xl font-bold text-primary">
+                            <Currency amount={service.finalPrice} />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/${locale}/dashboard/services/${service.id}`}
+                            title={t("edit")}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
+                          >
+                            <PencilSquareIcon className="h-5 w-5" />
+                          </Link>
+                          <button
+                            type="button"
+                            title={service.isActive ? t("deactivate") : t("activate")}
+                            onClick={() => handleToggleActive(service)}
+                            className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
+                              service.isActive
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-primary hover:text-primary'
+                            }`}
+                          >
+                            <PowerIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            title={t("delete")}
+                            onClick={() => handleDelete(service.id, locale === 'ar' ? service.name_ar : service.name_en)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                          >
+                            <TrashIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
     </TenantLayout>
