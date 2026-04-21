@@ -374,6 +374,12 @@ export default function AppointmentsPage() {
             </p>
           </div>
           <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <Link
+              href={`/${locale}/dashboard/appointments/new`}
+              className="btn btn-primary"
+            >
+              {locale === 'ar' ? 'موعد جديد' : 'New Appointment'}
+            </Link>
             <button
               onClick={() => setViewMode('list')}
               className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'list'
