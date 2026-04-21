@@ -1194,16 +1194,25 @@ exports.createEmployee = async (req, res) => {
 
         const isServiceProvider = normalizedPosition === 'service_provider';
         const accessPassword = staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null;
-        const staffAppAccess = isServiceProvider
-            ? await syncStaffAuthAccount({
-                tenantId,
-                nextEmail: normalizedEmail,
-                password: accessPassword,
-                transaction
-            })
-            : null;
+        let staffAppAccess = null;
 
         await transaction.commit();
+
+        if (isServiceProvider) {
+            const staffTransaction = await db.sequelize.transaction();
+            try {
+                staffAppAccess = await syncStaffAuthAccount({
+                    tenantId,
+                    nextEmail: normalizedEmail,
+                    password: accessPassword,
+                    transaction: staffTransaction
+                });
+                await staffTransaction.commit();
+            } catch (staffError) {
+                await staffTransaction.rollback();
+                console.error('Staff app sync error (create employee):', staffError);
+            }
+        }
 
         let dashboardAccess = null;
         if (!isServiceProvider) {
@@ -1429,24 +1438,33 @@ exports.updateEmployee = async (req, res) => {
         }
 
         const accessPassword = staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null;
-        const staffAppAccess = isServiceProvider
-            ? await syncStaffAuthAccount({
-                tenantId,
-                previousEmail,
-                nextEmail: employee.email,
-                password: accessPassword,
-                transaction
-            })
-            : await syncStaffAuthAccount({
-                tenantId,
-                previousEmail,
-                nextEmail: null,
-                transaction
-            });
+        let staffAppAccess = null;
         let dashboardAccess = null;
 
         await employee.save({ transaction });
         await transaction.commit();
+
+        const staffTransaction = await db.sequelize.transaction();
+        try {
+            staffAppAccess = isServiceProvider
+                ? await syncStaffAuthAccount({
+                    tenantId,
+                    previousEmail,
+                    nextEmail: employee.email,
+                    password: accessPassword,
+                    transaction: staffTransaction
+                })
+                : await syncStaffAuthAccount({
+                    tenantId,
+                    previousEmail,
+                    nextEmail: null,
+                    transaction: staffTransaction
+                });
+            await staffTransaction.commit();
+        } catch (staffError) {
+            await staffTransaction.rollback();
+            console.error('Staff app sync error (update employee):', staffError);
+        }
 
         const dashboardTransaction = await db.sequelize.transaction();
         try {
