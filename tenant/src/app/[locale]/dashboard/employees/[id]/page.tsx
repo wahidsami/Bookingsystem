@@ -93,6 +93,8 @@ export default function EditEmployeePage() {
   );
   const [dashboardInviteLoading, setDashboardInviteLoading] = useState(false);
   const [dashboardResetLoading, setDashboardResetLoading] = useState(false);
+  const [scheduleStartDate, setScheduleStartDate] = useState("");
+  const [scheduleEndDate, setScheduleEndDate] = useState("");
   const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
   const dashboardRoleLabel = ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)
     ? (locale === 'ar'
@@ -140,7 +142,7 @@ export default function EditEmployeePage() {
       Boolean(photoPreview || existingPhoto)
     ];
     const financeFields = [salaryValue > 0];
-    const scheduleFields = [formData.scheduleVisibilityWeeks.trim()];
+    const scheduleFields = [formData.scheduleVisibilityWeeks.trim(), scheduleStartDate.trim(), scheduleEndDate.trim()];
     const accessFields = isServiceProvider
       ? [appEnabled || Boolean(savedEmail)]
       : [Object.values(dashboardPermissions).some(Boolean)];
@@ -170,8 +172,10 @@ export default function EditEmployeePage() {
     isServiceProvider,
     photoPreview,
     savedEmail,
-    salaryValue
-  ]);
+    salaryValue,
+    scheduleStartDate,
+    scheduleEndDate
+  ]); 
 
   const editorSections: EmployeeEditorSection[] = [
     {
@@ -208,7 +212,6 @@ export default function EditEmployeePage() {
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId as typeof activeSection);
-    document.getElementById(`employee-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   useEffect(() => {
@@ -1007,7 +1010,7 @@ export default function EditEmployeePage() {
             </div>
 
             {/* Financial Information */}
-            <div id="employee-section-basic" className="card scroll-mt-6">
+            <div id="employee-section-basic" className={`${activeSection === 'basic' ? 'card scroll-mt-6' : 'hidden'}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'المعلومات المالية' : 'Financial Information'}
               </h3>
@@ -1104,7 +1107,7 @@ export default function EditEmployeePage() {
 
               </div>
 
-            <section id="employee-section-schedule" className="card scroll-mt-6 space-y-4">
+            <section id="employee-section-schedule" className={`${activeSection === 'schedule' ? 'card scroll-mt-6 space-y-4' : 'hidden'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -1143,6 +1146,34 @@ export default function EditEmployeePage() {
                       ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
                       : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
                   </p>
+
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'تاريخ بداية الجدول' : 'Schedule start date'}
+                      </label>
+                      <input
+                        type="date"
+                        value={scheduleStartDate}
+                        onChange={(event) => setScheduleStartDate(event.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'تاريخ نهاية الجدول' : 'Schedule end date'}
+                      </label>
+                      <input
+                        type="date"
+                        value={scheduleEndDate}
+                        onChange={(event) => setScheduleEndDate(event.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <EmployeeWeeklyScheduleEditor
@@ -1150,12 +1181,18 @@ export default function EditEmployeePage() {
                   employeeName={formData.name || undefined}
                   locale={locale}
                   isRTL={isRTL}
+                  sharedStartDate={scheduleStartDate || null}
+                  sharedEndDate={scheduleEndDate || null}
+                  onSharedRangeChange={({ startDate, endDate }) => {
+                    setScheduleStartDate(startDate || "");
+                    setScheduleEndDate(endDate || "");
+                  }}
                 />
               </div>
             </section>
 
             {/* Active Status */}
-            <div id="employee-section-bio" className="card scroll-mt-6">
+            <div id="employee-section-bio" className={`${activeSection === 'bio' ? 'card scroll-mt-6' : 'hidden'}`}>
               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <input
                   type="checkbox"
@@ -1171,7 +1208,7 @@ export default function EditEmployeePage() {
             {isServiceProvider ? (
               <>
                 {/* App Access Management */}
-            <div id="employee-section-finance" className="card scroll-mt-6">
+            <div id="employee-section-finance" className={`${activeSection === 'finance' ? 'card scroll-mt-6' : 'hidden'}`}>
                   <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'وصول التطبيق' : 'App Access'}
                   </h3>
@@ -1314,7 +1351,7 @@ export default function EditEmployeePage() {
                 </div>
               </>
             ) : (
-            <div id="employee-section-access" className="card scroll-mt-6">
+            <div id="employee-section-access" className={`${activeSection === 'access' ? 'card scroll-mt-6' : 'hidden'}`}>
                 <div className="mb-4 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>

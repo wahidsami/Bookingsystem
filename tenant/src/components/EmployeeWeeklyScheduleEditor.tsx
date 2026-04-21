@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { tenantApi } from "@/lib/api";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { CalendarIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -26,6 +26,9 @@ interface EmployeeWeeklyScheduleEditorProps {
   draftMode?: boolean;
   draftShifts?: ShiftRecord[];
   onDraftShiftsChange?: (shifts: ShiftRecord[]) => void;
+  sharedStartDate?: string | null;
+  sharedEndDate?: string | null;
+  onSharedRangeChange?: (range: { startDate: string | null; endDate: string | null }) => void;
 }
 
 const WEEK_DAYS = [
@@ -56,15 +59,15 @@ function normalizeShift(shift: Partial<ShiftRecord>): ShiftRecord {
   };
 }
 
-function buildShiftPayload(shift: ShiftRecord) {
+function buildShiftPayload(shift: ShiftRecord, sharedStartDate: string | null, sharedEndDate: string | null) {
   return {
     isRecurring: true,
     dayOfWeek: shift.dayOfWeek,
     specificDate: null,
     startTime: shift.startTime,
     endTime: shift.endTime,
-    startDate: shift.startDate || null,
-    endDate: shift.endDate || null,
+    startDate: sharedStartDate || shift.startDate || null,
+    endDate: sharedEndDate || shift.endDate || null,
     label: shift.label?.trim() || null,
     isActive: shift.isActive
   };
@@ -77,13 +80,17 @@ export function EmployeeWeeklyScheduleEditor({
   isRTL,
   draftMode = false,
   draftShifts,
-  onDraftShiftsChange
+  onDraftShiftsChange,
+  sharedStartDate = null,
+  sharedEndDate = null,
+  onSharedRangeChange
 }: EmployeeWeeklyScheduleEditorProps) {
   const dialog = useAppDialog();
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const isDraftMode = draftMode && !employeeId;
+  const lastReportedRangeRef = useRef<string>("");
 
   const setShiftsAndMirror = (updater: React.SetStateAction<ShiftRecord[]>) => {
     setShifts((current) => {
@@ -129,6 +136,71 @@ export function EmployeeWeeklyScheduleEditor({
 
     void loadShifts();
   }, [draftShifts, employeeId, isDraftMode]);
+
+  useEffect(() => {
+    if (isDraftMode || !employeeId || !onSharedRangeChange) {
+      return;
+    }
+
+    const recurringShifts = shifts.filter((shift) => shift.isRecurring !== false && shift.dayOfWeek !== null);
+    const firstRange = recurringShifts.find((shift) => shift.startDate || shift.endDate);
+    const nextRange = {
+      startDate: firstRange?.startDate || null,
+      endDate: firstRange?.endDate || null
+    };
+    const signature = `${nextRange.startDate || ""}|${nextRange.endDate || ""}`;
+
+    if (signature !== lastReportedRangeRef.current) {
+      lastReportedRangeRef.current = signature;
+      onSharedRangeChange(nextRange);
+    }
+  }, [employeeId, isDraftMode, onSharedRangeChange, shifts]);
+
+  useEffect(() => {
+    if (isDraftMode || !employeeId) {
+      return;
+    }
+
+    const targetStart = sharedStartDate || null;
+    const targetEnd = sharedEndDate || null;
+
+    if (!targetStart && !targetEnd) {
+      return;
+    }
+
+    const recurringShifts = shifts.filter((shift) => shift.isRecurring !== false && shift.dayOfWeek !== null);
+    const needsSync = recurringShifts.some((shift) => (shift.startDate || null) !== targetStart || (shift.endDate || null) !== targetEnd);
+    if (!needsSync) {
+      return;
+    }
+
+    const syncRange = async () => {
+      setSavingKey("schedule-range");
+      try {
+        const nextShifts = shifts.map((shift) =>
+          shift.isRecurring !== false && shift.dayOfWeek !== null
+            ? { ...shift, startDate: targetStart, endDate: targetEnd }
+            : shift
+        );
+        setShiftsAndMirror(nextShifts);
+
+        await Promise.allSettled(
+          recurringShifts.map((shift) =>
+            tenantApi.updateEmployeeShift(employeeId, shift.id, {
+              ...buildShiftPayload({ ...shift, startDate: targetStart, endDate: targetEnd }, targetStart, targetEnd),
+              isActive: shift.isActive
+            })
+          )
+        );
+      } catch (err) {
+        console.warn("Failed to sync shared schedule range:", err);
+      } finally {
+        setSavingKey(null);
+      }
+    };
+
+    void syncRange();
+  }, [employeeId, isDraftMode, sharedEndDate, sharedStartDate, shifts]);
 
   const groupedShifts = useMemo(() => {
     const groups = new Map<number, ShiftRecord[]>();
@@ -176,7 +248,11 @@ export function EmployeeWeeklyScheduleEditor({
 
     setSavingKey(shiftId);
     try {
-      const response = await tenantApi.updateEmployeeShift(employeeId, shiftId, buildShiftPayload(currentShift));
+      const response = await tenantApi.updateEmployeeShift(
+        employeeId,
+        shiftId,
+        buildShiftPayload(currentShift, sharedStartDate, sharedEndDate)
+      );
       const updatedShift = normalizeShift(response?.shift || response?.data?.shift || currentShift);
       setShiftsAndMirror((current) => current.map((shift) => (shift.id === shiftId ? updatedShift : shift)));
     } catch (err: any) {
@@ -226,8 +302,8 @@ export function EmployeeWeeklyScheduleEditor({
         startTime: DEFAULT_START,
         endTime: DEFAULT_END,
         isRecurring: true,
-        startDate: null,
-        endDate: null,
+        startDate: sharedStartDate || null,
+        endDate: sharedEndDate || null,
         label: undefined
       });
 
@@ -286,10 +362,10 @@ export function EmployeeWeeklyScheduleEditor({
       try {
         await Promise.all(
           dayShifts.map((shift) =>
-            tenantApi.updateEmployeeShift(employeeId, shift.id, {
-              ...buildShiftPayload(shift),
-              isActive: false
-            })
+              tenantApi.updateEmployeeShift(employeeId, shift.id, {
+                ...buildShiftPayload(shift, sharedStartDate, sharedEndDate),
+                isActive: false
+              })
           )
         );
         setShiftsAndMirror((current) =>
@@ -322,7 +398,7 @@ export function EmployeeWeeklyScheduleEditor({
           .filter((shift) => shift.isActive === false)
           .map((shift) =>
             tenantApi.updateEmployeeShift(employeeId, shift.id, {
-              ...buildShiftPayload(shift),
+              ...buildShiftPayload(shift, sharedStartDate, sharedEndDate),
               isActive: true
             })
           )
@@ -498,7 +574,7 @@ export function EmployeeWeeklyScheduleEditor({
                     {enabled && dayShifts.length > 0 ? (
                       dayShifts.map((shift) => (
                         <div key={shift.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                          <div className={`grid gap-3 ${isRTL ? 'lg:grid-cols-[1fr,1fr,1fr,1fr,auto]' : 'lg:grid-cols-[1fr,1fr,1fr,1fr,auto]'}`}>
+                          <div className={`grid gap-3 ${isRTL ? 'lg:grid-cols-[1fr,1fr,1fr,auto]' : 'lg:grid-cols-[1fr,1fr,1fr,auto]'}`}>
                             <div>
                               <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                                 {locale === "ar" ? "من" : "From"}
@@ -520,32 +596,6 @@ export function EmployeeWeeklyScheduleEditor({
                                 type="time"
                                 value={shift.endTime}
                                 onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, endTime: event.target.value }))}
-                                onBlur={() => void persistShift(shift.id)}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                                disabled={Boolean(savingKey)}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                                {locale === "ar" ? "من تاريخ" : "Start date"}
-                              </label>
-                              <input
-                                type="date"
-                                value={shift.startDate || ""}
-                                onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, startDate: event.target.value || null }))}
-                                onBlur={() => void persistShift(shift.id)}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                                disabled={Boolean(savingKey)}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                                {locale === "ar" ? "إلى تاريخ" : "End date"}
-                              </label>
-                              <input
-                                type="date"
-                                value={shift.endDate || ""}
-                                onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, endDate: event.target.value || null }))}
                                 onBlur={() => void persistShift(shift.id)}
                                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
                                 disabled={Boolean(savingKey)}
