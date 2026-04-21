@@ -612,8 +612,9 @@ export function EmployeeWeeklyScheduleEditor({
             const dayShifts = groupedShifts.get(day.value) || [];
             const activeShifts = dayShifts.filter((shift) => shift.isActive !== false);
             const mainShift = activeShifts.find((shift) => !shift.isDraft) || activeShifts[0] || null;
-            const draftShiftsForDay = dayShifts.filter((shift) => shift.isDraft);
-            const enabled = activeShifts.length > 0 || draftShiftsForDay.length > 0;
+            const nestedShifts = dayShifts.filter((shift) => mainShift ? shift.id !== mainShift.id : true);
+            const enabled = activeShifts.length > 0 || nestedShifts.length > 0;
+            const hasVisibleRows = enabled || nestedShifts.length > 0;
 
             return (
               <div key={day.value} className="p-4 lg:p-5">
@@ -631,15 +632,15 @@ export function EmployeeWeeklyScheduleEditor({
                         {locale === "ar" ? day.labelAr : day.labelEn}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {enabled
+                      {hasVisibleRows
                           ? (locale === "ar" ? `${dayShifts.length} وردية` : `${dayShifts.length} shift${dayShifts.length === 1 ? "" : "s"}`)
                           : (locale === "ar" ? "غير عامل" : "Not working")}
-                      </div>
                     </div>
+                  </div>
                   </div>
 
                   <div>
-                    {enabled && mainShift ? (
+                    {hasVisibleRows && mainShift ? (
                       <select
                         value={mainShift.startTime}
                         onChange={(event) => updateLocalShift(mainShift.id, (current) => ({ ...current, startTime: event.target.value }))}
@@ -659,7 +660,7 @@ export function EmployeeWeeklyScheduleEditor({
                   </div>
 
                   <div>
-                    {enabled && mainShift ? (
+                    {hasVisibleRows && mainShift ? (
                       <select
                         value={mainShift.endTime}
                         onChange={(event) => updateLocalShift(mainShift.id, (current) => ({ ...current, endTime: event.target.value }))}
@@ -683,7 +684,7 @@ export function EmployeeWeeklyScheduleEditor({
                       type="button"
                       onClick={() => createDraftSubShift(day.value)}
                       className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
-                      disabled={Boolean(savingKey) || !enabled}
+                      disabled={Boolean(savingKey) || !hasVisibleRows}
                       aria-label={locale === "ar" ? "إضافة وردية فرعية" : "Add sub shift"}
                     >
                       <PlusIcon className="h-5 w-5" />
@@ -691,7 +692,7 @@ export function EmployeeWeeklyScheduleEditor({
                   </div>
 
                   <div className={`flex items-start ${isRTL ? 'justify-start' : 'justify-end'}`}>
-                    {enabled && mainShift ? (
+                    {hasVisibleRows && mainShift ? (
                       <button
                         type="button"
                         onClick={() => void handleDeleteShift(mainShift.id)}
@@ -705,26 +706,28 @@ export function EmployeeWeeklyScheduleEditor({
                   </div>
                 </div>
 
-                {enabled && draftShiftsForDay.length > 0 ? (
+                {nestedShifts.length > 0 ? (
                   <div className="mt-4 space-y-3 border-t border-dashed border-gray-200 pt-4">
-                    {draftShiftsForDay.map((shift) => (
+                    {nestedShifts.map((shift) => (
                       <div key={shift.id} className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[1.1fr,1fr,1fr,0.8fr,0.8fr]">
                         <div className="flex items-center gap-3">
                           <div className="h-px w-10 bg-gray-300" />
-                          <input
-                            type="text"
-                            value={shift.label || ""}
-                            onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, label: event.target.value }))}
-                            placeholder={locale === "ar" ? "عنوان الوردية" : "Shift title"}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                            disabled={Boolean(savingKey)}
-                            style={{ textAlign: isRTL ? 'right' : 'left' }}
-                          />
+                        <input
+                          type="text"
+                          value={shift.label || ""}
+                          onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, label: event.target.value }))}
+                          onBlur={() => !shift.isDraft && void saveShiftRow(shift)}
+                          placeholder={locale === "ar" ? "عنوان الوردية" : "Shift title"}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                          disabled={Boolean(savingKey)}
+                          style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        />
                         </div>
 
                         <select
                           value={shift.startTime}
                           onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, startTime: event.target.value }))}
+                          onBlur={() => !shift.isDraft && void saveShiftRow(shift)}
                           className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
                           disabled={Boolean(savingKey)}
                         >
@@ -736,6 +739,7 @@ export function EmployeeWeeklyScheduleEditor({
                         <select
                           value={shift.endTime}
                           onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, endTime: event.target.value }))}
+                          onBlur={() => !shift.isDraft && void saveShiftRow(shift)}
                           className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
                           disabled={Boolean(savingKey)}
                         >
@@ -745,17 +749,23 @@ export function EmployeeWeeklyScheduleEditor({
                         </select>
 
                         <div className="flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => void saveShiftRow(shift)}
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
-                            disabled={Boolean(savingKey)}
-                            aria-label={locale === "ar" ? "حفظ الوردية الفرعية" : "Save sub shift"}
-                          >
-                            <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 10l4 4 8-8" />
-                            </svg>
-                          </button>
+                          {shift.isDraft ? (
+                            <button
+                              type="button"
+                              onClick={() => void saveShiftRow(shift)}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
+                              disabled={Boolean(savingKey)}
+                              aria-label={locale === "ar" ? "حفظ الوردية الفرعية" : "Save sub shift"}
+                            >
+                              <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 10l4 4 8-8" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                              {locale === "ar" ? "محفوظ" : "Saved"}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-end">
