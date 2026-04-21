@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const { normalizeEmployeePosition, VALID_EMPLOYEE_POSITIONS } = require('../utils/employeePositions');
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
 const DEFAULT_STAFF_PERMISSIONS = {
@@ -233,6 +234,7 @@ exports.getEmployees = async (req, res) => {
                 'email',
                 'phone',
                 'nationality',
+                'position',
                 'bio',
                 'experience',
                 'skills',
@@ -284,6 +286,7 @@ exports.getEmployee = async (req, res) => {
                 'email',
                 'phone',
                 'nationality',
+                'position',
                 'bio',
                 'experience',
                 'skills',
@@ -713,6 +716,7 @@ exports.createEmployee = async (req, res) => {
             email,
             phone,
             nationality,
+            position,
             bio,
             experience,
             skills,
@@ -749,7 +753,23 @@ exports.createEmployee = async (req, res) => {
         }
 
         const normalizedEmail = email && email.trim() ? normalizeEmail(email) : null;
+        const positionValue = `${position ?? ''}`.trim();
+        const normalizedPosition = normalizeEmployeePosition(positionValue);
         const parsedScheduleVisibilityWeeks = parseScheduleVisibilityWeeks(scheduleVisibilityWeeks, 1);
+        if (!positionValue) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Employee position is required'
+            });
+        }
+        if (!normalizedPosition) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Invalid employee position. Allowed values: ${VALID_EMPLOYEE_POSITIONS.join(', ')}`
+            });
+        }
         if (staffAppPassword && staffAppPassword.length < 8) {
             await transaction.rollback();
             return res.status(400).json({
@@ -1001,6 +1021,7 @@ exports.createEmployee = async (req, res) => {
             email: normalizedEmail,
             phone: phone && phone.trim() ? phone.trim() : null,
             nationality: nationality && nationality.trim() ? nationality.trim() : null,
+            position: normalizedPosition,
             bio: bio && bio.trim() ? bio.trim() : null,
             experience: experience && experience.trim() ? experience.trim() : null,
             skills: skillsForDB, // JavaScript array - JSONB should handle this correctly
@@ -1090,6 +1111,7 @@ exports.updateEmployee = async (req, res) => {
             email,
             phone,
             nationality,
+            position,
             bio,
             experience,
             skills,
@@ -1158,6 +1180,18 @@ exports.updateEmployee = async (req, res) => {
         if (email !== undefined) employee.email = email && email.trim() ? normalizeEmail(email) : null;
         if (phone !== undefined) employee.phone = phone || null;
         if (nationality !== undefined) employee.nationality = nationality || null;
+        if (position !== undefined) {
+            const positionValue = `${position}`.trim();
+            const normalizedPosition = normalizeEmployeePosition(positionValue);
+            if (positionValue && !normalizedPosition) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid employee position. Allowed values: ${VALID_EMPLOYEE_POSITIONS.join(', ')}`
+                });
+            }
+            employee.position = normalizedPosition;
+        }
         if (bio !== undefined) employee.bio = bio || null;
         if (experience !== undefined) employee.experience = experience || null;
         if (salary !== undefined) employee.salary = parseFloat(salary);

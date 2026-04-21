@@ -102,6 +102,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             comment: 'Employee nationality (e.g., "Saudi", "Egyptian", "Filipino")'
         },
+        position: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Employee job title or position'
+        },
         bio: {
             type: DataTypes.TEXT,
             allowNull: true,

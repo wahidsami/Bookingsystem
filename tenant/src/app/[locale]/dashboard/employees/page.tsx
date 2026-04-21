@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { getEmployeePositionLabel } from "@/lib/employeePositions";
 
 interface Employee {
   id: string;
@@ -15,6 +16,7 @@ interface Employee {
   email?: string;
   phone?: string;
   nationality?: string;
+  position?: string;
   bio?: string;
   experience?: string;
   skills: string[];
@@ -256,6 +258,11 @@ export default function EmployeesPage() {
               {/* Employee Info */}
               <div className="text-center mb-4">
                 <h3 className="text-xl font-bold text-gray-900 mb-1">{employee.name}</h3>
+                {employee.position && (
+                  <p className="text-sm font-semibold text-primary mb-2">
+                    {getEmployeePositionLabel(employee.position, locale as 'ar' | 'en')}
+                  </p>
+                )}
                 {employee.nationality && (
                   <p className="text-sm text-gray-600 mb-2">🌍 {employee.nationality}</p>
                 )}

@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { EMPLOYEE_POSITIONS } from "@/lib/employeePositions";
 
 const NATIONALITIES = [
   "Saudi", "Egyptian", "Filipino", "Indian", "Pakistani", 
@@ -28,6 +29,7 @@ export default function NewEmployeePage() {
     email: "",
     phone: "",
     nationality: "",
+    position: "",
     bio: "",
     experience: "",
     skills: [] as string[],
@@ -93,6 +95,7 @@ export default function NewEmployeePage() {
       if (formData.email) submitData.append("email", formData.email);
       if (formData.phone) submitData.append("phone", formData.phone);
       if (formData.nationality) submitData.append("nationality", formData.nationality);
+      if (formData.position) submitData.append("position", formData.position);
       if (formData.bio) submitData.append("bio", formData.bio);
       if (formData.experience) submitData.append("experience", formData.experience);
       submitData.append("skills", JSON.stringify(formData.skills));
@@ -228,6 +231,31 @@ export default function NewEmployeePage() {
                       <option key={nat} value={nat}>{nat}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الوظيفة / المسمى الوظيفي' : 'Position / Job Title'} <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="position"
+                    value={formData.position}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    {EMPLOYEE_POSITIONS.map((option) => (
+                      <option key={option.value || 'placeholder'} value={option.value}>
+                        {option.label[locale as 'ar' | 'en'] || option.label.en}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar'
+                      ? 'يظهر هذا المسمى داخل قائمة الموظفين ويساعد لاحقاً في تنظيم صلاحيات الحساب.'
+                      : 'This title appears in employee lists and helps organize future account permissions.'}
+                  </p>
                 </div>
 
                 <div>
