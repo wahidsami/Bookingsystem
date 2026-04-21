@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS } from "@/lib/employeePositions";
+import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
 
 const NATIONALITIES = [
   "Saudi", "Egyptian", "Filipino", "Indian", "Pakistani", 
@@ -24,6 +25,7 @@ export default function NewEmployeePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [tenantTaxRate, setTenantTaxRate] = useState(15);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -34,14 +36,41 @@ export default function NewEmployeePage() {
     bio: "",
     experience: "",
     skills: [] as string[],
+    spokenLanguages: [] as string[],
     salary: "",
     commissionRate: "",
+    serviceCommissionEnabled: false,
+    productCommissionEnabled: false,
     scheduleVisibilityWeeks: "1",
     isActive: true
   });
   const [newSkill, setNewSkill] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await tenantApi.getSettings();
+        const taxRate = Number(response?.data?.settings?.taxRate ?? response?.data?.settings?.tax_rate ?? 15);
+        if (!Number.isNaN(taxRate)) {
+          setTenantTaxRate(taxRate);
+        }
+      } catch (settingsErr) {
+        console.warn("Failed to load tenant settings for finance preview:", settingsErr);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  const salaryValue = Number(formData.salary || 0);
+  const vatAmount = useMemo(() => {
+    if (!salaryValue || Number.isNaN(salaryValue)) {
+      return 0;
+    }
+    return salaryValue * (tenantTaxRate / 100);
+  }, [salaryValue, tenantTaxRate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -69,6 +98,18 @@ export default function NewEmployeePage() {
       ...prev,
       skills: prev.skills.filter(s => s !== skill)
     }));
+  };
+
+  const toggleLanguage = (languageValue: string) => {
+    setFormData((prev) => {
+      const exists = prev.spokenLanguages.includes(languageValue);
+      return {
+        ...prev,
+        spokenLanguages: exists
+          ? prev.spokenLanguages.filter((item) => item !== languageValue)
+          : [...prev.spokenLanguages, languageValue]
+      };
+    });
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,8 +142,11 @@ export default function NewEmployeePage() {
       if (formData.bio) submitData.append("bio", formData.bio);
       if (formData.experience) submitData.append("experience", formData.experience);
       submitData.append("skills", JSON.stringify(formData.skills));
+      submitData.append("spokenLanguages", JSON.stringify(formData.spokenLanguages));
       submitData.append("salary", formData.salary);
       submitData.append("commissionRate", formData.commissionRate || "0");
+      submitData.append("serviceCommissionEnabled", String(formData.serviceCommissionEnabled));
+      submitData.append("productCommissionEnabled", String(formData.productCommissionEnabled));
       submitData.append("scheduleVisibilityWeeks", formData.scheduleVisibilityWeeks || "1");
       submitData.append("isActive", formData.isActive.toString());
       // Note: workingHours removed - use Schedules section to manage employee schedules
@@ -356,6 +400,30 @@ export default function NewEmployeePage() {
                     ))}
                   </div>
                 )}
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'اللغات المتحدثة' : 'Spoken languages'}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {EMPLOYEE_LANGUAGE_OPTIONS.map((option) => {
+                      const checked = formData.spokenLanguages.includes(option.value);
+                      return (
+                        <label key={option.value} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            {option.label[locale as 'ar' | 'en'] || option.label.en}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleLanguage(option.value)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -451,6 +519,60 @@ export default function NewEmployeePage() {
                   />
                 </div>
 
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'عمولة الخدمات' : 'Service commission'}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'تحديد ما إذا كان هذا الموظف يظهر في خدمات العمولات.' : 'Controls whether this employee is included in service commission flows.'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.serviceCommissionEnabled}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, serviceCommissionEnabled: e.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'عمولة المنتجات' : 'Product commission'}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'تحديد ما إذا كان هذا الموظف يظهر في منتجات العمولات.' : 'Controls whether this employee is included in product commission flows.'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.productCommissionEnabled}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, productCommissionEnabled: e.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                  </div>
+
+                  <div className="rounded-lg bg-white p-3 text-sm text-gray-600">
+                    <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <span>{locale === 'ar' ? 'الراتب قبل الضريبة' : 'Salary before VAT'}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <span>{locale === 'ar' ? 'قيمة الضريبة التقديرية' : 'Estimated VAT'}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <span className="font-medium text-gray-700">{locale === 'ar' ? 'الإجمالي التقريبي' : 'Estimated total'}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar'
+                        ? `تم احتساب الضريبة على معدل ${tenantTaxRate}% من إعدادات المركز الحالية.`
+                        : `VAT is estimated using the current tenant tax rate of ${tenantTaxRate}%.`}
+                    </p>
+                  </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule Visibility'}
@@ -490,6 +612,7 @@ export default function NewEmployeePage() {
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Form Actions */}

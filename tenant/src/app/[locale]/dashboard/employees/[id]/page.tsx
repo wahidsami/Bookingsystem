@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
@@ -9,6 +9,7 @@ import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
+import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
 import {
   DASHBOARD_PERMISSION_KEYS,
   SECTION_PERMISSION_LABELS,
@@ -33,9 +34,12 @@ interface Employee {
   bio?: string;
   experience?: string;
   skills: string[];
+  spokenLanguages?: string[];
   photo?: string;
   salary: number;
   commissionRate: number;
+  serviceCommissionEnabled?: boolean;
+  productCommissionEnabled?: boolean;
   scheduleVisibilityWeeks?: number;
   dashboardPermissions?: Record<string, boolean>;
   // workingHours removed - use Schedules section instead
@@ -65,8 +69,11 @@ export default function EditEmployeePage() {
     bio: "",
     experience: "",
     skills: [] as string[],
+    spokenLanguages: [] as string[],
     salary: "",
     commissionRate: "",
+    serviceCommissionEnabled: false,
+    productCommissionEnabled: false,
     scheduleVisibilityWeeks: "1",
     isActive: true
   });
@@ -74,6 +81,7 @@ export default function EditEmployeePage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [existingPhoto, setExistingPhoto] = useState<string | null>(null);
+  const [tenantTaxRate, setTenantTaxRate] = useState(15);
   const [savedEmail, setSavedEmail] = useState("");
   const isServiceProvider = `${formData.position || ''}`.trim() === 'service_provider';
   const [dashboardAccountId, setDashboardAccountId] = useState<string | null>(null);
@@ -89,6 +97,13 @@ export default function EditEmployeePage() {
       ? ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelAr
       : ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelEn)
     : dashboardRoleKey;
+  const salaryValue = Number(formData.salary || 0);
+  const vatAmount = useMemo(() => {
+    if (!salaryValue || Number.isNaN(salaryValue)) {
+      return 0;
+    }
+    return salaryValue * (tenantTaxRate / 100);
+  }, [salaryValue, tenantTaxRate]);
 
   // App Access State
   const [appEnabled, setAppEnabled] = useState(false);
@@ -112,6 +127,22 @@ export default function EditEmployeePage() {
     }
   }, [id]);
 
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await tenantApi.getSettings();
+        const taxRate = Number(response?.data?.settings?.taxRate ?? response?.data?.settings?.tax_rate ?? 15);
+        if (!Number.isNaN(taxRate)) {
+          setTenantTaxRate(taxRate);
+        }
+      } catch (settingsErr) {
+        console.warn("Failed to load tenant settings for finance preview:", settingsErr);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
   const loadEmployee = async () => {
     try {
       setLoading(true);
@@ -134,8 +165,11 @@ export default function EditEmployeePage() {
           bio: emp.bio || "",
           experience: emp.experience || "",
           skills: emp.skills || [],
+          spokenLanguages: Array.isArray(emp.spokenLanguages) ? emp.spokenLanguages : [],
           salary: emp.salary?.toString() || "",
           commissionRate: emp.commissionRate?.toString() || "",
+          serviceCommissionEnabled: emp.serviceCommissionEnabled ?? false,
+          productCommissionEnabled: emp.productCommissionEnabled ?? false,
           scheduleVisibilityWeeks: `${emp.scheduleVisibilityWeeks || 1}`,
           isActive: emp.isActive !== undefined ? emp.isActive : true
           // Note: workingHours removed - use Schedules section to manage employee schedules
@@ -227,6 +261,18 @@ export default function EditEmployeePage() {
       ...prev,
       skills: prev.skills.filter(s => s !== skill)
     }));
+  };
+
+  const toggleLanguage = (languageValue: string) => {
+    setFormData((prev) => {
+      const exists = prev.spokenLanguages.includes(languageValue);
+      return {
+        ...prev,
+        spokenLanguages: exists
+          ? prev.spokenLanguages.filter((item) => item !== languageValue)
+          : [...prev.spokenLanguages, languageValue]
+      };
+    });
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -536,8 +582,11 @@ export default function EditEmployeePage() {
       if (formData.bio) submitData.append("bio", formData.bio);
       if (formData.experience) submitData.append("experience", formData.experience);
       submitData.append("skills", JSON.stringify(formData.skills));
+      submitData.append("spokenLanguages", JSON.stringify(formData.spokenLanguages));
       submitData.append("salary", formData.salary);
       submitData.append("commissionRate", formData.commissionRate || "0");
+      submitData.append("serviceCommissionEnabled", String(formData.serviceCommissionEnabled));
+      submitData.append("productCommissionEnabled", String(formData.productCommissionEnabled));
       submitData.append("scheduleVisibilityWeeks", formData.scheduleVisibilityWeeks || "1");
       submitData.append("isActive", formData.isActive.toString());
       if (!isServiceProvider) {
@@ -799,6 +848,30 @@ export default function EditEmployeePage() {
                     ))}
                   </div>
                 )}
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'اللغات المتحدثة' : 'Spoken languages'}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {EMPLOYEE_LANGUAGE_OPTIONS.map((option) => {
+                      const checked = formData.spokenLanguages?.includes(option.value) || false;
+                      return (
+                        <label key={option.value} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            {option.label[locale as 'ar' | 'en'] || option.label.en}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleLanguage(option.value)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -893,6 +966,60 @@ export default function EditEmployeePage() {
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'عمولة الخدمات' : 'Service commission'}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'تحديد ما إذا كان هذا الموظف يظهر في خدمات العمولات.' : 'Controls whether this employee is included in service commission flows.'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.serviceCommissionEnabled || false}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, serviceCommissionEnabled: e.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'عمولة المنتجات' : 'Product commission'}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'تحديد ما إذا كان هذا الموظف يظهر في منتجات العمولات.' : 'Controls whether this employee is included in product commission flows.'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.productCommissionEnabled || false}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, productCommissionEnabled: e.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                  </div>
+
+                  <div className="rounded-lg bg-white p-3 text-sm text-gray-600">
+                    <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <span>{locale === 'ar' ? 'الراتب قبل الضريبة' : 'Salary before VAT'}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <span>{locale === 'ar' ? 'قيمة الضريبة التقديرية' : 'Estimated VAT'}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <span className="font-medium text-gray-700">{locale === 'ar' ? 'الإجمالي التقريبي' : 'Estimated total'}</span>
+                      <span className="font-semibold text-gray-900"><Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar'
+                        ? `تم احتساب الضريبة على معدل ${tenantTaxRate}% من إعدادات المركز الحالية.`
+                        : `VAT is estimated using the current tenant tax rate of ${tenantTaxRate}%.`}
+                    </p>
+                  </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -1174,6 +1301,7 @@ export default function EditEmployeePage() {
             )}
 
           </div>
+        </div>
         </div>
 
         {/* Form Actions */}

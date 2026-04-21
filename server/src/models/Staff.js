@@ -127,6 +127,11 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: [],
             comment: 'Array of skills (e.g., ["Haircut", "Coloring", "Styling"])'
         },
+        spokenLanguages: {
+            type: DataTypes.JSONB,
+            defaultValue: [],
+            comment: 'Array of spoken languages for employee profile'
+        },
         dashboardPermissions: {
             type: DataTypes.JSONB,
             allowNull: false,
@@ -161,6 +166,16 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DECIMAL(5, 2),
             defaultValue: 0.00,
             comment: 'Commission percentage per service (e.g., 10.00 for 10%)'
+        },
+        serviceCommissionEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+            comment: 'Whether the employee receives service commissions'
+        },
+        productCommissionEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+            comment: 'Whether the employee receives product commissions'
         },
         // Legacy commission field (for backward compatibility)
         commission: {

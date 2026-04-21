@@ -58,6 +58,69 @@ const parsePaginationValue = (value, fallback, min, max) => {
     return Math.min(Math.max(parsed, min), max);
 };
 
+const parseBooleanField = (value, fallback = false) => {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+
+    const normalized = `${value}`.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) {
+        return true;
+    }
+
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+        return false;
+    }
+
+    return fallback;
+};
+
+const parseStringArrayField = (value, fallback = []) => {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => `${item || ''}`.trim()).filter(Boolean);
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return fallback;
+        }
+
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                return parsed.map((item) => `${item || ''}`.trim()).filter(Boolean);
+            }
+
+            if (typeof parsed === 'string') {
+                return parseStringArrayField(parsed, fallback);
+            }
+        } catch (parseError) {
+            // Fall through to comma-separated parsing below.
+        }
+
+        return trimmed.split(',').map((item) => `${item || ''}`.trim()).filter(Boolean);
+    }
+
+    if (typeof value === 'object') {
+        return Object.values(value).map((item) => `${item || ''}`.trim()).filter(Boolean);
+    }
+
+    return fallback;
+};
+
 const getEmployeeSortOrder = (sortBy) => {
     const normalizedSortBy = `${sortBy || 'alphabetical'}`.trim().toLowerCase();
 
@@ -982,8 +1045,11 @@ exports.createEmployee = async (req, res) => {
             bio,
             experience,
             skills,
+            spokenLanguages,
             salary,
             commissionRate,
+            serviceCommissionEnabled,
+            productCommissionEnabled,
             scheduleVisibilityWeeks,
             staffAppPassword,
             dashboardPermissions,
@@ -1146,6 +1212,10 @@ exports.createEmployee = async (req, res) => {
             console.error('❌ CRITICAL: skillsArray is not an array! Type:', typeof skillsArray, 'Value:', skillsArray);
             skillsArray = [];
         }
+
+        const spokenLanguagesArray = parseStringArrayField(spokenLanguages, []);
+        const serviceCommissionEnabledBool = parseBooleanField(serviceCommissionEnabled, false);
+        const productCommissionEnabledBool = parseBooleanField(productCommissionEnabled, false);
         
         // Debug log - ALWAYS show this
         console.log('📊 FINAL Skills parsing result:', {
@@ -1314,6 +1384,9 @@ exports.createEmployee = async (req, res) => {
             bio: bio && bio.trim() ? bio.trim() : null,
             experience: experience && experience.trim() ? experience.trim() : null,
             skills: skillsForDB, // JavaScript array - JSONB should handle this correctly
+            spokenLanguages: spokenLanguagesArray,
+            serviceCommissionEnabled: serviceCommissionEnabledBool,
+            productCommissionEnabled: productCommissionEnabledBool,
             dashboardPermissions: normalizeStoredDashboardPermissions(parsedDashboardPermissions, normalizedPosition),
             photo: photoPath,
             salary: salaryNum,
@@ -1440,8 +1513,11 @@ exports.updateEmployee = async (req, res) => {
             bio,
             experience,
             skills,
+            spokenLanguages,
             salary,
             commissionRate,
+            serviceCommissionEnabled,
+            productCommissionEnabled,
             scheduleVisibilityWeeks,
             staffAppPassword,
             dashboardPermissions,
@@ -1523,6 +1599,10 @@ exports.updateEmployee = async (req, res) => {
             }
         }
 
+        if (spokenLanguages !== undefined) {
+            employee.spokenLanguages = parseStringArrayField(spokenLanguages, employee.spokenLanguages || []);
+        }
+
         // Note: workingHours is deprecated - not updated
         // Schedules are managed via Schedules section (StaffShift model)
 
@@ -1548,6 +1628,8 @@ exports.updateEmployee = async (req, res) => {
         if (experience !== undefined) employee.experience = experience || null;
         if (salary !== undefined) employee.salary = parseFloat(salary);
         if (commissionRate !== undefined) employee.commissionRate = parseFloat(commissionRate);
+        if (serviceCommissionEnabled !== undefined) employee.serviceCommissionEnabled = parseBooleanField(serviceCommissionEnabled, employee.serviceCommissionEnabled);
+        if (productCommissionEnabled !== undefined) employee.productCommissionEnabled = parseBooleanField(productCommissionEnabled, employee.productCommissionEnabled);
         if (scheduleVisibilityWeeks !== undefined) employee.scheduleVisibilityWeeks = parsedScheduleVisibilityWeeks;
         if (isActive !== undefined) employee.isActive = isActive === true || isActive === 'true';
 
