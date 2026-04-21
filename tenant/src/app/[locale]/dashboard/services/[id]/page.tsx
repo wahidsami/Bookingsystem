@@ -211,6 +211,7 @@ export default function EditServicePage() {
       const response = await tenantApi.getEmployees({ position: "service_provider" });
       if (response.success) {
         setEmployees(response.employees || []);
+        setTeamAssignmentsReady(true);
       }
     } catch (err) {
       console.error("Failed to load employees:", err);
