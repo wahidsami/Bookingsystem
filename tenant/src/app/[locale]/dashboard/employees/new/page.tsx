@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
@@ -23,10 +24,24 @@ const NATIONALITIES = [
   "Sudanese", "Tunisian", "Moroccan", "Other"
 ];
 
+type EmployeeScheduleDraftShift = {
+  id: string;
+  dayOfWeek: number | null;
+  specificDate: string | null;
+  startTime: string;
+  endTime: string;
+  isRecurring: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  label: string | null;
+  isActive: boolean;
+};
+
 export default function NewEmployeePage() {
   const t = useTranslations("Employees");
   const params = useParams();
   const router = useRouter();
+  const dialog = useAppDialog();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
 
@@ -56,6 +71,7 @@ export default function NewEmployeePage() {
   const [dashboardPermissions, setDashboardPermissions] = useState<Record<string, boolean>>(
     normalizeDashboardPermissions({}, 'custom')
   );
+  const [scheduleDraft, setScheduleDraft] = useState<EmployeeScheduleDraftShift[]>([]);
   const [newSkill, setNewSkill] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -157,7 +173,8 @@ export default function NewEmployeePage() {
     const financeFilled = financeFields.filter(Boolean).length;
 
     const scheduleFields = [formData.scheduleVisibilityWeeks.trim()];
-    const scheduleFilled = scheduleFields.filter(Boolean).length;
+    const hasDraftSchedule = scheduleDraft.some((shift) => shift.dayOfWeek !== null);
+    const scheduleFilled = scheduleFields.filter(Boolean).length + (hasDraftSchedule ? 1 : 0);
 
     const accessFields = isServiceProvider
       ? [staffAppPassword.trim().length >= 8]
@@ -168,10 +185,14 @@ export default function NewEmployeePage() {
       basic: { filled: basicFilled, total: basicFields.length, label: `${basicFilled}/${basicFields.length}` },
       bio: { filled: bioFilled, total: bioFields.length, label: bioFilled > 0 ? `${bioFilled}/${bioFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') },
       finance: { filled: financeFilled, total: financeFields.length, label: financeFilled > 0 ? `${financeFilled}/${financeFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') },
-      schedule: { filled: scheduleFilled, total: scheduleFields.length, label: scheduleFilled > 0 ? `${scheduleFilled}/${scheduleFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') },
+      schedule: {
+        filled: scheduleFilled,
+        total: scheduleFields.length + 1,
+        label: scheduleFilled > 0 ? `${scheduleFilled}/${scheduleFields.length + 1}` : (locale === 'ar' ? 'اختياري' : 'Optional')
+      },
       access: { filled: accessFilled, total: accessFields.length, label: accessFilled > 0 ? `${accessFilled}/${accessFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') }
     };
-  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, staffAppPassword]);
+  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, scheduleDraft, staffAppPassword]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId as typeof activeSection);
@@ -231,6 +252,39 @@ export default function NewEmployeePage() {
       }
 
       const response = await tenantApi.createEmployee(submitData);
+
+      const createdEmployee = response?.employee || response?.data?.employee || response?.data || response;
+      const createdEmployeeId = createdEmployee?.id || createdEmployee?.employee?.id || response?.employee?.id || response?.data?.id;
+
+      if (createdEmployeeId && scheduleDraft.length > 0) {
+        const scheduleResults = await Promise.allSettled(
+          scheduleDraft
+            .filter((shift) => shift.dayOfWeek !== null)
+            .map((shift) =>
+              tenantApi.createEmployeeShift(createdEmployeeId, {
+                dayOfWeek: shift.dayOfWeek,
+                specificDate: null,
+                startTime: shift.startTime,
+                endTime: shift.endTime,
+                isRecurring: true,
+                startDate: shift.startDate,
+                endDate: shift.endDate,
+                label: shift.label || undefined
+              })
+            )
+        );
+
+        const failedShifts = scheduleResults.filter((result) => result.status === "rejected");
+        if (failedShifts.length > 0) {
+          await dialog.alert({
+            title: locale === 'ar' ? 'تم حفظ الموظف مع تنبيه' : 'Employee saved with a warning',
+            message: locale === 'ar'
+              ? 'تم إنشاء الملف بنجاح، لكن بعض الورديات الأسبوعية لم تُحفظ. يمكنك تعديلها لاحقاً من صفحة الموظف.'
+              : 'The employee was created, but some weekly shifts could not be saved. You can finish them later from the employee page.',
+            tone: 'default'
+          });
+        }
+      }
       
       if (response.success) {
         router.push(`/${locale}/dashboard/employees`);
@@ -725,6 +779,9 @@ export default function NewEmployeePage() {
                   employeeName={formData.name || undefined}
                   locale={locale}
                   isRTL={isRTL}
+                  draftMode
+                  draftShifts={scheduleDraft}
+                  onDraftShiftsChange={setScheduleDraft}
                 />
               </div>
             </section>

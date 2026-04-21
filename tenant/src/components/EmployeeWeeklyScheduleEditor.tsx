@@ -23,6 +23,9 @@ interface EmployeeWeeklyScheduleEditorProps {
   employeeName?: string;
   locale: string;
   isRTL: boolean;
+  draftMode?: boolean;
+  draftShifts?: ShiftRecord[];
+  onDraftShiftsChange?: (shifts: ShiftRecord[]) => void;
 }
 
 const WEEK_DAYS = [
@@ -71,14 +74,36 @@ export function EmployeeWeeklyScheduleEditor({
   employeeId,
   employeeName,
   locale,
-  isRTL
+  isRTL,
+  draftMode = false,
+  draftShifts,
+  onDraftShiftsChange
 }: EmployeeWeeklyScheduleEditorProps) {
   const dialog = useAppDialog();
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
+  const isDraftMode = draftMode && !employeeId;
+
+  const setShiftsAndMirror = (updater: React.SetStateAction<ShiftRecord[]>) => {
+    setShifts((current) => {
+      const next = typeof updater === "function"
+        ? (updater as (value: ShiftRecord[]) => ShiftRecord[])(current)
+        : updater;
+      if (isDraftMode && onDraftShiftsChange) {
+        onDraftShiftsChange(next.map((shift) => normalizeShift(shift)));
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
+    if (isDraftMode) {
+      setLoading(false);
+      setShifts((draftShifts || []).map((shift) => normalizeShift(shift)));
+      return;
+    }
+
     if (!employeeId) {
       setShifts([]);
       return;
@@ -103,7 +128,7 @@ export function EmployeeWeeklyScheduleEditor({
     };
 
     void loadShifts();
-  }, [employeeId]);
+  }, [draftShifts, employeeId, isDraftMode]);
 
   const groupedShifts = useMemo(() => {
     const groups = new Map<number, ShiftRecord[]>();
@@ -136,10 +161,14 @@ export function EmployeeWeeklyScheduleEditor({
   const totalRecurringShifts = shifts.filter((shift) => shift.isRecurring !== false && shift.dayOfWeek !== null).length;
 
   const updateLocalShift = (shiftId: string, updater: (current: ShiftRecord) => ShiftRecord) => {
-    setShifts((current) => current.map((shift) => (shift.id === shiftId ? updater(shift) : shift)));
+    setShiftsAndMirror((current) => current.map((shift) => (shift.id === shiftId ? updater(shift) : shift)));
   };
 
   const persistShift = async (shiftId: string) => {
+    if (isDraftMode) {
+      return;
+    }
+
     if (!employeeId) return;
 
     const currentShift = shifts.find((shift) => shift.id === shiftId);
@@ -149,7 +178,7 @@ export function EmployeeWeeklyScheduleEditor({
     try {
       const response = await tenantApi.updateEmployeeShift(employeeId, shiftId, buildShiftPayload(currentShift));
       const updatedShift = normalizeShift(response?.shift || response?.data?.shift || currentShift);
-      setShifts((current) => current.map((shift) => (shift.id === shiftId ? updatedShift : shift)));
+      setShiftsAndMirror((current) => current.map((shift) => (shift.id === shiftId ? updatedShift : shift)));
     } catch (err: any) {
       console.error("Failed to update employee shift:", err);
       await dialog.alert({
@@ -163,6 +192,20 @@ export function EmployeeWeeklyScheduleEditor({
   };
 
   const createShiftForDay = async (dayOfWeek: number) => {
+    if (isDraftMode) {
+      const tempShift = normalizeShift({
+        id: `temp-${dayOfWeek}-${Date.now()}`,
+        dayOfWeek,
+        startTime: DEFAULT_START,
+        endTime: DEFAULT_END,
+        isRecurring: true,
+        isActive: true
+      });
+
+      setShiftsAndMirror((current) => [...current, tempShift]);
+      return;
+    }
+
     if (!employeeId) return;
 
     const tempId = `temp-${dayOfWeek}-${Date.now()}`;
@@ -189,7 +232,7 @@ export function EmployeeWeeklyScheduleEditor({
       });
 
       const createdShift = normalizeShift(response?.shift || response?.data?.shift || tempShift);
-      setShifts((current) => [...current, createdShift]);
+      setShiftsAndMirror((current) => [...current, createdShift]);
     } catch (err: any) {
       console.error("Failed to create employee shift:", err);
       await dialog.alert({
@@ -204,6 +247,33 @@ export function EmployeeWeeklyScheduleEditor({
 
   const handleToggleDay = async (dayOfWeek: number, enabled: boolean) => {
     const dayShifts = groupedShifts.get(dayOfWeek) || [];
+
+    if (isDraftMode) {
+      if (!enabled) {
+        if (dayShifts.length === 0) {
+          return;
+        }
+
+        setShiftsAndMirror((current) =>
+          current.map((shift) =>
+            shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
+          )
+        );
+        return;
+      }
+
+      if (dayShifts.length === 0) {
+        await createShiftForDay(dayOfWeek);
+        return;
+      }
+
+      setShiftsAndMirror((current) =>
+        current.map((shift) =>
+          shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: true } : shift
+        )
+      );
+      return;
+    }
 
     if (!employeeId) return;
 
@@ -222,7 +292,7 @@ export function EmployeeWeeklyScheduleEditor({
             })
           )
         );
-        setShifts((current) =>
+        setShiftsAndMirror((current) =>
           current.map((shift) =>
             shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
           )
@@ -257,7 +327,7 @@ export function EmployeeWeeklyScheduleEditor({
             })
           )
       );
-      setShifts((current) =>
+      setShiftsAndMirror((current) =>
         current.map((shift) =>
           shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: true } : shift
         )
@@ -275,6 +345,11 @@ export function EmployeeWeeklyScheduleEditor({
   };
 
   const handleDeleteShift = async (shiftId: string) => {
+    if (isDraftMode) {
+      setShiftsAndMirror((current) => current.filter((shift) => shift.id !== shiftId));
+      return;
+    }
+
     if (!employeeId) return;
     if (!(await dialog.confirm(locale === "ar" ? "هل تريد حذف هذه الوردية؟" : "Delete this shift?"))) return;
 
@@ -298,7 +373,7 @@ export function EmployeeWeeklyScheduleEditor({
 
   const oneTimeShiftCount = shifts.filter((shift) => shift.isRecurring === false || shift.specificDate).length;
 
-  if (!employeeId) {
+  if (!employeeId && !isDraftMode) {
     return (
       <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6">
         <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
