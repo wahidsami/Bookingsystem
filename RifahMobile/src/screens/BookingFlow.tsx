@@ -250,14 +250,15 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             const appointmentId = response.appointment?.id;
             const bookingNumber = response.appointment?.bookingNumber || appointmentId?.slice(0, 8)?.toUpperCase();
             const bookingAmount = Number(response.appointment?.price ?? getServicePrice(service));
+            const selectedVariantLabel = selectedVariant?.description?.trim() || '';
             const successTitle = language === 'ar' ? 'تم تأكيد الحجز' : 'Booking Confirmed';
             const successMessage = selectedPaymentMethod === 'at-center'
                 ? (language === 'ar'
-                    ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.\nسيكون الدفع عند الوصول للمركز.`
-                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.\nPayment will be collected when you arrive at the center.`)
+                    ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nالنوع المختار: ${selectedVariantLabel}` : ''}\nسيكون الدفع عند الوصول للمركز.`
+                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nSelected variant: ${selectedVariantLabel}` : ''}\nPayment will be collected when you arrive at the center.`)
                 : (language === 'ar'
-                    ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.\nالمطلوب الآن: ${payableNowAmount.toFixed(2)} ريال.`
-                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.\nDue now: ${payableNowAmount.toFixed(2)} SAR.`);
+                    ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nالنوع المختار: ${selectedVariantLabel}` : ''}\nالمطلوب الآن: ${payableNowAmount.toFixed(2)} ريال.`
+                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nSelected variant: ${selectedVariantLabel}` : ''}\nDue now: ${payableNowAmount.toFixed(2)} SAR.`);
             const payLaterLabel = language === 'ar' ? 'الدفع لاحقاً' : 'Pay Later';
             const payNowLabel = selectedPaymentMethod === 'booking-fee'
                 ? (language === 'ar' ? 'دفع العربون الآن' : 'Pay Deposit Now')

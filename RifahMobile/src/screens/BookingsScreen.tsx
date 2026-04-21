@@ -103,6 +103,15 @@ export function BookingsScreen({ navigation }: any) {
             : service?.name_en || service?.name_ar || '-';
     };
 
+    const getServiceVariantLabel = (booking: Booking) => {
+        const variantName = booking.serviceVariantName?.trim();
+        if (!variantName) {
+            return '';
+        }
+
+        return language === 'ar' ? `النوع: ${variantName}` : `Variant: ${variantName}`;
+    };
+
     const getStaffName = (booking: Booking) =>
         booking.Staff?.name || booking.staff?.name || '-';
 
@@ -176,6 +185,9 @@ export function BookingsScreen({ navigation }: any) {
                         {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(item)}
                     </Text>
                     <Text style={styles.serviceName}>{getServiceName(item)}</Text>
+                    {!!getServiceVariantLabel(item) && (
+                        <Text style={styles.variantLabel}>{getServiceVariantLabel(item)}</Text>
+                    )}
                     <View style={styles.dateTimeRow}>
                         <Text style={styles.dateIcon}>📅</Text>
                         <Text style={styles.dateTimeText}>
@@ -344,6 +356,18 @@ export function BookingsScreen({ navigation }: any) {
                                         <Text style={styles.detailLabel}>{language === 'ar' ? 'الخدمة' : 'Service'}</Text>
                                         <Text style={styles.detailValue}>{getServiceName(selectedBooking)}</Text>
                                     </View>
+                                    {selectedBooking.serviceVariantName && (
+                                        <View style={styles.detailRow}>
+                                            <Text style={styles.detailLabel}>{language === 'ar' ? 'نوع الخدمة' : 'Service Variant'}</Text>
+                                            <Text style={styles.detailValue}>{selectedBooking.serviceVariantName}</Text>
+                                        </View>
+                                    )}
+                                    {selectedBooking.serviceVariantDuration ? (
+                                        <View style={styles.detailRow}>
+                                            <Text style={styles.detailLabel}>{language === 'ar' ? 'مدة النوع' : 'Variant Duration'}</Text>
+                                            <Text style={styles.detailValue}>{selectedBooking.serviceVariantDuration} min</Text>
+                                        </View>
+                                    ) : null}
                                     <View style={styles.detailRow}>
                                         <Text style={styles.detailLabel}>{language === 'ar' ? 'الموظف' : 'Employee'}</Text>
                                         <Text style={styles.detailValue}>{getStaffName(selectedBooking)}</Text>
@@ -552,6 +576,12 @@ const styles = StyleSheet.create({
         fontSize: fontSize.lg,
         fontWeight: '700',
         color: colors.text,
+        marginBottom: spacing.sm,
+    },
+    variantLabel: {
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+        color: colors.primary,
         marginBottom: spacing.sm,
     },
     dateTimeRow: {
