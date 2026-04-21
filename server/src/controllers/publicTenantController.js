@@ -876,6 +876,70 @@ exports.createPublicBooking = async (req, res) => {
             lastName
         });
 
+        const bookingItems = Array.isArray(req.body.items) ? req.body.items : [];
+        if (bookingItems.length > 0) {
+            const normalizedItems = bookingItems.map((item, index) => {
+                const rawStartTime = item.startTime
+                    || (item.date && item.time ? new Date(`${item.date}T${item.time}`).toISOString() : null)
+                    || null;
+                const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
+
+                if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
+                    throw new Error(`Invalid start time for booking item ${index + 1}`);
+                }
+
+                return {
+                    serviceId: item.serviceId,
+                    variantId: item.variantId || null,
+                    staffId: item.staffId || null,
+                    requestedStaffId: item.requestedStaffId || item.staffId || null,
+                    startTime: parsedStartTime.toISOString(),
+                    notes: item.notes || specialRequests || null,
+                    paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
+                    assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined)
+                };
+            });
+
+            const multiPaymentMethods = new Set(normalizedItems.map((item) => item.paymentMethod || 'at-center'));
+            if (multiPaymentMethods.size > 1 || !multiPaymentMethods.has('at-center')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Multi-service bookings currently support pay at center only.'
+                });
+            }
+
+            const { session, appointments } = await bookingService.createBookingSession({
+                tenantId,
+                platformUserId: platformUser.id,
+                items: normalizedItems,
+                notes: specialRequests || null,
+                paymentMethod: 'at-center'
+            });
+
+            res.json({
+                success: true,
+                message: 'Booking created successfully',
+                data: {
+                    bookingId: session.id,
+                    bookingReference: session.bookingReference,
+                    bookingSessionId: session.id,
+                    appointments: appointments.map((appointment) => ({
+                        id: appointment.id,
+                        bookingNumber: appointment.bookingNumber,
+                        startTime: appointment.startTime,
+                        endTime: appointment.endTime,
+                        status: appointment.status,
+                        paymentStatus: appointment.paymentStatus,
+                        serviceVariantId: appointment.serviceVariantId,
+                        serviceVariantName: appointment.serviceVariantName,
+                        serviceVariantDuration: appointment.serviceVariantDuration
+                    })),
+                    platformUserId: platformUser.id
+                }
+            });
+            return;
+        }
+
         // Combine date and time into startTime
         const startTime = new Date(`${date}T${time}`);
         if (isNaN(startTime.getTime())) {

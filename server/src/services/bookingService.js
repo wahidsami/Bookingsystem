@@ -45,7 +45,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -253,6 +253,9 @@ class BookingService {
                 serviceVariantName: serviceVariant?.description || null,
                 serviceVariantDescription: serviceVariant?.description || null,
                 serviceVariantDuration: serviceVariant?.duration || null,
+                bookingSessionId: bookingSessionId || null,
+                bookingReference: bookingReference || null,
+                bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex : 0,
                 status: 'confirmed',
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING,
                 paymentMethod: normalizedPaymentMethod,
@@ -301,34 +304,36 @@ class BookingService {
                 await finalTransaction.commit();
             }
 
-            try {
-                const serviceName = service.name_en || service.name_ar || 'service';
-                const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
-                const appointmentDate = formatNotificationDate(start);
+            if (shouldCommit) {
+                try {
+                    const serviceName = service.name_en || service.name_ar || 'service';
+                    const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
+                    const appointmentDate = formatNotificationDate(start);
 
-                await pushNotificationService.sendToUser(platformUserId, {
-                    title: 'Booking confirmed',
-                    body: `Your ${serviceName} booking for ${appointmentDate} is confirmed.`,
-                    data: {
-                        type: 'booking_created',
-                        appointmentId: appointment.id,
-                        tenantId,
-                        staffId: finalStaffId
-                    }
-                });
+                    await pushNotificationService.sendToUser(platformUserId, {
+                        title: 'Booking confirmed',
+                        body: `Your ${serviceName} booking for ${appointmentDate} is confirmed.`,
+                        data: {
+                            type: 'booking_created',
+                            appointmentId: appointment.id,
+                            tenantId,
+                            staffId: finalStaffId
+                        }
+                    });
 
-                await pushNotificationService.sendToStaff(finalStaffId, {
-                    title: 'New appointment assigned',
-                    body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
-                    data: {
-                        type: 'staff_appointment_assigned',
-                        appointmentId: appointment.id,
-                        tenantId,
-                        platformUserId
-                    }
-                });
-            } catch (notificationError) {
-                console.warn('Booking notification warning:', notificationError.message);
+                    await pushNotificationService.sendToStaff(finalStaffId, {
+                        title: 'New appointment assigned',
+                        body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                        data: {
+                            type: 'staff_appointment_assigned',
+                            appointmentId: appointment.id,
+                            tenantId,
+                            platformUserId
+                        }
+                    });
+                } catch (notificationError) {
+                    console.warn('Booking notification warning:', notificationError.message);
+                }
             }
 
             // Release lock on success
@@ -357,6 +362,121 @@ class BookingService {
         
         } catch (error) {
             // Outer catch - handles validation errors before lock acquisition
+            throw error;
+        }
+    }
+
+    /**
+     * Create a grouped booking session with multiple appointment items.
+     * Each item is still persisted as a normal appointment row.
+     */
+    async createBookingSession(data, options = {}) {
+        const { tenantId, platformUserId, items, notes, paymentMethod } = data;
+        const transaction = options.transaction;
+        const shouldCommit = !transaction;
+        const finalTransaction = transaction || await db.sequelize.transaction();
+
+        try {
+            if (!tenantId) throw new Error('Tenant ID is required');
+            if (!platformUserId) throw new Error('Platform User ID is required');
+            if (!Array.isArray(items) || items.length === 0) {
+                throw new Error('At least one booking item is required');
+            }
+
+            const platformUser = await db.PlatformUser.findByPk(platformUserId, { transaction: finalTransaction });
+            if (!platformUser) throw new Error('Platform user not found');
+            if (!platformUser.isActive) throw new Error('User account is inactive');
+            if (platformUser.isBanned) throw new Error('User account is banned');
+
+            const normalizedNotes = typeof notes === 'string' ? notes.trim() : '';
+            const session = await db.BookingSession.create({
+                tenantId,
+                platformUserId,
+                status: 'confirmed',
+                itemCount: items.length,
+                subtotal: 0,
+                taxAmount: 0,
+                platformFee: 0,
+                totalAmount: 0,
+                paymentMethod: paymentMethod || items[0]?.paymentMethod || null,
+                notes: normalizedNotes || null
+            }, { transaction: finalTransaction });
+
+            const appointments = [];
+            let subtotal = 0;
+            let taxAmount = 0;
+            let platformFee = 0;
+            let totalAmount = 0;
+
+            for (let index = 0; index < items.length; index += 1) {
+                const item = items[index] || {};
+                const appointment = await this.createBooking({
+                    serviceId: item.serviceId,
+                    variantId: item.variantId || null,
+                    staffId: item.staffId || null,
+                    requestedStaffId: item.requestedStaffId || null,
+                    platformUserId,
+                    tenantId,
+                    startTime: item.startTime,
+                    notes: item.notes || normalizedNotes || null,
+                    paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
+                    assignmentMode: item.assignmentMode,
+                    bookingSessionId: session.id,
+                    bookingReference: session.bookingReference,
+                    bookingItemIndex: index
+                }, { transaction: finalTransaction });
+
+                appointments.push(appointment);
+                subtotal += parseFloat(appointment.rawPrice || 0);
+                taxAmount += parseFloat(appointment.taxAmount || 0);
+                platformFee += parseFloat(appointment.platformFee || 0);
+                totalAmount += parseFloat(appointment.price || 0);
+            }
+
+            await session.update({
+                itemCount: appointments.length,
+                subtotal: parseFloat(subtotal.toFixed(2)),
+                taxAmount: parseFloat(taxAmount.toFixed(2)),
+                platformFee: parseFloat(platformFee.toFixed(2)),
+                totalAmount: parseFloat(totalAmount.toFixed(2))
+            }, { transaction: finalTransaction });
+
+            if (shouldCommit) {
+                await finalTransaction.commit();
+
+                try {
+                    const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
+                    const serviceCount = appointments.length;
+                    const serviceLabel = serviceCount === 1 ? 'service' : 'services';
+                    await pushNotificationService.sendToUser(platformUserId, {
+                        title: 'Booking confirmed',
+                        body: `Your booking for ${serviceCount} ${serviceLabel} has been confirmed.`,
+                        data: {
+                            type: 'booking_session_created',
+                            bookingSessionId: session.id,
+                            bookingReference: session.bookingReference,
+                            tenantId,
+                            platformUserId,
+                            customerName
+                        }
+                    });
+                } catch (notificationError) {
+                    console.warn('Booking session notification warning:', notificationError.message);
+                }
+            }
+
+            return {
+                session,
+                appointments
+            };
+        } catch (error) {
+            if (shouldCommit && finalTransaction && !finalTransaction.finished) {
+                try {
+                    await finalTransaction.rollback();
+                } catch (rollbackError) {
+                    console.warn('Booking session rollback warning:', rollbackError.message);
+                }
+            }
             throw error;
         }
     }
