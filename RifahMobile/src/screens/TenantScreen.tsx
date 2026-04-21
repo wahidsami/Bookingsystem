@@ -8,6 +8,7 @@ import { api, Tenant, Service, ServiceVariant, Staff, Product, getImageUrl, getS
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 
 interface TenantDetailsProps {
     route: any;
@@ -36,6 +37,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[]; variants?: ServiceVariant[] }) | null>(null);
     const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
     const { itemCount, addToCart, clearCart } = useCart();
+    const { itemCount: serviceBookingItemCount } = useServiceBookingCart();
 
     useEffect(() => {
         loadTenantDetails();
@@ -388,6 +390,17 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <TouchableOpacity style={styles.iconButton} onPress={handleShareTenant}>
                                         <Ionicons name="share-outline" size={24} color="white" />
                                     </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.iconButton}
+                                        onPress={() => navigation.navigate('ServiceBookingCart')}
+                                    >
+                                        <Ionicons name="calendar-outline" size={24} color="white" />
+                                        {serviceBookingItemCount > 0 && (
+                                            <View style={styles.badgeContainer}>
+                                                <Text style={styles.badgeText}>{serviceBookingItemCount}</Text>
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
                                     <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Cart', { tenant })}>
                                         <Ionicons name="cart-outline" size={24} color="white" />
                                         {itemCount > 0 && (
@@ -451,6 +464,32 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
         return (
             <View style={styles.contentSection}>
+                {serviceBookingItemCount > 0 && (
+                    <View style={styles.serviceBookingBanner}>
+                        <View style={styles.serviceBookingBannerLeft}>
+                            <View style={styles.serviceBookingBannerIcon}>
+                                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.serviceBookingBannerTitle}>
+                                    {isRTL ? 'خدمات محفوظة للحجز' : 'Saved booking services'}
+                                </Text>
+                                <Text style={styles.serviceBookingBannerText}>
+                                    {serviceBookingItemCount}{' '}
+                                    {isRTL ? 'خدمة في سلة الحجز' : 'service items are in your booking cart'}
+                                </Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.serviceBookingBannerButton}
+                            onPress={() => navigation.navigate('ServiceBookingCart')}
+                        >
+                            <Text style={styles.serviceBookingBannerButtonText}>
+                                {isRTL ? 'عرض السلة' : 'View Cart'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
                 {services.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyText}>No services available yet.</Text>
@@ -956,6 +995,53 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.primary,
         marginLeft: spacing.md,
+    },
+    serviceBookingBanner: {
+        backgroundColor: 'rgba(124, 77, 255, 0.08)',
+        borderColor: 'rgba(124, 77, 255, 0.18)',
+        borderWidth: 1,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginBottom: spacing.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+    },
+    serviceBookingBannerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        flex: 1,
+    },
+    serviceBookingBannerIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(124, 77, 255, 0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    serviceBookingBannerTitle: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.text,
+        marginBottom: 2,
+    },
+    serviceBookingBannerText: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+    },
+    serviceBookingBannerButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: 10,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.primary,
+    },
+    serviceBookingBannerButtonText: {
+        color: 'white',
+        fontSize: fontSize.xs,
+        fontWeight: '700',
     },
     modalBackdrop: {
         flex: 1,
