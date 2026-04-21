@@ -7,8 +7,14 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
-import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS } from "@/lib/employeePositions";
+import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
 import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
+import {
+  DASHBOARD_PERMISSION_KEYS,
+  ROLE_OPTIONS,
+  SECTION_PERMISSION_LABELS,
+  normalizeDashboardPermissions
+} from "@/lib/dashboardAccess";
 
 const NATIONALITIES = [
   "Saudi", "Egyptian", "Filipino", "Indian", "Pakistani", 
@@ -25,6 +31,7 @@ export default function NewEmployeePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activeSection, setActiveSection] = useState<'basic' | 'bio' | 'finance' | 'schedule' | 'access'>('basic');
   const [tenantTaxRate, setTenantTaxRate] = useState(15);
   const [formData, setFormData] = useState({
     name: "",
@@ -44,9 +51,15 @@ export default function NewEmployeePage() {
     scheduleVisibilityWeeks: "1",
     isActive: true
   });
+  const [staffAppPassword, setStaffAppPassword] = useState("");
+  const [dashboardPermissions, setDashboardPermissions] = useState<Record<string, boolean>>(
+    normalizeDashboardPermissions({}, 'custom')
+  );
   const [newSkill, setNewSkill] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
+  const isServiceProvider = formData.position === 'service_provider';
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -112,6 +125,60 @@ export default function NewEmployeePage() {
     });
   };
 
+  const handleDashboardPermissionChange = (key: string, checked: boolean) => {
+    setDashboardPermissions((prev) => ({
+      ...prev,
+      [key]: checked
+    }));
+  };
+
+  const sectionProgress = useMemo(() => {
+    const basicFields = [
+      formData.name.trim(),
+      formData.email.trim(),
+      formData.phone.trim(),
+      formData.nationality.trim(),
+      formData.gender.trim(),
+      formData.position.trim()
+    ];
+    const basicFilled = basicFields.filter(Boolean).length;
+
+    const bioFields = [
+      formData.bio.trim(),
+      formData.experience.trim(),
+      formData.skills.length > 0,
+      formData.spokenLanguages.length > 0,
+      Boolean(photoPreview || photoFile)
+    ];
+    const bioFilled = bioFields.filter(Boolean).length;
+
+    const financeFields = [salaryValue > 0];
+    const financeFilled = financeFields.filter(Boolean).length;
+
+    const scheduleFields = [formData.scheduleVisibilityWeeks.trim()];
+    const scheduleFilled = scheduleFields.filter(Boolean).length;
+
+    const accessFields = isServiceProvider
+      ? [staffAppPassword.trim().length >= 8]
+      : [Object.values(dashboardPermissions).some(Boolean)];
+    const accessFilled = accessFields.filter(Boolean).length;
+
+    return {
+      basic: { filled: basicFilled, total: basicFields.length, label: `${basicFilled}/${basicFields.length}` },
+      bio: { filled: bioFilled, total: bioFields.length, label: bioFilled > 0 ? `${bioFilled}/${bioFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') },
+      finance: { filled: financeFilled, total: financeFields.length, label: financeFilled > 0 ? `${financeFilled}/${financeFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') },
+      schedule: { filled: scheduleFilled, total: scheduleFields.length, label: scheduleFilled > 0 ? `${scheduleFilled}/${scheduleFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') },
+      access: { filled: accessFilled, total: accessFields.length, label: accessFilled > 0 ? `${accessFilled}/${accessFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') }
+    };
+  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, staffAppPassword]);
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId as typeof activeSection);
+    if (typeof document !== 'undefined') {
+      document.getElementById(`employee-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -149,6 +216,12 @@ export default function NewEmployeePage() {
       submitData.append("productCommissionEnabled", String(formData.productCommissionEnabled));
       submitData.append("scheduleVisibilityWeeks", formData.scheduleVisibilityWeeks || "1");
       submitData.append("isActive", formData.isActive.toString());
+      if (isServiceProvider && staffAppPassword.trim()) {
+        submitData.append("staffAppPassword", staffAppPassword.trim());
+      }
+      if (!isServiceProvider) {
+        submitData.append("dashboardPermissions", JSON.stringify(dashboardPermissions));
+      }
       // Note: workingHours removed - use Schedules section to manage employee schedules
       
       // Append photo if selected
@@ -180,10 +253,9 @@ export default function NewEmployeePage() {
 
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
+      <div className="mb-6 animate-fade-in">
+        <div className={`flex flex-col gap-4 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
+          <div className="flex-1">
             <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {t("addEmployee")}
             </h2>
@@ -191,125 +263,150 @@ export default function NewEmployeePage() {
               {locale === 'ar' ? 'أضف موظفاً جديداً إلى فريقك' : 'Add a new employee to your team'}
             </p>
           </div>
-          <Link href={`/${locale}/dashboard/employees`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
+
+          <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+            <Link href={`/${locale}/dashboard/employees`} className="btn btn-secondary">
+              {t("cancel")}
+            </Link>
+            <button type="submit" form="employee-editor-form" disabled={loading} className="btn btn-primary">
+              {loading ? t("loading") : t("save")}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           {error}
         </div>
       )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Basic Information */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
-              </h3>
-              
+      <form id="employee-editor-form" onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
+          <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+                {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
+              </p>
+            </div>
+            <div className="space-y-2">
+              {[
+                { id: 'basic', label: locale === 'ar' ? 'المعلومات الأساسية' : 'Basic information', status: sectionProgress.basic.label },
+                { id: 'bio', label: locale === 'ar' ? 'السيرة الذاتية' : 'Biography', status: sectionProgress.bio.label },
+                { id: 'finance', label: locale === 'ar' ? 'المالية' : 'Finance', status: sectionProgress.finance.label },
+                { id: 'schedule', label: locale === 'ar' ? 'الجدول' : 'Schedule', status: sectionProgress.schedule.label },
+                { id: 'access', label: locale === 'ar' ? 'الصلاحيات' : 'Access', status: sectionProgress.access.label }
+              ].map((item) => {
+                const active = activeSection === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollToSection(item.id)}
+                    className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
+                      active
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <span className="font-medium">{item.label}</span>
+                      <span className="text-xs font-semibold text-gray-500">{item.status}</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{
+                          width: `${
+                            item.id === 'basic'
+                              ? Math.round((sectionProgress.basic.filled / sectionProgress.basic.total) * 100)
+                              : item.id === 'bio'
+                                ? Math.round((sectionProgress.bio.filled / sectionProgress.bio.total) * 100)
+                                : item.id === 'finance'
+                                  ? Math.round((sectionProgress.finance.filled / sectionProgress.finance.total) * 100)
+                                  : item.id === 'schedule'
+                                    ? Math.round((sectionProgress.schedule.filled / sectionProgress.schedule.total) * 100)
+                                    : Math.round((sectionProgress.access.filled / sectionProgress.access.total) * 100)
+                          }%`
+                        }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="space-y-6">
+            <section id="employee-section-basic" className="card scroll-mt-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الحقول الأساسية المطلوبة لإكمال الملف.' : 'Required fields to identify this team member.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {sectionProgress.basic.label}
+                </span>
+              </div>
+
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("name")} <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {t("email")} <span className="text-gray-400">({t("optional")})</span>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("email")} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {t("phone")} <span className="text-gray-400">({t("optional")})</span>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("phone")} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("nationality")} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
-                  <select
-                    name="nationality"
-                    value={formData.nationality}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  >
-                    <option value="">{t("selectNationality")}</option>
-                    {NATIONALITIES.map(nat => (
-                      <option key={nat} value={nat}>{nat}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {t("nationality")} <span className="text-red-500">*</span>
+                    </label>
+                    <select name="nationality" value={formData.nationality} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <option value="">{t("selectNationality")}</option>
+                      {NATIONALITIES.map((nat) => (
+                        <option key={nat} value={nat}>{nat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar' ? 'الجنس' : 'Gender'} <span className="text-red-500">*</span>
+                    </label>
+                    <select name="gender" value={formData.gender} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {EMPLOYEE_GENDERS.map((option) => (
+                        <option key={option.value || 'gender-placeholder'} value={option.value}>
+                          {option.label[locale as 'ar' | 'en'] || option.label.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'الجنس' : 'Gender'} <span className="text-gray-400">({t("optional")})</span>
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  >
-                    {EMPLOYEE_GENDERS.map((option) => (
-                      <option key={option.value || 'gender-placeholder'} value={option.value}>
-                        {option.label[locale as 'ar' | 'en'] || option.label.en}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'الوظيفة / المسمى الوظيفي' : 'Position / Job Title'} <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="position"
-                    value={formData.position}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  >
+                  <select name="position" value={formData.position} onChange={handleChange} required className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {EMPLOYEE_POSITIONS.map((option) => (
                       <option key={option.value || 'placeholder'} value={option.value}>
                         {option.label[locale as 'ar' | 'en'] || option.label.en}
@@ -322,24 +419,35 @@ export default function NewEmployeePage() {
                       : 'This title decides whether the team member uses the staff app or a dashboard account.'}
                   </p>
                 </div>
+              </div>
+            </section>
 
+            <section id="employee-section-bio" className="card scroll-mt-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("bio")} <span className="text-gray-400">({t("optional")})</span>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'السيرة الذاتية' : 'Biography'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'أضف ملخصاً مهنياً ومهاراته ولغاته وصورته.' : 'Add a short bio, skills, spoken languages, and a profile image.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  {sectionProgress.bio.label}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("bio")}
                   </label>
-                  <textarea
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
+                  <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary" style={{ textAlign: isRTL ? 'right' : 'left' }} />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("experience")} <span className="text-gray-400">({t("optional")})</span>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("experience")}
                   </label>
                   <input
                     type="text"
@@ -347,65 +455,49 @@ export default function NewEmployeePage() {
                     value={formData.experience}
                     onChange={handleChange}
                     placeholder={locale === 'ar' ? 'مثال: 5 سنوات' : 'e.g., 5 years'}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Skills */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("skills")}
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="text"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
-                    placeholder={locale === 'ar' ? 'أضف مهارة...' : 'Add a skill...'}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSkill}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    {t("addSkill")}
-                  </button>
-                </div>
-
-                {formData.skills.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.skills.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 bg-primary/10 text-primary rounded-full flex items-center gap-2"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                      >
-                        {skill}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill)}
-                          className="text-primary hover:text-primary/70"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("skills")}
+                  </label>
+                  <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <input
+                      type="text"
+                      value={newSkill}
+                      onChange={(e) => setNewSkill(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
+                      placeholder={locale === 'ar' ? 'أضف مهارة...' : 'Add a skill...'}
+                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                      style={{ textAlign: isRTL ? 'right' : 'left' }}
+                    />
+                    <button type="button" onClick={handleAddSkill} className="rounded-lg bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90">
+                      {t("addSkill")}
+                    </button>
                   </div>
-                )}
+
+                  {formData.skills.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {formData.skills.map((skill, idx) => (
+                        <span key={idx} className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-primary" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                          {skill}
+                          <button type="button" onClick={() => handleRemoveSkill(skill)} className="text-primary hover:text-primary/70">
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <h4 className="mb-3 text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'اللغات المتحدثة' : 'Spoken languages'}
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {EMPLOYEE_LANGUAGE_OPTIONS.map((option) => {
                       const checked = formData.spokenLanguages.includes(option.value);
                       return (
@@ -424,68 +516,72 @@ export default function NewEmployeePage() {
                     })}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Note: Working Hours removed - use Schedules section to manage employee schedules */}
-          </div>
-
-          {/* Right Column - Photo & Financial */}
-          <div className="space-y-6">
-            {/* Photo Upload */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("photo")}
-              </h3>
-              
-              <div className="space-y-4">
-                {photoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-                    >
-                      ×
-                    </button>
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {t("photo")}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'صورة واضحة تساعد على التعرّف على الموظف.' : 'A clear profile image helps identify the team member.'}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                      {sectionProgress.bio.label}
+                    </span>
                   </div>
-                ) : (
-                  <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="text-6xl">📷</span>
-                  </div>
-                )}
-                
-                <label className="block">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    className="hidden"
-                  />
-                  <span className="btn btn-secondary w-full text-center cursor-pointer">
-                    {photoPreview ? t("changePhoto") : t("uploadPhoto")}
-                  </span>
-                </label>
-              </div>
-            </div>
 
-            {/* Financial Information */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المعلومات المالية' : 'Financial Information'}
-              </h3>
-              
+                  <div className="space-y-4">
+                    {photoPreview ? (
+                      <div className="relative">
+                        <img src={photoPreview} alt="Preview" className="h-64 w-full rounded-lg object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoFile(null);
+                            setPhotoPreview(null);
+                          }}
+                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex h-64 w-full items-center justify-center rounded-lg bg-gray-100">
+                        <span className="text-6xl">📷</span>
+                      </div>
+                    )}
+
+                    <label className="block">
+                      <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                      <span className="btn btn-secondary w-full cursor-pointer text-center">
+                        {photoPreview ? t("changePhoto") : t("uploadPhoto")}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="employee-section-finance" className="card scroll-mt-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'المالية' : 'Finance'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الراتب والعمولات تظهر هنا مع احتساب الضريبة.' : 'Salary, commissions, and VAT preview live here.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {sectionProgress.finance.label}
+                </span>
+              </div>
+
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("salary")} (SAR) <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -496,13 +592,13 @@ export default function NewEmployeePage() {
                     required
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("commission")} (%) <span className="text-gray-400">({t("optional")})</span>
                   </label>
                   <input
@@ -514,7 +610,7 @@ export default function NewEmployeePage() {
                     max="100"
                     step="0.01"
                     placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
@@ -556,15 +652,21 @@ export default function NewEmployeePage() {
                   <div className="rounded-lg bg-white p-3 text-sm text-gray-600">
                     <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span>{locale === 'ar' ? 'الراتب قبل الضريبة' : 'Salary before VAT'}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                      <span className="font-semibold text-gray-900">
+                        <Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                      </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span>{locale === 'ar' ? 'قيمة الضريبة التقديرية' : 'Estimated VAT'}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                      <span className="font-semibold text-gray-900">
+                        <Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                      </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       <span className="font-medium text-gray-700">{locale === 'ar' ? 'الإجمالي التقريبي' : 'Estimated total'}</span>
-                      <span className="font-semibold text-gray-900"><Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} /></span>
+                      <span className="font-semibold text-gray-900">
+                        <Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                      </span>
                     </div>
                     <p className="mt-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {locale === 'ar'
@@ -572,16 +674,37 @@ export default function NewEmployeePage() {
                         : `VAT is estimated using the current tenant tax rate of ${tenantTaxRate}%.`}
                     </p>
                   </div>
+                </div>
+              </div>
+            </section>
 
+            <section id="employee-section-schedule" className="card scroll-mt-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الجدول' : 'Schedule'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar'
+                      ? 'ساعات الرؤية الأسبوعية تظهر هنا، بينما يتم إعداد الورديات التفصيلية من صفحة الجداول حالياً.'
+                      : 'Weekly visibility lives here, while detailed shifts still come from the schedules page for now.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  {sectionProgress.schedule.label}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule Visibility'}
                   </label>
                   <select
                     name="scheduleVisibilityWeeks"
                     value={formData.scheduleVisibilityWeeks}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
                     <option value="1">{locale === 'ar' ? 'أسبوع واحد' : '1 Week'}</option>
@@ -589,16 +712,111 @@ export default function NewEmployeePage() {
                     <option value="3">{locale === 'ar' ? '3 أسابيع' : '3 Weeks'}</option>
                     <option value="4">{locale === 'ar' ? '4 أسابيع' : '4 Weeks'}</option>
                   </select>
-                  <p className="text-sm text-gray-500 mt-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar'
-                      ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
-                      : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
-                  </p>
+                </div>
+                <p className="mt-3 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar'
+                    ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
+                    : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
+                </p>
+                <div className="mt-4">
+                  <Link href={`/${locale}/dashboard/schedules`} className="btn btn-secondary">
+                    {locale === 'ar' ? 'فتح صفحة الجداول' : 'Open schedules'}
+                  </Link>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Active Status */}
+            <section id="employee-section-access" className="card scroll-mt-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الصلاحيات' : 'Access'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {isServiceProvider
+                      ? (locale === 'ar'
+                        ? 'هذا العضو يستخدم تطبيق الموظفين. هنا نضبط وصول التطبيق وكلمة المرور الأولية.'
+                        : 'This role uses the staff app. Configure mobile access and the initial password here.')
+                      : (locale === 'ar'
+                        ? 'هذا العضو لا يستخدم تطبيق الموظفين. هنا نمنح صلاحيات لوحة التحكم.'
+                        : 'This role does not use the staff app. Use this section to manage dashboard access.')}
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {sectionProgress.access.label}
+                </span>
+              </div>
+
+              {isServiceProvider ? (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div>
+                        <h4 className="font-medium text-gray-800">{locale === 'ar' ? 'تفعيل الوصول للتطبيق' : 'Enable Mobile App Access'}</h4>
+                        <p className="text-sm text-gray-500">{locale === 'ar' ? 'سيتم إنشاء حساب تطبيق الموظف عند حفظ الملف.' : 'A staff app account will be created when the employee is saved.'}</p>
+                      </div>
+                      <div className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                        {locale === 'ar' ? 'مفعل تلقائياً' : 'Auto-managed'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar' ? 'كلمة مرور أولية للتطبيق' : 'Initial app password'}
+                    </label>
+                    <input
+                      type="password"
+                      value={staffAppPassword}
+                      onChange={(e) => setStaffAppPassword(e.target.value)}
+                      placeholder={locale === 'ar' ? 'اتركه فارغاً لإنشاء كلمة مرور تلقائياً' : 'Leave blank to auto-generate'}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                      style={{ textAlign: isRTL ? 'right' : 'left' }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div>
+                        <h4 className="font-medium text-gray-800">{locale === 'ar' ? 'دور لوحة التحكم' : 'Dashboard role'}</h4>
+                        <p className="text-sm text-gray-500">
+                          {locale === 'ar'
+                            ? `سيتم إنشاء الحساب كـ ${ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelAr || dashboardRoleKey}.`
+                            : `The dashboard account will use the ${ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelEn || dashboardRoleKey} preset.`}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600">
+                        {ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelEn || dashboardRoleKey}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {DASHBOARD_PERMISSION_KEYS.filter((key) => key !== 'view_dashboard').map((key) => {
+                      const checked = dashboardPermissions[key] === true;
+                      const label = SECTION_PERMISSION_LABELS[key];
+
+                      return (
+                        <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
+                          <span className="text-sm font-medium text-gray-700">
+                            {isRTL ? label.ar : label.en}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => handleDashboardPermissionChange(key, e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
+
             <div className="card">
               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <input
@@ -606,27 +824,12 @@ export default function NewEmployeePage() {
                   name="isActive"
                   checked={formData.isActive}
                   onChange={handleChange}
-                  className="w-4 h-4 text-primary focus:ring-primary"
+                  className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <label className="font-medium text-gray-700">{t("isActive")}</label>
               </div>
             </div>
           </div>
-        </div>
-        </div>
-
-        {/* Form Actions */}
-        <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <Link href={`/${locale}/dashboard/employees`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary flex-1"
-          >
-            {loading ? t("loading") : t("save")}
-          </button>
         </div>
       </form>
     </TenantLayout>
