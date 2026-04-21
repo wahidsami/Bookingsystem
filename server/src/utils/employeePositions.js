@@ -9,6 +9,14 @@ const VALID_EMPLOYEE_POSITIONS = [
   'other'
 ];
 
+const DASHBOARD_ACCOUNT_ROLE_BY_POSITION = {
+  accountant: 'accountant',
+  receptionist: 'receptionist',
+  marketing: 'marketing',
+  manager: 'manager',
+  other: 'custom'
+};
+
 const normalizeEmployeePosition = (value) => {
   if (value === undefined || value === null) {
     return null;
@@ -22,7 +30,26 @@ const normalizeEmployeePosition = (value) => {
   return VALID_EMPLOYEE_POSITIONS.includes(normalized) ? normalized : null;
 };
 
+const isServiceProviderPosition = (value) => normalizeEmployeePosition(value) === 'service_provider';
+
+const isDashboardAccessPosition = (value) => {
+  const normalized = normalizeEmployeePosition(value);
+  return Boolean(normalized && normalized !== 'service_provider');
+};
+
+const getDashboardRoleKeyForEmployeePosition = (value) => {
+  const normalized = normalizeEmployeePosition(value);
+  if (!normalized || normalized === 'service_provider') {
+    return null;
+  }
+
+  return DASHBOARD_ACCOUNT_ROLE_BY_POSITION[normalized] || 'custom';
+};
+
 module.exports = {
   VALID_EMPLOYEE_POSITIONS,
-  normalizeEmployeePosition
+  normalizeEmployeePosition,
+  isServiceProviderPosition,
+  isDashboardAccessPosition,
+  getDashboardRoleKeyForEmployeePosition
 };

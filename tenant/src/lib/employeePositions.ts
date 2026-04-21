@@ -10,6 +10,24 @@ export const EMPLOYEE_POSITIONS = [
 
 export type EmployeePositionValue = (typeof EMPLOYEE_POSITIONS)[number]['value'];
 
+export const isServiceProviderPosition = (position?: string | null) => {
+  return `${position || ''}`.trim() === 'service_provider';
+};
+
+export const getDashboardRoleKeyForEmployeePosition = (position?: string | null) => {
+  const normalized = `${position || ''}`.trim();
+
+  if (!normalized || normalized === 'service_provider') {
+    return null;
+  }
+
+  if (normalized === 'accountant' || normalized === 'receptionist' || normalized === 'marketing' || normalized === 'manager') {
+    return normalized;
+  }
+
+  return 'custom';
+};
+
 export const getEmployeePositionLabel = (position?: string | null, locale: 'ar' | 'en' = 'en') => {
   const normalized = `${position || ''}`.trim();
   const match = EMPLOYEE_POSITIONS.find((item) => item.value === normalized);

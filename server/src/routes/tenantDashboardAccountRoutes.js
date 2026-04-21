@@ -12,6 +12,7 @@ router.get('/role-options', controller.getRoleOptions);
 router.get('/', controller.listAccounts);
 router.post('/', controller.createAccount);
 router.put('/:id', controller.updateAccount);
+router.post('/:id/send-invite', controller.sendInvite);
 router.patch('/:id/reset-password', controller.resetPassword);
 router.delete('/:id', controller.deactivateAccount);
 

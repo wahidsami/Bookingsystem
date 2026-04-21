@@ -346,7 +346,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     { name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
     { name: t("services"), href: `/${locale}/dashboard/services`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.services },
     { name: t("products"), href: `/${locale}/dashboard/products`, icon: ShoppingBagIcon, visible: hasProductsAndOrders, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.products },
-    { name: t("employees"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.employees },
+    { name: t("teams"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.employees },
     { name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.schedules },
     { name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.appointments },
     {

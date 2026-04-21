@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
 import { tenantApi } from "@/lib/api";
+import { getEmployeePositionLabel, isServiceProviderPosition } from "@/lib/employeePositions";
 import {
   DASHBOARD_PERMISSION_KEYS,
   ROLE_OPTIONS,
@@ -22,6 +23,14 @@ type DashboardAccount = {
   lastLoginAt?: string | null;
 };
 
+type TeamEmployee = {
+  id: string;
+  name: string;
+  email?: string | null;
+  position?: string | null;
+  isActive?: boolean;
+};
+
 const initialForm = {
   displayName: "",
   email: "",
@@ -39,19 +48,25 @@ export function TeamAccessSection() {
   const [accounts, setAccounts] = useState<DashboardAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [generatedSecret, setGeneratedSecret] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(initialForm);
+  const [employees, setEmployees] = useState<TeamEmployee[]>([]);
 
   const canTogglePermission = (key: string) => key !== "view_dashboard";
 
   const loadAccounts = async () => {
     try {
       setLoading(true);
-      const response = await tenantApi.getDashboardAccounts();
-      setAccounts(Array.isArray(response.accounts) ? response.accounts : []);
+      const [accountsResponse, employeesResponse] = await Promise.all([
+        tenantApi.getDashboardAccounts(),
+        tenantApi.getEmployees().catch(() => ({ employees: [] }))
+      ]);
+      setAccounts(Array.isArray(accountsResponse.accounts) ? accountsResponse.accounts : []);
+      setEmployees(Array.isArray(employeesResponse.employees) ? employeesResponse.employees : []);
     } catch (err: any) {
       setError(err.message || (locale === "ar" ? "تعذر تحميل الحسابات" : "Failed to load accounts"));
     } finally {
@@ -66,6 +81,21 @@ export function TeamAccessSection() {
   }, [canManageAccounts]);
 
   const roleOptions = useMemo(() => ROLE_OPTIONS, []);
+  const employeeByEmail = useMemo(() => {
+    const map = new Map<string, TeamEmployee>();
+    employees.forEach((employee) => {
+      if (employee.email) {
+        map.set(employee.email.trim().toLowerCase(), employee);
+      }
+    });
+    return map;
+  }, [employees]);
+  const visibleAccounts = useMemo(() => {
+    return accounts.filter((account) => {
+      const linkedEmployee = account.email ? employeeByEmail.get(account.email.trim().toLowerCase()) : null;
+      return !linkedEmployee || !isServiceProviderPosition(linkedEmployee.position);
+    });
+  }, [accounts, employeeByEmail]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -149,6 +179,23 @@ export function TeamAccessSection() {
     }
   };
 
+  const handleSendInvite = async (accountId: string) => {
+    try {
+      setInviteLoadingId(accountId);
+      const response = await tenantApi.sendDashboardAccountInvite(accountId);
+      if (response?.temporaryPassword) {
+        setGeneratedSecret(response.temporaryPassword);
+      }
+      await loadAccounts();
+      setSuccess(response.message || (locale === "ar" ? "تم إرسال الدعوة" : "Invitation sent"));
+      window.setTimeout(() => setSuccess(null), 3500);
+    } catch (err: any) {
+      setError(err.message || (locale === "ar" ? "تعذر إرسال الدعوة" : "Failed to send invitation"));
+    } finally {
+      setInviteLoadingId(null);
+    }
+  };
+
   const handleToggleActive = async (account: DashboardAccount) => {
     try {
       setSaving(true);
@@ -224,8 +271,8 @@ export function TeamAccessSection() {
               </h4>
               <p className="text-xs text-gray-500">
                 {locale === "ar"
-                  ? `${accounts.length} حساب`
-                  : `${accounts.length} account(s)`}
+                  ? `${visibleAccounts.length} حساب`
+                  : `${visibleAccounts.length} account(s)`}
               </p>
             </div>
           </div>
@@ -236,13 +283,23 @@ export function TeamAccessSection() {
                 <div key={item} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
               ))}
             </div>
-          ) : accounts.length === 0 ? (
+          ) : visibleAccounts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
-              {locale === "ar" ? "لا توجد حسابات بعد." : "No dashboard accounts yet."}
+              {locale === "ar"
+                ? "لا توجد حسابات فريق حالياً."
+                : "No team dashboard accounts yet."}
             </div>
           ) : (
             <div className="space-y-3">
-              {accounts.map((account) => (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">
+                {locale === "ar"
+                  ? "مقدمو الخدمة تُدار حساباتهم من صفحة الموظف، وتظهر هنا حسابات الفريق الأخرى فقط."
+                  : "Service providers are managed from the employee page, while other team accounts appear here."}
+              </div>
+              {visibleAccounts.map((account) => {
+                const linkedEmployee = account.email ? employeeByEmail.get(account.email.trim().toLowerCase()) : null;
+
+                return (
                 <div key={account.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -256,6 +313,11 @@ export function TeamAccessSection() {
                         {account.passwordResetRequired && (
                           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
                             {locale === "ar" ? "يحتاج تغيير كلمة المرور" : "Password reset required"}
+                          </span>
+                        )}
+                        {linkedEmployee?.position && (
+                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-600">
+                            {getEmployeePositionLabel(linkedEmployee.position, locale as 'ar' | 'en')}
                           </span>
                         )}
                       </div>
@@ -281,6 +343,16 @@ export function TeamAccessSection() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => handleSendInvite(account.id)}
+                        disabled={inviteLoadingId === account.id}
+                        className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {inviteLoadingId === account.id
+                          ? (locale === "ar" ? "جارٍ الإرسال..." : "Sending...")
+                          : (locale === "ar" ? "إرسال دعوة" : "Send invite")}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleToggleActive(account)}
                         className={`rounded-xl px-3 py-2 text-xs font-medium ${
                           account.isActive
@@ -295,7 +367,8 @@ export function TeamAccessSection() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -359,6 +432,11 @@ export function TeamAccessSection() {
                   </p>
                 </div>
               </div>
+              <p className="mb-3 text-xs text-gray-500">
+                {locale === "ar"
+                  ? "يتم استخدام هذا القسم للحسابات الإدارية فقط، أما مقدمو الخدمة فتُدار صلاحياتهم من صفحة الموظف."
+                  : "This section is for admin/team dashboard accounts only. Service providers are managed from the employee page."}
+              </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {DASHBOARD_PERMISSION_KEYS.filter((key) => canTogglePermission(key)).map((key) => {
                   const checked = form.permissions[key] === true;

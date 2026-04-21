@@ -8,6 +8,8 @@ const {
   normalizeDashboardPermissions,
   getDashboardRoleLabel
 } = require('../utils/tenantDashboardPermissions');
+const { sendDashboardAccountInviteEmail } = require('../utils/emailService');
+const { getTenantDashboardLoginUrl } = require('../utils/url');
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
@@ -58,6 +60,8 @@ const ensureEmailAvailability = async (email, tenantId, excludeAccountId = null)
     throw new Error('This email is already used by this tenant');
   }
 };
+
+const isValidRoleKey = (roleKey) => ROLE_OPTIONS.some((option) => option.value === roleKey);
 
 const writeActivityLog = async ({ req, tenantId, accountId, action, details, previousValue, newValue }) => {
   try {
@@ -130,7 +134,7 @@ exports.createAccount = async (req, res) => {
       });
     }
 
-    if (!ROLE_OPTIONS.includes(roleKey)) {
+    if (!isValidRoleKey(roleKey)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role selected'
@@ -209,7 +213,7 @@ exports.updateAccount = async (req, res) => {
       updates.email = normalizedEmail;
     }
     if (req.body.roleKey !== undefined) {
-      if (!ROLE_OPTIONS.includes(req.body.roleKey)) {
+      if (!isValidRoleKey(req.body.roleKey)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid role selected'
@@ -341,6 +345,74 @@ exports.deactivateAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to disable dashboard account',
+      error: error.message
+    });
+  }
+};
+
+exports.sendInvite = async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+    const account = await db.TenantDashboardAccount.findOne({
+      where: { id, tenantId }
+    });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dashboard account not found'
+      });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const nextPassword = temporaryPassword;
+    await account.update({
+      password: nextPassword,
+      passwordResetRequired: true,
+      isActive: true
+    });
+
+    const tenant = await db.Tenant.findByPk(tenantId, {
+      attributes: ['name', 'name_en', 'name_ar', 'settings']
+    });
+
+    const locale = tenant?.settings?.language === 'en' ? 'en' : 'ar';
+    const loginUrl = getTenantDashboardLoginUrl(locale);
+    const emailResult = await sendDashboardAccountInviteEmail({
+      email: account.email,
+      displayName: account.displayName,
+      tenantName: tenant?.name_ar || tenant?.name_en || tenant?.name || 'Rifah',
+      temporaryPassword,
+      loginUrl
+    });
+
+    await writeActivityLog({
+      req,
+      tenantId,
+      accountId: account.id,
+      action: 'updated',
+      details: {
+        event: 'dashboard_account_invite_sent',
+        emailSent: emailResult.success
+      }
+    });
+
+    res.json({
+      success: true,
+      message: emailResult.success
+        ? 'Invitation email sent successfully'
+        : 'Account updated, but invitation email could not be sent',
+      temporaryPassword,
+      emailSent: emailResult.success,
+      emailError: emailResult.success ? null : emailResult.error,
+      account: sanitizeAccount(account)
+    });
+  } catch (error) {
+    console.error('Send dashboard account invite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send invitation email',
       error: error.message
     });
   }

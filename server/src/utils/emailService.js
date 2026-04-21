@@ -362,6 +362,22 @@ const sendStaffInviteEmail = async ({ email, staffName, tenantName, temporaryPas
     });
 };
 
+const sendDashboardAccountInviteEmail = async ({ email, displayName, tenantName, temporaryPassword, loginUrl }) => {
+    const dashboardLoginUrl = loginUrl || getTenantDashboardLoginUrl();
+    return sendEmail({
+        to: email,
+        subject: 'Rifah dashboard access invitation',
+        template: 'dashboard_invite',
+        data: {
+            displayName,
+            tenantName,
+            email,
+            temporaryPassword,
+            loginUrl: dashboardLoginUrl
+        }
+    });
+};
+
 const sendStaffPasswordResetEmail = async ({ email, staffName, tenantName, temporaryPassword }) => {
     const loginUrl = getStaffAppLoginUrl();
     return sendEmail({
@@ -388,5 +404,6 @@ module.exports = {
     sendPaymentSuccessEmail,
     sendPaymentFailedEmail,
     sendStaffInviteEmail,
+    sendDashboardAccountInviteEmail,
     sendStaffPasswordResetEmail
 };

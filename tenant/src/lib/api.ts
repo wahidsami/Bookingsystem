@@ -353,6 +353,10 @@ class TenantApiClient {
     return this.delete(`/tenant/dashboard-accounts/${id}`);
   }
 
+  async sendDashboardAccountInvite(id: string): Promise<any> {
+    return this.post(`/tenant/dashboard-accounts/${id}/send-invite`, {});
+  }
+
   async getDashboardAccountRoleOptions(): Promise<any> {
     return this.get('/tenant/dashboard-accounts/role-options');
   }

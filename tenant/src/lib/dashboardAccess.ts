@@ -127,7 +127,7 @@ export const SECTION_PERMISSION_LABELS: Record<DashboardPermissionKey, { en: str
   view_dashboard: { en: 'Dashboard', ar: 'لوحة التحكم' },
   view_appointments: { en: 'Appointments', ar: 'الحجوزات' },
   view_schedules: { en: 'Schedules', ar: 'الجداول' },
-  view_employees: { en: 'Employees', ar: 'الموظفون' },
+  view_employees: { en: 'Teams', ar: 'الفرق' },
   view_customers: { en: 'Customers', ar: 'العملاء' },
   view_services: { en: 'Services', ar: 'الخدمات' },
   view_products: { en: 'Products', ar: 'المنتجات' },

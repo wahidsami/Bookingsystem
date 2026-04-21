@@ -10,6 +10,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { normalizeEmployeePosition, VALID_EMPLOYEE_POSITIONS } = require('../utils/employeePositions');
+const { normalizeDashboardPermissions, DASHBOARD_ROLE_PRESETS } = require('../utils/tenantDashboardPermissions');
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
 const DEFAULT_STAFF_PERMISSIONS = {
@@ -159,6 +160,125 @@ const syncStaffAuthAccount = async ({
         hasAccount: true,
         temporaryPassword: finalPassword,
         passwordUpdated: Boolean(password)
+    });
+};
+
+const buildDashboardAccountPayload = ({ email, hasAccount, temporaryPassword = null, passwordUpdated = false, accountRemoved = false, needsEmail = false }) => ({
+    email,
+    hasAccount,
+    temporaryPassword,
+    passwordUpdated,
+    accountRemoved,
+    needsEmail
+});
+
+const syncTenantDashboardAccount = async ({
+    tenantId,
+    previousEmail = null,
+    nextEmail = null,
+    displayName = '',
+    position = null,
+    password = null,
+    transaction
+}) => {
+    const previousNormalized = previousEmail ? normalizeEmail(previousEmail) : null;
+    const nextNormalized = nextEmail ? normalizeEmail(nextEmail) : null;
+    const normalizedPosition = normalizeEmployeePosition(position);
+    const isDashboardManaged = Boolean(normalizedPosition && normalizedPosition !== 'service_provider');
+
+    const findDashboardAccountByEmail = async (email) => db.TenantDashboardAccount.findOne({
+        where: {
+            tenantId,
+            email
+        },
+        transaction
+    });
+
+    const previousAccount = previousNormalized
+        ? await findDashboardAccountByEmail(previousNormalized)
+        : null;
+    const nextAccount = nextNormalized
+        ? await findDashboardAccountByEmail(nextNormalized)
+        : null;
+    const existingAccount = previousAccount || nextAccount;
+
+    if (!isDashboardManaged) {
+        if (existingAccount) {
+            await existingAccount.destroy({ transaction });
+        }
+
+        return buildDashboardAccountPayload({
+            email: null,
+            hasAccount: false,
+            accountRemoved: Boolean(existingAccount)
+        });
+    }
+
+    if (!nextNormalized) {
+        if (existingAccount) {
+            await existingAccount.destroy({ transaction });
+        }
+
+        return buildDashboardAccountPayload({
+            email: null,
+            hasAccount: false,
+            accountRemoved: Boolean(existingAccount),
+            needsEmail: true
+        });
+    }
+
+    const roleKey = Object.keys(DASHBOARD_ROLE_PRESETS).includes(normalizedPosition)
+        ? normalizedPosition
+        : 'custom';
+    const permissions = normalizeDashboardPermissions({}, roleKey);
+    const finalDisplayName = String(displayName || '').trim() || nextNormalized;
+    const temporaryPassword = !existingAccount && !password ? generateTemporaryStaffPassword() : null;
+    const finalPassword = password || temporaryPassword;
+
+    if (existingAccount) {
+        const updates = {
+            displayName: finalDisplayName,
+            roleKey,
+            permissions,
+            isActive: true,
+            passwordResetRequired: !password
+        };
+
+        if (existingAccount.email !== nextNormalized) {
+            updates.email = nextNormalized;
+        }
+
+        if (password) {
+            updates.password = password;
+        }
+
+        await existingAccount.update(updates, { transaction });
+
+        return buildDashboardAccountPayload({
+            email: nextNormalized,
+            hasAccount: true,
+            passwordUpdated: Boolean(password),
+            needsEmail: false
+        });
+    }
+
+    await db.TenantDashboardAccount.create({
+        tenantId,
+        email: nextNormalized,
+        password: finalPassword,
+        displayName: finalDisplayName,
+        roleKey,
+        permissions,
+        isActive: true,
+        passwordResetRequired: true
+    }, { transaction });
+
+    return buildDashboardAccountPayload({
+        email: nextNormalized,
+        hasAccount: true,
+        temporaryPassword,
+        passwordUpdated: Boolean(password),
+        needsEmail: false
     });
 };
 
@@ -1033,12 +1153,26 @@ exports.createEmployee = async (req, res) => {
             isActive: isActiveBool
         }, { transaction });
 
-        const staffAppAccess = await syncStaffAuthAccount({
-            tenantId,
-            nextEmail: normalizedEmail,
-            password: staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null,
-            transaction
-        });
+        const isServiceProvider = normalizedPosition === 'service_provider';
+        const accessPassword = staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null;
+        const staffAppAccess = isServiceProvider
+            ? await syncStaffAuthAccount({
+                tenantId,
+                nextEmail: normalizedEmail,
+                password: accessPassword,
+                transaction
+            })
+            : null;
+        const dashboardAccess = !isServiceProvider
+            ? await syncTenantDashboardAccount({
+                tenantId,
+                nextEmail: normalizedEmail,
+                displayName: name.trim(),
+                position: normalizedPosition,
+                password: accessPassword,
+                transaction
+            })
+            : null;
 
         await transaction.commit();
 
@@ -1046,7 +1180,8 @@ exports.createEmployee = async (req, res) => {
             success: true,
             message: 'Employee created successfully',
             employee,
-            staffAppAccess
+            staffAppAccess,
+            dashboardAccess
         });
     } catch (error) {
         await transaction.rollback();
@@ -1213,13 +1348,40 @@ exports.updateEmployee = async (req, res) => {
             employee.photo = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
         }
 
-        const staffAppAccess = await syncStaffAuthAccount({
-            tenantId,
-            previousEmail,
-            nextEmail: employee.email,
-            password: staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null,
-            transaction
-        });
+        const accessPassword = staffAppPassword && staffAppPassword.trim() ? staffAppPassword.trim() : null;
+        const isServiceProvider = employee.position === 'service_provider';
+        const staffAppAccess = isServiceProvider
+            ? await syncStaffAuthAccount({
+                tenantId,
+                previousEmail,
+                nextEmail: employee.email,
+                password: accessPassword,
+                transaction
+            })
+            : await syncStaffAuthAccount({
+                tenantId,
+                previousEmail,
+                nextEmail: null,
+                transaction
+            });
+        const dashboardAccess = !isServiceProvider
+            ? await syncTenantDashboardAccount({
+                tenantId,
+                previousEmail,
+                nextEmail: employee.email,
+                displayName: employee.name,
+                position: employee.position,
+                password: accessPassword,
+                transaction
+            })
+            : await syncTenantDashboardAccount({
+                tenantId,
+                previousEmail,
+                nextEmail: null,
+                displayName: employee.name,
+                position: employee.position,
+                transaction
+            });
 
         await employee.save({ transaction });
         await transaction.commit();
@@ -1228,7 +1390,8 @@ exports.updateEmployee = async (req, res) => {
             success: true,
             message: 'Employee updated successfully',
             employee,
-            staffAppAccess
+            staffAppAccess,
+            dashboardAccess
         });
     } catch (error) {
         await transaction.rollback();
@@ -1295,18 +1458,32 @@ exports.deleteEmployee = async (req, res) => {
             }
         }
 
-        if (employee.email) {
-            const staffUser = await db.User.findOne({
+        if (employee.position === 'service_provider') {
+            if (employee.email) {
+                const staffUser = await db.User.findOne({
+                    where: {
+                        email: normalizeEmail(employee.email),
+                        tenantId,
+                        role: 'staff'
+                    },
+                    transaction
+                });
+
+                if (staffUser) {
+                    await staffUser.destroy({ transaction });
+                }
+            }
+        } else if (employee.email) {
+            const dashboardAccount = await db.TenantDashboardAccount.findOne({
                 where: {
-                    email: normalizeEmail(employee.email),
                     tenantId,
-                    role: 'staff'
+                    email: normalizeEmail(employee.email)
                 },
                 transaction
             });
 
-            if (staffUser) {
-                await staffUser.destroy({ transaction });
+            if (dashboardAccount) {
+                await dashboardAccount.destroy({ transaction });
             }
         }
 

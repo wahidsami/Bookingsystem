@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rifah Dashboard Access Invitation</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,sans-serif;color:#1f2937;">
+    <div style="max-width:640px;margin:0 auto;padding:32px 20px;">
+        <div style="background:#111827;border-radius:16px;padding:32px;color:#ffffff;">
+            <h1 style="margin:0 0 12px;font-size:28px;">You have been invited to Rifah Dashboard</h1>
+            <p style="margin:0 0 24px;line-height:1.7;color:#d1d5db;">
+                Hello {{displayName}}, your dashboard access for <strong>{{tenantName}}</strong> is ready.
+            </p>
+            <div style="background:#1f2937;border-radius:12px;padding:20px;margin-bottom:24px;">
+                <p style="margin:0 0 8px;"><strong>Email:</strong> {{email}}</p>
+                <p style="margin:0 0 8px;"><strong>Temporary password:</strong> {{temporaryPassword}}</p>
+                <p style="margin:0;color:#9ca3af;font-size:14px;">Please sign in and change your password after the first login.</p>
+            </div>
+            <p style="margin:0 0 8px;line-height:1.7;color:#d1d5db;">
+                Dashboard login:
+            </p>
+            <p style="margin:0 0 24px;word-break:break-all;">
+                <a href="{{loginUrl}}" style="color:#93c5fd;">{{loginUrl}}</a>
+            </p>
+            <p style="margin:0;line-height:1.7;color:#d1d5db;">
+                If you did not expect this invitation, please contact your tenant administrator.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

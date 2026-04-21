@@ -66,6 +66,7 @@ export default function EditEmployeePage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [existingPhoto, setExistingPhoto] = useState<string | null>(null);
   const [savedEmail, setSavedEmail] = useState("");
+  const isServiceProvider = `${formData.position || ''}`.trim() === 'service_provider';
 
   // App Access State
   const [appEnabled, setAppEnabled] = useState(false);
@@ -446,8 +447,8 @@ export default function EditEmployeePage() {
                   </select>
                   <p className="mt-2 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar'
-                      ? 'يمكنك تعديل المسمى الوظيفي هنا ليظهر بشكل أوضح في قائمة الموظفين.'
-                      : 'Adjust the job title here so it appears clearly in employee listings.'}
+                      ? 'يحدد هذا المسمى ما إذا كان العضو سيستخدم تطبيق الموظف أم حساب لوحة التحكم.'
+                      : 'This title decides whether the team member uses the staff app or a dashboard account.'}
                   </p>
                 </div>
 
@@ -662,148 +663,180 @@ export default function EditEmployeePage() {
               </div>
             </div>
 
-            {/* App Access Management */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'وصول التطبيق' : 'App Access'}
-              </h3>
+            {isServiceProvider ? (
+              <>
+                {/* App Access Management */}
+                <div className="card">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'وصول التطبيق' : 'App Access'}
+                  </h3>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    <p className="font-medium text-gray-800">{locale === 'ar' ? 'تفعيل الوصول للتطبيق' : 'Enable Mobile App Access'}</p>
-                    <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف باستخدام تطبيق RifahStaff' : 'Allow staff to use the RifahStaff mobile app'}</p>
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={handleToggleAppAccess}
-                      disabled={appAccessLoading}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${appEnabled ? 'bg-primary' : 'bg-gray-200'} ${appAccessLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${appEnabled ? (isRTL ? '-translate-x-5' : 'translate-x-5') : 'translate-x-0'}`}
-                      />
-                    </button>
-                  </div>
-                </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        <p className="font-medium text-gray-800">{locale === 'ar' ? 'تفعيل الوصول للتطبيق' : 'Enable Mobile App Access'}</p>
+                        <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف باستخدام تطبيق RifahStaff' : 'Allow staff to use the RifahStaff mobile app'}</p>
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={handleToggleAppAccess}
+                          disabled={appAccessLoading}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${appEnabled ? 'bg-primary' : 'bg-gray-200'} ${appAccessLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${appEnabled ? (isRTL ? '-translate-x-5' : 'translate-x-5') : 'translate-x-0'}`}
+                          />
+                        </button>
+                      </div>
+                    </div>
 
-                <hr className="border-gray-100" />
+                    <hr className="border-gray-100" />
 
-                <div className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSendInvite}
-                    disabled={inviteLoading || !savedEmail}
-                    className="w-full px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
-                  >
-                    {inviteLoading ? (
-                      <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      locale === 'ar' ? 'إرسال دعوة التطبيق (بريد إلكتروني)' : 'Send App Invite (Email)'
-                    )}
-                  </button>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        type="button"
+                        onClick={handleSendInvite}
+                        disabled={inviteLoading || !savedEmail}
+                        className="w-full px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                      >
+                        {inviteLoading ? (
+                          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          locale === 'ar' ? 'إرسال دعوة التطبيق (بريد إلكتروني)' : 'Send App Invite (Email)'
+                        )}
+                      </button>
 
-                  {appEnabled && (
-                    <button
-                      type="button"
-                      onClick={handleResetPassword}
-                      disabled={resetLoading || !savedEmail}
-                      className="w-full px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
-                    >
-                      {resetLoading ? (
-                        <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        locale === 'ar' ? 'طلب إعادة تعيين كلمة المرور' : 'Request Password Reset'
+                      {appEnabled && (
+                        <button
+                          type="button"
+                          onClick={handleResetPassword}
+                          disabled={resetLoading || !savedEmail}
+                          className="w-full px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                        >
+                          {resetLoading ? (
+                            <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            locale === 'ar' ? 'طلب إعادة تعيين كلمة المرور' : 'Request Password Reset'
+                          )}
+                        </button>
                       )}
-                    </button>
-                  )}
 
-                  {!savedEmail && (
-                    <p className="text-xs text-red-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      {locale === 'ar'
-                        ? 'احفظ الموظف بعنوان بريد إلكتروني أولاً لتفعيل التطبيق أو إرسال الدعوة.'
-                        : 'Save the employee with an email address first to enable app access or send invites.'}
-                    </p>
-                  )}
+                      {!savedEmail && (
+                        <p className="text-xs text-red-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar'
+                            ? 'احفظ الموظف بعنوان بريد إلكتروني أولاً لتفعيل التطبيق أو إرسال الدعوة.'
+                            : 'Save the employee with an email address first to enable app access or send invites.'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Permissions Matrix */}
+                <div className="card lg:col-span-2">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4 flex justify-between items-center" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', textAlign: isRTL ? 'right' : 'left' }}>
+                    <span>{locale === 'ar' ? 'صلاحيات الموظف' : 'Staff Permissions'}</span>
+                    {permissionsLoading && <span className="text-sm font-normal text-primary animate-pulse">{locale === 'ar' ? 'جاري الحفظ...' : 'Saving...'}</span>}
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
+                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <p className="font-medium text-gray-800">💰 {locale === 'ar' ? 'عرض الأرباح' : 'View Earnings'}</p>
+                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'تمكين الموظف من رؤية راتبه والعمولات والإكراميات.' : 'Let this staff see their payroll, commission, and tips.'}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={permissions.view_earnings} onChange={(e) => handlePermissionChange('view_earnings', e.target.checked)} />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
+                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <p className="font-medium text-gray-800">⭐ {locale === 'ar' ? 'عرض التقييمات' : 'View Reviews'}</p>
+                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح برؤية تقييمات العملاء لهذا الموظف.' : 'Let this staff see reviews left by customers.'}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={permissions.view_reviews} onChange={(e) => handlePermissionChange('view_reviews', e.target.checked)} />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
+                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <p className="font-medium text-gray-800">✍️ {locale === 'ar' ? 'الرد على التقييمات' : 'Reply to Reviews'}</p>
+                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للرد بشكل عام على تقييمات العملاء.' : 'Let this staff post public replies to reviews.'}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={permissions.reply_reviews} onChange={(e) => handlePermissionChange('reply_reviews', e.target.checked)} />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
+                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <p className="font-medium text-gray-800">👥 {locale === 'ar' ? 'عرض العملاء الدائمين' : 'View Clients'}</p>
+                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح بمعرفة سجل العملاء ومؤشراتهم.' : 'Let this staff see repeat clients and customer context.'}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={permissions.view_clients} onChange={(e) => handlePermissionChange('view_clients', e.target.checked)} />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
+                      <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <p className="font-medium text-gray-800">📝 {locale === 'ar' ? 'عرض ملاحظات الحجوزات' : 'View Booking Notes'}</p>
+                          <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف برؤية الملاحظات التي يضيفها العميل مع الحجز.' : 'Let this staff see notes that customers add while booking.'}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={permissions.view_booking_notes} onChange={(e) => handlePermissionChange('view_booking_notes', e.target.checked)} />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="card">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar' ? 'وصول لوحة التحكم' : 'Dashboard Access'}
+                </h3>
+                <div className="space-y-3 text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <p>
+                    {locale === 'ar'
+                      ? 'هذا المسمى الوظيفي لا يستخدم تطبيق الموظفين. سيتم إدارة حسابه من قسم الفريق والصلاحيات.'
+                      : 'This job title does not use the staff mobile app. Its account is managed from Team & Access.'}
+                  </p>
+                  <p>
+                    {locale === 'ar'
+                      ? 'بعد حفظ الموظف، ستظهر صلاحياته وبيانات الحساب في صفحة Team & Access حيث يمكنك إرسال الدعوة أو إعادة التعيين.'
+                      : 'After saving the employee, the account and section permissions are managed in Team & Access, where you can send the invite or reset the password.'}
+                  </p>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div className="font-medium text-gray-900">{locale === 'ar' ? 'البريد الإلكتروني المرتبط' : 'Linked email'}</div>
+                    <div className="mt-1 text-gray-700">{savedEmail || formData.email || '-'}</div>
+                  </div>
+                  <Link
+                    href={`/${locale}/dashboard/settings`}
+                    className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary/90"
+                  >
+                    {locale === 'ar' ? 'فتح الفريق والصلاحيات' : 'Open Team & Access'}
+                  </Link>
                 </div>
               </div>
-            </div>
-
-            {/* Permissions Matrix */}
-            <div className="card lg:col-span-2">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 flex justify-between items-center" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', textAlign: isRTL ? 'right' : 'left' }}>
-                <span>{locale === 'ar' ? 'صلاحيات الموظف' : 'Staff Permissions'}</span>
-                {permissionsLoading && <span className="text-sm font-normal text-primary animate-pulse">{locale === 'ar' ? 'جاري الحفظ...' : 'Saving...'}</span>}
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="font-medium text-gray-800">💰 {locale === 'ar' ? 'عرض الأرباح' : 'View Earnings'}</p>
-                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'تمكين الموظف من رؤية راتبه والعمولات والإكراميات.' : 'Let this staff see their payroll, commission, and tips.'}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={permissions.view_earnings} onChange={(e) => handlePermissionChange('view_earnings', e.target.checked)} />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="font-medium text-gray-800">⭐ {locale === 'ar' ? 'عرض التقييمات' : 'View Reviews'}</p>
-                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح برؤية تقييمات العملاء لهذا الموظف.' : 'Let this staff see reviews left by customers.'}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={permissions.view_reviews} onChange={(e) => handlePermissionChange('view_reviews', e.target.checked)} />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="font-medium text-gray-800">✍️ {locale === 'ar' ? 'الرد على التقييمات' : 'Reply to Reviews'}</p>
-                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للرد بشكل عام على تقييمات العملاء.' : 'Let this staff post public replies to reviews.'}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={permissions.reply_reviews} onChange={(e) => handlePermissionChange('reply_reviews', e.target.checked)} />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="font-medium text-gray-800">👥 {locale === 'ar' ? 'عرض العملاء الدائمين' : 'View Clients'}</p>
-                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح بمعرفة سجل العملاء ومؤشراتهم.' : 'Let this staff see repeat clients and customer context.'}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={permissions.view_clients} onChange={(e) => handlePermissionChange('view_clients', e.target.checked)} />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="p-4 border rounded-lg hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="font-medium text-gray-800">📝 {locale === 'ar' ? 'عرض ملاحظات الحجوزات' : 'View Booking Notes'}</p>
-                      <p className="text-sm text-gray-500">{locale === 'ar' ? 'السماح للموظف برؤية الملاحظات التي يضيفها العميل مع الحجز.' : 'Let this staff see notes that customers add while booking.'}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={permissions.view_booking_notes} onChange={(e) => handlePermissionChange('view_booking_notes', e.target.checked)} />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
 
           </div>
         </div>

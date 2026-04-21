@@ -253,8 +253,8 @@ export default function NewEmployeePage() {
                   </select>
                   <p className="mt-2 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar'
-                      ? 'يظهر هذا المسمى داخل قائمة الموظفين ويساعد لاحقاً في تنظيم صلاحيات الحساب.'
-                      : 'This title appears in employee lists and helps organize future account permissions.'}
+                      ? 'يحدد هذا المسمى ما إذا كان العضو سيستخدم تطبيق الموظف أم حساب لوحة التحكم.'
+                      : 'This title decides whether the team member uses the staff app or a dashboard account.'}
                   </p>
                 </div>
 
