@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklyScheduleEditor";
 import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
 import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
 import {
@@ -678,16 +679,16 @@ export default function NewEmployeePage() {
               </div>
             </section>
 
-            <section id="employee-section-schedule" className="card scroll-mt-6">
-              <div className="mb-4 flex items-start justify-between gap-3">
+            <section id="employee-section-schedule" className="card scroll-mt-6 space-y-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'الجدول' : 'Schedule'}
                   </h3>
                   <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar'
-                      ? 'ساعات الرؤية الأسبوعية تظهر هنا، بينما يتم إعداد الورديات التفصيلية من صفحة الجداول حالياً.'
-                      : 'Weekly visibility lives here, while detailed shifts still come from the schedules page for now.'}
+                      ? 'الجدول الأسبوعي الخاص بالموظف يُدار هنا مباشرة باستخدام نفس ورديات التطبيق.'
+                      : 'The employee’s weekly schedule is managed here directly using the same shift records.'}
                   </p>
                 </div>
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
@@ -695,10 +696,10 @@ export default function NewEmployeePage() {
                 </span>
               </div>
 
-              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-                <div>
+              <div className="grid gap-4 lg:grid-cols-[280px,minmax(0,1fr)]">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule Visibility'}
+                    {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule visibility'}
                   </label>
                   <select
                     name="scheduleVisibilityWeeks"
@@ -712,17 +713,19 @@ export default function NewEmployeePage() {
                     <option value="3">{locale === 'ar' ? '3 أسابيع' : '3 Weeks'}</option>
                     <option value="4">{locale === 'ar' ? '4 أسابيع' : '4 Weeks'}</option>
                   </select>
+                  <p className="mt-3 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar'
+                      ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
+                      : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
+                  </p>
                 </div>
-                <p className="mt-3 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {locale === 'ar'
-                    ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
-                    : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
-                </p>
-                <div className="mt-4">
-                  <Link href={`/${locale}/dashboard/schedules`} className="btn btn-secondary">
-                    {locale === 'ar' ? 'فتح صفحة الجداول' : 'Open schedules'}
-                  </Link>
-                </div>
+
+                <EmployeeWeeklyScheduleEditor
+                  employeeId={null}
+                  employeeName={formData.name || undefined}
+                  locale={locale}
+                  isRTL={isRTL}
+                />
               </div>
             </section>
 

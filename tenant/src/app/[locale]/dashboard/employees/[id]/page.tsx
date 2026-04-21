@@ -6,9 +6,9 @@ import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
-import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { EmployeeEditorFrame, type EmployeeEditorSection } from "@/components/EmployeeEditorFrame";
+import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklyScheduleEditor";
 import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
 import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
 import {
@@ -1102,15 +1102,35 @@ export default function EditEmployeePage() {
                     </p>
                   </div>
 
+              </div>
+
+            <section id="employee-section-schedule" className="card scroll-mt-6 space-y-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule Visibility'}
+                  <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'الجدول' : 'Schedule'}
+                  </h3>
+                  <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar'
+                      ? 'الجدول الأسبوعي الخاص بالموظف يُدار هنا مباشرة باستخدام نفس ورديات التطبيق.'
+                      : 'The employee’s weekly schedule is managed here directly using the same shift records.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  {`${sectionProgress.schedule.filled}/${sectionProgress.schedule.total}`}
+                </span>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[280px,minmax(0,1fr)]">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'إتاحة الجدول للموظف' : 'Schedule visibility'}
                   </label>
                   <select
                     name="scheduleVisibilityWeeks"
                     value={formData.scheduleVisibilityWeeks}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
                     <option value="1">{locale === 'ar' ? 'أسبوع واحد' : '1 Week'}</option>
@@ -1118,14 +1138,21 @@ export default function EditEmployeePage() {
                     <option value="3">{locale === 'ar' ? '3 أسابيع' : '3 Weeks'}</option>
                     <option value="4">{locale === 'ar' ? '4 أسابيع' : '4 Weeks'}</option>
                   </select>
-                  <p className="text-sm text-gray-500 mt-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <p className="mt-3 text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar'
                       ? 'يحدد عدد الأسابيع المستقبلية التي يستطيع الموظف رؤيتها في تطبيق RifahStaff.'
                       : 'Controls how many future weeks this employee can view in the RifahStaff app.'}
                   </p>
                 </div>
+
+                <EmployeeWeeklyScheduleEditor
+                  employeeId={id as string}
+                  employeeName={formData.name || undefined}
+                  locale={locale}
+                  isRTL={isRTL}
+                />
               </div>
-            </div>
+            </section>
 
             {/* Active Status */}
             <div id="employee-section-bio" className="card scroll-mt-6">
@@ -1382,6 +1409,7 @@ export default function EditEmployeePage() {
             )}
 
           </div>
+        </div>
         </div>
         </div>
 
