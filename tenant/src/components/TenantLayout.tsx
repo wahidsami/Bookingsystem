@@ -245,6 +245,16 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     return pathname?.startsWith(href);
   };
   const currentSection = navigation.find((item) => isActive(item.href))?.name || t("dashboard");
+  const sidebarWidth = sidebarCollapsed ? 88 : 280;
+  const shellGridStyle = {
+    gridTemplateRows: '88px minmax(0, 1fr)',
+    gridTemplateColumns: isRTL
+      ? `minmax(0, 1fr) ${sidebarWidth}px`
+      : `${sidebarWidth}px minmax(0, 1fr)`,
+    gridTemplateAreas: isRTL
+      ? '"header logo" "content sidebar"'
+      : '"logo header" "sidebar content"',
+  } as React.CSSProperties;
 
   const renderSidebarNavItem = (item: { name: string; href: string; icon: NavIcon; badgeCount?: number }) => {
     const active = isActive(item.href);
@@ -306,239 +316,245 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </div>
       </header>
 
-      <div className="hidden lg:flex min-h-screen" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-        <aside
-          className={`sticky top-0 h-screen flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
-            isRTL ? 'border-l' : 'border-r'
-          }`}
-          style={{ width: sidebarCollapsed ? 88 : 280 }}
+      <div className="hidden lg:grid min-h-screen" style={{ ...shellGridStyle, direction: 'ltr' }}>
+        <div
+          className="border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          style={{ gridArea: 'logo' }}
+          dir={isRTL ? 'rtl' : 'ltr'}
         >
-          <div
-            className="h-[88px] border-b border-gray-200 bg-gradient-to-r from-primary/5 to-secondary/5 px-4"
-            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-          >
-            <div className="flex h-full items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                {(user?.logo || user?.profileImage) ? (
-                  <img
-                    src={user.logo ? (user.logo.startsWith('http') ? user.logo : getImageUrl(user.logo)) : getImageUrl(user.profileImage)}
-                    alt="Business Logo"
-                    className="h-12 w-12 rounded-xl object-cover border-2 border-primary/20 shrink-0"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
-                    <span className="text-primary font-semibold text-xl">
-                      {user?.businessName?.[0] || (locale === 'ar' ? 'م' : 'B')}
-                    </span>
-                  </div>
-                )}
-                {!sidebarCollapsed && (
-                  <div className="min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    <p className="truncate text-base font-bold text-gray-900">
-                      {user?.businessName || (locale === 'ar' ? 'اسم المركز' : 'Business name')}
-                    </p>
-                    <p className="truncate text-xs text-gray-600">
-                      {Array.isArray(user?.businessType)
-                        ? user.businessType.map((item: string) => item.replace('_', ' ')).join(', ')
-                        : user?.businessType || 'Salon'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSidebarCollapsed((current) => !current)}
-                className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
-                aria-label={sidebarCollapsed ? (locale === 'ar' ? 'توسيع القائمة' : 'Expand sidebar') : (locale === 'ar' ? 'تصغير القائمة' : 'Collapse sidebar')}
-              >
-                {sidebarCollapsed
-                  ? (isRTL ? <ChevronRightIcon className="h-5 w-5" /> : <ChevronLeftIcon className="h-5 w-5" />)
-                  : <Bars3Icon className="h-5 w-5" />}
-              </button>
-            </div>
-          </div>
-
-          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {navigation.map((item) => renderSidebarNavItem(item))}
-          </nav>
-        </aside>
-
-        <main className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-40 h-[88px] border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm">
-            <div className="flex h-full items-center justify-between px-6" style={{ flexDirection: isRTL ? 'row' : 'row' }}>
-              <div className="flex items-center gap-3 min-w-0" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
-                  <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
-                  {currentDateTimeLabel}
-                </div>
-                <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-                    {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
+          <div className="flex h-full items-center justify-between gap-3 px-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <div className="flex min-w-0 items-center gap-3">
+              {(user?.logo || user?.profileImage) ? (
+                <img
+                  src={user.logo ? (user.logo.startsWith('http') ? user.logo : getImageUrl(user.logo)) : getImageUrl(user.profileImage)}
+                  alt="Business Logo"
+                  className="h-12 w-12 rounded-xl object-cover border-2 border-primary/20 shrink-0"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                  <span className="text-primary font-semibold text-xl">
+                    {user?.businessName?.[0] || (locale === 'ar' ? 'م' : 'B')}
                   </span>
-                  <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
                 </div>
+              )}
+              {!sidebarCollapsed && (
+                <div className="min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <p className="truncate text-base font-bold text-gray-900">
+                    {user?.businessName || (locale === 'ar' ? 'اسم المركز' : 'Business name')}
+                  </p>
+                  <p className="truncate text-xs text-gray-600">
+                    {Array.isArray(user?.businessType)
+                      ? user.businessType.map((item: string) => item.replace('_', ' ')).join(', ')
+                      : user?.businessType || 'Salon'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((current) => !current)}
+              className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
+              aria-label={sidebarCollapsed ? (locale === 'ar' ? 'توسيع القائمة' : 'Expand sidebar') : (locale === 'ar' ? 'تصغير القائمة' : 'Collapse sidebar')}
+            >
+              {sidebarCollapsed
+                ? (isRTL ? <ChevronRightIcon className="h-5 w-5" /> : <ChevronLeftIcon className="h-5 w-5" />)
+                : <Bars3Icon className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        <header
+          className="border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          style={{ gridArea: 'header' }}
+          dir={isRTL ? 'rtl' : 'ltr'}
+        >
+          <div className="flex h-full items-center justify-between px-6" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <div className="flex items-center gap-3 min-w-0" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
+                <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
+                {currentDateTimeLabel}
               </div>
+              <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
+                </span>
+                <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
+              </div>
+            </div>
 
-              <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <Link
-                  href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <Link
+                href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {locale === 'ar' ? 'EN' : 'عربي'}
+              </Link>
+
+              <div ref={userMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((current) => !current)}
+                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
+                  style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                 >
-                  {locale === 'ar' ? 'EN' : 'عربي'}
-                </Link>
-
-                <div ref={userMenuRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setUserMenuOpen((current) => !current)}
-                    className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
-                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                  >
-                    {user?.profileImage || user?.logo ? (
-                      <img
-                        src={user.profileImage ? getImageUrl(user.profileImage) : getImageUrl(user.logo)}
-                        alt={displayName}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
+                  {user?.profileImage || user?.logo ? (
+                    <img
+                      src={user.profileImage ? getImageUrl(user.profileImage) : getImageUrl(user.logo)}
+                      alt={displayName}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
                       {displayInitials}
                     </div>
                   )}
                   <div className="min-w-0 text-left" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
-                      <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
-                    </div>
-                    <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                    <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
+                    <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
+                  </div>
+                  <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
 
-                  {userMenuOpen && (
-                    <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
-                      <div className="border-b border-gray-100 px-4 py-4">
-                        <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                        <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
-                      </div>
-                      <div className="p-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            router.push(`/${locale}/dashboard/settings`);
-                          }}
-                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                        >
-                          <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
-                          <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled
-                          title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
-                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                          style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                        >
-                          <LifebuoyIcon className="h-5 w-5 text-gray-400" />
-                          <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled
-                          title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
-                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                          style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                        >
-                          <InformationCircleIcon className="h-5 w-5 text-gray-400" />
-                          <span>{locale === 'ar' ? 'حول' : 'About'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            logout();
-                          }}
-                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                        >
-                          <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
-                          <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
-                        </button>
-                      </div>
+                {userMenuOpen && (
+                  <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
+                    <div className="border-b border-gray-100 px-4 py-4">
+                      <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                      <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
                     </div>
-                  )}
-                </div>
+                    <div className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          router.push(`/${locale}/dashboard/settings`);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                      >
+                        <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
+                        <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                      >
+                        <LifebuoyIcon className="h-5 w-5 text-gray-400" />
+                        <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                      >
+                        <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+                        <span>{locale === 'ar' ? 'حول' : 'About'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          logout();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                      >
+                        <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
+                        <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </header>
+          </div>
+        </header>
 
-          <div className="flex-1 p-4 lg:p-8">
+        <aside
+          className={`sticky top-[88px] h-[calc(100vh-88px)] flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
+            isRTL ? 'border-l' : 'border-r'
+          }`}
+          style={{ gridArea: 'sidebar' }}
+          dir={isRTL ? 'rtl' : 'ltr'}
+        >
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+            {navigation.map((item) => renderSidebarNavItem(item))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0" style={{ gridArea: 'content' }} dir={isRTL ? 'rtl' : 'ltr'}>
+          <div className="p-4 lg:p-8">
             <div className="mx-auto w-full max-w-[1600px]">
-            {(posAlerts.length > 0 || usageAlerts.length > 0) && (
-              <div className="mb-4 space-y-2">
-                {posAlerts.map((alert) => (
-                  <div
-                    key={`pos-${alert.id}`}
-                    className={`rounded-2xl border px-3 py-2.5 flex items-start justify-between gap-3 ${
-                      alert.severity === 'high'
-                        ? 'bg-rose-50 border-rose-200 text-rose-900'
-                        : 'bg-sky-50 border-sky-200 text-sky-900'
-                    }`}
-                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                  >
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="text-[13px] font-bold leading-tight">
-                        {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
-                      </p>
-                      <p className="text-[11px] mt-1 opacity-90 leading-snug">
-                        {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
-                      </p>
-                      <Link
-                        href={`/${locale}${alert.detailPath || '/dashboard/pos'}`}
-                        className="mt-1.5 inline-flex text-[11px] font-semibold underline"
+              {(posAlerts.length > 0 || usageAlerts.length > 0) && (
+                <div className="mb-4 space-y-2">
+                  {posAlerts.map((alert) => (
+                    <div
+                      key={`pos-${alert.id}`}
+                      className={`rounded-2xl border px-3 py-2.5 flex items-start justify-between gap-3 ${
+                        alert.severity === 'high'
+                          ? 'bg-rose-50 border-rose-200 text-rose-900'
+                          : 'bg-sky-50 border-sky-200 text-sky-900'
+                      }`}
+                      style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                    >
+                      <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        <p className="text-[13px] font-bold leading-tight">
+                          {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
+                        </p>
+                        <p className="text-[11px] mt-1 opacity-90 leading-snug">
+                          {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
+                        </p>
+                        <Link
+                          href={`/${locale}${alert.detailPath || '/dashboard/pos'}`}
+                          className="mt-1.5 inline-flex text-[11px] font-semibold underline"
+                        >
+                          {locale === 'ar' ? 'فتح التحصيل' : 'Open collection'}
+                        </Link>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => dismissPosAlert(alert.id)}
+                        className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold hover:bg-white"
                       >
-                        {locale === 'ar' ? 'فتح التحصيل' : 'Open collection'}
-                      </Link>
+                        {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => dismissPosAlert(alert.id)}
-                      className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold hover:bg-white"
+                  ))}
+                  {usageAlerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`rounded-2xl border px-3 py-2.5 flex items-start justify-between gap-3 ${
+                        alert.priority === 'high' || alert.priority === 'critical'
+                          ? 'bg-rose-50 border-rose-200 text-rose-900'
+                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                      }`}
+                      style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                     >
-                      {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
-                    </button>
-                  </div>
-                ))}
-                {usageAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={`rounded-2xl border px-3 py-2.5 flex items-start justify-between gap-3 ${
-                      alert.priority === 'high' || alert.priority === 'critical'
-                        ? 'bg-rose-50 border-rose-200 text-rose-900'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
-                    }`}
-                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                  >
-                    <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="text-[13px] font-bold leading-tight">
-                        {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
-                      </p>
-                      <p className="text-[11px] mt-1 opacity-90 leading-snug">
-                        {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
-                      </p>
+                      <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        <p className="text-[13px] font-bold leading-tight">
+                          {locale === 'ar' ? (alert.title_ar || alert.title) : alert.title}
+                        </p>
+                        <p className="text-[11px] mt-1 opacity-90 leading-snug">
+                          {locale === 'ar' ? (alert.message_ar || alert.message) : alert.message}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => dismissAlert(alert.id)}
+                        className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold hover:bg-white"
+                      >
+                        {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => dismissAlert(alert.id)}
-                      className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold hover:bg-white"
-                    >
-                      {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {children}
+                  ))}
+                </div>
+              )}
+              {children}
             </div>
           </div>
         </main>
