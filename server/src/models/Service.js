@@ -153,6 +153,12 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: [],
             comment: 'Array of service variants with description, duration, price, and active state'
         },
+        paymentOptions: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            defaultValue: [],
+            comment: 'Array of allowed booking payment methods for this service'
+        },
         // Legacy pricing (for backward compatibility)
         basePrice: {
             type: DataTypes.DECIMAL(10, 2),

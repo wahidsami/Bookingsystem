@@ -8,6 +8,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { Op } = require('sequelize');
+const { normalizeServicePaymentOptions } = require('../utils/tenantPaymentSettings');
 
 // Configure multer for service image uploads
 const storage = multer.diskStorage({
@@ -117,6 +118,10 @@ function parseServiceVariants(input) {
     } catch (error) {
         return [];
     }
+}
+
+function parseServicePaymentOptions(input) {
+    return normalizeServicePaymentOptions(input);
 }
 
 function normalizeServiceEmployeeAssignment(input, index = 0) {
@@ -403,6 +408,7 @@ exports.createService = async (req, res) => {
             benefits, // JSON string or array of {en, ar} objects
             whatToExpect, // JSON string or array of {en, ar} objects
             variants,
+            paymentOptions,
             employeeAssignments,
             hasOffer,
             offerDetails,
@@ -498,6 +504,7 @@ exports.createService = async (req, res) => {
         }
 
         const variantsArray = parseServiceVariants(variants);
+        const paymentOptionsArray = parseServicePaymentOptions(paymentOptions);
 
         const parsedEmployeeAssignments = parseServiceEmployeeAssignments(employeeAssignments || employeeIds);
         const selectedEmployeeAssignments = parsedEmployeeAssignments.filter((assignment) => assignment.isAssigned);
@@ -547,6 +554,7 @@ exports.createService = async (req, res) => {
             benefits: benefitsArray,
             whatToExpect: whatToExpectArray,
             variants: variantsArray,
+            paymentOptions: paymentOptionsArray,
             hasOffer: hasOffer === true || hasOffer === 'true',
             offerDetails: offerDetails || null,
             hasGift: hasGift === true || hasGift === 'true',
@@ -625,6 +633,7 @@ exports.updateService = async (req, res) => {
             benefits,
             whatToExpect,
             variants,
+            paymentOptions,
             employeeAssignments,
             hasOffer,
             offerDetails,
@@ -732,6 +741,9 @@ exports.updateService = async (req, res) => {
         if (variants !== undefined) {
             variantsArray = parseServiceVariants(variants);
         }
+        const paymentOptionsArray = paymentOptions !== undefined
+            ? parseServicePaymentOptions(paymentOptions)
+            : normalizeServicePaymentOptions(service.paymentOptions || []);
 
         const parsedEmployeeAssignments = employeeAssignments !== undefined
             ? parseServiceEmployeeAssignments(employeeAssignments)
@@ -775,6 +787,7 @@ exports.updateService = async (req, res) => {
         service.benefits = benefitsArray;
         service.whatToExpect = whatToExpectArray;
         if (variants !== undefined) service.variants = variantsArray;
+        if (paymentOptions !== undefined) service.paymentOptions = paymentOptionsArray;
         if (hasOffer !== undefined) service.hasOffer = hasOffer === true || hasOffer === 'true';
         if (offerDetails !== undefined) service.offerDetails = offerDetails || null;
         if (hasGift !== undefined) service.hasGift = hasGift === true || hasGift === 'true';

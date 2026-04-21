@@ -151,6 +151,7 @@ export interface Service {
     maxPrice?: number;
     rawPrice?: number;
     finalPrice?: number;
+    paymentOptions?: Array<'at-center' | 'online-full' | 'booking-fee'>;
     employees?: Staff[];
 }
 
@@ -489,6 +490,12 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
     maxPrice: toNumber((service as Partial<Service> & { maxPrice?: number }).maxPrice),
     rawPrice: toNumber(service?.rawPrice),
     finalPrice: toNumber(service?.finalPrice),
+    paymentOptions: Array.isArray((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions)
+        ? (service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions
+            .map((option) => toStringValue(option).trim().toLowerCase())
+            .filter((option): option is 'at-center' | 'online-full' | 'booking-fee' =>
+                ['at-center', 'online-full', 'booking-fee'].includes(option))
+        : undefined,
 });
 
 export const normalizeProduct = (product: Partial<Product> | null | undefined): Product => ({

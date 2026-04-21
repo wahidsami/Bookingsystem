@@ -18,6 +18,16 @@ interface BookingProps {
 type BookingStep = 'staff' | 'datetime' | 'review';
 type ServicePaymentChoice = 'at-center' | 'online-full' | 'booking-fee';
 
+const SERVICE_PAYMENT_CHOICES: ServicePaymentChoice[] = ['at-center', 'online-full', 'booking-fee'];
+
+const normalizeServicePaymentOptions = (paymentOptions?: Array<string | null | undefined> | null) => {
+    const normalized = (paymentOptions || [])
+        .map((value) => `${value ?? ''}`.trim().toLowerCase())
+        .filter((value): value is ServicePaymentChoice => SERVICE_PAYMENT_CHOICES.includes(value as ServicePaymentChoice));
+
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : [...SERVICE_PAYMENT_CHOICES];
+};
+
 const DEFAULT_BOOKING_PAYMENT_SETTINGS = {
     allowServicePayAtCenter: true,
     allowServiceFullOnline: true,
@@ -46,6 +56,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [bookingNote, setBookingNote] = useState('');
     const [paymentSettings, setPaymentSettings] = useState(tenant?.paymentSettings || DEFAULT_BOOKING_PAYMENT_SETTINGS);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServicePaymentChoice>('at-center');
+    const allowedServicePaymentMethods = new Set(normalizeServicePaymentOptions(service?.paymentOptions));
 
     useEffect(() => {
         loadStaff();
@@ -106,25 +117,22 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     };
 
     useEffect(() => {
-        if (paymentSettings.allowServicePayAtCenter) {
-            setSelectedPaymentMethod((current) =>
-                current === 'at-center' || !current ? 'at-center' : current
-            );
+        const availableMethods = [
+            paymentSettings.allowServicePayAtCenter && allowedServicePaymentMethods.has('at-center') ? 'at-center' : null,
+            paymentSettings.allowServiceFullOnline && allowedServicePaymentMethods.has('online-full') ? 'online-full' : null,
+            paymentSettings.allowServiceDeposit && allowedServicePaymentMethods.has('booking-fee') ? 'booking-fee' : null,
+        ].filter(Boolean) as ServicePaymentChoice[];
+
+        if (availableMethods.length === 0) {
             return;
         }
 
-        if (paymentSettings.allowServiceFullOnline) {
-            setSelectedPaymentMethod('online-full');
-            return;
-        }
-
-        if (paymentSettings.allowServiceDeposit) {
-            setSelectedPaymentMethod('booking-fee');
-        }
+        setSelectedPaymentMethod((current) => availableMethods.includes(current) ? current : availableMethods[0]);
     }, [
         paymentSettings.allowServiceDeposit,
         paymentSettings.allowServiceFullOnline,
         paymentSettings.allowServicePayAtCenter,
+        service?.paymentOptions,
     ]);
 
     const servicePrice = getServicePrice(service);
@@ -134,7 +142,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const payableNowAmount = selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : servicePrice;
 
     const paymentOptions = [
-        paymentSettings.allowServicePayAtCenter ? {
+        paymentSettings.allowServicePayAtCenter && allowedServicePaymentMethods.has('at-center') ? {
             id: 'at-center' as ServicePaymentChoice,
             title: language === 'ar' ? 'الدفع عند الوصول' : 'Pay When You Arrive',
             subtitle: language === 'ar'
@@ -143,7 +151,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             amountLabel: language === 'ar' ? 'يدفع لاحقاً' : 'Pay later',
             icon: 'storefront-outline' as const,
         } : null,
-        paymentSettings.allowServiceFullOnline ? {
+        paymentSettings.allowServiceFullOnline && allowedServicePaymentMethods.has('online-full') ? {
             id: 'online-full' as ServicePaymentChoice,
             title: language === 'ar' ? 'الدفع الكامل الآن' : 'Pay In Full Now',
             subtitle: language === 'ar'
@@ -152,7 +160,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             amountLabel: `${servicePrice.toFixed(2)} SAR`,
             icon: 'card-outline' as const,
         } : null,
-        paymentSettings.allowServiceDeposit ? {
+        paymentSettings.allowServiceDeposit && allowedServicePaymentMethods.has('booking-fee') ? {
             id: 'booking-fee' as ServicePaymentChoice,
             title: language === 'ar' ? 'دفع عربون الحجز' : 'Pay Booking Fee',
             subtitle: language === 'ar'

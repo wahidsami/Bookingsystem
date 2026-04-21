@@ -12,6 +12,7 @@ const {
     assertServicePaymentMethodAllowed,
     calculateServiceDeposit,
     getTenantPaymentSettings,
+    normalizeServicePaymentOptions,
     resolvePublicOrderPaymentMethod
 } = require('../utils/tenantPaymentSettings');
 const { createAppointmentTransaction } = require('../services/paymentTransactionLedgerService');
@@ -491,6 +492,7 @@ exports.getPublicServices = async (req, res) => {
                 'finalPrice',
                 'duration',
                 'image',
+                'paymentOptions',
                 'availableInCenter',
                 'availableHomeVisit',
                 'benefits',
@@ -536,6 +538,7 @@ exports.getPublicService = async (req, res) => {
                 'finalPrice',
                 'duration',
                 'image',
+                'paymentOptions',
                 'availableInCenter',
                 'availableHomeVisit',
                 'benefits',
@@ -873,8 +876,25 @@ exports.createPublicBooking = async (req, res) => {
             });
         }
 
+        const service = await db.Service.findOne({
+            where: {
+                id: serviceId,
+                tenantId,
+                isActive: true
+            },
+            attributes: ['id', 'name_en', 'name_ar', 'paymentOptions']
+        });
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
         const tenantPaymentSettings = await getTenantPaymentSettings(tenantId);
-        assertServicePaymentMethodAllowed(paymentMethod || 'at-center', tenantPaymentSettings);
+        const servicePaymentOptions = normalizeServicePaymentOptions(service.paymentOptions);
+        assertServicePaymentMethodAllowed(paymentMethod || 'at-center', tenantPaymentSettings, servicePaymentOptions);
 
         // Use unified booking service
         // This handles all validation, conflict checking, pricing, etc.
@@ -887,8 +907,6 @@ exports.createPublicBooking = async (req, res) => {
             startTime: startTime.toISOString()
         });
 
-        // Get service for pricing info (for response)
-        const service = await db.Service.findByPk(serviceId);
         const pricing = {
             totalAmount: appointment.price,
             rawPrice: appointment.rawPrice,
@@ -1012,7 +1030,8 @@ exports.createPublicBooking = async (req, res) => {
                     service: {
                         id: service.id,
                         name_en: service.name_en,
-                        name_ar: service.name_ar
+                        name_ar: service.name_ar,
+                        paymentOptions: servicePaymentOptions
                     }
                 },
                 pricing,

@@ -22,6 +22,8 @@ const SERVICE_PAYMENT_METHOD_RULES = {
     'booking-fee': 'allowServiceDeposit'
 };
 
+const SERVICE_PAYMENT_METHODS = Object.freeze(['at-center', 'online-full', 'booking-fee']);
+
 const toBoolean = (value, fallback) => (value === undefined || value === null ? fallback : Boolean(value));
 
 const toSafeAmount = (value, fallback = 0) => {
@@ -33,6 +35,31 @@ const toSafePercentage = (value, fallback = 50) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return fallback;
     return Math.min(100, Math.max(1, numeric));
+};
+
+const normalizeServicePaymentOptions = (paymentOptions) => {
+    if (!paymentOptions) {
+        return [...SERVICE_PAYMENT_METHODS];
+    }
+
+    const parsed = Array.isArray(paymentOptions)
+        ? paymentOptions
+        : typeof paymentOptions === 'string'
+            ? (() => {
+                try {
+                    const value = JSON.parse(paymentOptions);
+                    return Array.isArray(value) ? value : [];
+                } catch (error) {
+                    return [];
+                }
+            })()
+            : [];
+
+    const normalized = parsed
+        .map((value) => `${value ?? ''}`.trim().toLowerCase())
+        .filter((value) => SERVICE_PAYMENT_METHODS.includes(value));
+
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : [...SERVICE_PAYMENT_METHODS];
 };
 
 const normalizeTenantPaymentSettings = (settings = {}, legacyFields = {}) => {
@@ -123,12 +150,17 @@ const calculateServiceDeposit = (totalPrice, settings) => {
     };
 };
 
-const assertServicePaymentMethodAllowed = (paymentMethod, settings) => {
+const assertServicePaymentMethodAllowed = (paymentMethod, settings, servicePaymentOptions = null) => {
     const normalizedSettings = normalizeTenantPaymentSettings(settings);
     const paymentFlag = SERVICE_PAYMENT_METHOD_RULES[paymentMethod];
 
     if (!paymentFlag || !normalizedSettings[paymentFlag]) {
         throw new Error('Selected service payment option is not available for this center');
+    }
+
+    const normalizedServicePaymentOptions = normalizeServicePaymentOptions(servicePaymentOptions);
+    if (normalizedServicePaymentOptions.length > 0 && !normalizedServicePaymentOptions.includes(paymentMethod)) {
+        throw new Error('Selected service payment option is not available for this service');
     }
 
     return normalizedSettings;
@@ -175,6 +207,7 @@ module.exports = {
     DEFAULT_TENANT_PAYMENT_SETTINGS,
     SERVICE_PAYMENT_METHOD_RULES,
     normalizeTenantPaymentSettings,
+    normalizeServicePaymentOptions,
     validateTenantPaymentSettings,
     getTenantPaymentSettings,
     calculateServiceDeposit,

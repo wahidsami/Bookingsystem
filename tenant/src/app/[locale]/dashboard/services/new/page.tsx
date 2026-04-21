@@ -17,6 +17,7 @@ import {
   getSelectedServiceEmployeeIds,
   type ServiceEmployeeAssignment
 } from "@/components/serviceEmployeeAssignments";
+import { type ServicePaymentMethod } from "@/components/servicePaymentOptions";
 
 interface ServiceCategory {
   id: string;
@@ -83,6 +84,7 @@ export default function NewServicePage() {
     giftType: "text" as "text" | "product",
     giftDetails: "",
     giftProductId: "",
+    paymentOptions: ['at-center', 'online-full', 'booking-fee'] as ServicePaymentMethod[],
     employeeIds: [] as string[],
     isActive: true,
     availableInCenter: true,
@@ -174,6 +176,19 @@ export default function NewServicePage() {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const toggleServicePaymentOption = (option: ServicePaymentMethod) => {
+    setFormData(prev => {
+      const next = prev.paymentOptions.includes(option)
+        ? prev.paymentOptions.filter((item) => item !== option)
+        : [...prev.paymentOptions, option];
+
+      return {
+        ...prev,
+        paymentOptions: next.length > 0 ? next : [...prev.paymentOptions]
+      };
+    });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -279,7 +294,10 @@ export default function NewServicePage() {
     const basicFilled = basicFields.filter(Boolean).length;
     const teamFilled = selectedEmployeeIds.length > 0 ? 1 : 0;
     const optionsFilled = [imagePreview, formData.hasOffer, formData.hasGift].some(Boolean) ? 1 : 0;
-    const settingsFilled = [formData.isActive, formData.availableInCenter, formData.availableHomeVisit].some(Boolean) ? 1 : 0;
+    const settingsFilled = [
+      formData.paymentOptions.length > 0,
+      formData.isActive !== undefined,
+    ].filter(Boolean).length;
 
     return [
       {
@@ -303,8 +321,8 @@ export default function NewServicePage() {
       {
         id: "service-settings",
         label: locale === "ar" ? "الإعدادات" : "Settings",
-        progressLabel: settingsFilled ? "1/1" : "Optional",
-        progressPercent: settingsFilled ? 100 : 0,
+        progressLabel: `${settingsFilled}/2`,
+        progressPercent: Math.min((settingsFilled / 2) * 100, 100),
       },
     ];
   }, [
@@ -319,6 +337,7 @@ export default function NewServicePage() {
     formData.isActive,
     formData.name_ar,
     formData.name_en,
+    formData.paymentOptions.length,
     formData.targetGender,
     imagePreview,
     locale
@@ -382,6 +401,8 @@ export default function NewServicePage() {
           submitData.append("giftDetails", formData.giftProductId);
         }
       }
+
+      submitData.append("paymentOptions", JSON.stringify(formData.paymentOptions));
 
       // Employees
       submitData.append("employeeAssignments", JSON.stringify(employeeAssignments));
@@ -837,86 +858,119 @@ export default function NewServicePage() {
               </div>
             </div>
 
-            {/* Benefits List */}
+            {/* Settings */}
             <div className="card" id="service-settings">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("benefitsList")} <span className="text-gray-400">({t("optional")})</span>
+                {locale === 'ar' ? 'الإعدادات' : 'Settings'}
               </h3>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={newBenefit.en}
-                    onChange={(e) => setNewBenefit(prev => ({ ...prev, en: e.target.value }))}
-                    placeholder={locale === 'ar' ? 'Benefit (English)...' : 'Benefit (English)...'}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                  <input
-                    type="text"
-                    value={newBenefit.ar}
-                    onChange={(e) => setNewBenefit(prev => ({ ...prev, ar: e.target.value }))}
-                    placeholder={locale === 'ar' ? 'الفائدة (بالعربية)...' : 'الفائدة (بالعربية)...'}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    style={{ textAlign: isRTL ? 'right' : 'left', direction: 'rtl' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddBenefit}
-                    disabled={!newBenefit.en.trim() && !newBenefit.ar.trim()}
-                    className="btn btn-secondary w-full"
-                  >
-                    {t("addBenefit")}
-                  </button>
+              <div className="space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{t("paymentOptions")}</p>
+                      <p className="text-sm text-gray-500">
+                        {locale === 'ar'
+                          ? 'حدد طريقة أو أكثر ليظهر للعميل عند الحجز.'
+                          : 'Choose one or more methods that customers can select when booking.'}
+                      </p>
+                    </div>
+                    <span className="text-xs rounded-full bg-purple-50 text-primary px-3 py-1">
+                      {formData.paymentOptions.length}/3
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                      {
+                        id: 'at-center' as ServicePaymentMethod,
+                        title: locale === 'ar' ? 'الدفع عند المركز' : 'Pay at Center',
+                        description: locale === 'ar'
+                          ? 'يدفع العميل عند الحضور.'
+                          : 'Customer pays when arriving at the center.'
+                      },
+                      {
+                        id: 'online-full' as ServicePaymentMethod,
+                        title: locale === 'ar' ? 'الدفع الكامل عبر الإنترنت' : 'Pay in Full Online',
+                        description: locale === 'ar'
+                          ? 'يتم الدفع الكامل قبل تأكيد الحجز.'
+                          : 'Collect the full amount before confirming the booking.'
+                      },
+                      {
+                        id: 'booking-fee' as ServicePaymentMethod,
+                        title: locale === 'ar' ? 'عربون الحجز' : 'Booking Fee',
+                        description: locale === 'ar'
+                          ? 'يدفع العميل عربوناً مقدماً والباقي لاحقاً.'
+                          : 'Customer pays a deposit now and settles the remainder later.'
+                      }
+                    ].map((option) => {
+                      const checked = formData.paymentOptions.includes(option.id);
+                      return (
+                        <label
+                          key={option.id}
+                          className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition ${
+                            checked ? 'border-primary bg-purple-50' : 'border-gray-200 bg-white'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleServicePaymentOption(option.id)}
+                            className="mt-1 w-4 h-4 text-primary focus:ring-primary"
+                          />
+                          <span className="flex-1">
+                        <span className="block font-medium text-gray-900">{option.title}</span>
+                            <span className="block text-xs text-gray-500 mt-1">{option.description}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {formData.benefits.length > 0 && (
-                  <div className="space-y-3 mt-4">
-                    {formData.benefits.map((item, index) => (
-                      <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3 relative">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveBenefit(index)}
-                          className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white rounded-full p-1"
-                          style={{ right: isRTL ? 'auto' : '0.5rem', left: isRTL ? '0.5rem' : 'auto' }}
-                        >
-                          ×
-                        </button>
-                        <div className="space-y-2 pr-6 pl-6">
-                          <div className={`flex justify-between items-center ${isRTL ? 'flex-row-reverse' : ''}`}>
-                            <span className="text-sm border-l-2 border-primary pl-2 block text-left w-full" style={{ textAlign: 'left', borderLeft: '2px solid #6366f1', paddingLeft: '0.5rem', borderRight: 'none', paddingRight: '0' }}>{item.en}</span>
-                            {hasAIFeature && item.ar && !item.en && (
-                              <button
-                                type="button"
-                                onClick={() => handleTranslateArrayItem('benefits', index, 'ar', 'English')}
-                                disabled={translatingField === `benefits_${index}_en`}
-                                className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50 whitespace-nowrap"
-                              >
-                                <LanguageIcon className="w-3 h-3" />
-                                {translatingField === `benefits_${index}_en` ? '...' : (locale === 'ar' ? 'ترجم للإنجليزية' : 'Translate to EN')}
-                              </button>
-                            )}
-                          </div>
-                          <div className={`flex justify-between items-center ${isRTL ? 'flex-row-reverse' : ''}`}>
-                            <span className="text-sm border-r-2 border-primary pr-2 block text-right w-full" style={{ textAlign: 'right', borderRight: '2px solid #6366f1', paddingRight: '0.5rem', borderLeft: 'none', paddingLeft: '0' }} dir="rtl">{item.ar}</span>
-                            {hasAIFeature && item.en && !item.ar && (
-                              <button
-                                type="button"
-                                onClick={() => handleTranslateArrayItem('benefits', index, 'en', 'Arabic')}
-                                disabled={translatingField === `benefits_${index}_ar`}
-                                className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 disabled:opacity-50 whitespace-nowrap"
-                              >
-                                <LanguageIcon className="w-3 h-3" />
-                                {translatingField === `benefits_${index}_ar` ? '...' : (locale === 'ar' ? 'ترجم للعربية' : 'Translate to AR')}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{t("serviceStatus")}</p>
+                      <p className="text-sm text-gray-500">
+                        {locale === 'ar'
+                          ? 'التحكم في ظهور الخدمة للعميل.'
+                          : 'Control whether the service is visible to customers.'}
+                      </p>
+                    </div>
+                    <label className="inline-flex items-center gap-2 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <input
+                        type="checkbox"
+                        name="isActive"
+                        checked={formData.isActive}
+                        onChange={handleChange}
+                        className="w-5 h-5 text-primary focus:ring-primary"
+                      />
+                      <span className="font-medium text-gray-700">{formData.isActive ? (locale === 'ar' ? 'نشط' : 'Active') : (locale === 'ar' ? 'غير نشط' : 'Inactive')}</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="font-medium text-gray-900 mb-3">{locale === 'ar' ? 'التوفر' : 'Availability'}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: 'availableInCenter', label: locale === 'ar' ? 'متوفر في المركز' : 'Available in Center' },
+                      { name: 'availableHomeVisit', label: locale === 'ar' ? 'متوفر كزيارة منزلية' : 'Available as Home Visit' }
+                    ].map((item) => (
+                      <label key={item.name} className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          name={item.name}
+                          checked={(formData as any)[item.name]}
+                          onChange={handleChange}
+                          className="w-4 h-4 text-primary focus:ring-primary"
+                        />
+                        <span className="font-medium text-gray-700">{item.label}</span>
+                      </label>
                     ))}
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
