@@ -38,9 +38,7 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterActive, setFilterActive] = useState<string>("all");
-  const [filterGender, setFilterGender] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"alphabetical" | "gender">("alphabetical");
+  const [listFilter, setListFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -51,11 +49,11 @@ export default function EmployeesPage() {
   useEffect(() => {
     loadEmployees();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterActive, filterGender, searchTerm, sortBy, currentPage]);
+  }, [listFilter, searchTerm, currentPage]);
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [filterActive, filterGender, searchTerm, sortBy, currentPage]);
+  }, [listFilter, searchTerm, currentPage]);
 
   const loadEmployees = async () => {
     try {
@@ -65,21 +63,30 @@ export default function EmployeesPage() {
       const params: any = {
         page: currentPage,
         limit: PAGE_SIZE,
-        sortBy
       };
 
-      if (filterActive === "true") {
+      if (listFilter === "active") {
         params.isActive = true;
-      } else if (filterActive === "false") {
+      } else if (listFilter === "inactive") {
         params.isActive = false;
+      }
+
+      if (listFilter === "male" || listFilter === "female") {
+        params.gender = listFilter;
       }
 
       if (searchTerm.trim()) {
         params.search = searchTerm.trim();
       }
 
-      if (filterGender !== "all") {
-        params.gender = filterGender;
+      if (listFilter === "az") {
+        params.sortBy = "alphabetical";
+      } else if (listFilter === "za") {
+        params.sortBy = "alphabetical_desc";
+      } else if (listFilter === "created") {
+        params.sortBy = "created_at";
+      } else if (listFilter === "gender-sort") {
+        params.sortBy = "gender";
       }
 
       const [response, limitsData] = await Promise.all([
@@ -223,6 +230,26 @@ export default function EmployeesPage() {
     ? `${totalItems} عضو`
     : `${totalItems} member(s)`;
 
+  const listFilterOptions = [
+    { value: "all", label: locale === "ar" ? "الكل" : "All" },
+    { value: "active", label: locale === "ar" ? "نشط" : "Active" },
+    { value: "inactive", label: locale === "ar" ? "غير نشط" : "Inactive" },
+    { value: "male", label: locale === "ar" ? "ذكر" : "Male" },
+    { value: "female", label: locale === "ar" ? "أنثى" : "Female" },
+    { value: "az", label: locale === "ar" ? "أبجديًا أ-ي" : "Alphabetical A-Z" },
+    { value: "za", label: locale === "ar" ? "أبجديًا ي-أ" : "Alphabetical Z-A" },
+    { value: "created", label: locale === "ar" ? "تاريخ الإضافة" : "Date created" }
+  ];
+
+  const formatCreatedAt = (value: string) => new Intl.DateTimeFormat(
+    locale === "ar" ? "ar-SA" : "en-GB",
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    }
+  ).format(new Date(value));
+
   return (
     <TenantLayout>
       <div className="mb-8 animate-fade-in">
@@ -245,9 +272,44 @@ export default function EmployeesPage() {
                 </span>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className={`card mb-6 ${isRTL ? "text-right" : ""}`}>
+        <div className={`flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between ${isRTL ? "xl:flex-row-reverse" : ""}`}>
+          <div className={`flex flex-1 flex-wrap items-center gap-3 ${isRTL ? "justify-start xl:justify-end" : "justify-start"}`}>
+            <input
+              type="text"
+              placeholder={t("searchPlaceholder")}
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full min-w-[220px] flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+              style={{ textAlign: isRTL ? "right" : "left" }}
+            />
+
+            <select
+              value={listFilter}
+              onChange={(event) => {
+                setListFilter(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full min-w-[250px] px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              style={{ textAlign: isRTL ? "right" : "left" }}
+            >
+              {listFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
             <Link
               href={limits && !limits.allowed ? "#" : `/${locale}/dashboard/employees/new`}
-              className={`btn btn-primary ${limits && !limits.allowed ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+              className={`btn btn-primary inline-flex items-center gap-2 ${limits && !limits.allowed ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
               style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
               onClick={(event) => {
                 if (limits && !limits.allowed) {
@@ -262,83 +324,20 @@ export default function EmployeesPage() {
                 }
               }}
             >
-              <span className="mr-2">{isRTL ? "➕" : ""}</span>
-              {t("addEmployee")}
-              <span className="ml-2">{!isRTL ? "➕" : ""}</span>
+              <span className="text-lg leading-none">+</span>
+              <span>{locale === "ar" ? "إضافة" : "Add"}</span>
             </Link>
-          </div>
-        </div>
-      </div>
 
-      <div className={`card mb-6 ${isRTL ? "text-right" : ""}`}>
-        <div className={`flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between ${isRTL ? "xl:flex-row-reverse" : ""}`}>
-          <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <input
-              type="text"
-              placeholder={t("searchPlaceholder")}
-              value={searchTerm}
-              onChange={(event) => {
-                setSearchTerm(event.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? "right" : "left" }}
-            />
-
-            <select
-              value={filterActive}
-              onChange={(event) => {
-                setFilterActive(event.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
-              style={{ textAlign: isRTL ? "right" : "left" }}
-            >
-              <option value="all">{locale === "ar" ? "الكل" : "All status"}</option>
-              <option value="true">{t("active")}</option>
-              <option value="false">{t("inactive")}</option>
-            </select>
-
-            <select
-              value={filterGender}
-              onChange={(event) => {
-                setFilterGender(event.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
-              style={{ textAlign: isRTL ? "right" : "left" }}
-            >
-              <option value="all">{locale === "ar" ? "كل الجنس" : "All genders"}</option>
-              {EMPLOYEE_GENDERS.filter((option) => option.value).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label[locale as "ar" | "en"] || option.label.en}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(event) => {
-                setSortBy(event.target.value as "alphabetical" | "gender");
-                setCurrentPage(1);
-              }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
-              style={{ textAlign: isRTL ? "right" : "left" }}
-            >
-              <option value="alphabetical">{locale === "ar" ? "ترتيب أبجدي" : "Alphabetical"}</option>
-              <option value="gender">{locale === "ar" ? "حسب الجنس" : "By gender"}</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3 whitespace-nowrap">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600">
-              {employeeCountLabel}
-            </div>
-            {selectedIds.length > 0 && (
-              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm text-primary">
-                {locale === "ar" ? `${selectedIds.length} محدد` : `${selectedIds.length} selected`}
+            <div className="flex items-center gap-3 whitespace-nowrap">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                {employeeCountLabel}
               </div>
-            )}
+              {selectedIds.length > 0 && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm text-primary">
+                  {locale === "ar" ? `${selectedIds.length} محدد` : `${selectedIds.length} selected`}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -371,7 +370,7 @@ export default function EmployeesPage() {
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[920px] w-full border-separate border-spacing-0">
+            <table className="min-w-[1120px] w-full border-separate border-spacing-0">
               <thead className="bg-gray-50">
                 <tr className="text-sm text-gray-600">
                   <th className="border-b border-gray-200 px-4 py-4 text-center">
@@ -390,6 +389,9 @@ export default function EmployeesPage() {
                   </th>
                   <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
                     {locale === "ar" ? "الحالة" : "Status"}
+                  </th>
+                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                    {locale === "ar" ? "تاريخ الإنشاء" : "Date created"}
                   </th>
                   <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-left" : "text-right"}`}>
                     {locale === "ar" ? "الإجراءات" : "Actions"}
@@ -455,6 +457,9 @@ export default function EmployeesPage() {
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${employee.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
                           {employee.isActive ? (locale === "ar" ? "مفعل" : "Enabled") : (locale === "ar" ? "معطل" : "Disabled")}
                         </span>
+                      </td>
+                      <td className={`px-4 py-4 align-middle text-sm text-gray-600 ${isRTL ? "text-right" : "text-left"}`}>
+                        {formatCreatedAt(employee.createdAt)}
                       </td>
                       <td className={`px-4 py-4 align-middle ${isRTL ? "text-left" : "text-right"}`}>
                         <div className={`flex flex-wrap gap-2 ${isRTL ? "justify-start" : "justify-end"}`}>

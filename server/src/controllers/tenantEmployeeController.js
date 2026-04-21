@@ -77,6 +77,20 @@ const getEmployeeSortOrder = (sortBy) => {
         ];
     }
 
+    if (normalizedSortBy === 'alphabetical_desc' || normalizedSortBy === 'name_desc') {
+        return [
+            ['name', 'DESC'],
+            ['createdAt', 'DESC']
+        ];
+    }
+
+    if (normalizedSortBy === 'created_at' || normalizedSortBy === 'created') {
+        return [
+            ['createdAt', 'DESC'],
+            ['name', 'ASC']
+        ];
+    }
+
     return [
         ['name', 'ASC'],
         ['createdAt', 'DESC']
