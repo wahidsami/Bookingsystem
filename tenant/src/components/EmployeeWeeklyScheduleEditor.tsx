@@ -37,6 +37,8 @@ interface EmployeeWeeklyScheduleEditorProps {
   }) => void;
 }
 
+type ScheduleMode = "recurring" | "one-time";
+
 const WEEK_DAYS = [
   { value: 6, labelEn: "Saturday", labelAr: "السبت" },
   { value: 0, labelEn: "Sunday", labelAr: "الأحد" },
@@ -75,13 +77,13 @@ function normalizeShift(shift: Partial<ShiftRecord>): ShiftRecord {
 
 function buildShiftPayload(shift: ShiftRecord, sharedStartDate: string | null, sharedEndDate: string | null) {
   return {
-    isRecurring: true,
-    dayOfWeek: shift.dayOfWeek,
-    specificDate: null,
+    isRecurring: shift.isRecurring !== false,
+    dayOfWeek: shift.isRecurring !== false ? shift.dayOfWeek : null,
+    specificDate: shift.isRecurring !== false ? null : (shift.specificDate || sharedStartDate || null),
     startTime: shift.startTime,
     endTime: shift.endTime,
-    startDate: sharedStartDate || shift.startDate || null,
-    endDate: sharedEndDate || shift.endDate || null,
+    startDate: shift.isRecurring !== false ? (sharedStartDate || shift.startDate || null) : null,
+    endDate: shift.isRecurring !== false ? (sharedEndDate || shift.endDate || null) : null,
     label: shift.label?.trim() || null,
     isActive: shift.isActive
   };
@@ -104,6 +106,7 @@ export function EmployeeWeeklyScheduleEditor({
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("recurring");
   const isDraftMode = draftMode && !employeeId;
   const lastReportedRangeRef = useRef<string>("");
 
@@ -283,13 +286,17 @@ export function EmployeeWeeklyScheduleEditor({
   };
 
   const createShiftForDay = async (dayOfWeek: number) => {
+    const isRecurringSchedule = scheduleMode === "recurring";
+    const specificDate = !isRecurringSchedule ? (sharedStartDate || new Date().toISOString().slice(0, 10)) : null;
+
     if (isDraftMode) {
       const tempShift = normalizeShift({
         id: `temp-${dayOfWeek}-${Date.now()}`,
-        dayOfWeek,
+        dayOfWeek: isRecurringSchedule ? dayOfWeek : null,
+        specificDate,
         startTime: DEFAULT_START,
         endTime: DEFAULT_END,
-        isRecurring: true,
+        isRecurring: isRecurringSchedule,
         isActive: true
       });
 
@@ -302,23 +309,24 @@ export function EmployeeWeeklyScheduleEditor({
     const tempId = `temp-${dayOfWeek}-${Date.now()}`;
     const tempShift = normalizeShift({
       id: tempId,
-      dayOfWeek,
+      dayOfWeek: isRecurringSchedule ? dayOfWeek : null,
+      specificDate,
       startTime: DEFAULT_START,
       endTime: DEFAULT_END,
-      isRecurring: true,
+      isRecurring: isRecurringSchedule,
       isActive: true
     });
 
     setSavingKey(tempId);
     try {
       const response = await tenantApi.createEmployeeShift(employeeId, {
-        dayOfWeek,
-        specificDate: null,
+        dayOfWeek: isRecurringSchedule ? dayOfWeek : null,
+        specificDate,
         startTime: DEFAULT_START,
         endTime: DEFAULT_END,
-        isRecurring: true,
-        startDate: sharedStartDate || null,
-        endDate: sharedEndDate || null,
+        isRecurring: isRecurringSchedule,
+        startDate: isRecurringSchedule ? (sharedStartDate || null) : null,
+        endDate: isRecurringSchedule ? (sharedEndDate || null) : null,
         label: undefined
       });
 
@@ -345,15 +353,13 @@ export function EmployeeWeeklyScheduleEditor({
           return;
         }
 
-        setShiftsAndMirror((current) =>
-          current
-            .filter((shift) => !(shift.dayOfWeek === dayOfWeek && shift.isDraft))
-            .map((shift) =>
-              shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
-            )
-        );
-        return;
-      }
+      setShiftsAndMirror((current) =>
+        current
+          .filter((shift) => !(shift.dayOfWeek === dayOfWeek && shift.isDraft))
+          .map((shift) => (shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift))
+      );
+      return;
+    }
 
       if (dayShifts.length === 0) {
         await createShiftForDay(dayOfWeek);
@@ -388,9 +394,7 @@ export function EmployeeWeeklyScheduleEditor({
         setShiftsAndMirror((current) =>
           current
             .filter((shift) => !(shift.dayOfWeek === dayOfWeek && shift.isDraft))
-            .map((shift) =>
-              shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift
-            )
+            .map((shift) => (shift.dayOfWeek === dayOfWeek ? { ...shift, isActive: false } : shift))
         );
       } catch (err: any) {
         console.error("Failed to disable day:", err);
@@ -467,12 +471,15 @@ export function EmployeeWeeklyScheduleEditor({
   };
 
   const createDraftSubShift = (dayOfWeek: number) => {
+    const isRecurringSchedule = scheduleMode === "recurring";
+    const specificDate = !isRecurringSchedule ? (sharedStartDate || new Date().toISOString().slice(0, 10)) : null;
     const draftShift = normalizeShift({
       id: `draft-${dayOfWeek}-${Date.now()}`,
-      dayOfWeek,
+      dayOfWeek: isRecurringSchedule ? dayOfWeek : null,
+      specificDate,
       startTime: DEFAULT_START,
       endTime: DEFAULT_END,
-      isRecurring: true,
+      isRecurring: isRecurringSchedule,
       isActive: true,
       isDraft: true
     });
@@ -481,8 +488,13 @@ export function EmployeeWeeklyScheduleEditor({
   };
 
   const saveShiftRow = async (shift: ShiftRecord) => {
+    const isRecurringShift = shift.isRecurring !== false;
+    const specificDate = !isRecurringShift
+      ? (shift.specificDate || sharedStartDate || new Date().toISOString().slice(0, 10))
+      : null;
+
     if (shift.isDraft) {
-      if (!shift.dayOfWeek && shift.dayOfWeek !== 0) {
+      if (isRecurringShift && !shift.dayOfWeek && shift.dayOfWeek !== 0) {
         return;
       }
 
@@ -498,13 +510,13 @@ export function EmployeeWeeklyScheduleEditor({
       setSavingKey(shift.id);
       try {
         const response = await tenantApi.createEmployeeShift(employeeId, {
-          dayOfWeek: shift.dayOfWeek,
-          specificDate: null,
+          dayOfWeek: isRecurringShift ? shift.dayOfWeek : null,
+          specificDate,
           startTime: shift.startTime,
           endTime: shift.endTime,
-          isRecurring: true,
-          startDate: sharedStartDate || null,
-          endDate: sharedEndDate || null,
+          isRecurring: isRecurringShift,
+          startDate: isRecurringShift ? (sharedStartDate || null) : null,
+          endDate: isRecurringShift ? (sharedEndDate || null) : null,
           label: shift.label?.trim() || undefined
         });
 
@@ -587,6 +599,19 @@ export function EmployeeWeeklyScheduleEditor({
           </div>
 
           <div className={`flex flex-wrap items-center gap-3 ${isRTL ? 'lg:justify-start' : 'lg:justify-end'}`}>
+            <label className="rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                {locale === "ar" ? "نوع الجدول" : "Schedule type"}
+              </span>
+              <select
+                value={scheduleMode}
+                onChange={(event) => setScheduleMode(event.target.value as ScheduleMode)}
+                className="mt-1 w-full bg-transparent text-sm font-medium text-gray-900 outline-none"
+              >
+                <option value="recurring">{locale === "ar" ? "دوري (أسبوعي)" : "Recurring (Weekly)"}</option>
+                <option value="one-time">{locale === "ar" ? "لمرة واحدة" : "One-time"}</option>
+              </select>
+            </label>
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{activeDays}</span>
               <span className="mx-1">{locale === "ar" ? "أيام نشطة من" : "active days of"}</span>
@@ -624,11 +649,12 @@ export function EmployeeWeeklyScheduleEditor({
         <div className="divide-y divide-gray-100">
           {WEEK_DAYS.map((day) => {
             const dayShifts = groupedShifts.get(day.value) || [];
-            const activeShifts = dayShifts.filter((shift) => shift.isActive !== false);
-            const mainShift = activeShifts.find((shift) => !shift.isDraft) || activeShifts[0] || null;
-            const nestedShifts = dayShifts.filter((shift) => mainShift ? shift.id !== mainShift.id : true);
-            const enabled = activeShifts.length > 0 || nestedShifts.length > 0;
-            const hasVisibleRows = enabled || nestedShifts.length > 0;
+            const visibleShifts = dayShifts.filter((shift) => shift.isDraft || shift.isActive !== false);
+            const activeShifts = visibleShifts.filter((shift) => !shift.isDraft);
+            const mainShift = activeShifts[0] || visibleShifts[0] || null;
+            const nestedShifts = mainShift ? visibleShifts.filter((shift) => shift.id !== mainShift.id) : [];
+            const enabled = visibleShifts.length > 0;
+            const hasVisibleRows = enabled;
 
             return (
               <div key={day.value} className="p-4 lg:p-5">
@@ -646,11 +672,11 @@ export function EmployeeWeeklyScheduleEditor({
                         {locale === "ar" ? day.labelAr : day.labelEn}
                       </div>
                       <div className="text-xs text-gray-500">
-                      {hasVisibleRows
+                        {hasVisibleRows
                           ? (locale === "ar" ? `${dayShifts.length} وردية` : `${dayShifts.length} shift${dayShifts.length === 1 ? "" : "s"}`)
                           : (locale === "ar" ? "غير عامل" : "Not working")}
+                      </div>
                     </div>
-                  </div>
                   </div>
 
                   <div>
