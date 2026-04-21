@@ -206,7 +206,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
     }
   };
   const renderNotificationMenu = () => (
-    <div ref={notificationMenuRef} className="relative">
+    <div ref={notificationMenuRef} className="relative z-50">
       <button
         type="button"
         onClick={() => {
@@ -225,7 +225,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
       </button>
 
       {notificationMenuOpen && (
-        <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
+        <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} z-[60] mt-2 w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
           <div className="border-b border-gray-100 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -531,7 +531,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </div>
 
         <header
-          className="h-full overflow-hidden border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="relative z-50 h-full overflow-visible border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
           style={{ gridArea: 'header' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -753,7 +753,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </header>
 
         <aside
-          className={`h-full flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
+          className={`relative z-40 h-full flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
               isRTL ? 'border-l' : 'border-r'
             }`}
           style={{ gridArea: 'sidebar' }}
@@ -764,7 +764,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
           </nav>
         </aside>
 
-        <main className="min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
+        <main className="relative z-0 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
           <div className="p-4 lg:p-8">
             <div className="mx-auto w-full max-w-[1600px]">
               {children}
