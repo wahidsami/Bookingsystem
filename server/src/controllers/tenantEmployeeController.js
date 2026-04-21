@@ -85,7 +85,9 @@ const syncStaffAuthAccount = async ({
 
     const findStaffUserByEmail = async (email) => db.User.findOne({
         where: {
-            email,
+            email: {
+                [Op.iLike]: email
+            },
             tenantId,
             role: 'staff'
         },
@@ -189,7 +191,9 @@ const syncTenantDashboardAccount = async ({
     const findDashboardAccountByEmail = async (email) => db.TenantDashboardAccount.findOne({
         where: {
             tenantId,
-            email
+            email: {
+                [Op.iLike]: email
+            }
         },
         transaction
     });

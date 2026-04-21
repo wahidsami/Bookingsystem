@@ -8,7 +8,13 @@ import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
-import { EMPLOYEE_POSITIONS } from "@/lib/employeePositions";
+import { EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
+import {
+  DASHBOARD_PERMISSION_KEYS,
+  SECTION_PERMISSION_LABELS,
+  ROLE_OPTIONS,
+  normalizeDashboardPermissions
+} from "@/lib/dashboardAccess";
 
 const NATIONALITIES = [
   "Saudi", "Egyptian", "Filipino", "Indian", "Pakistani",
@@ -67,6 +73,20 @@ export default function EditEmployeePage() {
   const [existingPhoto, setExistingPhoto] = useState<string | null>(null);
   const [savedEmail, setSavedEmail] = useState("");
   const isServiceProvider = `${formData.position || ''}`.trim() === 'service_provider';
+  const [dashboardAccountId, setDashboardAccountId] = useState<string | null>(null);
+  const [dashboardAccountEmail, setDashboardAccountEmail] = useState("");
+  const [dashboardPermissions, setDashboardPermissions] = useState<Record<string, boolean>>(
+    normalizeDashboardPermissions({}, 'custom')
+  );
+  const [dashboardPermissionsLoading, setDashboardPermissionsLoading] = useState(false);
+  const [dashboardInviteLoading, setDashboardInviteLoading] = useState(false);
+  const [dashboardResetLoading, setDashboardResetLoading] = useState(false);
+  const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
+  const dashboardRoleLabel = ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)
+    ? (locale === 'ar'
+      ? ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelAr
+      : ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)?.labelEn)
+    : dashboardRoleKey;
 
   // App Access State
   const [appEnabled, setAppEnabled] = useState(false);
@@ -99,6 +119,9 @@ export default function EditEmployeePage() {
 
       if (response.success && response.employee) {
         const emp = response.employee;
+        const employeePosition = `${emp.position || ''}`.trim();
+        const isEmployeeServiceProvider = employeePosition === 'service_provider';
+        const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(employeePosition) || 'custom';
         setFormData({
           name: emp.name || "",
           email: emp.email || "",
@@ -117,10 +140,34 @@ export default function EditEmployeePage() {
 
         setAppEnabled(emp.app_enabled || false);
         setSavedEmail(emp.email || "");
+        setDashboardAccountId(null);
+        setDashboardAccountEmail(emp.email || "");
+        setDashboardPermissions(normalizeDashboardPermissions({}, dashboardRoleKey));
 
         if (emp.photo) {
           setExistingPhoto(getImageUrl(emp.photo));
           setPhotoPreview(getImageUrl(emp.photo));
+        }
+
+        if (!isEmployeeServiceProvider && emp.email) {
+          try {
+            const dashboardAccountsResponse = await tenantApi.getDashboardAccounts();
+            const dashboardAccounts = Array.isArray(dashboardAccountsResponse.accounts)
+              ? dashboardAccountsResponse.accounts
+              : [];
+            const account = dashboardAccounts.find((item: any) => {
+              const accountEmail = `${item.email || ''}`.trim().toLowerCase();
+              return accountEmail && accountEmail === `${emp.email || ''}`.trim().toLowerCase();
+            });
+
+            if (account) {
+              setDashboardAccountId(account.id || null);
+              setDashboardAccountEmail(account.email || emp.email || "");
+              setDashboardPermissions(normalizeDashboardPermissions(account.permissions || {}, account.roleKey || dashboardRoleKey));
+            }
+          } catch (dashboardErr) {
+            console.error("Failed to load dashboard account:", dashboardErr);
+          }
         }
 
         // Load Permissions
@@ -268,6 +315,91 @@ export default function EditEmployeePage() {
       setPermissions(prev => ({ ...prev, [key]: !checked }));
     } finally {
       setPermissionsLoading(false);
+    }
+  };
+
+  const handleDashboardPermissionChange = async (key: string, checked: boolean) => {
+    const accountId = dashboardAccountId;
+    if (!accountId) {
+      setError(locale === 'ar'
+        ? 'احفظ الموظف أولاً لتظهر حسابات لوحة التحكم.'
+        : 'Save the employee first so the dashboard account can be managed.');
+      return;
+    }
+
+    const nextPermissions = {
+      ...dashboardPermissions,
+      [key]: checked
+    };
+
+    setDashboardPermissions(nextPermissions);
+    setDashboardPermissionsLoading(true);
+    try {
+      const response = await tenantApi.updateDashboardAccount(accountId, {
+        permissions: nextPermissions
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.message || (locale === 'ar' ? 'تعذر تحديث الصلاحيات' : 'Failed to update permissions'));
+      }
+    } catch (err: any) {
+      console.error("Failed to update dashboard permissions:", err);
+      setError(err.message || (locale === 'ar' ? 'تعذر تحديث الصلاحيات' : 'Failed to update permissions'));
+      setDashboardPermissions(prev => ({ ...prev, [key]: !checked }));
+    } finally {
+      setDashboardPermissionsLoading(false);
+    }
+  };
+
+  const handleDashboardInvite = async () => {
+    if (!dashboardAccountId) {
+      setError(locale === 'ar'
+        ? 'احفظ الموظف أولاً قبل إرسال الدعوة.'
+        : 'Save the employee first before sending the invite.');
+      return;
+    }
+
+    setDashboardInviteLoading(true);
+    try {
+      const response = await tenantApi.sendDashboardAccountInvite(dashboardAccountId);
+      if (!response?.success) {
+        throw new Error(response?.message || (locale === 'ar' ? 'تعذر إرسال الدعوة' : 'Failed to send invitation'));
+      }
+      alert(locale === 'ar' ? 'تم إرسال الدعوة بنجاح.' : 'Invitation sent successfully.');
+    } catch (err: any) {
+      console.error("Failed to send dashboard invite:", err);
+      setError(err.message || (locale === 'ar' ? 'تعذر إرسال الدعوة' : 'Failed to send invitation'));
+    } finally {
+      setDashboardInviteLoading(false);
+    }
+  };
+
+  const handleDashboardResetPassword = async () => {
+    if (!dashboardAccountId) {
+      setError(locale === 'ar'
+        ? 'احفظ الموظف أولاً قبل إعادة تعيين كلمة المرور.'
+        : 'Save the employee first before resetting the password.');
+      return;
+    }
+
+    if (!(await dialog.confirm(locale === 'ar'
+      ? 'هل تريد إعادة تعيين كلمة مرور حساب لوحة التحكم لهذا العضو؟'
+      : 'Reset this team member dashboard account password?'))) {
+      return;
+    }
+
+    setDashboardResetLoading(true);
+    try {
+      const response = await tenantApi.resetDashboardAccountPassword(dashboardAccountId);
+      if (!response?.success) {
+        throw new Error(response?.message || (locale === 'ar' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
+      }
+      alert(locale === 'ar' ? 'تمت إعادة تعيين كلمة المرور.' : 'Password reset successfully.');
+    } catch (err: any) {
+      console.error("Failed to reset dashboard password:", err);
+      setError(err.message || (locale === 'ar' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
+    } finally {
+      setDashboardResetLoading(false);
     }
   };
 
@@ -810,30 +942,99 @@ export default function EditEmployeePage() {
               </>
             ) : (
               <div className="card">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {locale === 'ar' ? 'وصول لوحة التحكم' : 'Dashboard Access'}
-                </h3>
-                <div className="space-y-3 text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  <p>
-                    {locale === 'ar'
-                      ? 'هذا المسمى الوظيفي لا يستخدم تطبيق الموظفين. سيتم إدارة حسابه من قسم الفريق والصلاحيات.'
-                      : 'This job title does not use the staff mobile app. Its account is managed from Team & Access.'}
-                  </p>
-                  <p>
-                    {locale === 'ar'
-                      ? 'بعد حفظ الموظف، ستظهر صلاحياته وبيانات الحساب في صفحة Team & Access حيث يمكنك إرسال الدعوة أو إعادة التعيين.'
-                      : 'After saving the employee, the account and section permissions are managed in Team & Access, where you can send the invite or reset the password.'}
-                  </p>
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                    <div className="font-medium text-gray-900">{locale === 'ar' ? 'البريد الإلكتروني المرتبط' : 'Linked email'}</div>
-                    <div className="mt-1 text-gray-700">{savedEmail || formData.email || '-'}</div>
+                <div className="mb-4 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar' ? 'صلاحيات لوحة التحكم' : 'Dashboard Permissions'}
+                    </h3>
+                    <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar'
+                        ? 'هذا العضو لا يستخدم تطبيق الموظفين. هنا نمنح صلاحيات الأقسام الخاصة بلوحة التحكم.'
+                        : 'This role does not use the staff app. Use this section to manage dashboard section access.'}
+                    </p>
                   </div>
-                  <Link
-                    href={`/${locale}/dashboard/settings`}
-                    className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 font-semibold text-white hover:bg-primary/90"
-                  >
-                    {locale === 'ar' ? 'فتح الفريق والصلاحيات' : 'Open Team & Access'}
-                  </Link>
+                  <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    {dashboardRoleLabel}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                    <div className="font-medium text-gray-900">{locale === 'ar' ? 'الحساب المرتبط' : 'Linked account'}</div>
+                    <div className="mt-1 break-all text-gray-700">
+                      {dashboardAccountEmail || savedEmail || formData.email || '-'}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {dashboardAccountId
+                        ? (locale === 'ar' ? 'يمكنك الآن تعديل الصلاحيات أو إرسال الدعوة.' : 'You can edit permissions or resend the invite now.')
+                        : (locale === 'ar' ? 'احفظ الموظف مرة واحدة ليتم إنشاء الحساب المرتبط.' : 'Save the employee once to create the linked dashboard account.')}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDashboardInvite}
+                      disabled={dashboardInviteLoading || !dashboardAccountId}
+                      className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {dashboardInviteLoading
+                        ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                        : (locale === 'ar' ? 'إرسال دعوة' : 'Send invite')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDashboardResetPassword}
+                      disabled={dashboardResetLoading || !dashboardAccountId}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {dashboardResetLoading
+                        ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
+                        : (locale === 'ar' ? 'إعادة كلمة المرور' : 'Reset password')}
+                    </button>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          {locale === 'ar' ? 'صلاحيات الأقسام' : 'Section permissions'}
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          {locale === 'ar'
+                            ? 'تُستخدم هذه الصلاحيات لحسابات لوحة التحكم فقط.'
+                            : 'These permissions apply to dashboard accounts only.'}
+                        </p>
+                      </div>
+                      {dashboardPermissionsLoading && (
+                        <span className="text-xs font-medium text-primary">
+                          {locale === 'ar' ? 'جارٍ الحفظ...' : 'Saving...'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {DASHBOARD_PERMISSION_KEYS.filter((key) => key !== 'view_dashboard').map((key) => {
+                        const checked = dashboardPermissions[key] === true;
+                        const label = SECTION_PERMISSION_LABELS[key];
+
+                        return (
+                          <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
+                            <span className="text-sm font-medium text-gray-700">
+                              {isRTL ? label.ar : label.en}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => handleDashboardPermissionChange(key, event.target.checked)}
+                              disabled={!dashboardAccountId || dashboardPermissionsLoading}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

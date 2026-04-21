@@ -39,7 +39,7 @@ const ensureEmailAvailability = async (email, tenantId, excludeAccountId = null)
 
   const existingAccount = await db.TenantDashboardAccount.findOne({
     where: {
-      email,
+      email: { [Op.iLike]: email },
       ...(excludeAccountId ? { id: { [Op.ne]: excludeAccountId } } : {})
     }
   });
@@ -51,7 +51,7 @@ const ensureEmailAvailability = async (email, tenantId, excludeAccountId = null)
   const tenantScopedCollision = await db.TenantDashboardAccount.findOne({
     where: {
       tenantId,
-      email,
+      email: { [Op.iLike]: email },
       ...(excludeAccountId ? { id: { [Op.ne]: excludeAccountId } } : {})
     }
   });
