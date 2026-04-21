@@ -1140,9 +1140,10 @@ exports.createEmployee = async (req, res) => {
             });
         }
 
-        // Parse salary - handle string from FormData
-        const salaryNum = salary ? parseFloat(salary) : 0;
-        if (!salary || isNaN(salaryNum) || salaryNum < 0) {
+        // Parse salary - allow drafts to save without finance completed yet
+        const hasSalaryValue = salary !== undefined && salary !== null && `${salary}`.trim() !== '';
+        const salaryNum = hasSalaryValue ? parseFloat(salary) : 0;
+        if (hasSalaryValue && (isNaN(salaryNum) || salaryNum < 0)) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -1626,7 +1627,7 @@ exports.updateEmployee = async (req, res) => {
         }
         if (bio !== undefined) employee.bio = bio || null;
         if (experience !== undefined) employee.experience = experience || null;
-        if (salary !== undefined) employee.salary = parseFloat(salary);
+        if (salary !== undefined && `${salary}`.trim() !== '') employee.salary = parseFloat(salary);
         if (commissionRate !== undefined) employee.commissionRate = parseFloat(commissionRate);
         if (serviceCommissionEnabled !== undefined) employee.serviceCommissionEnabled = parseBooleanField(serviceCommissionEnabled, employee.serviceCommissionEnabled);
         if (productCommissionEnabled !== undefined) employee.productCommissionEnabled = parseBooleanField(productCommissionEnabled, employee.productCommissionEnabled);

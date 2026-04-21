@@ -696,7 +696,9 @@ export default function EditEmployeePage() {
       if (formData.experience) submitData.append("experience", formData.experience);
       submitData.append("skills", JSON.stringify(formData.skills));
       submitData.append("spokenLanguages", JSON.stringify(formData.spokenLanguages));
-      submitData.append("salary", formData.salary);
+      if (formData.salary !== "") {
+        submitData.append("salary", formData.salary);
+      }
       submitData.append("commissionRate", formData.commissionRate || "0");
       submitData.append("serviceCommissionEnabled", String(formData.serviceCommissionEnabled));
       submitData.append("productCommissionEnabled", String(formData.productCommissionEnabled));
@@ -718,11 +720,23 @@ export default function EditEmployeePage() {
         setSavedEmail(formData.email.trim());
         router.push(`/${locale}/dashboard/employees`);
       } else {
-        setError(response.message || t("updateError"));
+        const message = response.message || t("updateError");
+        setError(message);
+        await dialog.alert({
+          title: locale === 'ar' ? 'تعذر حفظ الموظف' : 'Could not save employee',
+          message,
+          tone: 'danger'
+        });
       }
     } catch (err: any) {
       console.error("Failed to update employee:", err);
-      setError(err.message || t("updateError"));
+      const message = err.message || t("updateError");
+      setError(message);
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر حفظ الموظف' : 'Could not save employee',
+        message,
+        tone: 'danger'
+      });
     } finally {
       setSaving(false);
     }
@@ -757,7 +771,7 @@ export default function EditEmployeePage() {
         activeSection={activeSection}
         onSectionSelect={scrollToSection}
       >
-      <form id="employee-editor-form" onSubmit={handleSubmit} className="space-y-6">
+      <form id="employee-editor-form" onSubmit={handleSubmit} noValidate className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
@@ -1038,14 +1052,13 @@ export default function EditEmployeePage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("salary")} (SAR) <span className="text-red-500">*</span>
+                    {t("salary")} (SAR) <span className="text-gray-400">({t("optional")})</span>
                   </label>
                   <input
                     type="number"
                     name="salary"
                     value={formData.salary}
                     onChange={handleChange}
-                    required
                     min="0"
                     step="0.01"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"

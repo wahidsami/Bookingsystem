@@ -243,7 +243,9 @@ export default function NewEmployeePage() {
       if (formData.experience) submitData.append("experience", formData.experience);
       submitData.append("skills", JSON.stringify(formData.skills));
       submitData.append("spokenLanguages", JSON.stringify(formData.spokenLanguages));
-      submitData.append("salary", formData.salary);
+      if (formData.salary !== "") {
+        submitData.append("salary", formData.salary);
+      }
       submitData.append("commissionRate", formData.commissionRate || "0");
       submitData.append("serviceCommissionEnabled", String(formData.serviceCommissionEnabled));
       submitData.append("productCommissionEnabled", String(formData.productCommissionEnabled));
@@ -300,13 +302,24 @@ export default function NewEmployeePage() {
       if (response.success) {
         router.push(`/${locale}/dashboard/employees`);
       } else {
-        setError(response.message || t("createError"));
+        const message = response.message || t("createError");
+        setError(message);
+        await dialog.alert({
+          title: locale === 'ar' ? 'تعذر حفظ الموظف' : 'Could not save employee',
+          message,
+          tone: 'danger'
+        });
       }
     } catch (err: any) {
       console.error("Failed to create employee:", err);
       // Show more detailed error message
       const errorMessage = err.message || err.response?.data?.message || t("createError");
       setError(errorMessage);
+      await dialog.alert({
+        title: locale === 'ar' ? 'تعذر حفظ الموظف' : 'Could not save employee',
+        message: errorMessage,
+        tone: 'danger'
+      });
       
       // Log full error for debugging
       if (process.env.NODE_ENV === 'development') {
@@ -347,7 +360,7 @@ export default function NewEmployeePage() {
         </div>
       )}
 
-      <form id="employee-editor-form" onSubmit={handleSubmit} className="space-y-6">
+      <form id="employee-editor-form" onSubmit={handleSubmit} noValidate className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
           <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="mb-4">
@@ -648,14 +661,13 @@ export default function NewEmployeePage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {t("salary")} (SAR) <span className="text-red-500">*</span>
+                    {t("salary")} (SAR) <span className="text-gray-400">({t("optional")})</span>
                   </label>
                   <input
                     type="number"
                     name="salary"
                     value={formData.salary}
                     onChange={handleChange}
-                    required
                     min="0"
                     step="0.01"
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
