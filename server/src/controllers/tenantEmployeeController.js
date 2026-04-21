@@ -10,7 +10,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { normalizeEmployeePosition, VALID_EMPLOYEE_POSITIONS } = require('../utils/employeePositions');
-const { normalizeDashboardPermissions, DASHBOARD_ROLE_PRESETS } = require('../utils/tenantDashboardPermissions');
+const { normalizeDashboardPermissions, ROLE_PRESETS } = require('../utils/tenantDashboardPermissions');
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
 const DEFAULT_STAFF_PERMISSIONS = {
@@ -37,7 +37,7 @@ const parseScheduleVisibilityWeeks = (value, fallback = 1) => {
 
 const normalizeStoredDashboardPermissions = (permissions, position) => {
     const normalizedPosition = normalizeEmployeePosition(position);
-    const roleKey = Object.keys(DASHBOARD_ROLE_PRESETS).includes(normalizedPosition)
+    const roleKey = normalizedPosition && Object.prototype.hasOwnProperty.call(ROLE_PRESETS, normalizedPosition)
         ? normalizedPosition
         : 'custom';
 
@@ -244,7 +244,7 @@ const syncTenantDashboardAccount = async ({
         });
     }
 
-    const roleKey = Object.keys(DASHBOARD_ROLE_PRESETS).includes(normalizedPosition)
+    const roleKey = normalizedPosition && Object.prototype.hasOwnProperty.call(ROLE_PRESETS, normalizedPosition)
         ? normalizedPosition
         : 'custom';
     const normalizedPermissions = normalizeDashboardPermissions(permissions || {}, roleKey);
