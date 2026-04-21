@@ -132,8 +132,8 @@ export default function SettingsPage() {
   const [appearanceSettings, setAppearanceSettings] = useState({
     layoutTemplate: 'default',
     themeColors: {
-      primary: '#7C3AED',
-      secondary: '#EC4899',
+      primary: '#8B5ADF',
+      secondary: '#FE01AB',
     },
   });
 
@@ -233,7 +233,7 @@ export default function SettingsPage() {
         if (business.layoutTemplate || business.themeColors) {
           setAppearanceSettings({
             layoutTemplate: business.layoutTemplate || 'default',
-            themeColors: business.themeColors || { primary: '#7C3AED', secondary: '#EC4899' },
+            themeColors: business.themeColors || { primary: '#8B5ADF', secondary: '#FE01AB' },
           });
         }
       }
