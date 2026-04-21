@@ -473,7 +473,7 @@ exports.uploadPhoto = upload.single('photo');
 exports.getEmployees = async (req, res) => {
     try {
         const tenantId = req.tenantId;
-        const { isActive, search, gender, page, limit, sortBy } = req.query;
+        const { isActive, search, gender, position, page, limit, sortBy } = req.query;
 
         const where = { tenantId };
         
@@ -491,6 +491,18 @@ exports.getEmployees = async (req, res) => {
 
         if (normalizedGender) {
             where.gender = normalizedGender;
+        }
+
+        const normalizedPosition = normalizeEmployeePosition(position);
+        if (position !== undefined && position !== '' && !normalizedPosition) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid position. Allowed values: ${VALID_EMPLOYEE_POSITIONS.join(', ')}`
+            });
+        }
+
+        if (normalizedPosition) {
+            where.position = normalizedPosition;
         }
 
         if (search) {

@@ -75,6 +75,8 @@ export default function EmployeesPage() {
         params.gender = listFilter;
       }
 
+      params.position = "service_provider";
+
       if (searchTerm.trim()) {
         params.search = searchTerm.trim();
       }

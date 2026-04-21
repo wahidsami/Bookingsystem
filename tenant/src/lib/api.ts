@@ -505,7 +505,7 @@ class TenantApiClient {
   /**
    * Employee Management
    */
-  async getEmployees(params?: { isActive?: boolean; search?: string; gender?: string; page?: number; limit?: number; sortBy?: string }): Promise<any> {
+  async getEmployees(params?: { isActive?: boolean; search?: string; gender?: string; position?: string; page?: number; limit?: number; sortBy?: string }): Promise<any> {
     const queryParams = new URLSearchParams();
     if (params?.isActive !== undefined) {
       queryParams.append('isActive', params.isActive.toString());
@@ -515,6 +515,9 @@ class TenantApiClient {
     }
     if (params?.gender) {
       queryParams.append('gender', params.gender);
+    }
+    if (params?.position) {
+      queryParams.append('position', params.position);
     }
     if (params?.page !== undefined) {
       queryParams.append('page', params.page.toString());
