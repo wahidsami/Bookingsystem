@@ -36,7 +36,7 @@ export function ServiceTeamSection({
   onAssignmentsChange
 }: ServiceTeamSectionProps) {
   const serviceProviders = useMemo(
-    () => employees.filter((employee) => employee.isActive !== false && isServiceProviderEmployee(employee)),
+    () => employees.filter((employee) => isServiceProviderEmployee(employee)),
     [employees]
   );
 
@@ -86,7 +86,7 @@ export function ServiceTeamSection({
             <p className="mt-1 text-gray-500">
               {locale === 'ar'
                 ? 'لا يوجد موظفون بخاصية مزود خدمة حتى الآن. أضف أعضاء فريق من صفحة الفرق أولاً.'
-                : 'No active service providers found yet. Add team members first, then assign them here.'}
+                : 'No service providers found yet. Add team members first, then assign them here.'}
             </p>
             <Link href={`/${locale}/dashboard/employees/new`} className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90">
               {locale === 'ar' ? 'إضافة عضو فريق' : 'Add team member'}
@@ -166,15 +166,15 @@ export function ServiceTeamSection({
                       </div>
                     )}
 
-                    <div>
-                      <p className="font-semibold text-gray-900">{employee.name}</p>
-                      <p className="text-xs text-gray-500">
+                <div>
+                  <p className="font-semibold text-gray-900">{employee.name}</p>
+                  <p className="text-xs text-gray-500">
                         {employee.isActive === false
                           ? (locale === 'ar' ? 'غير نشط' : 'Inactive')
                           : (locale === 'ar' ? 'مزود خدمة' : 'Service provider')}
-                      </p>
-                    </div>
-                  </div>
+                  </p>
+                </div>
+              </div>
                 </label>
 
                 <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse md:justify-end' : 'flex-row'}`}>

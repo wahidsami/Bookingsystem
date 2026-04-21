@@ -202,7 +202,7 @@ export default function EditServicePage() {
 
   const loadEmployees = async () => {
     try {
-      const response = await tenantApi.getEmployees({ isActive: true, position: "service_provider" });
+      const response = await tenantApi.getEmployees({ position: "service_provider" });
       if (response.success) {
         setEmployees(response.employees || []);
       }
