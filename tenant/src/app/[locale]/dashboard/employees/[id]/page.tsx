@@ -758,8 +758,8 @@ export default function EditEmployeePage() {
       <EmployeeEditorFrame
         locale={locale}
         isRTL={isRTL}
-        title={`${t("edit")} ${t("title")}`}
-        subtitle={locale === 'ar' ? 'تعديل معلومات الموظف' : 'Edit employee information'}
+        title={locale === 'ar' ? 'تعديل عضو الفريق' : 'Edit Team Member'}
+        subtitle={locale === 'ar' ? 'تعديل بيانات عضو الفريق' : 'Edit team member information'}
         cancelHref={`/${locale}/dashboard/employees`}
         saveLabel={t("save")}
         loadingLabel={t("loading")}
@@ -1044,9 +1044,9 @@ export default function EditEmployeePage() {
             </div>
 
             {/* Financial Information */}
-            <div id="employee-section-basic" className={`${activeSection === 'basic' ? 'card scroll-mt-6' : 'hidden'}`}>
+            <div id="employee-section-finance" className={`${activeSection === 'finance' ? 'card scroll-mt-6' : 'hidden'}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المعلومات المالية' : 'Financial Information'}
+                {locale === 'ar' ? 'المالية' : 'Finance'}
               </h3>
 
               <div className="space-y-4">
