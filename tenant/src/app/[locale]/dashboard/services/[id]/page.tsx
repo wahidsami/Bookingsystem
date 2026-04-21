@@ -780,36 +780,6 @@ export default function EditServicePage() {
                 assignments={employeeAssignments}
                 onAssignmentsChange={setEmployeeAssignments}
               />
-
-              <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {locale === 'ar' ? 'التوفر' : 'Availability'}
-                </h3>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <input
-                      type="checkbox"
-                      name="availableInCenter"
-                      checked={formData.availableInCenter}
-                      onChange={handleChange}
-                      className="w-4 h-4 text-primary focus:ring-primary"
-                    />
-                    <label className="font-medium text-gray-700">{t("availableInCenter")}</label>
-                  </div>
-
-                  <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <input
-                      type="checkbox"
-                      name="availableHomeVisit"
-                      checked={formData.availableHomeVisit}
-                      onChange={handleChange}
-                      className="w-4 h-4 text-primary focus:ring-primary"
-                    />
-                    <label className="font-medium text-gray-700">{t("availableHomeVisit")}</label>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Includes Section */}
