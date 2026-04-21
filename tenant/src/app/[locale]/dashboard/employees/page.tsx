@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
-import { Currency } from "@/components/Currency";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
-import { getEmployeePositionLabel } from "@/lib/employeePositions";
+import {
+  EMPLOYEE_GENDERS,
+  getEmployeeGenderLabel,
+  getEmployeePositionLabel
+} from "@/lib/employeePositions";
 
 interface Employee {
   id: string;
@@ -16,50 +19,67 @@ interface Employee {
   email?: string;
   phone?: string;
   nationality?: string;
+  gender?: string;
   position?: string;
-  bio?: string;
-  experience?: string;
-  skills: string[];
   photo?: string;
-  rating: number;
-  totalBookings: number;
-  salary: number;
-  commissionRate: number;
-  workingHours?: any;
   isActive: boolean;
   createdAt: string;
 }
 
+const PAGE_SIZE = 10;
+
 export default function EmployeesPage() {
-    const dialog = useAppDialog();
+  const dialog = useAppDialog();
   const t = useTranslations("Employees");
   const params = useParams();
-  const router = useRouter();
-  const locale = (params?.locale as string) || 'ar';
-  const isRTL = locale === 'ar';
+  const locale = (params?.locale as string) || "ar";
+  const isRTL = locale === "ar";
 
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
+  const [filterActive, setFilterActive] = useState<string>("all");
+  const [filterGender, setFilterGender] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"alphabetical" | "gender">("alphabetical");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [limits, setLimits] = useState<any>(null);
 
   useEffect(() => {
     loadEmployees();
-  }, [filterActive, searchTerm]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterActive, filterGender, searchTerm, sortBy, currentPage]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [filterActive, filterGender, searchTerm, sortBy, currentPage]);
 
   const loadEmployees = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const params: any = {};
-      if (filterActive !== undefined) {
-        params.isActive = filterActive;
+      const params: any = {
+        page: currentPage,
+        limit: PAGE_SIZE,
+        sortBy
+      };
+
+      if (filterActive === "true") {
+        params.isActive = true;
+      } else if (filterActive === "false") {
+        params.isActive = false;
       }
-      if (searchTerm) {
-        params.search = searchTerm;
+
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+
+      if (filterGender !== "all") {
+        params.gender = filterGender;
       }
 
       const [response, limitsData] = await Promise.all([
@@ -71,156 +91,273 @@ export default function EmployeesPage() {
         setLimits(limitsData.staff);
       }
 
-      // Handle different response structures
       const data = response.data || response;
 
       if (data.success !== false) {
-        // Response is successful (either success: true or success is undefined but no error)
         const employeesList = data.employees || data.data?.employees || [];
+        const totalValue = Number(data.totalItems ?? data.count ?? employeesList.length ?? 0);
         setEmployees(employeesList);
-
-        if (employeesList.length === 0 && !filterActive && !searchTerm) {
-          console.log("No employees found. Response:", response);
-        }
+        setTotalItems(totalValue || 0);
+        setTotalPages(Math.max(1, Number(data.totalPages ?? Math.ceil(totalValue / PAGE_SIZE)) || 1));
       } else {
         setError(data.message || t("loadError"));
         setEmployees([]);
+        setTotalItems(0);
+        setTotalPages(1);
       }
     } catch (err: any) {
       console.error("Failed to load employees:", err);
-      console.error("Error details:", {
-        message: err.message,
-        stack: err.stack,
-        response: err.response
-      });
       setError(err.message || t("loadError"));
       setEmployees([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!(await dialog.confirm(locale === 'ar'
-      ? `هل أنت متأكد من حذف الموظف "${name}"؟`
-      : `Are you sure you want to delete employee "${name}"?`))) {
+  const goToPage = (nextPage: number) => {
+    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+    setCurrentPage(safePage);
+  };
+
+  const pageNumbers = useMemo(() => {
+    const total = Math.max(totalPages, 1);
+    const pages: number[] = [];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(total, currentPage + 2);
+
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+
+    return pages;
+  }, [currentPage, totalPages]);
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(employees.map((employee) => employee.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const toggleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      if (checked) {
+        return Array.from(new Set([...current, id]));
+      }
+      return current.filter((item) => item !== id);
+    });
+  };
+
+  const handleDelete = async (employee: Employee) => {
+    const confirmed = await dialog.confirm(
+      locale === "ar"
+        ? `هل أنت متأكد من حذف العضو "${employee.name}"؟`
+        : `Are you sure you want to delete "${employee.name}"?`
+    );
+
+    if (!confirmed) {
       return;
     }
 
     try {
-      const response = await tenantApi.deleteEmployee(id);
+      const response = await tenantApi.deleteEmployee(employee.id);
       if (response.success) {
-        loadEmployees();
+        await dialog.alert({
+          title: locale === "ar" ? "تم الحذف" : "Deleted",
+          message: locale === "ar" ? "تم حذف العضو بنجاح." : "The team member was deleted successfully.",
+          tone: "success"
+        });
+        await loadEmployees();
       } else {
-        alert(response.message || t("deleteError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر الحذف" : "Delete failed",
+          message: response.message || t("deleteError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to delete employee:", err);
-      alert(err.message || t("deleteError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر الحذف" : "Delete failed",
+        message: err.message || t("deleteError"),
+        tone: "danger"
+      });
     }
   };
 
+  const handleToggleActive = async (employee: Employee) => {
+    try {
+      const confirmed = await dialog.confirm(
+        locale === "ar"
+          ? `هل تريد ${employee.isActive ? "تعطيل" : "تفعيل"} "${employee.name}"؟`
+          : `Do you want to ${employee.isActive ? "disable" : "enable"} "${employee.name}"?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      const submitData = new FormData();
+      submitData.append("isActive", String(!employee.isActive));
+      const response = await tenantApi.updateEmployee(employee.id, submitData);
+
+      if (response.success) {
+        await loadEmployees();
+      } else {
+        throw new Error(response.message || t("updateError"));
+      }
+    } catch (err: any) {
+      console.error("Failed to update employee status:", err);
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
+    }
+  };
+
+  const employeeCountLabel = locale === "ar"
+    ? `${totalItems} عضو`
+    : `${totalItems} member(s)`;
+
   return (
     <TenantLayout>
-      {/* Header */}
       <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between ${isRTL ? "xl:flex-row-reverse" : ""}`}>
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? "right" : "left" }}>
               {t("title")}
             </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            <p className="text-gray-600" style={{ textAlign: isRTL ? "right" : "left" }}>
               {t("subtitle")}
             </p>
           </div>
-          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+
+          <div className={`flex flex-wrap items-center gap-3 ${isRTL ? "justify-start xl:justify-end" : "justify-start xl:justify-end"}`}>
             {limits && (
-              <div className="text-sm px-3 py-1 bg-gray-100 rounded-lg whitespace-nowrap">
-                <span className="text-gray-500">{isRTL ? 'الحد المسموح:' : 'Limit:'} </span>
-                <span className={`font-medium ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
+              <div className="text-sm px-3 py-2 bg-gray-100 rounded-xl whitespace-nowrap">
+                <span className="text-gray-500">{isRTL ? "الحد المسموح:" : "Limit:"} </span>
+                <span className={`font-medium ${!limits.allowed ? "text-red-600" : "text-gray-900"}`}>
                   {limits.current} / {limits.limit}
                 </span>
               </div>
             )}
             <Link
-              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/employees/new`}
-              className={`btn btn-primary ${limits && !limits.allowed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-              onClick={(e) => {
+              href={limits && !limits.allowed ? "#" : `/${locale}/dashboard/employees/new`}
+              className={`btn btn-primary ${limits && !limits.allowed ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+              onClick={(event) => {
                 if (limits && !limits.allowed) {
-                  e.preventDefault();
-                  alert(isRTL ? 'تم الوصول للحد الأقصى לבاقتك' : 'You have reached your subscription limit');
+                  event.preventDefault();
+                  dialog.alert({
+                    title: isRTL ? "الحد الأقصى" : "Limit reached",
+                    message: isRTL
+                      ? "لقد وصلت إلى الحد الأقصى لموظفي باقتك."
+                      : "You have reached your subscription staff limit.",
+                    tone: "danger"
+                  });
                 }
               }}
             >
-              <span className="mr-2">{isRTL ? '➕' : ''}</span>
+              <span className="mr-2">{isRTL ? "➕" : ""}</span>
               {t("addEmployee")}
-              <span className="ml-2">{!isRTL ? '➕' : ''}</span>
+              <span className="ml-2">{!isRTL ? "➕" : ""}</span>
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className={`card mb-6 ${isRTL ? 'text-right' : ''}`}>
-        <div className={`flex flex-col md:flex-row gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
-          {/* Search */}
-          <div className="flex-1">
+      <div className={`card mb-6 ${isRTL ? "text-right" : ""}`}>
+        <div className={`flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between ${isRTL ? "xl:flex-row-reverse" : ""}`}>
+          <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <input
               type="text"
               placeholder={t("searchPlaceholder")}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+              style={{ textAlign: isRTL ? "right" : "left" }}
             />
+
+            <select
+              value={filterActive}
+              onChange={(event) => {
+                setFilterActive(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              style={{ textAlign: isRTL ? "right" : "left" }}
+            >
+              <option value="all">{locale === "ar" ? "الكل" : "All status"}</option>
+              <option value="true">{t("active")}</option>
+              <option value="false">{t("inactive")}</option>
+            </select>
+
+            <select
+              value={filterGender}
+              onChange={(event) => {
+                setFilterGender(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              style={{ textAlign: isRTL ? "right" : "left" }}
+            >
+              <option value="all">{locale === "ar" ? "كل الجنس" : "All genders"}</option>
+              {EMPLOYEE_GENDERS.filter((option) => option.value).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label[locale as "ar" | "en"] || option.label.en}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(event) => {
+                setSortBy(event.target.value as "alphabetical" | "gender");
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              style={{ textAlign: isRTL ? "right" : "left" }}
+            >
+              <option value="alphabetical">{locale === "ar" ? "ترتيب أبجدي" : "Alphabetical"}</option>
+              <option value="gender">{locale === "ar" ? "حسب الجنس" : "By gender"}</option>
+            </select>
           </div>
 
-          {/* Active Filter */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterActive(undefined)}
-              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === undefined
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("all")}
-            </button>
-            <button
-              onClick={() => setFilterActive(true)}
-              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === true
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("active")}
-            </button>
-            <button
-              onClick={() => setFilterActive(false)}
-              className={`px-4 py-2 rounded-lg transition-colors ${filterActive === false
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("inactive")}
-            </button>
+          <div className="flex items-center gap-3 whitespace-nowrap">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600">
+              {employeeCountLabel}
+            </div>
+            {selectedIds.length > 0 && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm text-primary">
+                {locale === "ar" ? `${selectedIds.length} محدد` : `${selectedIds.length} selected`}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
           {error}
         </div>
       )}
 
-      {/* Loading State */}
       {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="mt-4 text-gray-600">{t("loading")}</p>
+        <div className="card overflow-hidden">
+          <div className="p-6">
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((row) => (
+                <div key={row} className="h-16 animate-pulse rounded-2xl bg-gray-100" />
+              ))}
+            </div>
+          </div>
         </div>
       ) : employees.length === 0 ? (
         <div className="card text-center py-12">
@@ -232,114 +369,174 @@ export default function EmployeesPage() {
           </Link>
         </div>
       ) : (
-        /* Employees Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {employees.map((employee) => (
-            <div key={employee.id} className="card hover:shadow-xl transition-shadow">
-              {/* Employee Photo and Status */}
-              <div className="relative mb-4">
-                <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                  {employee.photo ? (
-                    <img
-                      src={getImageUrl(employee.photo)}
-                      alt={employee.name}
-                      className="w-full h-full object-cover"
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-[920px] w-full border-separate border-spacing-0">
+              <thead className="bg-gray-50">
+                <tr className="text-sm text-gray-600">
+                  <th className="border-b border-gray-200 px-4 py-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={employees.length > 0 && selectedIds.length === employees.length}
+                      onChange={(event) => toggleSelectAll(event.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
-                  ) : (
-                    <span className="text-4xl">👤</span>
-                  )}
-                </div>
-                <div
-                  className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} w-6 h-6 rounded-full border-2 border-white ${employee.isActive ? 'bg-green-500' : 'bg-gray-400'
-                    }`}
-                ></div>
-              </div>
+                  </th>
+                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                    {locale === "ar" ? "العضو" : "Team member"}
+                  </th>
+                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                    {locale === "ar" ? "المسمى الوظيفي" : "Job title"}
+                  </th>
+                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                    {locale === "ar" ? "الحالة" : "Status"}
+                  </th>
+                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-left" : "text-right"}`}>
+                    {locale === "ar" ? "الإجراءات" : "Actions"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((employee) => {
+                  const checked = selectedIds.includes(employee.id);
 
-              {/* Employee Info */}
-              <div className="text-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-1">{employee.name}</h3>
-                {employee.position && (
-                  <p className="text-sm font-semibold text-primary mb-2">
-                    {getEmployeePositionLabel(employee.position, locale as 'ar' | 'en')}
-                  </p>
-                )}
-                {employee.nationality && (
-                  <p className="text-sm text-gray-600 mb-2">🌍 {employee.nationality}</p>
-                )}
-                {employee.experience && (
-                  <p className="text-sm text-gray-600 mb-2">⭐ {employee.experience}</p>
-                )}
-                {employee.skills && employee.skills.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-1 mt-2">
-                    {employee.skills.slice(0, 3).map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {employee.skills.length > 3 && (
-                      <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                        +{employee.skills.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+                  return (
+                    <tr
+                      key={employee.id}
+                      className={`border-b border-gray-100 transition-colors ${checked ? "bg-primary/5" : "hover:bg-gray-50"}`}
+                    >
+                      <td className="px-4 py-4 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => toggleSelectOne(employee.id, event.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse text-right" : ""}`}>
+                          <div className="h-12 w-12 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            {employee.photo ? (
+                              <img
+                                src={getImageUrl(employee.photo)}
+                                alt={employee.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-lg font-semibold text-gray-600">
+                                {employee.name?.charAt(0)?.toUpperCase() || "?"}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold text-gray-900">{employee.name}</span>
+                              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${employee.isActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>
+                                {employee.isActive ? (locale === "ar" ? "نشط" : "Active") : (locale === "ar" ? "غير نشط" : "Inactive")}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm text-gray-500 break-all">{employee.email || "-"}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className={`px-4 py-4 align-middle ${isRTL ? "text-right" : "text-left"}`}>
+                        <div className="font-medium text-gray-900">
+                          {employee.position
+                            ? getEmployeePositionLabel(employee.position, locale as "ar" | "en")
+                            : (locale === "ar" ? "غير محدد" : "Unassigned")}
+                        </div>
+                        {employee.gender && (
+                          <div className="mt-1 text-sm text-gray-500">
+                            {locale === "ar" ? "الجنس" : "Gender"}: {getEmployeeGenderLabel(employee.gender, locale as "ar" | "en")}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`px-4 py-4 align-middle ${isRTL ? "text-right" : "text-left"}`}>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${employee.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
+                          {employee.isActive ? (locale === "ar" ? "مفعل" : "Enabled") : (locale === "ar" ? "معطل" : "Disabled")}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-4 align-middle ${isRTL ? "text-left" : "text-right"}`}>
+                        <div className={`flex flex-wrap gap-2 ${isRTL ? "justify-start" : "justify-end"}`}>
+                          <Link
+                            href={`/${locale}/dashboard/employees/${employee.id}`}
+                            className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                          >
+                            {locale === "ar" ? "عرض" : "View"}
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleActive(employee)}
+                            className={`rounded-xl px-3 py-2 text-xs font-medium ${
+                              employee.isActive
+                                ? "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                : "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {employee.isActive ? (locale === "ar" ? "تعطيل" : "Deactivate") : (locale === "ar" ? "تفعيل" : "Activate")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(employee)}
+                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100"
+                          >
+                            {t("delete")}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-4 mb-4 text-center">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">{t("rating")}</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {employee.rating ? Number(employee.rating).toFixed(1) : '5.0'} ⭐
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">{t("bookings")}</p>
-                  <p className="text-lg font-semibold text-gray-900">{employee.totalBookings}</p>
-                </div>
-              </div>
+          <div className={`flex flex-col gap-3 border-t border-gray-100 px-4 py-4 lg:flex-row lg:items-center lg:justify-between ${isRTL ? "lg:flex-row-reverse" : ""}`}>
+            <div className="text-sm text-gray-600">
+              {locale === "ar"
+                ? `عرض ${employees.length} من أصل ${totalItems}`
+                : `Showing ${employees.length} of ${totalItems}`}
+            </div>
 
-              {/* Salary */}
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{t("salary")}</span>
-                  <span className="font-semibold text-gray-900">
-                    <Currency amount={employee.salary} />
-                  </span>
-                </div>
-                {employee.commissionRate > 0 && (
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm text-gray-600">{t("commission")}</span>
-                    <span className="font-semibold text-gray-900">
-                      {employee.commissionRate}%
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <Link
-                  href={`/${locale}/dashboard/employees/${employee.id}`}
-                  className="flex-1 btn btn-secondary text-center"
-                >
-                  {t("edit")}
-                </Link>
+            {totalPages > 1 && (
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => handleDelete(employee.id, employee.name)}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  type="button"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {t("delete")}
+                  {locale === "ar" ? "السابق" : "Previous"}
+                </button>
+
+                {pageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => goToPage(page)}
+                    className={`min-w-10 rounded-xl px-3 py-2 text-sm font-medium ${
+                      page === currentPage
+                        ? "bg-primary text-white"
+                        : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {locale === "ar" ? "التالي" : "Next"}
                 </button>
               </div>
-            </div>
-          ))}
+            )}
+          </div>
         </div>
       )}
     </TenantLayout>
   );
 }
-

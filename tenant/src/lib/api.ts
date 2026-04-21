@@ -505,13 +505,25 @@ class TenantApiClient {
   /**
    * Employee Management
    */
-  async getEmployees(params?: { isActive?: boolean; search?: string }): Promise<any> {
+  async getEmployees(params?: { isActive?: boolean; search?: string; gender?: string; page?: number; limit?: number; sortBy?: string }): Promise<any> {
     const queryParams = new URLSearchParams();
     if (params?.isActive !== undefined) {
       queryParams.append('isActive', params.isActive.toString());
     }
     if (params?.search) {
       queryParams.append('search', params.search);
+    }
+    if (params?.gender) {
+      queryParams.append('gender', params.gender);
+    }
+    if (params?.page !== undefined) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params?.limit !== undefined) {
+      queryParams.append('limit', params.limit.toString());
+    }
+    if (params?.sortBy) {
+      queryParams.append('sortBy', params.sortBy);
     }
     const query = queryParams.toString();
     return this.get(`/tenant/employees${query ? `?${query}` : ''}`);

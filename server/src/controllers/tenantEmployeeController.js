@@ -10,6 +10,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { normalizeEmployeePosition, VALID_EMPLOYEE_POSITIONS } = require('../utils/employeePositions');
+const { normalizeEmployeeGender, VALID_EMPLOYEE_GENDERS } = require('../utils/employeeGenders');
 const { normalizeDashboardPermissions, ROLE_PRESETS } = require('../utils/tenantDashboardPermissions');
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
@@ -21,6 +22,15 @@ const DEFAULT_STAFF_PERMISSIONS = {
     view_booking_notes: false
 };
 const VALID_SCHEDULE_VISIBILITY_WEEKS = [1, 2, 3, 4];
+const DEFAULT_EMPLOYEE_LIMIT = 12;
+const MAX_EMPLOYEE_LIMIT = 100;
+
+const EMPLOYEE_GENDER_SORT_ORDER = {
+    male: 1,
+    female: 2,
+    other: 3,
+    prefer_not_to_say: 4
+};
 
 const parseScheduleVisibilityWeeks = (value, fallback = 1) => {
     if (value === undefined || value === null || value === '') {
@@ -33,6 +43,44 @@ const parseScheduleVisibilityWeeks = (value, fallback = 1) => {
     }
 
     return parsed;
+};
+
+const parsePaginationValue = (value, fallback, min, max) => {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) {
+        return null;
+    }
+
+    return Math.min(Math.max(parsed, min), max);
+};
+
+const getEmployeeSortOrder = (sortBy) => {
+    const normalizedSortBy = `${sortBy || 'alphabetical'}`.trim().toLowerCase();
+
+    if (normalizedSortBy === 'gender') {
+        return [
+            [
+                db.sequelize.literal(`CASE
+                    WHEN "gender" = 'male' THEN ${EMPLOYEE_GENDER_SORT_ORDER.male}
+                    WHEN "gender" = 'female' THEN ${EMPLOYEE_GENDER_SORT_ORDER.female}
+                    WHEN "gender" = 'other' THEN ${EMPLOYEE_GENDER_SORT_ORDER.other}
+                    WHEN "gender" = 'prefer_not_to_say' THEN ${EMPLOYEE_GENDER_SORT_ORDER.prefer_not_to_say}
+                    ELSE 99
+                END`),
+                'ASC'
+            ],
+            ['name', 'ASC']
+        ];
+    }
+
+    return [
+        ['name', 'ASC'],
+        ['createdAt', 'DESC']
+    ];
 };
 
 const normalizeStoredDashboardPermissions = (permissions, position) => {
@@ -348,12 +396,24 @@ exports.uploadPhoto = upload.single('photo');
 exports.getEmployees = async (req, res) => {
     try {
         const tenantId = req.tenantId;
-        const { isActive, search } = req.query;
+        const { isActive, search, gender, page, limit, sortBy } = req.query;
 
         const where = { tenantId };
         
         if (isActive !== undefined) {
             where.isActive = isActive === 'true';
+        }
+
+        const normalizedGender = normalizeEmployeeGender(gender);
+        if (gender !== undefined && gender !== '' && !normalizedGender) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid gender. Allowed values: ${VALID_EMPLOYEE_GENDERS.join(', ')}`
+            });
+        }
+
+        if (normalizedGender) {
+            where.gender = normalizedGender;
         }
 
         if (search) {
@@ -364,37 +424,82 @@ exports.getEmployees = async (req, res) => {
             ];
         }
 
-        const employees = await db.Staff.findAll({
+        const employeeAttributes = [
+            'id',
+            'name',
+            'email',
+            'phone',
+            'nationality',
+            'gender',
+            'position',
+            'bio',
+            'experience',
+            'skills',
+            'dashboardPermissions',
+            'photo',
+            'rating',
+            'totalBookings',
+            'salary',
+            'commissionRate',
+            'workingHours',
+            'scheduleVisibilityWeeks',
+            'isActive',
+            'createdAt',
+            'updatedAt'
+        ];
+
+        const shouldPaginate = page !== undefined || limit !== undefined;
+        let employees;
+        let count;
+
+        if (shouldPaginate) {
+            const pageNumber = parsePaginationValue(page, 1, 1, Number.MAX_SAFE_INTEGER);
+            const pageLimit = parsePaginationValue(limit, DEFAULT_EMPLOYEE_LIMIT, 1, MAX_EMPLOYEE_LIMIT);
+
+            if (pageNumber === null || pageLimit === null) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'page and limit must be valid positive integers'
+                });
+            }
+
+            const offset = (pageNumber - 1) * pageLimit;
+            const result = await db.Staff.findAndCountAll({
+                where,
+                limit: pageLimit,
+                offset,
+                order: getEmployeeSortOrder(sortBy),
+                attributes: employeeAttributes
+            });
+
+            employees = result.rows;
+            count = result.count;
+
+            return res.json({
+                success: true,
+                employees,
+                count,
+                page: pageNumber,
+                limit: pageLimit,
+                totalPages: Math.max(1, Math.ceil(count / pageLimit)),
+                totalItems: count
+            });
+        }
+
+        employees = await db.Staff.findAll({
             where,
             order: [['name', 'ASC']],
-            attributes: [
-                'id',
-                'name',
-                'email',
-                'phone',
-                'nationality',
-                'position',
-                'bio',
-                'experience',
-                'skills',
-                'dashboardPermissions',
-                'photo',
-                'rating',
-                'totalBookings',
-                'salary',
-                'commissionRate',
-                'workingHours',
-                'scheduleVisibilityWeeks',
-                'isActive',
-                'createdAt',
-                'updatedAt'
-            ]
+            attributes: employeeAttributes
         });
 
         res.json({
             success: true,
             employees,
-            count: employees.length
+            count: employees.length,
+            page: 1,
+            limit: employees.length,
+            totalPages: 1,
+            totalItems: employees.length
         });
     } catch (error) {
         console.error('Get employees error:', error);
@@ -426,6 +531,7 @@ exports.getEmployee = async (req, res) => {
                 'email',
                 'phone',
                 'nationality',
+                'gender',
                 'position',
                 'bio',
                 'experience',
@@ -857,6 +963,7 @@ exports.createEmployee = async (req, res) => {
             email,
             phone,
             nationality,
+            gender,
             position,
             bio,
             experience,
@@ -897,6 +1004,8 @@ exports.createEmployee = async (req, res) => {
         const normalizedEmail = email && email.trim() ? normalizeEmail(email) : null;
         const positionValue = `${position ?? ''}`.trim();
         const normalizedPosition = normalizeEmployeePosition(positionValue);
+        const genderValue = `${gender ?? ''}`.trim();
+        const normalizedGender = normalizeEmployeeGender(genderValue);
         let parsedDashboardPermissions = null;
         if (dashboardPermissions !== undefined) {
             if (typeof dashboardPermissions === 'string' && dashboardPermissions.trim()) {
@@ -926,6 +1035,13 @@ exports.createEmployee = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: `Invalid employee position. Allowed values: ${VALID_EMPLOYEE_POSITIONS.join(', ')}`
+            });
+        }
+        if (genderValue && !normalizedGender) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Invalid gender. Allowed values: ${VALID_EMPLOYEE_GENDERS.join(', ')}`
             });
         }
         if (staffAppPassword && staffAppPassword.length < 8) {
@@ -1179,6 +1295,7 @@ exports.createEmployee = async (req, res) => {
             email: normalizedEmail,
             phone: phone && phone.trim() ? phone.trim() : null,
             nationality: nationality && nationality.trim() ? nationality.trim() : null,
+            gender: normalizedGender,
             position: normalizedPosition,
             bio: bio && bio.trim() ? bio.trim() : null,
             experience: experience && experience.trim() ? experience.trim() : null,
@@ -1304,6 +1421,7 @@ exports.updateEmployee = async (req, res) => {
             email,
             phone,
             nationality,
+            gender,
             position,
             bio,
             experience,
@@ -1356,6 +1474,15 @@ exports.updateEmployee = async (req, res) => {
         }
 
         const previousEmail = employee.email;
+        const genderValue = `${gender ?? ''}`.trim();
+        const normalizedGender = normalizeEmployeeGender(genderValue);
+        if (gender !== undefined && genderValue && !normalizedGender) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Invalid gender. Allowed values: ${VALID_EMPLOYEE_GENDERS.join(', ')}`
+            });
+        }
         let parsedDashboardPermissions = null;
         if (dashboardPermissions !== undefined) {
             if (typeof dashboardPermissions === 'string' && dashboardPermissions.trim()) {
@@ -1390,6 +1517,7 @@ exports.updateEmployee = async (req, res) => {
         if (email !== undefined) employee.email = email && email.trim() ? normalizeEmail(email) : null;
         if (phone !== undefined) employee.phone = phone || null;
         if (nationality !== undefined) employee.nationality = nationality || null;
+        if (gender !== undefined) employee.gender = normalizedGender;
         if (position !== undefined) {
             const positionValue = `${position}`.trim();
             const normalizedPosition = normalizeEmployeePosition(positionValue);
