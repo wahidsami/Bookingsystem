@@ -139,7 +139,7 @@ export default function NewAppointmentPage() {
       return;
     }
 
-    if (query.length < 2) {
+    if (query.length < 1) {
       setCustomers([]);
       return;
     }
@@ -149,7 +149,7 @@ export default function NewAppointmentPage() {
         setCustomerLoading(true);
         const response = await tenantApi.getCustomers({ search: query, limit: 10 });
         if (response.success) {
-          setCustomers(response.customers || []);
+          setCustomers(response.data?.customers || []);
         } else {
           setCustomers([]);
         }
@@ -434,7 +434,7 @@ export default function NewAppointmentPage() {
                       );
                     })}
                   </div>
-                ) : customerSearch.trim().length >= 2 ? (
+                ) : customerSearch.trim().length >= 1 ? (
                   <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
                     {locale === 'ar'
                       ? 'لا يوجد عميل مطابق. يمكنك إنشاء عميل جديد من التبويب المجاور.'
