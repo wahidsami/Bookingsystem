@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
+import { Currency } from "@/components/Currency";
 import { getImageUrl } from "@/lib/api";
 
 interface Appointment {
@@ -18,8 +19,11 @@ interface Appointment {
     | 'refunded'
     | 'partially_refunded';
   price: number;
+  bookingNumber?: string | null;
   notes?: string;
   paymentMethod?: string | null;
+  serviceVariantName?: string | null;
+  serviceVariantDuration?: number | null;
   requestedStaffId?: string | null;
   assignmentMode?: 'unknown' | 'customer_selected' | 'auto_assigned' | 'tenant_reassigned';
   service: {
@@ -860,6 +864,7 @@ export function CalendarView({
                           t('unknownCustomer');
                         const serviceName =
                           locale === 'ar' ? appointment.service.name_ar : appointment.service.name_en;
+                        const variantName = appointment.serviceVariantName?.trim() || "";
                         const startTime = new Date(appointment.startTime);
                         const endTime = new Date(appointment.endTime);
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
@@ -913,10 +918,69 @@ export function CalendarView({
                               setDraggedAppointmentId(null);
                               setDragOverStaffId(null);
                             }}
-                            className={`${getAppointmentColor(appointment)} relative z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
+                            className={`${getAppointmentColor(appointment)} group relative z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
+                            <div className={`pointer-events-none absolute z-40 w-72 rounded-3xl border border-white/20 bg-slate-950/95 p-4 text-white shadow-2xl ring-1 ring-black/25 backdrop-blur-xl opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 ${isRTL ? 'right-full mr-3 translate-y-2' : 'left-full ml-3 translate-y-2'} top-0`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-base font-semibold leading-tight">{serviceName}</div>
+                                  <div className="mt-1 flex items-center gap-2 text-xs text-white/70">
+                                    <span className="truncate">{customerFirstName}</span>
+                                    {appointment.bookingNumber ? (
+                                      <span className="rounded-full bg-white/10 px-2 py-0.5 font-medium text-white/80">
+                                        #{appointment.bookingNumber}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}>
+                                  {getPaymentBadgeLabel(appointment)}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                  <div className="text-white/60">{locale === 'ar' ? 'الوقت' : 'Time'}</div>
+                                  <div className="mt-1 font-semibold">{timeLabel}</div>
+                                </div>
+                                <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                  <div className="text-white/60">{locale === 'ar' ? 'الحالة' : 'Status'}</div>
+                                  <div className="mt-1 font-semibold">{getStatusLabel(appointment.status)}</div>
+                                </div>
+                                <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                  <div className="text-white/60">{locale === 'ar' ? 'الموظف' : 'Provider'}</div>
+                                  <div className="mt-1 truncate font-semibold">{appointment.staff.name}</div>
+                                </div>
+                                <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                  <div className="text-white/60">{locale === 'ar' ? 'السعر' : 'Price'}</div>
+                                  <div className="mt-1 font-semibold">
+                                    <Currency amount={appointment.price} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {(variantName || appointment.notes?.trim()) && (
+                                <div className="mt-3 space-y-2 text-xs text-white/85">
+                                  {variantName ? (
+                                    <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                      <div className="text-white/60">{locale === 'ar' ? 'النسخة' : 'Variant'}</div>
+                                      <div className="mt-1 truncate font-semibold">{variantName}</div>
+                                    </div>
+                                  ) : null}
+                                  {appointment.notes?.trim() ? (
+                                    <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                      <div className="text-white/60">{locale === 'ar' ? 'ملاحظة' : 'Note'}</div>
+                                      <div className="mt-1 line-clamp-2 whitespace-pre-wrap leading-relaxed">
+                                        {appointment.notes.trim()}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+
                             <div className={`flex h-full flex-col overflow-hidden rounded-2xl ${isCompactCard ? 'text-[11px]' : ''}`}>
                               <div className={`flex flex-shrink-0 items-center justify-between gap-2 bg-black/25 ${isCompactCard ? 'px-3 py-2' : 'px-4 py-3'}`}>
                                 <div className="min-w-0">
