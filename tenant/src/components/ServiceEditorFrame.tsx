@@ -75,92 +75,46 @@ export function ServiceEditorFrame({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
-        {isRTL ? (
-          <>
-            <div className="min-w-0">
-              {children}
-            </div>
+      <div className={`flex flex-col gap-6 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
+        <aside className="sticky top-6 w-full shrink-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:w-[280px]">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+              {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {sections.map((section) => {
+              const active = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => onSectionSelect(section.id)}
+                  className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
+                    active
+                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <span className="font-medium">{section.label}</span>
+                    <span className="text-xs font-semibold text-gray-500">{section.progressLabel}</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${Math.max(0, Math.min(100, section.progressPercent))}%` }}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
 
-            <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                  {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
-                </p>
-              </div>
-              <div className="space-y-2">
-                {sections.map((section) => {
-                  const active = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => onSectionSelect(section.id)}
-                      className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
-                        active
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <span className="font-medium">{section.label}</span>
-                        <span className="text-xs font-semibold text-gray-500">{section.progressLabel}</span>
-                      </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${Math.max(0, Math.min(100, section.progressPercent))}%` }}
-                        />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </aside>
-          </>
-        ) : (
-          <>
-            <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                  {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
-                </p>
-              </div>
-              <div className="space-y-2">
-                {sections.map((section) => {
-                  const active = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => onSectionSelect(section.id)}
-                      className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
-                        active
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <span className="font-medium">{section.label}</span>
-                        <span className="text-xs font-semibold text-gray-500">{section.progressLabel}</span>
-                      </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${Math.max(0, Math.min(100, section.progressPercent))}%` }}
-                        />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </aside>
-
-            <div className="min-w-0">
-              {children}
-            </div>
-          </>
-        )}
+        <div className="min-w-0 flex-1">
+          {children}
+        </div>
       </div>
     </div>
   );
