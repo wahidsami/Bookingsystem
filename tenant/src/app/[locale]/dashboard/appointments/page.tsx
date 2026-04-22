@@ -155,29 +155,6 @@ export default function AppointmentsPage() {
     loadEmployees();
   }, []);
 
-  useEffect(() => {
-    if (!boardContextMenu) {
-      return;
-    }
-
-    const handlePointerDown = () => setBoardContextMenu(null);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setBoardContextMenu(null);
-      }
-    };
-
-    window.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("touchstart", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("touchstart", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [boardContextMenu]);
-
   const selectedDateKey = useMemo(() => getLocalDateKey(selectedDate), [selectedDate]);
   const requestKey = useMemo(() => {
     const filterKey = [
