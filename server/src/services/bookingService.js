@@ -45,7 +45,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -153,11 +153,15 @@ class BookingService {
         const duration = serviceVariant?.duration || service.duration || 30; // Default 30 minutes
         const end = new Date(start.getTime() + duration * 60000);
 
-        // Validate start time is in the future (allow 1 hour buffer for same-day bookings)
-        const now = new Date();
-        const oneHourFromNow = new Date(now.getTime() + 60 * 60000);
-        if (start < oneHourFromNow) {
-            throw new Error('Booking must be at least 1 hour in advance');
+        // Validate start time is in the future for customer/self-service bookings.
+        // Tenant dashboard bookings can intentionally bypass this rule so admins can
+        // backfill or create immediate appointments from the board.
+        if (!skipAdvanceValidation) {
+            const now = new Date();
+            const oneHourFromNow = new Date(now.getTime() + 60 * 60000);
+            if (start < oneHourFromNow) {
+                throw new Error('Booking must be at least 1 hour in advance');
+            }
         }
 
         // ========== POLICY ENFORCEMENT ==========

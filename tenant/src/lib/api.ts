@@ -177,7 +177,7 @@ class TenantApiClient {
           throw new Error(data.message || 'Account suspended. Please pay your bill to restore access.');
         }
       }
-      throw new Error(data.message || data.error || 'API request failed');
+      throw new Error(data.error || data.message || 'API request failed');
     }
 
     return data;

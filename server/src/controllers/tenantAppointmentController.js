@@ -189,7 +189,8 @@ exports.createAppointment = async (req, res) => {
             startTime,
             notes,
             paymentMethod,
-            assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined)
+            assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
+            skipAdvanceValidation: true
         }, { transaction });
 
         const fullAppointment = await db.Appointment.findByPk(appointment.id, {
