@@ -1038,8 +1038,8 @@ export function CalendarView({
                               </div>
 
                               <div className={`flex flex-1 flex-col bg-black/15 backdrop-blur-[1px] ${isCompactCard ? 'gap-1.5 px-3 py-2.5' : 'gap-2 px-4 py-4'}`}>
-                                <div className="grid min-w-0 grid-cols-[auto,minmax(0,1fr)] items-start gap-3">
-                                  <div className="relative flex-shrink-0">
+                                <div className="grid min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3">
+                                  <div className="relative flex h-8 w-8 items-center justify-center">
                                     {(() => {
                                       const userPhoto = appointment.user?.photo || appointment.user?.profileImage;
                                       const hasValidPhoto = Boolean(
@@ -1078,31 +1078,30 @@ export function CalendarView({
                                   </div>
 
                                   <div className="min-w-0 pt-0.5">
-                                    <div className="flex min-w-0 items-start justify-between gap-2">
-                                      <div className={`min-w-0 truncate font-semibold leading-tight ${isCompactCard ? 'text-[13px]' : 'text-sm'}`}>{customerFirstName}</div>
-                                      <div className="flex items-center gap-1.5">
-                                        {hasBookingNote && (
-                                          <button
-                                            type="button"
-                                            data-note-trigger="true"
-                                            className={`inline-flex items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20 transition hover:bg-white/30 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}
-                                            title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              setOpenNoteAppointmentId((current) => (current === appointment.id ? null : appointment.id));
-                                            }}
-                                          >
-                                            <svg className={`${isCompactCard ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                              <path
-                                                fillRule="evenodd"
-                                                d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z"
-                                                clipRule="evenodd"
-                                              />
-                                            </svg>
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
+                                    <div className={`min-w-0 truncate font-semibold leading-tight ${isCompactCard ? 'text-[13px]' : 'text-sm'}`}>{customerFirstName}</div>
+                                  </div>
+
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {hasBookingNote && (
+                                      <button
+                                        type="button"
+                                        data-note-trigger="true"
+                                        className={`inline-flex items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20 transition hover:bg-white/30 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}
+                                        title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setOpenNoteAppointmentId((current) => (current === appointment.id ? null : appointment.id));
+                                        }}
+                                      >
+                                        <svg className={`${isCompactCard ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                          <path
+                                            fillRule="evenodd"
+                                            d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z"
+                                            clipRule="evenodd"
+                                          />
+                                        </svg>
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
