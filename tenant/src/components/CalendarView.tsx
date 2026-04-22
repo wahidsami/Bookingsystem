@@ -332,6 +332,10 @@ export function CalendarView({
   };
 
   const getPaymentBadgeLabel = (appointment: Appointment) => {
+    if (appointment.paymentStatus === 'pending') {
+      return locale === 'ar' ? 'بانتظار الدفع' : 'Awaiting payment';
+    }
+
     if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
       return locale === 'ar' ? 'مدفوع' : 'Paid';
     }
@@ -356,6 +360,14 @@ export function CalendarView({
   };
 
   const getPaymentBadgeTitle = (appointment: Appointment) => {
+    if (appointment.paymentStatus === 'pending') {
+      if (appointment.paymentMethod === 'at-center' || appointment.paymentMethod === 'pay_on_visit' || appointment.paymentMethod === 'cash') {
+        return locale === 'ar' ? 'الدفع عند الوصول' : 'Pay on arrival';
+      }
+
+      return locale === 'ar' ? 'الحجز بانتظار الدفع' : 'Booking awaiting payment';
+    }
+
     if (appointment.paymentStatus === 'deposit_paid') {
       return locale === 'ar' ? 'تم دفع العربون ويتبقى جزء عند الوصول' : 'Deposit paid, remainder still due';
     }
@@ -373,6 +385,18 @@ export function CalendarView({
 
   const getPaymentTypeLabel = (appointment: Appointment) => {
     const normalizedMethod = `${appointment.paymentMethod || ''}`.toLowerCase();
+
+    if (appointment.paymentStatus === 'pending') {
+      if (
+        normalizedMethod.includes('at-center')
+        || normalizedMethod.includes('pay_on_visit')
+        || normalizedMethod.includes('cash')
+      ) {
+        return locale === 'ar' ? 'الدفع عند الوصول' : 'Pay on arrival';
+      }
+
+      return locale === 'ar' ? 'بانتظار الدفع' : 'Awaiting payment';
+    }
 
     if (
       appointment.paymentStatus === 'deposit_paid'
@@ -394,7 +418,6 @@ export function CalendarView({
       normalizedMethod.includes('at-center')
       || normalizedMethod.includes('pay_on_visit')
       || normalizedMethod.includes('cash')
-      || appointment.paymentStatus === 'pending'
     ) {
       return locale === 'ar' ? 'الدفع عند الوصول' : 'Pay on arrival';
     }
@@ -406,6 +429,12 @@ export function CalendarView({
 
   const getPaymentTypeSymbol = (appointment: Appointment) => {
     const normalizedMethod = `${appointment.paymentMethod || ''}`.toLowerCase();
+
+    if (appointment.paymentStatus === 'pending') {
+      return normalizedMethod.includes('at-center') || normalizedMethod.includes('pay_on_visit') || normalizedMethod.includes('cash')
+        ? '🏢'
+        : '⏳';
+    }
 
     if (
       appointment.paymentStatus === 'deposit_paid'
