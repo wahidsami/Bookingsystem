@@ -1038,7 +1038,7 @@ export function CalendarView({
                               </div>
 
                               <div className={`flex flex-1 flex-col bg-black/15 backdrop-blur-[1px] ${isCompactCard ? 'gap-1.5 px-3 py-2.5' : 'gap-2 px-4 py-4'}`}>
-                                <div className="flex items-center gap-3 min-w-0">
+                                <div className="grid min-w-0 grid-cols-[auto,minmax(0,1fr)] items-start gap-3">
                                   <div className="relative flex-shrink-0">
                                     {(() => {
                                       const userPhoto = appointment.user?.photo || appointment.user?.profileImage;
@@ -1077,8 +1077,8 @@ export function CalendarView({
                                     })()}
                                   </div>
 
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                  <div className="min-w-0 pt-0.5">
+                                    <div className="flex min-w-0 items-start justify-between gap-2">
                                       <div className={`min-w-0 truncate font-semibold leading-tight ${isCompactCard ? 'text-[13px]' : 'text-sm'}`}>{customerFirstName}</div>
                                       <div className="flex items-center gap-1.5">
                                         {hasBookingNote && (
