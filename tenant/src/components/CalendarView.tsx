@@ -41,6 +41,7 @@ interface Appointment {
     id: string;
     firstName: string;
     lastName: string;
+    profileImage?: string | null;
     phone?: string;
     photo?: string;
   };
@@ -1037,10 +1038,10 @@ export function CalendarView({
                               </div>
 
                               <div className={`flex flex-1 flex-col bg-black/15 backdrop-blur-[1px] ${isCompactCard ? 'gap-1.5 px-3 py-2.5' : 'gap-2 px-4 py-4'}`}>
-                                <div className="flex items-start gap-2">
+                                <div className="flex items-center gap-3 min-w-0">
                                   <div className="relative flex-shrink-0">
                                     {(() => {
-                                      const userPhoto = appointment.user?.photo;
+                                      const userPhoto = appointment.user?.photo || appointment.user?.profileImage;
                                       const hasValidPhoto = Boolean(
                                         userPhoto && typeof userPhoto === 'string' && userPhoto.trim() !== ''
                                       );
@@ -1048,10 +1049,10 @@ export function CalendarView({
                                       if (hasValidPhoto) {
                                         return (
                                           <>
-                                          <img
+                                            <img
                                               src={getImageUrl(userPhoto as string)}
                                               alt={customerFirstName}
-                                              className={`relative z-10 rounded-full border border-white/30 object-cover ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}
+                                              className={`relative z-10 rounded-full border border-white/30 object-cover ${isCompactCard ? 'h-6 w-6' : 'h-7 w-7'}`}
                                               onError={(e) => {
                                                 const img = e.currentTarget;
                                                 img.style.display = 'none';
@@ -1061,7 +1062,7 @@ export function CalendarView({
                                                 }
                                               }}
                                             />
-                                            <div className={`avatar-fallback absolute inset-0 hidden items-center justify-center rounded-full border border-white/30 bg-white/20 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}>
+                                            <div className={`avatar-fallback absolute inset-0 hidden items-center justify-center rounded-full border border-white/30 bg-white/20 ${isCompactCard ? 'h-6 w-6' : 'h-7 w-7'}`}>
                                               <span className={`${isCompactCard ? 'text-[10px]' : 'text-xs'} font-semibold`}>{userInitials}</span>
                                             </div>
                                           </>
@@ -1069,7 +1070,7 @@ export function CalendarView({
                                       }
 
                                       return (
-                                        <div className={`flex items-center justify-center rounded-full border border-white/30 bg-white/20 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}>
+                                        <div className={`flex items-center justify-center rounded-full border border-white/30 bg-white/20 ${isCompactCard ? 'h-6 w-6' : 'h-7 w-7'}`}>
                                           <span className={`${isCompactCard ? 'text-[10px]' : 'text-xs'} font-semibold`}>{userInitials}</span>
                                         </div>
                                       );
@@ -1077,8 +1078,8 @@ export function CalendarView({
                                   </div>
 
                                   <div className="min-w-0 flex-1">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className={`truncate font-semibold leading-tight ${isCompactCard ? 'text-[13px]' : 'text-sm'}`}>{customerFirstName}</div>
+                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                      <div className={`min-w-0 truncate font-semibold leading-tight ${isCompactCard ? 'text-[13px]' : 'text-sm'}`}>{customerFirstName}</div>
                                       <div className="flex items-center gap-1.5">
                                         {hasBookingNote && (
                                           <button
@@ -1107,9 +1108,9 @@ export function CalendarView({
 
                                 <div className={`flex items-center gap-2 font-medium opacity-90 ${isCompactCard ? 'text-[11px]' : 'text-xs'}`}>
                                   <span className="opacity-70">{locale === 'ar' ? 'نوع الدفع' : 'Payment type'}</span>
-                                  <span className={`inline-flex items-center gap-1 rounded-full bg-white/15 ${isCompactCard ? 'px-2 py-0.5' : 'px-2 py-1'}`}>
+                                  <span className={`inline-flex max-w-full items-center gap-1 rounded-full bg-white/15 ${isCompactCard ? 'px-2 py-0.5' : 'px-2 py-1'}`}>
                                     <span aria-hidden="true">{getPaymentTypeSymbol(appointment)}</span>
-                                    <span className="max-w-[8rem] truncate">{paymentTypeLabel}</span>
+                                    <span className="min-w-0 max-w-[8rem] truncate">{paymentTypeLabel}</span>
                                   </span>
                                 </div>
 
