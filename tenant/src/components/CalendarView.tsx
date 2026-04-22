@@ -879,6 +879,19 @@ export function CalendarView({
                         const hasCustomerSelectedStaff = appointment.assignmentMode === 'customer_selected';
                         const hasBookingNote = Boolean(appointment.notes?.trim());
                         const paymentTypeLabel = getPaymentTypeLabel(appointment);
+                        const paymentStatusLabel = getPaymentBadgeLabel(appointment);
+                        const paymentStatusTitle = getPaymentBadgeTitle(appointment);
+                        const paymentToneClass = (() => {
+                          if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
+                            return 'border-emerald-400/35 bg-emerald-400/12 text-emerald-50';
+                          }
+
+                          if (appointment.paymentStatus === 'deposit_paid') {
+                            return 'border-amber-300/35 bg-amber-300/12 text-amber-50';
+                          }
+
+                          return 'border-slate-300/20 bg-white/8 text-slate-50';
+                        })();
                         const isNoteOpen = openNoteAppointmentId === appointment.id;
                         const canReassign = Boolean(onReassignAppointment) && !['completed', 'cancelled', 'no_show'].includes(appointment.status);
                         const isDragged = draggedAppointmentId === appointment.id;
@@ -922,22 +935,45 @@ export function CalendarView({
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                            <div className={`pointer-events-none absolute z-40 w-72 rounded-3xl border border-white/20 bg-slate-950/95 p-4 text-white shadow-2xl ring-1 ring-black/25 backdrop-blur-xl opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 ${isRTL ? 'right-full mr-3 translate-y-2' : 'left-full ml-3 translate-y-2'} top-0`}>
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="truncate text-base font-semibold leading-tight">{serviceName}</div>
-                                  <div className="mt-1 flex items-center gap-2 text-xs text-white/70">
-                                    <span className="truncate">{customerFirstName}</span>
-                                    {appointment.bookingNumber ? (
-                                      <span className="rounded-full bg-white/10 px-2 py-0.5 font-medium text-white/80">
-                                        #{appointment.bookingNumber}
-                                      </span>
-                                    ) : null}
+                              <div className={`pointer-events-none absolute z-40 w-72 rounded-3xl border border-white/20 bg-slate-950/95 p-4 text-white shadow-2xl ring-1 ring-black/25 backdrop-blur-xl opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 ${isRTL ? 'right-full mr-3 translate-y-2' : 'left-full ml-3 translate-y-2'} top-0`}>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-base font-semibold leading-tight">{serviceName}</div>
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-white/70">
+                                      <span className="truncate">{customerFirstName}</span>
+                                    </div>
                                   </div>
                                 </div>
-                                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}>
-                                  {getPaymentBadgeLabel(appointment)}
-                                </span>
+
+                                {appointment.bookingNumber ? (
+                                  <div className="mt-2 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80">
+                                    #{appointment.bookingNumber}
+                                  </div>
+                                ) : null}
+
+                              <div className={`mt-3 rounded-3xl border p-3 shadow-inner ${paymentToneClass}`}>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">
+                                      {locale === 'ar' ? 'حالة الدفع' : 'Payment status'}
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                                      <span className="h-2.5 w-2.5 rounded-full bg-current/80 shadow-[0_0_0_4px_rgba(255,255,255,0.10)]" />
+                                      <span className="truncate">{paymentStatusLabel}</span>
+                                    </div>
+                                    <div className="mt-1 text-xs leading-relaxed text-white/75">
+                                      {paymentStatusTitle}
+                                    </div>
+                                  </div>
+                                  <div className="shrink-0 rounded-2xl bg-black/20 px-3 py-2 text-right ring-1 ring-white/10">
+                                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">
+                                      {locale === 'ar' ? 'نوع الدفع' : 'Type'}
+                                    </div>
+                                    <div className="mt-1 max-w-[8rem] truncate text-xs font-semibold">
+                                      {paymentTypeLabel}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
 
                               <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
