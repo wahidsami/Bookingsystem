@@ -212,7 +212,7 @@ export function CalendarView({
       }
     }
     return slots;
-  }, [locale]);
+  }, [locale, pixelsPerHour, pixelsPerMinute]);
 
   // Calculate appointment position and height
   const getAppointmentStyle = (appointment: Appointment) => {
