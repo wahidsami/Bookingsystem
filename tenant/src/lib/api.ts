@@ -1200,6 +1200,12 @@ class TenantApiClient {
     });
   }
 
+  async reassignAppointmentStaff(id: string, staffId: string): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/reassign-staff`, {
+      staffId
+    });
+  }
+
   /**
    * Record remainder payment at center (for deposit_paid appointments).
    */

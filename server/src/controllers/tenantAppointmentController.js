@@ -218,6 +218,42 @@ exports.createAppointment = async (req, res) => {
 
         await transaction.commit();
 
+        try {
+            const serviceName = fullAppointment?.service?.name_en || fullAppointment?.service?.name_ar || 'service';
+            const customerName = `${customerUser.firstName || ''} ${customerUser.lastName || ''}`.trim() || 'A customer';
+            const appointmentDate = new Date(appointment.startTime).toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+
+            await pushNotificationService.sendToUser(customerUser.id, {
+                title: 'Booking confirmed',
+                body: `Your ${serviceName} booking for ${appointmentDate} is confirmed.`,
+                data: {
+                    type: 'booking_created',
+                    appointmentId: appointment.id,
+                    tenantId,
+                    staffId: appointment.staffId
+                }
+            });
+
+            await pushNotificationService.sendToStaff(appointment.staffId, {
+                title: 'New appointment assigned',
+                body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                data: {
+                    type: 'staff_appointment_assigned',
+                    appointmentId: appointment.id,
+                    tenantId,
+                    platformUserId: customerUser.id
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Tenant appointment notification warning:', notificationError.message);
+        }
+
         res.status(201).json({
             success: true,
             message: 'Appointment created successfully',
@@ -889,6 +925,185 @@ exports.updatePaymentStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to update payment status',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Reassign an appointment to another staff member without changing time.
+ * PATCH /api/v1/tenant/appointments/:id/reassign-staff
+ */
+exports.reassignAppointmentStaff = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+        const { staffId } = req.body;
+
+        if (!staffId) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'staffId is required'
+            });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: { id },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    where: { tenantId },
+                    required: true
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    where: { tenantId },
+                    required: true
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
+            transaction
+        });
+
+        if (!appointment) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Appointment not found'
+            });
+        }
+
+        if (['completed', 'cancelled', 'no_show'].includes(appointment.status)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Closed appointments cannot be reassigned'
+            });
+        }
+
+        if (appointment.staffId === staffId) {
+            await transaction.commit();
+            return res.json({
+                success: true,
+                message: 'Appointment already assigned to this staff member',
+                appointment
+            });
+        }
+
+        const assignedStaff = await db.Staff.findOne({
+            where: {
+                id: staffId,
+                tenantId,
+                isActive: true
+            },
+            transaction
+        });
+
+        if (!assignedStaff) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Staff member not found'
+            });
+        }
+
+        const canPerform = await db.ServiceEmployee.findOne({
+            where: {
+                serviceId: appointment.serviceId,
+                staffId
+            },
+            transaction
+        });
+
+        if (!canPerform) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Selected staff cannot perform this service'
+            });
+        }
+
+        const hasConflict = await bookingService.hasConflict(
+            staffId,
+            new Date(appointment.startTime),
+            new Date(appointment.endTime),
+            appointment.id,
+            transaction
+        );
+
+        if (hasConflict) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected staff is not available for this time slot'
+            });
+        }
+
+        appointment.requestedStaffId = staffId;
+        appointment.assignmentMode = 'tenant_reassigned';
+        appointment.staffId = staffId;
+        await appointment.save({ transaction });
+
+        await transaction.commit();
+
+        try {
+            const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+            const customerName = appointment.user
+                ? `${appointment.user.firstName || ''} ${appointment.user.lastName || ''}`.trim()
+                : 'A customer';
+            const appointmentDate = new Date(appointment.startTime).toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+
+            await pushNotificationService.sendToUser(appointment.platformUserId, {
+                title: 'Booking updated',
+                body: `Your ${serviceName} appointment on ${appointmentDate} was reassigned.`,
+                data: {
+                    type: 'booking_staff_reassigned',
+                    appointmentId: appointment.id,
+                    tenantId,
+                    staffId
+                }
+            });
+
+            await pushNotificationService.sendToStaff(staffId, {
+                title: 'Appointment assigned',
+                body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                data: {
+                    type: 'staff_appointment_assigned',
+                    appointmentId: appointment.id,
+                    tenantId,
+                    platformUserId: appointment.platformUserId
+                }
+            });
+        } catch (notificationError) {
+            console.warn('Tenant appointment reassignment notification warning:', notificationError.message);
+        }
+
+        res.json({
+            success: true,
+            message: 'Appointment reassigned successfully',
+            appointment
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Reassign appointment staff error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reassign appointment',
             error: error.message
         });
     }

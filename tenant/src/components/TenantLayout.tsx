@@ -49,6 +49,7 @@ import {
 
 interface TenantLayoutProps {
   children: React.ReactNode;
+  fullWidth?: boolean;
 }
 
 type NavIcon = React.ComponentType<{ className?: string }>;
@@ -73,7 +74,7 @@ type NavigationGroupItem = {
 
 type NavigationItem = NavigationLeafItem | NavigationGroupItem;
 
-export function TenantLayout({ children }: TenantLayoutProps) {
+export function TenantLayout({ children, fullWidth = false }: TenantLayoutProps) {
   const pathname = usePathname();
   const params = useParams();
   const router = useRouter();
@@ -89,7 +90,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
   const [usageAlerts, setUsageAlerts] = useState<any[]>([]);
   const [posAlerts, setPosAlerts] = useState<any[]>([]);
   const [posDueCount, setPosDueCount] = useState(0);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [expandedNavGroups, setExpandedNavGroups] = useState<Record<string, boolean>>({});
@@ -905,8 +906,8 @@ export function TenantLayout({ children }: TenantLayoutProps) {
         </aside>
 
         <main className="relative z-0 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
-          <div className="p-4 lg:p-8">
-            <div className="mx-auto w-full max-w-[1600px]">
+          <div className={fullWidth ? 'p-4 lg:p-6' : 'p-4 lg:p-8'}>
+            <div className={`mx-auto w-full ${fullWidth ? 'max-w-none' : 'max-w-[1600px]'}`}>
               {children}
             </div>
           </div>

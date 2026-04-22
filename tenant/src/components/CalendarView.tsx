@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { getImageUrl } from "@/lib/api";
@@ -59,6 +59,7 @@ interface CalendarViewProps {
   employees: Array<{ id: string; name: string; photo?: string }>;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  onReassignAppointment?: (appointmentId: string, staffId: string) => Promise<void> | void;
   locale: string;
   isRTL: boolean;
   t: (key: string) => string;
@@ -79,6 +80,7 @@ export function CalendarView({
   employees,
   selectedDate,
   onDateChange,
+  onReassignAppointment,
   locale,
   isRTL,
   t
@@ -88,6 +90,8 @@ export function CalendarView({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [openNoteAppointmentId, setOpenNoteAppointmentId] = useState<string | null>(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
+  const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
   const [visibleStaffIds, setVisibleStaffIds] = useState<Set<string>>(
     new Set(employees.map(emp => emp.id))
   );
@@ -482,6 +486,41 @@ export function CalendarView({
     });
   };
 
+  const handleStaffDragOver = (event: DragEvent<HTMLDivElement>, staffId: string) => {
+    if (!onReassignAppointment) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDragOverStaffId(staffId);
+  };
+
+  const handleStaffDrop = async (event: DragEvent<HTMLDivElement>, staffId: string) => {
+    event.preventDefault();
+
+    const appointmentId = draggedAppointmentId;
+    setDraggedAppointmentId(null);
+    setDragOverStaffId(null);
+
+    if (!onReassignAppointment || !appointmentId) {
+      return;
+    }
+
+    const appointment = dayAppointments.find((item) => item.id === appointmentId);
+    if (!appointment || appointment.staff.id === staffId) {
+      return;
+    }
+
+    await onReassignAppointment(appointmentId, staffId);
+  };
+
+  const handleStaffDropLeave = (staffId: string) => {
+    if (dragOverStaffId === staffId) {
+      setDragOverStaffId(null);
+    }
+  };
+
   const handleAppointmentClick = (appointmentId: string) => {
     router.push(`/${params.locale}/dashboard/appointments/${appointmentId}`);
   };
@@ -657,8 +696,11 @@ export function CalendarView({
                 return (
                   <div
                     key={staff.id}
-                    className="flex-shrink-0 border-r border-gray-200"
+                    className={`flex-shrink-0 border-r border-gray-200 transition-colors ${dragOverStaffId === staff.id ? 'bg-primary/5' : ''}`}
                     style={{ minWidth: '240px', width: '240px' }}
+                    onDragOver={(event) => handleStaffDragOver(event, staff.id)}
+                    onDrop={(event) => handleStaffDrop(event, staff.id)}
+                    onDragLeave={() => handleStaffDropLeave(staff.id)}
                   >
                     {/* Staff Header */}
                     <div className="sticky top-0 z-30 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
@@ -778,12 +820,30 @@ export function CalendarView({
                         const hasBookingNote = Boolean(appointment.notes?.trim());
                         const paymentTypeLabel = getPaymentTypeLabel(appointment);
                         const isNoteOpen = openNoteAppointmentId === appointment.id;
+                        const canReassign = Boolean(onReassignAppointment) && !['completed', 'cancelled', 'no_show'].includes(appointment.status);
+                        const isDragged = draggedAppointmentId === appointment.id;
 
                         return (
                           <div
                             key={appointment.id}
                             onClick={() => handleAppointmentClick(appointment.id)}
-                            className={`${getAppointmentColor(appointment)} relative z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''}`}
+                            draggable={canReassign}
+                            onDragStart={(event) => {
+                              if (!canReassign) {
+                                event.preventDefault();
+                                return;
+                              }
+                              event.stopPropagation();
+                              event.dataTransfer.effectAllowed = 'move';
+                              event.dataTransfer.setData('text/plain', appointment.id);
+                              setDraggedAppointmentId(appointment.id);
+                              setDragOverStaffId(appointment.staff.id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedAppointmentId(null);
+                              setDragOverStaffId(null);
+                            }}
+                            className={`${getAppointmentColor(appointment)} relative z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >

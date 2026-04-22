@@ -8,6 +8,14 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import {
+  ArrowPathIcon,
+  CalendarDaysIcon,
+  Cog6ToothIcon,
+  FunnelIcon,
+  PlusIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline";
 
 interface Service {
   id: string;
@@ -350,6 +358,24 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleReassignAppointment = async (appointmentId: string, staffId: string) => {
+    try {
+      const response = await tenantApi.reassignAppointmentStaff(appointmentId, staffId);
+      if (response.success) {
+        if (viewMode === 'calendar') {
+          loadAppointmentsBoard();
+        } else {
+          loadAppointments();
+        }
+      } else {
+        alert(response.message || t("updateError"));
+      }
+    } catch (err: any) {
+      console.error("Failed to reassign appointment staff:", err);
+      alert(err.message || t("updateError"));
+    }
+  };
+
   const clearFilters = () => {
     const defaults = getCurrentMonthRange();
     setStartDate(defaults.start);
@@ -361,198 +387,290 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("title")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("subtitle")}
-            </p>
-          </div>
-          <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <Link
-              href={`/${locale}/dashboard/appointments/new`}
-              className="btn btn-primary"
-            >
-              {locale === 'ar' ? 'موعد جديد' : 'New Appointment'}
-            </Link>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'list'
-                ? 'bg-primary text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("listView")}
-            </button>
-            <button
-              onClick={() => setViewMode('calendar')}
-              className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'calendar'
-                ? 'bg-primary text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              {t("calendarView")}
-            </button>
-          </div>
+    <TenantLayout fullWidth>
+      <div className="mb-6 flex items-start justify-between gap-4 animate-fade-in">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            {t("title")}
+          </h2>
+          <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            {t("subtitle")}
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowFilters(true)}
+          className="relative inline-flex h-12 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50"
+          aria-label={locale === 'ar' ? 'فتح أدوات الجدول' : 'Open board tools'}
+        >
+          <Cog6ToothIcon className="h-5 w-5 text-gray-700" />
+          <span>{locale === 'ar' ? 'الأدوات' : 'Tools'}</span>
+          {activeFilterCount > 0 && (
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Filters */}
-      <div className={`card mb-4 ${isRTL ? 'text-right' : ''}`}>
-        <div className="flex flex-col gap-3">
-          <div className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 ${isRTL ? 'xl:flex-row-reverse' : ''}`}>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("filters")}
-              </h3>
-              <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'قم بتوسيع الفلاتر عند الحاجة فقط لتوفير مساحة أكبر للجدول.' : 'Expand filters only when needed so the schedule stays spacious.'}
-              </p>
-            </div>
-            <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'justify-end' : ''}`}>
+      <div className={`fixed inset-0 z-50 transition ${showFilters ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+        <div
+          className={`absolute inset-0 bg-slate-950/35 backdrop-blur-[1px] transition-opacity duration-300 ${showFilters ? 'opacity-100' : 'opacity-0'}`}
+          onClick={() => setShowFilters(false)}
+        />
+
+        <aside
+          className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[28rem] border-l border-gray-200 bg-white shadow-2xl transition-transform duration-300 ${showFilters ? 'translate-x-0' : isRTL ? '-translate-x-full' : 'translate-x-full'}`}
+          dir={isRTL ? 'rtl' : 'ltr'}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{locale === 'ar' ? 'أدوات المواعيد' : 'Appointment Tools'}</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {locale === 'ar'
+                    ? 'الفلترة، التنقل اليومي، والإجراءات السريعة.'
+                    : 'Filters, day navigation, and quick actions.'}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowFilters((current) => !current)}
-                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                  showFilters
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                onClick={() => setShowFilters(false)}
+                className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
+                aria-label={locale === 'ar' ? 'إغلاق' : 'Close'}
               >
-                <span>{showFilters ? (locale === 'ar' ? 'إخفاء الفلاتر' : 'Hide filters') : (locale === 'ar' ? 'إظهار الفلاتر' : 'Show filters')}</span>
-                {activeFilterCount > 0 && (
-                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1 text-[11px] font-bold">
-                    {activeFilterCount}
-                  </span>
-                )}
+                <XMarkIcon className="h-5 w-5" />
               </button>
-              {hasActiveFilters && (
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  onClick={() => {
+                    setViewMode('calendar');
+                    setShowFilters(false);
+                  }}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'calendar' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                 >
-                  {locale === 'ar' ? 'إعادة الضبط' : 'Reset'}
+                  {locale === 'ar' ? 'اللوحة' : 'Board'}
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('list');
+                    setShowFilters(false);
+                  }}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >
+                  {t("listView")}
+                </button>
+              </div>
+
+              <Link
+                href={`/${locale}/dashboard/appointments/new`}
+                onClick={() => setShowFilters(false)}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>{locale === 'ar' ? 'موعد جديد' : 'New Appointment'}</span>
+              </Link>
+
+              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <CalendarDaysIcon className="h-5 w-5 text-primary" />
+                    <p className="text-sm font-semibold text-gray-900">{locale === 'ar' ? 'التاريخ' : 'Date'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(new Date());
+                    }}
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === 'ar' ? 'اليوم' : 'Today'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">{locale === 'ar' ? 'تنقّل بين الأيام' : 'Move between days'}</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = new Date(selectedDate);
+                      next.setDate(next.getDate() - 1);
+                      setSelectedDate(next);
+                    }}
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {isRTL ? '›' : '‹'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = new Date(selectedDate);
+                      next.setDate(next.getDate() + 1);
+                      setSelectedDate(next);
+                    }}
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {isRTL ? '‹' : '›'}
+                  </button>
+                  <div className="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-900 ring-1 ring-gray-200">
+                    {selectedDate.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (viewMode === 'calendar') {
+                      loadAppointmentsBoard();
+                    } else {
+                      loadAppointments();
+                    }
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  <ArrowPathIcon className="h-5 w-5" />
+                  <span>{locale === 'ar' ? 'تحديث' : 'Refresh'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearFilters();
+                    if (viewMode === 'calendar') {
+                      loadAppointmentsBoard();
+                    } else {
+                      loadAppointments();
+                    }
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  <FunnelIcon className="h-5 w-5" />
+                  <span>{locale === 'ar' ? 'إعادة الضبط' : 'Reset'}</span>
+                </button>
+              </div>
+
+              <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("startDate")}
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("endDate")}
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("employee")}
+                  </label>
+                  <select
+                    value={filterStaffId}
+                    onChange={(e) => setFilterStaffId(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    <option value="">{t("allEmployees")}</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("service")}
+                  </label>
+                  <select
+                    value={filterServiceId}
+                    onChange={(e) => setFilterServiceId(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    <option value="">{t("allServices")}</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {locale === 'ar' ? service.name_ar : service.name_en}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("statusLabel")}
+                  </label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    <option value="">{t("allStatuses")}</option>
+                    <option value="pending">{t("pending")}</option>
+                    <option value="confirmed">{t("confirmed")}</option>
+                    <option value="checked_in">{t("checkedIn")}</option>
+                    <option value="in_service">{t("inProgress")}</option>
+                    <option value="completed">{t("completed")}</option>
+                    <option value="cancelled">{t("cancelled")}</option>
+                    <option value="no_show">{t("noShow")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t("paymentStatus") || "Payment"}
+                  </label>
+                  <select
+                    value={filterPaymentStatus}
+                    onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    style={{ textAlign: isRTL ? 'right' : 'left' }}
+                  >
+                    <option value="">{t("allPayments") || "All"}</option>
+                    <option value="pending">{t("paymentPending")}</option>
+                    <option value="deposit_paid">{t("remainderDue") || "Remainder due"}</option>
+                    <option value="fully_paid">{t("paid")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm font-semibold text-gray-900">{locale === 'ar' ? 'الملخص' : 'Summary'}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {filterSummary.map((item, index) => (
+                    <span
+                      key={`${item}-${index}`}
+                      className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-
-          {!showFilters && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {filterSummary.map((item, index) => (
-                <span
-                  key={`${item}-${index}`}
-                  className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {showFilters && (
-            <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 ${isRTL ? 'md:grid-cols-2 lg:grid-cols-6' : ''}`}>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("startDate")}
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("endDate")}
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("employee")}
-                </label>
-                <select
-                  value={filterStaffId}
-                  onChange={(e) => setFilterStaffId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                  style={{ textAlign: isRTL ? 'right' : 'left' }}
-                >
-                  <option value="">{t("allEmployees")}</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("service")}
-                </label>
-                <select
-                  value={filterServiceId}
-                  onChange={(e) => setFilterServiceId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                  style={{ textAlign: isRTL ? 'right' : 'left' }}
-                >
-                  <option value="">{t("allServices")}</option>
-                  {services.map(service => (
-                    <option key={service.id} value={service.id}>
-                      {locale === 'ar' ? service.name_ar : service.name_en}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("statusLabel")}
-                </label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                  style={{ textAlign: isRTL ? 'right' : 'left' }}
-                >
-                  <option value="">{t("allStatuses")}</option>
-                  <option value="pending">{t("pending")}</option>
-                  <option value="confirmed">{t("confirmed")}</option>
-                  <option value="checked_in">{t("checkedIn")}</option>
-                  <option value="in_service">{t("inProgress")}</option>
-                  <option value="completed">{t("completed")}</option>
-                  <option value="cancelled">{t("cancelled")}</option>
-                  <option value="no_show">{t("noShow")}</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {t("paymentStatus") || "Payment"}
-                </label>
-                <select
-                  value={filterPaymentStatus}
-                  onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                  style={{ textAlign: isRTL ? 'right' : 'left' }}
-                >
-                  <option value="">{t("allPayments") || "All"}</option>
-                  <option value="pending">{t("paymentPending")}</option>
-                  <option value="deposit_paid">{t("remainderDue") || "Remainder due"}</option>
-                  <option value="fully_paid">{t("paid")}</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
+        </aside>
       </div>
 
       {/* Error Message */}
@@ -696,6 +814,7 @@ export default function AppointmentsPage() {
           employees={employees}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
+          onReassignAppointment={handleReassignAppointment}
           locale={locale}
           isRTL={isRTL}
           t={t}

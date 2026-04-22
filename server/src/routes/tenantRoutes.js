@@ -133,6 +133,7 @@ router.post('/appointments', tenantAppointmentController.createAppointment);
 router.get('/appointments/:id', tenantAppointmentController.getAppointment);
 router.patch('/appointments/:id/status', tenantAppointmentController.updateAppointmentStatus);
 router.patch('/appointments/:id/payment', tenantAppointmentController.updatePaymentStatus);
+router.patch('/appointments/:id/reassign-staff', tenantAppointmentController.reassignAppointmentStaff);
 router.patch('/appointments/:id/reschedule', tenantAppointmentController.rescheduleAppointment);
 
 // Financial management
