@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { CalendarView } from "@/components/CalendarView";
+import { AppointmentActionDrawer } from "@/components/AppointmentActionDrawer";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
@@ -119,6 +120,16 @@ export default function AppointmentsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [showQuickDrawer, setShowQuickDrawer] = useState(false);
+  const [quickDrawerMode, setQuickDrawerMode] = useState<'appointment' | 'blocked_time'>('appointment');
+  const [drawerPrefill, setDrawerPrefill] = useState<{ staffId?: string; date?: string; time?: string }>({});
+  const [boardContextMenu, setBoardContextMenu] = useState<{
+    x: number;
+    y: number;
+    staffId: string;
+    startTime: string;
+    appointmentId?: string;
+  } | null>(null);
   const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestKeyRef = useRef<string>("");
 
@@ -143,6 +154,29 @@ export default function AppointmentsPage() {
     loadServices();
     loadEmployees();
   }, []);
+
+  useEffect(() => {
+    if (!boardContextMenu) {
+      return;
+    }
+
+    const handlePointerDown = () => setBoardContextMenu(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setBoardContextMenu(null);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("touchstart", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("touchstart", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [boardContextMenu]);
 
   const selectedDateKey = useMemo(() => getLocalDateKey(selectedDate), [selectedDate]);
   const requestKey = useMemo(() => {
@@ -381,6 +415,69 @@ export default function AppointmentsPage() {
     }
   };
 
+  const openQuickAppointmentDrawer = (prefill?: { staffId?: string; date?: string; time?: string }) => {
+    setDrawerPrefill(prefill || {});
+    setQuickDrawerMode('appointment');
+    setShowQuickDrawer(true);
+    setShowFilters(false);
+    setBoardContextMenu(null);
+  };
+
+  const openBlockedTimeDrawer = (prefill?: { staffId?: string; date?: string; time?: string }) => {
+    setDrawerPrefill(prefill || {});
+    setQuickDrawerMode('blocked_time');
+    setShowQuickDrawer(true);
+    setShowFilters(false);
+    setBoardContextMenu(null);
+  };
+
+  const handleGridContextMenu = (payload: {
+    clientX: number;
+    clientY: number;
+    staffId: string;
+    startTime: string;
+    appointmentId?: string;
+  }) => {
+    const start = new Date(payload.startTime);
+    setBoardContextMenu({
+      x: payload.clientX,
+      y: payload.clientY,
+      staffId: payload.staffId,
+      startTime: start.toISOString(),
+      appointmentId: payload.appointmentId
+    });
+  };
+
+  const handleOpenAppointmentFromMenu = () => {
+    if (!boardContextMenu) {
+      return;
+    }
+
+    const start = new Date(boardContextMenu.startTime);
+    const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    openQuickAppointmentDrawer({
+      staffId: boardContextMenu.staffId,
+      date,
+      time
+    });
+  };
+
+  const handleOpenBlockedTimeFromMenu = () => {
+    if (!boardContextMenu) {
+      return;
+    }
+
+    const start = new Date(boardContextMenu.startTime);
+    const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    openBlockedTimeDrawer({
+      staffId: boardContextMenu.staffId,
+      date,
+      time
+    });
+  };
+
   const clearFilters = () => {
     const defaults = getCurrentMonthRange();
     setStartDate(defaults.start);
@@ -464,14 +561,14 @@ export default function AppointmentsPage() {
                 </button>
               </div>
 
-              <Link
-                href={`/${locale}/dashboard/appointments/new`}
-                onClick={() => setShowFilters(false)}
+              <button
+                type="button"
+                onClick={() => openQuickAppointmentDrawer()}
                 className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
               >
                 <PlusIcon className="h-5 w-5" />
                 <span>{locale === 'ar' ? 'موعد جديد' : 'New Appointment'}</span>
-              </Link>
+              </button>
 
               <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -699,6 +796,40 @@ export default function AppointmentsPage() {
         </aside>
       </div>
 
+      {boardContextMenu && (
+        <div
+          className="fixed inset-0 z-[70]"
+          onContextMenu={(event) => event.preventDefault()}
+          onClick={() => setBoardContextMenu(null)}
+        >
+          <div
+            className="absolute min-w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl"
+            style={{
+              top: boardContextMenu.y,
+              left: boardContextMenu.x
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={handleOpenAppointmentFromMenu}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              <PlusIcon className="h-4 w-4 text-primary" />
+              <span>{locale === 'ar' ? 'إضافة موعد جديد' : 'Add new appointment'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenBlockedTimeFromMenu}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              <CalendarDaysIcon className="h-4 w-4 text-primary" />
+              <span>{locale === 'ar' ? 'إضافة وقت محجوز' : 'Add blocked time'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -841,12 +972,41 @@ export default function AppointmentsPage() {
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
           onReassignAppointment={handleReassignAppointment}
+          onGridContextMenu={handleGridContextMenu}
+          onAppointmentSettingsClick={(appointmentId) => router.push(`/${locale}/dashboard/appointments/${appointmentId}`)}
           locale={locale}
           isRTL={isRTL}
           t={t}
           sectionTitle={t("title")}
         />
       )}
+
+      <AppointmentActionDrawer
+        open={showQuickDrawer}
+        mode={quickDrawerMode}
+        locale={locale}
+        isRTL={isRTL}
+        services={services}
+        employees={employees}
+        defaultStaffId={drawerPrefill.staffId}
+        defaultDate={drawerPrefill.date}
+        defaultTime={drawerPrefill.time}
+        onClose={() => setShowQuickDrawer(false)}
+        onAppointmentCreated={() => {
+          if (viewMode === 'calendar') {
+            loadAppointmentsBoard();
+          } else {
+            loadAppointments();
+          }
+        }}
+        onBreakCreated={() => {
+          if (viewMode === 'calendar') {
+            loadAppointmentsBoard();
+          } else {
+            loadAppointments();
+          }
+        }}
+      />
     </TenantLayout>
   );
 }

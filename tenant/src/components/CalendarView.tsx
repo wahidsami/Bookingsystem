@@ -60,6 +60,14 @@ interface CalendarViewProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
   onReassignAppointment?: (appointmentId: string, staffId: string) => Promise<void> | void;
+  onGridContextMenu?: (payload: {
+    clientX: number;
+    clientY: number;
+    staffId: string;
+    startTime: string;
+    appointmentId?: string;
+  }) => void;
+  onAppointmentSettingsClick?: (appointmentId: string) => void;
   locale: string;
   isRTL: boolean;
   t: (key: string) => string;
@@ -82,6 +90,8 @@ export function CalendarView({
   selectedDate,
   onDateChange,
   onReassignAppointment,
+  onGridContextMenu,
+  onAppointmentSettingsClick,
   locale,
   isRTL,
   t,
@@ -234,6 +244,17 @@ export function CalendarView({
       left: '4px',
       right: '4px'
     };
+  };
+
+  const getSnappedDateTimeFromPointer = (clientY: number, containerTop: number) => {
+    const offsetMinutes = (clientY - containerTop) / PIXELS_PER_MINUTE;
+    const snappedMinutes = Math.round(offsetMinutes / MINUTES_PER_SLOT) * MINUTES_PER_SLOT;
+    const totalAvailableMinutes = (END_HOUR - START_HOUR) * 60;
+    const clampedMinutes = Math.max(0, Math.min(totalAvailableMinutes - MINUTES_PER_SLOT, snappedMinutes));
+    const baseDate = new Date(selectedDate);
+    baseDate.setHours(START_HOUR, 0, 0, 0);
+    baseDate.setMinutes(baseDate.getMinutes() + clampedMinutes);
+    return baseDate;
   };
 
   const getBreakStyle = (breakItem: EmployeeBreak) => {
@@ -721,7 +742,30 @@ export function CalendarView({
                     </div>
 
                     {/* Appointments Column */}
-                    <div className="relative" style={{ height: `${totalHeight}px` }}>
+                    <div
+                      className="relative"
+                      style={{ height: `${totalHeight}px` }}
+                      onContextMenu={(event) => {
+                        if (!onGridContextMenu) {
+                          return;
+                        }
+
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        const startTime = getSnappedDateTimeFromPointer(
+                          event.clientY,
+                          event.currentTarget.getBoundingClientRect().top
+                        );
+
+                        onGridContextMenu({
+                          clientX: event.clientX,
+                          clientY: event.clientY,
+                          staffId: staff.id,
+                          startTime: startTime.toISOString()
+                        });
+                      }}
+                    >
                       {/* Dotted lines for each time slot (extend into columns) */}
                       {timeSlots.map((slot, index) => (
                         <div
@@ -798,6 +842,21 @@ export function CalendarView({
                           <div
                             key={appointment.id}
                             onClick={() => handleAppointmentClick(appointment.id)}
+                            onContextMenu={(event) => {
+                              if (!onGridContextMenu) {
+                                return;
+                              }
+
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onGridContextMenu({
+                                clientX: event.clientX,
+                                clientY: event.clientY,
+                                staffId: appointment.staff.id,
+                                startTime: appointment.startTime,
+                                appointmentId: appointment.id
+                              });
+                            }}
                             draggable={canReassign}
                             onDragStart={(event) => {
                               if (!canReassign) {
@@ -927,12 +986,30 @@ export function CalendarView({
                                     <div className="h-1.5 w-1.5 rounded-full bg-white/70"></div>
                                     <span className="text-xs capitalize opacity-80">{getStatusLabel(appointment.status)}</span>
                                   </div>
-                                  <span
-                                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}
-                                    title={getPaymentBadgeTitle(appointment)}
-                                  >
-                                    {getPaymentBadgeLabel(appointment)}
-                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}
+                                      title={getPaymentBadgeTitle(appointment)}
+                                    >
+                                      {getPaymentBadgeLabel(appointment)}
+                                    </span>
+                                    {onAppointmentSettingsClick && (
+                                      <button
+                                        type="button"
+                                        data-appointment-settings="true"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 transition hover:bg-white/25"
+                                        title={locale === 'ar' ? 'إعدادات الموعد' : 'Appointment settings'}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          onAppointmentSettingsClick(appointment.id);
+                                        }}
+                                      >
+                                        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                          <path d="M11.983 1.75a1 1 0 00-1.966 0l-.12.74a7.52 7.52 0 00-1.426.588l-.63-.44a1 1 0 00-1.352.115l-1.3 1.3a1 1 0 00-.115 1.352l.44.63c-.22.46-.42.935-.588 1.426l-.74.12a1 1 0 000 1.966l.74.12c.168.49.368.966.588 1.426l-.44.63a1 1 0 00.115 1.352l1.3 1.3a1 1 0 001.352.115l.63-.44c.46.22.935.42 1.426.588l.12.74a1 1 0 001.966 0l.12-.74c.49-.168.966-.368 1.426-.588l.63.44a1 1 0 001.352-.115l1.3-1.3a1 1 0 00.115-1.352l-.44-.63c.22-.46.42-.935.588-1.426l.74-.12a1 1 0 000-1.966l-.74-.12a7.52 7.52 0 00-.588-1.426l.44-.63a1 1 0 00-.115-1.352l-1.3-1.3a1 1 0 00-1.352-.115l-.63.44a7.52 7.52 0 00-1.426-.588l-.12-.74zM10 13.25a3.25 3.25 0 100-6.5 3.25 3.25 0 000 6.5z" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
 
                                 {appointment.assignmentMode === 'auto_assigned' && (
