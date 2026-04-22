@@ -80,7 +80,7 @@ interface CalendarViewProps {
 const START_HOUR = 6; // 6 AM
 const END_HOUR = 22; // 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
-const MIN_APPOINTMENT_HEIGHT = 192;
+const MIN_APPOINTMENT_HEIGHT = 88;
 const MIN_BREAK_HEIGHT = 72;
 
 export function CalendarView({
@@ -239,10 +239,11 @@ export function CalendarView({
     const top = (startHour - START_HOUR) * pixelsPerHour + startMinute * pixelsPerMinute;
     const duration = (endHour - startHour) * 60 + (endMinute - startMinute);
     const height = duration * pixelsPerMinute;
+    const appointmentHeight = Math.max(height, MIN_APPOINTMENT_HEIGHT);
 
     return {
       top: `${top}px`,
-      height: `${Math.max(height, MIN_APPOINTMENT_HEIGHT)}px`,
+      height: `${appointmentHeight}px`,
       position: 'absolute' as const,
       width: 'calc(100% - 8px)',
       left: '4px',
@@ -864,8 +865,9 @@ export function CalendarView({
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
 
                         const style = getAppointmentStyle(appointment);
-                        const contentHeight = MIN_APPOINTMENT_HEIGHT + (appointment.notes?.trim() ? 8 : 0);
-                        const minHeight = Math.max(parseFloat(style.height as string), contentHeight);
+                        const calculatedHeight = Number.parseFloat(String(style.height ?? '0')) || MIN_APPOINTMENT_HEIGHT;
+                        const minHeight = Math.max(calculatedHeight, MIN_APPOINTMENT_HEIGHT);
+                        const isCompactCard = minHeight < 160;
                         const userInitials = appointment.user
                           ? `${appointment.user.firstName?.[0] || ''}${appointment.user.lastName?.[0] || ''}`.toUpperCase() || '?'
                           : '?';
@@ -915,16 +917,16 @@ export function CalendarView({
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                            <div className="flex h-full flex-col overflow-hidden rounded-2xl">
-                              <div className="flex flex-shrink-0 items-center justify-between gap-3 bg-black/25 px-4 py-3">
+                            <div className={`flex h-full flex-col overflow-hidden rounded-2xl ${isCompactCard ? 'text-[11px]' : ''}`}>
+                              <div className={`flex flex-shrink-0 items-center justify-between gap-2 bg-black/25 ${isCompactCard ? 'px-3 py-2' : 'px-4 py-3'}`}>
                                 <div className="min-w-0">
-                                  <div className="break-words text-sm font-semibold leading-tight">
+                                  <div className={`break-words font-semibold leading-tight ${isCompactCard ? 'text-sm' : 'text-sm'}`}>
                                     {serviceName}
                                   </div>
                                 </div>
                                 {hasCustomerSelectedStaff && (
                                   <span
-                                    className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/25"
+                                    className={`inline-flex flex-shrink-0 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/25 ${isCompactCard ? 'h-7 w-7' : 'h-8 w-8'}`}
                                     title={locale === 'ar' ? 'اختار الموظف بنفسه' : 'Customer selected a specific employee'}
                                   >
                                     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -934,7 +936,7 @@ export function CalendarView({
                                 )}
                               </div>
 
-                              <div className="flex flex-1 flex-col gap-2 bg-black/15 px-4 py-4 backdrop-blur-[1px]">
+                              <div className={`flex flex-1 flex-col bg-black/15 backdrop-blur-[1px] ${isCompactCard ? 'gap-1.5 px-3 py-2.5' : 'gap-2 px-4 py-4'}`}>
                                 <div className="flex items-start gap-2">
                                   <div className="relative flex-shrink-0">
                                     {(() => {
@@ -946,10 +948,10 @@ export function CalendarView({
                                       if (hasValidPhoto) {
                                         return (
                                           <>
-                                            <img
+                                          <img
                                               src={getImageUrl(userPhoto as string)}
                                               alt={customerFirstName}
-                                              className="relative z-10 h-6 w-6 rounded-full border border-white/30 object-cover"
+                                              className={`relative z-10 rounded-full border border-white/30 object-cover ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}
                                               onError={(e) => {
                                                 const img = e.currentTarget;
                                                 img.style.display = 'none';
@@ -959,16 +961,16 @@ export function CalendarView({
                                                 }
                                               }}
                                             />
-                                            <div className="avatar-fallback absolute inset-0 hidden h-6 w-6 items-center justify-center rounded-full border border-white/30 bg-white/20">
-                                              <span className="text-xs font-semibold">{userInitials}</span>
+                                            <div className={`avatar-fallback absolute inset-0 hidden items-center justify-center rounded-full border border-white/30 bg-white/20 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}>
+                                              <span className={`${isCompactCard ? 'text-[10px]' : 'text-xs'} font-semibold`}>{userInitials}</span>
                                             </div>
                                           </>
                                         );
                                       }
 
                                       return (
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/30 bg-white/20">
-                                          <span className="text-xs font-semibold">{userInitials}</span>
+                                        <div className={`flex items-center justify-center rounded-full border border-white/30 bg-white/20 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}>
+                                          <span className={`${isCompactCard ? 'text-[10px]' : 'text-xs'} font-semibold`}>{userInitials}</span>
                                         </div>
                                       );
                                     })()}
@@ -976,20 +978,20 @@ export function CalendarView({
 
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center justify-between gap-2">
-                                      <div className="truncate text-sm font-semibold leading-tight">{customerFirstName}</div>
+                                      <div className={`truncate font-semibold leading-tight ${isCompactCard ? 'text-[13px]' : 'text-sm'}`}>{customerFirstName}</div>
                                       <div className="flex items-center gap-1.5">
                                         {hasBookingNote && (
                                           <button
                                             type="button"
                                             data-note-trigger="true"
-                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20 transition hover:bg-white/30"
+                                            className={`inline-flex items-center justify-center rounded-full bg-white/20 ring-1 ring-white/20 transition hover:bg-white/30 ${isCompactCard ? 'h-5 w-5' : 'h-6 w-6'}`}
                                             title={locale === 'ar' ? 'توجد ملاحظة من العميل' : 'Customer added a booking note'}
                                             onClick={(event) => {
                                               event.stopPropagation();
                                               setOpenNoteAppointmentId((current) => (current === appointment.id ? null : appointment.id));
                                             }}
                                           >
-                                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <svg className={`${isCompactCard ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                               <path
                                                 fillRule="evenodd"
                                                 d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123A6.921 6.921 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-10-1a1 1 0 112 0v.01a1 1 0 11-2 0V9zm0 3a1 1 0 112 0v.01a1 1 0 11-2 0V12zm4-3a1 1 0 112 0v.01a1 1 0 11-2 0V9z"
@@ -1003,30 +1005,30 @@ export function CalendarView({
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-xs font-medium opacity-90">
+                                <div className={`flex items-center gap-2 font-medium opacity-90 ${isCompactCard ? 'text-[11px]' : 'text-xs'}`}>
                                   <span className="opacity-70">{locale === 'ar' ? 'نوع الدفع' : 'Payment type'}</span>
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1">
+                                  <span className={`inline-flex items-center gap-1 rounded-full bg-white/15 ${isCompactCard ? 'px-2 py-0.5' : 'px-2 py-1'}`}>
                                     <span aria-hidden="true">{getPaymentTypeSymbol(appointment)}</span>
-                                    <span>{paymentTypeLabel}</span>
+                                    <span className="max-w-[8rem] truncate">{paymentTypeLabel}</span>
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 text-xs leading-tight opacity-90">
+                                <div className={`flex items-center gap-1.5 leading-tight opacity-90 ${isCompactCard ? 'text-[11px]' : 'text-xs'}`}>
                                   <span className="whitespace-nowrap opacity-70">{locale === 'ar' ? 'وقت الحجز' : 'Booked time'}</span>
-                                  <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className={`${isCompactCard ? 'h-2.5 w-2.5' : 'h-3 w-3'} flex-shrink-0`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
                                   <span className="truncate">{timeLabel}</span>
                                 </div>
 
-                                <div className="mt-auto flex items-center justify-between gap-2 pt-1.5">
+                                <div className={`mt-auto flex items-center justify-between gap-2 ${isCompactCard ? 'pt-0.5' : 'pt-1.5'}`}>
                                   <div className="flex items-center gap-1">
                                     <div className="h-1.5 w-1.5 rounded-full bg-white/70"></div>
-                                    <span className="text-xs capitalize opacity-80">{getStatusLabel(appointment.status)}</span>
+                                    <span className={`${isCompactCard ? 'text-[11px]' : 'text-xs'} capitalize opacity-80`}>{getStatusLabel(appointment.status)}</span>
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     <span
-                                      className={`rounded-full px-2 py-1 text-[11px] font-semibold ${getPaymentBadgeClasses(appointment)}`}
+                                      className={`rounded-full font-semibold ${getPaymentBadgeClasses(appointment)} ${isCompactCard ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'}`}
                                       title={getPaymentBadgeTitle(appointment)}
                                     >
                                       {getPaymentBadgeLabel(appointment)}
@@ -1035,14 +1037,14 @@ export function CalendarView({
                                       <button
                                         type="button"
                                         data-appointment-settings="true"
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 transition hover:bg-white/25"
+                                        className={`inline-flex items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 transition hover:bg-white/25 ${isCompactCard ? 'h-6 w-6' : 'h-7 w-7'}`}
                                         title={locale === 'ar' ? 'إعدادات الموعد' : 'Appointment settings'}
                                         onClick={(event) => {
                                           event.stopPropagation();
                                           onAppointmentSettingsClick(appointment.id);
                                         }}
                                       >
-                                        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <svg className={`${isCompactCard ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                           <path d="M11.983 1.75a1 1 0 00-1.966 0l-.12.74a7.52 7.52 0 00-1.426.588l-.63-.44a1 1 0 00-1.352.115l-1.3 1.3a1 1 0 00-.115 1.352l.44.63c-.22.46-.42.935-.588 1.426l-.74.12a1 1 0 000 1.966l.74.12c.168.49.368.966.588 1.426l-.44.63a1 1 0 00.115 1.352l1.3 1.3a1 1 0 001.352.115l.63-.44c.46.22.935.42 1.426.588l.12.74a1 1 0 001.966 0l.12-.74c.49-.168.966-.368 1.426-.588l.63.44a1 1 0 001.352-.115l1.3-1.3a1 1 0 00.115-1.352l-.44-.63c.22-.46.42-.935.588-1.426l.74-.12a1 1 0 000-1.966l-.74-.12a7.52 7.52 0 00-.588-1.426l.44-.63a1 1 0 00-.115-1.352l-1.3-1.3a1 1 0 00-1.352-.115l-.63.44a7.52 7.52 0 00-1.426-.588l-.12-.74zM10 13.25a3.25 3.25 0 100-6.5 3.25 3.25 0 000 6.5z" />
                                         </svg>
                                       </button>
@@ -1051,7 +1053,7 @@ export function CalendarView({
                                 </div>
 
                                 {appointment.assignmentMode === 'auto_assigned' && (
-                                  <div className="pt-1 text-[11px] opacity-75">
+                                  <div className={`opacity-75 ${isCompactCard ? 'pt-0 text-[10px]' : 'pt-1 text-[11px]'}`}>
                                     {locale === 'ar' ? 'تم تعيينه تلقائياً' : 'Auto-assigned'}
                                   </div>
                                 )}
