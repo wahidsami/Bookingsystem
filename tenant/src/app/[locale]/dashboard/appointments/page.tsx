@@ -28,6 +28,7 @@ interface Employee {
   id: string;
   name: string;
   photo?: string;
+  position?: string;
 }
 
 interface User {
@@ -199,9 +200,13 @@ export default function AppointmentsPage() {
 
   const loadEmployees = async () => {
     try {
-      const response = await tenantApi.getEmployees({ isActive: true });
+      const response = await tenantApi.getEmployees({ isActive: true, position: 'service_provider' });
       if (response.success) {
-        setEmployees(response.employees || []);
+        const providerEmployees = (response.employees || []).filter((employee: Employee) => {
+          const normalizedPosition = `${employee.position || ''}`.replace(/\s+/g, '_').toLowerCase();
+          return normalizedPosition === 'service_provider';
+        });
+        setEmployees(providerEmployees);
       }
     } catch (err) {
       console.error("Failed to load employees:", err);
@@ -388,16 +393,7 @@ export default function AppointmentsPage() {
 
   return (
     <TenantLayout fullWidth>
-      <div className="mb-6 flex items-start justify-between gap-4 animate-fade-in">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {t("title")}
-          </h2>
-          <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {t("subtitle")}
-          </p>
-        </div>
-
+      <div className="mb-6 flex items-start justify-end gap-4 animate-fade-in">
         <button
           type="button"
           onClick={() => setShowFilters(true)}
@@ -668,6 +664,36 @@ export default function AppointmentsPage() {
                   ))}
                 </div>
               </div>
+
+              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm font-semibold text-gray-900">{locale === 'ar' ? 'الدليل' : 'Legend'}</p>
+                <div className="mt-3 space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-gray-700">{locale === 'ar' ? 'مدفوع بالكامل' : 'Fully paid'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                    <span className="text-gray-700">{locale === 'ar' ? 'عربون' : 'Deposit'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+                    <span className="text-gray-700">{locale === 'ar' ? 'بانتظار الدفع' : 'Pending payment'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-500 text-[10px] font-bold text-white">A</span>
+                    <span className="text-gray-700">{locale === 'ar' ? 'تعيين تلقائي' : 'Auto-assigned'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">S</span>
+                    <span className="text-gray-700">{locale === 'ar' ? 'اختيار العميل للموظف' : 'Customer picked staff'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-200 text-[10px] font-bold text-rose-700">B</span>
+                    <span className="text-gray-700">{locale === 'ar' ? 'استراحة' : 'Break'}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
@@ -818,6 +844,7 @@ export default function AppointmentsPage() {
           locale={locale}
           isRTL={isRTL}
           t={t}
+          sectionTitle={t("title")}
         />
       )}
     </TenantLayout>

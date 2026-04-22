@@ -63,6 +63,7 @@ interface CalendarViewProps {
   locale: string;
   isRTL: boolean;
   t: (key: string) => string;
+  sectionTitle?: string;
 }
 
 // Time configuration
@@ -83,13 +84,13 @@ export function CalendarView({
   onReassignAppointment,
   locale,
   isRTL,
-  t
+  t,
+  sectionTitle
 }: CalendarViewProps) {
   const router = useRouter();
   const params = useParams();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [openNoteAppointmentId, setOpenNoteAppointmentId] = useState<string | null>(null);
-  const [showLegend, setShowLegend] = useState(false);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
   const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
   const [visibleStaffIds, setVisibleStaffIds] = useState<Set<string>>(
@@ -537,6 +538,17 @@ export function CalendarView({
     <div className="space-y-4">
       {/* Date Navigation */}
       <div className={`flex flex-col md:flex-row items-start md:items-center justify-between bg-white rounded-lg p-4 shadow-sm gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
+        <div className={`flex flex-col gap-1 ${isRTL ? 'items-end' : 'items-start'}`}>
+          <h3 className="text-2xl font-bold text-gray-900">
+            {sectionTitle || (locale === 'ar' ? 'المواعيد' : 'Appointments')}
+          </h3>
+          <p className="text-sm text-gray-500">
+            {locale === 'ar'
+              ? 'اسحب الموعد بين الموظفين لتغيير مقدم الخدمة.'
+              : 'Drag appointments between staff columns to reassign the provider.'}
+          </p>
+        </div>
+
         <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <button
             onClick={goToToday}
@@ -594,60 +606,19 @@ export function CalendarView({
       </div>
 
       <div className={`rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 ${isRTL ? 'text-right' : ''}`}>
-        <div className={`flex flex-col gap-3 ${isRTL ? 'items-end' : ''}`}>
-          <div className={`flex flex-wrap items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {locale === 'ar' ? 'مفاتيح اللوحة' : 'Board Guide'}
-              </span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-                {locale === 'ar' ? `${summaryCounts.appointments} حجوزات` : `${summaryCounts.appointments} bookings`}
-              </span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-                {locale === 'ar' ? `${summaryCounts.breaks} استراحات` : `${summaryCounts.breaks} breaks`}
-              </span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-                {locale === 'ar' ? `${summaryCounts.visibleStaff} موظفين ظاهرين` : `${summaryCounts.visibleStaff} visible staff`}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowLegend((current) => !current)}
-              className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              {showLegend ? (locale === 'ar' ? 'إخفاء الدليل' : 'Hide legend') : (locale === 'ar' ? 'إظهار الدليل' : 'Show legend')}
-            </button>
-          </div>
-
-          {showLegend && (
-            <div className={`flex flex-wrap items-center gap-2 text-xs ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                {locale === 'ar' ? 'مدفوع بالكامل' : 'Fully paid'}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
-                {locale === 'ar' ? 'عربون' : 'Deposit'}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
-                {locale === 'ar' ? 'بانتظار الدفع' : 'Pending payment'}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-500 text-[10px] font-bold text-white">A</span>
-                {locale === 'ar' ? 'تعيين تلقائي' : 'Auto-assigned'}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">S</span>
-                {locale === 'ar' ? 'اختيار العميل للموظف' : 'Customer picked staff'}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-200 text-[10px] font-bold text-rose-700">B</span>
-                {locale === 'ar' ? 'استراحة' : 'Break'}
-              </span>
-            </div>
-          )}
+        <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {locale === 'ar' ? 'مفاتيح اللوحة' : 'Board Guide'}
+          </span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+            {locale === 'ar' ? `${summaryCounts.appointments} حجوزات` : `${summaryCounts.appointments} bookings`}
+          </span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+            {locale === 'ar' ? `${summaryCounts.breaks} استراحات` : `${summaryCounts.breaks} breaks`}
+          </span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+            {locale === 'ar' ? `${summaryCounts.visibleStaff} موظفين ظاهرين` : `${summaryCounts.visibleStaff} visible staff`}
+          </span>
         </div>
       </div>
 
