@@ -60,6 +60,7 @@ interface CalendarViewProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
   onReassignAppointment?: (appointmentId: string, staffId: string) => Promise<void> | void;
+  onAppointmentClick?: (appointmentId: string) => void;
   onGridContextMenu?: (payload: {
     clientX: number;
     clientY: number;
@@ -72,14 +73,13 @@ interface CalendarViewProps {
   isRTL: boolean;
   t: (key: string) => string;
   sectionTitle?: string;
+  hourHeight?: number;
 }
 
 // Time configuration
 const START_HOUR = 6; // 6 AM
 const END_HOUR = 22; // 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
-const PIXELS_PER_HOUR = 240; // Taller rhythm so cards can breathe and align with the grid
-const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
 const MIN_APPOINTMENT_HEIGHT = 192;
 const MIN_BREAK_HEIGHT = 72;
 
@@ -90,12 +90,14 @@ export function CalendarView({
   selectedDate,
   onDateChange,
   onReassignAppointment,
+  onAppointmentClick,
   onGridContextMenu,
   onAppointmentSettingsClick,
   locale,
   isRTL,
   t,
-  sectionTitle
+  sectionTitle,
+  hourHeight = 240
 }: CalendarViewProps) {
   const router = useRouter();
   const params = useParams();
@@ -106,6 +108,8 @@ export function CalendarView({
   const [visibleStaffIds, setVisibleStaffIds] = useState<Set<string>>(
     new Set(employees.map(emp => emp.id))
   );
+  const pixelsPerHour = Math.max(120, Math.min(360, Number(hourHeight) || 240));
+  const pixelsPerMinute = pixelsPerHour / 60;
 
   useEffect(() => {
     setVisibleStaffIds((previous) => {
@@ -203,7 +207,7 @@ export function CalendarView({
           hour,
           minute,
           label: formatTime(hour, minute, locale),
-          position: (hour - START_HOUR) * PIXELS_PER_HOUR + minute * PIXELS_PER_MINUTE
+          position: (hour - START_HOUR) * pixelsPerHour + minute * pixelsPerMinute
         });
       }
     }
@@ -232,9 +236,9 @@ export function CalendarView({
       return { display: 'none' };
     }
 
-    const top = (startHour - START_HOUR) * PIXELS_PER_HOUR + startMinute * PIXELS_PER_MINUTE;
+    const top = (startHour - START_HOUR) * pixelsPerHour + startMinute * pixelsPerMinute;
     const duration = (endHour - startHour) * 60 + (endMinute - startMinute);
-    const height = duration * PIXELS_PER_MINUTE;
+    const height = duration * pixelsPerMinute;
 
     return {
       top: `${top}px`,
@@ -247,7 +251,7 @@ export function CalendarView({
   };
 
   const getSnappedDateTimeFromPointer = (clientY: number, containerTop: number) => {
-    const offsetMinutes = (clientY - containerTop) / PIXELS_PER_MINUTE;
+    const offsetMinutes = (clientY - containerTop) / pixelsPerMinute;
     const snappedMinutes = Math.round(offsetMinutes / MINUTES_PER_SLOT) * MINUTES_PER_SLOT;
     const totalAvailableMinutes = (END_HOUR - START_HOUR) * 60;
     const clampedMinutes = Math.max(0, Math.min(totalAvailableMinutes - MINUTES_PER_SLOT, snappedMinutes));
@@ -266,9 +270,9 @@ export function CalendarView({
     const endHour = endParts[0] || 0;
     const endMinute = endParts[1] || 0;
 
-    const top = (startHour - START_HOUR) * PIXELS_PER_HOUR + startMinute * PIXELS_PER_MINUTE;
+    const top = (startHour - START_HOUR) * pixelsPerHour + startMinute * pixelsPerMinute;
     const duration = (endHour - startHour) * 60 + (endMinute - startMinute);
-    const height = duration * PIXELS_PER_MINUTE;
+    const height = duration * pixelsPerMinute;
 
     return {
       top: `${top}px`,
@@ -455,7 +459,7 @@ export function CalendarView({
 
     const hour = now.getHours();
     const minute = now.getMinutes();
-    const position = (hour - START_HOUR) * PIXELS_PER_HOUR + minute * PIXELS_PER_MINUTE;
+    const position = (hour - START_HOUR) * pixelsPerHour + minute * pixelsPerMinute;
 
     if (hour < START_HOUR || hour >= END_HOUR) {
       return null; // Outside visible range
@@ -544,10 +548,15 @@ export function CalendarView({
   };
 
   const handleAppointmentClick = (appointmentId: string) => {
+    if (onAppointmentClick) {
+      onAppointmentClick(appointmentId);
+      return;
+    }
+
     router.push(`/${params.locale}/dashboard/appointments/${appointmentId}`);
   };
 
-  const totalHeight = (END_HOUR - START_HOUR) * PIXELS_PER_HOUR;
+  const totalHeight = (END_HOUR - START_HOUR) * pixelsPerHour;
   const currentTimePosition = getCurrentTimePosition();
   const summaryCounts = {
     appointments: dayAppointments.length,

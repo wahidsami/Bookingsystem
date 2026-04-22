@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { tenantApi, getImageUrl, API_BASE_URL } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 
@@ -107,6 +107,7 @@ export default function AppointmentDetailsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
   const { id } = params;
@@ -122,11 +123,16 @@ export default function AppointmentDetailsPage() {
   const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState<SlotItem | null>(null);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const autoOpenRescheduleRef = useRef(false);
 
   useEffect(() => {
     if (id) {
       loadAppointment();
     }
+  }, [id]);
+
+  useEffect(() => {
+    autoOpenRescheduleRef.current = false;
   }, [id]);
 
   const loadAppointment = async () => {
@@ -218,6 +224,24 @@ export default function AppointmentDetailsPage() {
     appointment &&
     (appointment.status === "confirmed" || appointment.status === "pending") &&
     hoursUntilStart > 24;
+
+  useEffect(() => {
+    if (!appointment || autoOpenRescheduleRef.current) {
+      return;
+    }
+
+    if (searchParams.get('reschedule') !== '1') {
+      return;
+    }
+
+    if (!canReschedule) {
+      return;
+    }
+
+    autoOpenRescheduleRef.current = true;
+    setRescheduleDate(new Date().toISOString().slice(0, 10));
+    setRescheduleModalOpen(true);
+  }, [appointment, canReschedule, searchParams]);
 
   useEffect(() => {
     if (!rescheduleModalOpen || !rescheduleDate || !appointment || !tenantId) return;

@@ -50,6 +50,25 @@ interface NewCustomerForm {
   dateOfBirth: string;
 }
 
+interface PrefillCustomer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface AppointmentActionDrawerPrefill {
+  customer?: PrefillCustomer | null;
+  serviceId?: string;
+  variantId?: string;
+  staffId?: string;
+  date?: string;
+  time?: string;
+  paymentMethod?: string;
+  notes?: string;
+}
+
 type DrawerMode = "appointment" | "blocked_time";
 
 interface AppointmentActionDrawerProps {
@@ -62,6 +81,7 @@ interface AppointmentActionDrawerProps {
   defaultStaffId?: string;
   defaultDate?: string;
   defaultTime?: string;
+  prefill?: AppointmentActionDrawerPrefill;
   onClose: () => void;
   onAppointmentCreated?: () => void;
   onBreakCreated?: () => void;
@@ -109,6 +129,7 @@ export function AppointmentActionDrawer({
   defaultStaffId,
   defaultDate,
   defaultTime,
+  prefill,
   onClose,
   onAppointmentCreated,
   onBreakCreated
@@ -157,10 +178,16 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
-      setCustomerMode("existing");
-      setCustomerSearch("");
+      setCustomerMode(prefill?.customer ? "existing" : "existing");
+      setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
       setCustomers([]);
-      setSelectedCustomer(null);
+      setSelectedCustomer(prefill?.customer ? {
+        id: prefill.customer.id,
+        firstName: prefill.customer.firstName,
+        lastName: prefill.customer.lastName,
+        email: prefill.customer.email || "",
+        phone: prefill.customer.phone || ""
+      } : null);
       setNewCustomer({
         firstName: "",
         lastName: "",
@@ -170,13 +197,13 @@ export function AppointmentActionDrawer({
         gender: "",
         dateOfBirth: ""
       });
-      setSelectedServiceId("");
-      setSelectedVariantId("");
-      setSelectedStaffId(defaultStaffId || "");
-      setAppointmentDate(defaultDate || getTodayDateKey());
-      setAppointmentTime(defaultTime || "10:00");
-      setPaymentMethod("");
-      setNotes("");
+      setSelectedServiceId(prefill?.serviceId || "");
+      setSelectedVariantId(prefill?.variantId || "");
+      setSelectedStaffId(prefill?.staffId || defaultStaffId || "");
+      setAppointmentDate(prefill?.date || defaultDate || getTodayDateKey());
+      setAppointmentTime(prefill?.time || defaultTime || "10:00");
+      setPaymentMethod(prefill?.paymentMethod || "");
+      setNotes(prefill?.notes || "");
       return;
     }
 
@@ -186,7 +213,7 @@ export function AppointmentActionDrawer({
     setBreakEndTime(addMinutesToTime(defaultTime || "10:00", 30));
     setBreakType("other");
     setBreakLabel("");
-  }, [open, mode, defaultStaffId, defaultDate, defaultTime]);
+  }, [open, mode, defaultStaffId, defaultDate, defaultTime, prefill]);
 
   useEffect(() => {
     if (!open || mode !== "appointment") {

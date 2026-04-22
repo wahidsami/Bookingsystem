@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { CalendarView } from "@/components/CalendarView";
-import { AppointmentActionDrawer } from "@/components/AppointmentActionDrawer";
+import { AppointmentActionDrawer, type AppointmentActionDrawerPrefill } from "@/components/AppointmentActionDrawer";
+import { AppointmentDetailsDrawer, type AppointmentItem } from "@/components/AppointmentDetailsDrawer";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import {
@@ -99,7 +100,6 @@ function getLocalDateKey(value: Date) {
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
-  const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
 
@@ -122,7 +122,18 @@ export default function AppointmentsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showQuickDrawer, setShowQuickDrawer] = useState(false);
   const [quickDrawerMode, setQuickDrawerMode] = useState<'appointment' | 'blocked_time'>('appointment');
-  const [drawerPrefill, setDrawerPrefill] = useState<{ staffId?: string; date?: string; time?: string }>({});
+  const [drawerPrefill, setDrawerPrefill] = useState<AppointmentActionDrawerPrefill>({});
+  const [showAppointmentDetailsDrawer, setShowAppointmentDetailsDrawer] = useState(false);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [gridHourHeight, setGridHourHeight] = useState(() => {
+    if (typeof window === "undefined") {
+      return 240;
+    }
+
+    const stored = window.localStorage.getItem("appointments-grid-hour-height");
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) ? Math.max(120, Math.min(360, parsed)) : 240;
+  });
   const [boardContextMenu, setBoardContextMenu] = useState<{
     x: number;
     y: number;
@@ -396,6 +407,7 @@ export default function AppointmentsPage() {
     setDrawerPrefill(prefill || {});
     setQuickDrawerMode('appointment');
     setShowQuickDrawer(true);
+    setShowAppointmentDetailsDrawer(false);
     setShowFilters(false);
     setBoardContextMenu(null);
   };
@@ -404,8 +416,42 @@ export default function AppointmentsPage() {
     setDrawerPrefill(prefill || {});
     setQuickDrawerMode('blocked_time');
     setShowQuickDrawer(true);
+    setShowAppointmentDetailsDrawer(false);
     setShowFilters(false);
     setBoardContextMenu(null);
+  };
+
+  const handleOpenAppointmentDetails = (appointmentId: string) => {
+    setSelectedAppointmentId(appointmentId);
+    setShowAppointmentDetailsDrawer(true);
+    setShowQuickDrawer(false);
+    setShowFilters(false);
+    setBoardContextMenu(null);
+  };
+
+  const handleRebookAppointment = (appointment: AppointmentItem) => {
+    const start = new Date(appointment.startTime);
+    setDrawerPrefill({
+      customer: appointment.user
+        ? {
+            id: appointment.user.id,
+            firstName: appointment.user.firstName,
+            lastName: appointment.user.lastName,
+            email: appointment.user.email,
+            phone: appointment.user.phone
+          }
+        : undefined,
+      serviceId: appointment.service?.id,
+      variantId: appointment.serviceVariantId || undefined,
+      staffId: appointment.staff?.id,
+      date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
+      time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      paymentMethod: appointment.paymentMethod || undefined,
+      notes: appointment.notes || undefined
+    });
+    setQuickDrawerMode('appointment');
+    setShowQuickDrawer(true);
+    setShowAppointmentDetailsDrawer(false);
   };
 
   const handleGridContextMenu = (payload: {
@@ -464,6 +510,14 @@ export default function AppointmentsPage() {
     setFilterStatus("");
     setFilterPaymentStatus("");
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem("appointments-grid-hour-height", String(gridHourHeight));
+  }, [gridHourHeight]);
 
   return (
     <TenantLayout fullWidth>
@@ -536,6 +590,35 @@ export default function AppointmentsPage() {
                 >
                   {t("listView")}
                 </button>
+              </div>
+
+              <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {locale === 'ar' ? 'حجم الشبكة' : 'Grid size'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {locale === 'ar' ? 'كبر أو صغر ارتفاع الجدول' : 'Increase or decrease the calendar row height'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    {gridHourHeight}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={120}
+                  max={360}
+                  step={15}
+                  value={gridHourHeight}
+                  onChange={(event) => setGridHourHeight(Number(event.target.value))}
+                  className="mt-4 w-full accent-primary"
+                />
+                <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                  <span>{locale === 'ar' ? 'مضغوط' : 'Compact'}</span>
+                  <span>{locale === 'ar' ? 'واسع' : 'Spacious'}</span>
+                </div>
               </div>
 
               <button
@@ -949,14 +1032,28 @@ export default function AppointmentsPage() {
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
           onReassignAppointment={handleReassignAppointment}
+          onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
-          onAppointmentSettingsClick={(appointmentId) => router.push(`/${locale}/dashboard/appointments/${appointmentId}`)}
+          onAppointmentSettingsClick={handleOpenAppointmentDetails}
           locale={locale}
           isRTL={isRTL}
           t={t}
           sectionTitle={t("title")}
+          hourHeight={gridHourHeight}
         />
       )}
+
+      <AppointmentDetailsDrawer
+        open={showAppointmentDetailsDrawer}
+        appointmentId={selectedAppointmentId}
+        locale={locale}
+        isRTL={isRTL}
+        onClose={() => {
+          setShowAppointmentDetailsDrawer(false);
+          setSelectedAppointmentId(null);
+        }}
+        onRebook={handleRebookAppointment}
+      />
 
       <AppointmentActionDrawer
         open={showQuickDrawer}
@@ -968,6 +1065,7 @@ export default function AppointmentsPage() {
         defaultStaffId={drawerPrefill.staffId}
         defaultDate={drawerPrefill.date}
         defaultTime={drawerPrefill.time}
+        prefill={drawerPrefill}
         onClose={() => setShowQuickDrawer(false)}
         onAppointmentCreated={() => {
           if (viewMode === 'calendar') {
