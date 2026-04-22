@@ -279,10 +279,76 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
     };
 }
 
+async function sendCustomerInboxNotification(tenantId, platformUserId, title, body, data = {}) {
+    if (!tenantId || !platformUserId) {
+        return {
+            success: false,
+            skipped: true,
+            reason: 'missing_recipient'
+        };
+    }
+
+    const payload = {
+        tenantId: String(tenantId),
+        linkType: data.linkType || 'tenant',
+        screen: data.linkType === 'service' && data.serviceId ? 'ServiceDetail' : 'Tenant',
+        audienceType: 'selected',
+        ...data
+    };
+
+    if (payload.linkType === 'service' && payload.serviceId) {
+        payload.screen = 'ServiceDetail';
+    }
+
+    let campaign = null;
+    try {
+        campaign = await db.TenantPushCampaign.create({
+            tenantId,
+            title: title.trim(),
+            body: body.trim(),
+            data: payload,
+            audienceType: 'selected',
+            recipientCount: 1,
+            sentAt: new Date()
+        });
+
+        payload.campaignId = String(campaign.id);
+
+        await db.TenantPushCampaignRecipient.create({
+            campaignId: campaign.id,
+            platformUserId
+        });
+    } catch (error) {
+        console.error('[CustomerNotification] Failed to create appointment campaign:', error.message);
+        campaign = null;
+    }
+
+    const pushResult = await sendToCustomer(platformUserId, title, body, payload);
+
+    if (campaign) {
+        try {
+            await campaign.update({
+                recipientCount: 1,
+                sentAt: new Date(),
+                data: payload
+            });
+        } catch (error) {
+            console.error('[CustomerNotification] Failed to finalize appointment campaign:', error.message);
+        }
+    }
+
+    return {
+        success: true,
+        campaignId: campaign?.id || null,
+        pushResult
+    };
+}
+
 module.exports = {
     sendToCustomer,
     getTenantPushUsage,
     sendTenantMarketingPush,
+    sendCustomerInboxNotification,
     normalizeCustomerNotification,
     async getUserNotifications(platformUserId, { page = 1, limit = 20 } = {}) {
         const safePage = Math.max(parseInt(page, 10) || 1, 1);

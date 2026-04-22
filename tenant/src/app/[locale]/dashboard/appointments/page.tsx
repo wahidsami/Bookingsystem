@@ -142,6 +142,7 @@ export default function AppointmentsPage() {
   } | null>(null);
   const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestKeyRef = useRef<string>("");
+  const refreshInFlightRef = useRef(false);
 
   const defaultMonthRange = getCurrentMonthRange();
   const hasActiveFilters =
@@ -234,9 +235,11 @@ export default function AppointmentsPage() {
     }
   };
 
-  const loadAppointments = async () => {
+  const loadAppointments = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError("");
 
       const params: any = {
@@ -261,13 +264,17 @@ export default function AppointmentsPage() {
       console.error("Failed to load appointments:", err);
       setError(err.message || t("loadError"));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
-  const loadAppointmentsBoard = async () => {
+  const loadAppointmentsBoard = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError("");
 
       const year = selectedDate.getFullYear();
@@ -293,9 +300,64 @@ export default function AppointmentsPage() {
       console.error("Failed to load appointments board:", err);
       setError(err.message || t("loadError"));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  const refreshAppointments = async () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
+
+    if (refreshInFlightRef.current) {
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+    try {
+      if (viewMode === 'calendar') {
+        await loadAppointmentsBoard(true);
+        return;
+      }
+
+      await loadAppointments(true);
+    } finally {
+      refreshInFlightRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleFocus = () => {
+      void refreshAppointments();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshAppointments();
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refreshAppointments();
+      }
+    }, viewMode === 'calendar' ? 25000 : 40000);
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [viewMode, selectedDateKey, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -374,7 +436,11 @@ export default function AppointmentsPage() {
     try {
       const response = await tenantApi.updateAppointmentStatus(id, newStatus);
       if (response.success) {
-        loadAppointments();
+        if (viewMode === 'calendar') {
+          loadAppointmentsBoard();
+        } else {
+          loadAppointments();
+        }
       } else {
         alert(response.message || t("updateError"));
       }

@@ -8,6 +8,7 @@ const { Op } = require('sequelize');
 const { Sequelize } = require('sequelize');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('../services/pushNotificationService');
+const customerNotificationService = require('../services/customerNotificationService');
 const bookingService = require('../services/bookingService');
 const { calculateSplitPayment } = require('../services/splitPaymentService');
 const userService = require('../services/userService');
@@ -240,6 +241,22 @@ exports.createAppointment = async (req, res) => {
                     staffId: appointment.staffId
                 }
             });
+
+            await customerNotificationService.sendCustomerInboxNotification(
+                tenantId,
+                customerUser.id,
+                'New appointment booked',
+                `Your ${serviceName} appointment for ${appointmentDate} has been scheduled.`,
+                {
+                    type: 'appointment_created',
+                    appointmentId: appointment.id,
+                    bookingReference: appointment.bookingReference || fullAppointment?.bookingNumber || null,
+                    serviceId: appointment.serviceId,
+                    staffId: appointment.staffId,
+                    imageUrl: fullAppointment?.service?.image || '',
+                    linkType: 'tenant'
+                }
+            );
 
             await pushNotificationService.sendToStaff(appointment.staffId, {
                 title: 'New appointment assigned',
