@@ -74,6 +74,8 @@ interface CalendarViewProps {
     appointmentId?: string;
   }) => void;
   onAppointmentSettingsClick?: (appointmentId: string) => void;
+  onOpenTools?: () => void;
+  activeFilterCount?: number;
   locale: string;
   isRTL: boolean;
   t: (key: string) => string;
@@ -98,6 +100,8 @@ export function CalendarView({
   onAppointmentClick,
   onGridContextMenu,
   onAppointmentSettingsClick,
+  onOpenTools,
+  activeFilterCount = 0,
   locale,
   isRTL,
   t,
@@ -666,6 +670,24 @@ export function CalendarView({
                 {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
               </button>
             ))}
+            {onOpenTools && (
+              <button
+                type="button"
+                onClick={onOpenTools}
+                className="relative inline-flex h-8 items-center gap-2 rounded-lg bg-white px-3 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50"
+                aria-label={locale === 'ar' ? 'فتح أدوات الجدول' : 'Open board tools'}
+              >
+                <svg className="h-4 w-4 text-gray-700" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M11.983 1.75a1 1 0 00-1.966 0l-.12.74a7.52 7.52 0 00-1.426.588l-.63-.44a1 1 0 00-1.352.115l-1.3 1.3a1 1 0 00-.115 1.352l.44.63c-.22.46-.42.935-.588 1.426l-.74.12a1 1 0 000 1.966l.74.12c.168.49.368.966.588 1.426l-.44.63a1 1 0 00.115 1.352l1.3 1.3a1 1 0 001.352.115l.63-.44c.46.22.935.42 1.426.588l.12.74a1 1 0 001.966 0l.12-.74c.49-.168.966-.368 1.426-.588l.63.44a1 1 0 001.352-.115l1.3-1.3a1 1 0 00.115-1.352l-.44-.63c.22-.46.42-.935.588-1.426l.74-.12a1 1 0 000-1.966l-.74-.12a7.52 7.52 0 00-.588-1.426l.44-.63a1 1 0 00-.115-1.352l-1.3-1.3a1 1 0 00-1.352-.115l-.63.44a7.52 7.52 0 00-1.426-.588l-.12-.74zM10 13.25a3.25 3.25 0 100-6.5 3.25 3.25 0 000 6.5z" />
+                </svg>
+                <span>{locale === 'ar' ? 'الأدوات' : 'Tools'}</span>
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

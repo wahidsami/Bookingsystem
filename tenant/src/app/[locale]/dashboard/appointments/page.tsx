@@ -13,7 +13,6 @@ import Link from "next/link";
 import {
   ArrowPathIcon,
   CalendarDaysIcon,
-  Cog6ToothIcon,
   FunnelIcon,
   PlusIcon,
   XMarkIcon
@@ -521,23 +520,6 @@ export default function AppointmentsPage() {
 
   return (
     <TenantLayout fullWidth>
-      <div className="mb-6 flex items-start justify-end gap-4 animate-fade-in">
-        <button
-          type="button"
-          onClick={() => setShowFilters(true)}
-          className="relative inline-flex h-12 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50"
-          aria-label={locale === 'ar' ? 'فتح أدوات الجدول' : 'Open board tools'}
-        >
-          <Cog6ToothIcon className="h-5 w-5 text-gray-700" />
-          <span>{locale === 'ar' ? 'الأدوات' : 'Tools'}</span>
-          {activeFilterCount > 0 && (
-            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-      </div>
-
       <div className={`fixed inset-0 z-50 transition ${showFilters ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div
           className={`absolute inset-0 bg-slate-950/35 backdrop-blur-[1px] transition-opacity duration-300 ${showFilters ? 'opacity-100' : 'opacity-0'}`}
@@ -1035,6 +1017,8 @@ export default function AppointmentsPage() {
           onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
           onAppointmentSettingsClick={handleOpenAppointmentDetails}
+          onOpenTools={() => setShowFilters(true)}
+          activeFilterCount={activeFilterCount}
           locale={locale}
           isRTL={isRTL}
           t={t}
