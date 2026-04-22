@@ -75,8 +75,8 @@ export function EmployeeEditorFrame({
         </div>
       ) : null}
 
-      <div className={`grid gap-6 ${isRTL ? 'lg:grid-cols-[minmax(0,1fr),280px]' : 'lg:grid-cols-[280px,minmax(0,1fr)]'}`}>
-        <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className={`flex flex-col gap-6 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
+        <aside className="sticky top-6 w-full shrink-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:w-[280px]">
           <div className="mb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
               {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
@@ -112,7 +112,7 @@ export function EmployeeEditorFrame({
           </div>
         </aside>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {children}
         </div>
       </div>
