@@ -74,7 +74,7 @@ type NavigationGroupItem = {
 
 type NavigationItem = NavigationLeafItem | NavigationGroupItem;
 
-export function TenantLayout({ children, fullWidth = false }: TenantLayoutProps) {
+export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) {
   const pathname = usePathname();
   const params = useParams();
   const router = useRouter();
