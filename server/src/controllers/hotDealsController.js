@@ -554,12 +554,10 @@ const getActiveHotDeals = async (req, res) => {
     try {
         const now = new Date();
 
-        const deals = await db.HotDeal.findAll({
+        const allDeals = await db.HotDeal.findAll({
             where: {
                 status: { [Op.in]: ['pending', 'active'] },
-                isActive: true,
-                validFrom: { [Op.lte]: now },
-                validUntil: { [Op.gte]: now }
+                isActive: true
             },
             include: [
                 {
@@ -577,9 +575,52 @@ const getActiveHotDeals = async (req, res) => {
             limit: 20
         });
 
+        const visibilityChecks = allDeals.map((deal) => {
+            const serialized = serializeHotDeal(deal);
+            const reasons = [];
+            const validFrom = serialized.validFrom ? new Date(serialized.validFrom) : null;
+            const validUntil = serialized.validUntil ? new Date(serialized.validUntil) : null;
+
+            if (!serialized.isActive) {
+                reasons.push('inactive');
+            }
+            if (!['pending', 'active'].includes(serialized.status)) {
+                reasons.push(`status:${serialized.status || 'unknown'}`);
+            }
+            if (validFrom && !Number.isNaN(validFrom.getTime()) && validFrom > now) {
+                reasons.push('not-yet-valid');
+            }
+            if (validUntil && !Number.isNaN(validUntil.getTime()) && validUntil < now) {
+                reasons.push('expired');
+            }
+
+            return {
+                ...serialized,
+                visible: reasons.length === 0,
+                reasons
+            };
+        });
+
+        const deals = visibilityChecks.filter((deal) => deal.visible);
+
+        console.info('[hot-deals] public feed', JSON.stringify({
+            total: allDeals.length,
+            visible: deals.length,
+            deals: visibilityChecks.map((deal) => ({
+                id: deal.id,
+                title: deal.title_en || deal.title_ar || 'Untitled',
+                status: deal.status,
+                isActive: deal.isActive,
+                validFrom: deal.validFrom,
+                validUntil: deal.validUntil,
+                visible: deal.visible,
+                reasons: deal.reasons
+            }))
+        }));
+
         res.json({
             success: true,
-            deals: deals.map(serializeHotDeal)
+            deals: deals.map(({ visible, reasons, ...deal }) => deal)
         });
     } catch (error) {
         console.error('Get active hot deals error:', error);
