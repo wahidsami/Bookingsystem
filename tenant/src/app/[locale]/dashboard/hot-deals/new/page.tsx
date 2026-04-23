@@ -16,6 +16,7 @@ export default function NewHotDealPage() {
     const [loading, setLoading] = useState(false);
     const [services, setServices] = useState<any[]>([]);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [dateRangeError, setDateRangeError] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -31,6 +32,28 @@ export default function NewHotDealPage() {
         maxRedemptions: '50'
     });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    const isInvalidDateRange = Boolean(
+        formData.validFrom &&
+        formData.validUntil &&
+        formData.validUntil <= formData.validFrom
+    );
+
+    const handleDateChange = (field: 'validFrom' | 'validUntil', value: string) => {
+        setFormData((current) => ({ ...current, [field]: value }));
+
+        const nextValidFrom = field === 'validFrom' ? value : formData.validFrom;
+        const nextValidUntil = field === 'validUntil' ? value : formData.validUntil;
+
+        if (nextValidFrom && nextValidUntil && nextValidUntil <= nextValidFrom) {
+            setDateRangeError(isRTL
+                ? 'يجب أن يكون تاريخ الانتهاء بعد تاريخ البداية.'
+                : 'The end date must be after the start date.');
+            return;
+        }
+
+        setDateRangeError('');
+    };
 
     useEffect(() => {
         fetchServices();
@@ -67,6 +90,14 @@ export default function NewHotDealPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (isInvalidDateRange) {
+            setDateRangeError(isRTL
+                ? 'يجب أن يكون تاريخ الانتهاء بعد تاريخ البداية.'
+                : 'The end date must be after the start date.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -290,8 +321,10 @@ export default function NewHotDealPage() {
                                     type="date"
                                     required
                                     value={formData.validFrom}
-                                    onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow [color-scheme:dark]"
+                                    onChange={(e) => handleDateChange('validFrom', e.target.value)}
+                                    className={`w-full px-4 py-3 bg-dark-900 border rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow [color-scheme:dark] ${
+                                        isInvalidDateRange ? 'border-red-500' : 'border-dark-600'
+                                    }`}
                                 />
                             </div>
                             <div>
@@ -302,10 +335,17 @@ export default function NewHotDealPage() {
                                     type="date"
                                     required
                                     value={formData.validUntil}
-                                    onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow [color-scheme:dark]"
+                                    onChange={(e) => handleDateChange('validUntil', e.target.value)}
+                                    className={`w-full px-4 py-3 bg-dark-900 border rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow [color-scheme:dark] ${
+                                        isInvalidDateRange ? 'border-red-500' : 'border-dark-600'
+                                    }`}
                                 />
                             </div>
+                            {dateRangeError && (
+                                <p className="md:col-span-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+                                    {dateRangeError}
+                                </p>
+                            )}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-dark-300 mb-2">
                                     {t('form.maxRedemptions')}
@@ -335,7 +375,7 @@ export default function NewHotDealPage() {
                         </button>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || isInvalidDateRange}
                             className="flex-1 px-8 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-purple-900/20"
                         >
                             {loading ? t('form.creating') : t('form.createBtn')}
