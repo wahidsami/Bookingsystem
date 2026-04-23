@@ -520,7 +520,11 @@ exports.getCustomer = async (req, res) => {
                 status: a.status,
                 price: a.price,
                 paymentStatus: a.paymentStatus,
-                notes: a.notes
+                paymentMethod: a.paymentMethod,
+                notes: a.notes,
+                bookingReference: a.bookingReference || null,
+                serviceVariantName: a.serviceVariantName || null,
+                serviceVariantDuration: a.serviceVariantDuration || null
             })),
             // All orders (complete history)
             allOrders: orders.map(o => ({
@@ -542,9 +546,14 @@ exports.getCustomer = async (req, res) => {
                 service: a.service,
                 staff: a.staff,
                 date: a.startTime,
+                endTime: a.endTime,
                 status: a.status,
                 price: a.price,
-                paymentStatus: a.paymentStatus
+                paymentStatus: a.paymentStatus,
+                paymentMethod: a.paymentMethod,
+                bookingReference: a.bookingReference || null,
+                serviceVariantName: a.serviceVariantName || null,
+                serviceVariantDuration: a.serviceVariantDuration || null
             })),
             recentOrders: orders.slice(0, 10).map(o => ({
                 id: o.id,

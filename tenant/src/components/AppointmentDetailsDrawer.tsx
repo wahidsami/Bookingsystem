@@ -12,8 +12,8 @@ export interface AppointmentItem {
   bookingReference?: string | null;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
-  paymentStatus: 'pending' | 'deposit_paid' | 'fully_paid' | 'paid' | 'refunded' | 'partially_refunded';
+  status: "pending" | "confirmed" | "checked_in" | "in_service" | "completed" | "cancelled" | "no_show";
+  paymentStatus: "pending" | "deposit_paid" | "fully_paid" | "paid" | "refunded" | "partially_refunded";
   paymentMethod?: string | null;
   price: number;
   rawPrice?: number;
@@ -50,6 +50,50 @@ export interface AppointmentItem {
   createdAt?: string;
 }
 
+interface CustomerAppointmentHistoryItem {
+  id: string;
+  service?: {
+    id?: string;
+    name_en?: string;
+    name_ar?: string;
+  };
+  staff?: {
+    id?: string;
+    name?: string;
+    photo?: string | null;
+  };
+  date: string;
+  endTime?: string | null;
+  status: AppointmentItem["status"];
+  paymentStatus: AppointmentItem["paymentStatus"];
+  paymentMethod?: string | null;
+  price?: number;
+  notes?: string;
+  bookingReference?: string | null;
+  serviceVariantName?: string | null;
+  serviceVariantDuration?: number | null;
+}
+
+interface CustomerOrderHistoryItem {
+  id: string;
+  orderNumber?: string;
+  items?: Array<{
+    id?: string;
+    quantity?: number;
+    productName?: string;
+    productNameAr?: string;
+    productImage?: string | null;
+  }>;
+  status: string;
+  paymentStatus: string;
+  totalAmount?: number;
+  deliveryType?: string | null;
+  shippingAddress?: string | null;
+  trackingNumber?: string | null;
+  date: string;
+  expectedDeliveryDate?: string | null;
+}
+
 interface CustomerProfile {
   id: string;
   firstName: string;
@@ -58,11 +102,32 @@ interface CustomerProfile {
   phone: string;
   profileImage?: string | null;
   gender?: string | null;
+  dateOfBirth?: string | null;
+  preferredLanguage?: string;
+  joinedAt?: string;
   totalBookings?: number;
+  totalOrders?: number;
+  completedBookings?: number;
   totalSpent?: number;
+  averageBookingValue?: number;
   firstVisit?: string | null;
   lastVisit?: string | null;
+  noShowCount?: number;
+  cancellationCount?: number;
+  favoriteServices?: { name: string; count: number }[];
+  favoriteProducts?: { name: string; count: number }[];
+  preferredStaff?: { name: string; count: number }[];
+  preferredTime?: string;
+  preferredDeliveryType?: string;
+  loyaltyTier?: string;
+  loyaltyPoints?: number;
+  tags?: string[];
   notes?: string;
+  customerType?: "service_only" | "product_only" | "both";
+  allAppointments?: CustomerAppointmentHistoryItem[];
+  allOrders?: CustomerOrderHistoryItem[];
+  recentAppointments?: CustomerAppointmentHistoryItem[];
+  recentOrders?: CustomerOrderHistoryItem[];
 }
 
 interface AppointmentDetailsDrawerProps {
@@ -143,13 +208,15 @@ export function AppointmentDetailsDrawer({
   const [appointment, setAppointment] = useState<AppointmentItem | null>(null);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
-  const [customerExpanded, setCustomerExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
+  const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
 
   useEffect(() => {
     if (!open || !appointmentId) {
       setAppointment(null);
       setCustomerProfile(null);
-      setCustomerExpanded(false);
+      setViewMode("appointment");
+      setCustomerTab("overview");
       setError("");
       setLoading(false);
       return;
@@ -190,7 +257,7 @@ export function AppointmentDetailsDrawer({
   }, [open, appointmentId, locale]);
 
   useEffect(() => {
-    if (!open || !appointment?.user?.id || !customerExpanded) {
+    if (!open || viewMode !== "customer" || !appointment?.user?.id) {
       return;
     }
 
@@ -223,12 +290,60 @@ export function AppointmentDetailsDrawer({
     return () => {
       cancelled = true;
     };
-  }, [open, appointment, customerExpanded, customerProfile?.id]);
+  }, [open, appointment?.user?.id, viewMode, customerProfile?.id]);
 
   const serviceName = useMemo(() => {
     if (!appointment) return "";
     return locale === "ar" ? appointment.service.name_ar : appointment.service.name_en;
   }, [appointment, locale]);
+
+  const customerFullName = useMemo(() => {
+    if (!customerProfile) return "";
+    return `${customerProfile.firstName} ${customerProfile.lastName}`.trim();
+  }, [customerProfile]);
+
+  const customerAppointments = useMemo(() => {
+    return customerProfile?.allAppointments || customerProfile?.recentAppointments || [];
+  }, [customerProfile]);
+
+  const customerOrders = useMemo(() => {
+    return customerProfile?.allOrders || customerProfile?.recentOrders || [];
+  }, [customerProfile]);
+
+  const customerTransactions = useMemo(() => {
+    const appointmentTransactions = customerAppointments.map((item) => ({
+      key: `appointment-${item.id}`,
+      kind: "appointment" as const,
+      title: locale === "ar"
+        ? item.service?.name_ar || item.service?.name_en || item.bookingReference || item.id
+        : item.service?.name_en || item.service?.name_ar || item.bookingReference || item.id,
+      subtitle: item.staff?.name || "",
+      date: item.date,
+      amount: Number(item.price || 0),
+      status: item.paymentStatus,
+      paymentMethod: item.paymentMethod || null,
+      label: locale === "ar" ? "حجز خدمة" : "Service booking"
+    }));
+
+    const orderTransactions = customerOrders.map((item) => ({
+      key: `order-${item.id}`,
+      kind: "order" as const,
+      title: `${locale === "ar" ? "طلب" : "Order"} #${item.orderNumber || item.id.slice(0, 8)}`,
+      subtitle: item.items?.[0]
+        ? (locale === "ar"
+          ? item.items[0].productNameAr || item.items[0].productName || ""
+          : item.items[0].productName || item.items[0].productNameAr || "")
+        : "",
+      date: item.date,
+      amount: Number(item.totalAmount || 0),
+      status: item.paymentStatus,
+      paymentMethod: item.deliveryType || null,
+      label: locale === "ar" ? "عملية شراء" : "Purchase"
+    }));
+
+    return [...appointmentTransactions, ...orderTransactions]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [customerAppointments, customerOrders, locale]);
 
   const handleReschedule = () => {
     if (!appointment) return;
@@ -245,22 +360,199 @@ export function AppointmentDetailsDrawer({
     return null;
   }
 
+  const renderOverview = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
+          </p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
+          </p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">
+            <Currency amount={Number(customerProfile?.totalSpent || 0)} />
+          </p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "أول زيارة" : "First visit"}
+          </p>
+          <p className="mt-2 text-sm font-semibold text-gray-900">
+            {customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "آخر زيارة" : "Last visit"}
+          </p>
+          <p className="mt-2 text-sm font-semibold text-gray-900">
+            {customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "البريد الإلكتروني" : "Email"}
+          </p>
+          <p className="mt-2 break-all text-sm font-semibold text-gray-900">{customerProfile?.email || "-"}</p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "الهاتف" : "Phone"}
+          </p>
+          <p className="mt-2 text-sm font-semibold text-gray-900">{customerProfile?.phone || "-"}</p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "النوع" : "Gender"}
+          </p>
+          <p className="mt-2 text-sm font-semibold capitalize text-gray-900">{customerProfile?.gender || "-"}</p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "اللغة المفضلة" : "Preferred language"}
+          </p>
+          <p className="mt-2 text-sm font-semibold capitalize text-gray-900">{customerProfile?.preferredLanguage || "-"}</p>
+        </div>
+      </div>
+
+      {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
+        <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "ملاحظات" : "Notes"}
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+            {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
+          </p>
+          {customerProfile?.tags && customerProfile.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {customerProfile.tags.map((tag) => (
+                <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderAppointments = () => (
+    <div className="space-y-3">
+      {customerAppointments.length > 0 ? customerAppointments.map((item) => (
+        <div key={item.id} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  {locale === "ar" ? "موعد" : "Appointment"}
+                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {getStatusLabel(item.status, locale)}
+                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {getPaymentStatusLabel(item.paymentStatus, locale)}
+                </span>
+              </div>
+              <h5 className="text-base font-bold text-gray-900">
+                {locale === "ar"
+                  ? item.service?.name_ar || item.service?.name_en || "-"
+                  : item.service?.name_en || item.service?.name_ar || "-"}
+              </h5>
+              <p className="text-sm text-gray-500">
+                {formatDateTime(item.date, locale)}
+                {item.endTime ? ` → ${formatDateTime(item.endTime, locale)}` : ""}
+              </p>
+              <p className="text-sm text-gray-600">{item.staff?.name || "-"}</p>
+              {item.serviceVariantName && (
+                <p className="text-sm text-gray-600">
+                  {locale === "ar" ? "النوع" : "Variant"}: {item.serviceVariantName}
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              <Currency amount={Number(item.price || 0)} className="text-lg font-bold text-gray-900" />
+            </div>
+          </div>
+        </div>
+      )) : (
+        <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+          {locale === "ar" ? "لا توجد مواعيد متاحة." : "No appointments available."}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderTransactions = () => (
+    <div className="space-y-3">
+      {customerTransactions.length > 0 ? customerTransactions.map((item) => (
+        <div key={item.key} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {item.label}
+                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {item.kind === "appointment"
+                    ? (locale === "ar" ? "حجز خدمة" : "Service")
+                    : (locale === "ar" ? "طلب" : "Order")}
+                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {getPaymentStatusLabel(item.status, locale)}
+                </span>
+              </div>
+              <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
+              {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
+              <p className="text-sm text-gray-500">{formatDateTime(item.date, locale)}</p>
+              {item.paymentMethod && (
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الطريقة" : "Method"}: {item.paymentMethod}
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
+            </div>
+          </div>
+        </div>
+      )) : (
+        <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+          {locale === "ar" ? "لا توجد معاملات متاحة." : "No transactions available."}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[65]">
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[38rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[56rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                {locale === "ar" ? "تفاصيل الموعد" : "Appointment Details"}
+                {viewMode === "customer"
+                  ? (locale === "ar" ? "مساحة العميل" : "Customer workspace")
+                  : (locale === "ar" ? "تفاصيل الموعد" : "Appointment Details")}
               </p>
               <h3 className="mt-1 text-xl font-bold text-gray-900">
-                {appointment ? `${serviceName}` : (locale === "ar" ? "جارٍ التحميل..." : "Loading...")}
+                {loading
+                  ? (locale === "ar" ? "جارٍ التحميل..." : "Loading...")
+                  : viewMode === "customer"
+                    ? (customerFullName || serviceName)
+                    : serviceName}
               </h3>
               {appointment && (
                 <p className="mt-1 text-sm text-gray-500">
@@ -292,188 +584,200 @@ export function AppointmentDetailsDrawer({
               </div>
             ) : appointment ? (
               <div className="space-y-4">
-                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                      {getStatusLabel(appointment.status, locale)}
-                    </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                      {getPaymentStatusLabel(appointment.paymentStatus, locale)}
-                    </span>
-                  </div>
+                {viewMode === "appointment" ? (
+                  <>
+                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                          {getStatusLabel(appointment.status, locale)}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                          {getPaymentStatusLabel(appointment.paymentStatus, locale)}
+                        </span>
+                      </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                        {locale === "ar" ? "الوقت" : "Time"}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
-                        {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
-                      </p>
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "الوقت" : "Time"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">
+                            {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "الخدمة" : "Service"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">{serviceName}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "الموظف" : "Employee"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.staff.name}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "السعر" : "Price"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">
+                            <Currency amount={Number(appointment.price || 0)} />
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                        {locale === "ar" ? "الخدمة" : "Service"}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{serviceName}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                        {locale === "ar" ? "الموظف" : "Employee"}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.staff.name}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                        {locale === "ar" ? "السعر" : "Price"}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
-                        <Currency amount={Number(appointment.price || 0)} />
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
-                {appointment.user ? (
-                  <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => setCustomerExpanded((current) => !current)}
-                      className={`flex w-full items-center justify-between gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-gray-50 ${isRTL ? "flex-row-reverse text-right" : ""}`}
-                    >
-                      <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
-                          {(appointment.user.photo || appointment.user.profileImage) ? (
+                    {appointment.user ? (
+                      <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                          <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
+                              {(appointment.user.photo || appointment.user.profileImage) ? (
+                                <img
+                                  src={avatarUrl(appointment.user.photo || appointment.user.profileImage || undefined)}
+                                  alt={`${appointment.user.firstName} ${appointment.user.lastName}`}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                `${appointment.user.firstName?.[0] || ""}${appointment.user.lastName?.[0] || ""}`.toUpperCase() || "?"
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {appointment.user.firstName} {appointment.user.lastName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {locale === "ar" ? "عرض بيانات العميل في نفس اللوحة" : "View customer data in this drawer"}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomerTab("overview");
+                              setViewMode("customer");
+                            }}
+                            className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90"
+                          >
+                            {locale === "ar" ? "فتح الملف" : "Open profile"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {appointment.notes && (
+                      <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                          {locale === "ar" ? "ملاحظات" : "Notes"}
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{appointment.notes}</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={handleRebook}
+                        className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                      >
+                        {locale === "ar" ? "إعادة الحجز" : "Rebook"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleReschedule}
+                        className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                      >
+                        {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
+                        </p>
+                        <Link
+                          href={`/${locale}/dashboard/appointments/${appointment.id}`}
+                          className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100"
+                          onClick={onClose}
+                        >
+                          {locale === "ar" ? "عرض" : "View"}
+                        </Link>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                      <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode("appointment")}
+                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                        >
+                          {locale === "ar" ? "رجوع" : "Back"}
+                        </button>
+                        <div className={`${isRTL ? "text-right" : "text-left"}`}>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                            {locale === "ar" ? "مساحة العميل" : "Customer workspace"}
+                          </p>
+                          <h4 className="mt-1 text-lg font-bold text-gray-900">{customerFullName}</h4>
+                        </div>
+                        <div className="h-12 w-12 overflow-hidden rounded-full bg-primary/10 ring-1 ring-gray-200">
+                          {customerProfile?.profileImage ? (
                             <img
-                              src={avatarUrl(appointment.user.photo || appointment.user.profileImage || undefined)}
-                              alt={`${appointment.user.firstName} ${appointment.user.lastName}`}
+                              src={avatarUrl(customerProfile.profileImage)}
+                              alt={customerFullName}
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            `${appointment.user.firstName?.[0] || ""}${appointment.user.lastName?.[0] || ""}`.toUpperCase() || "?"
+                            <div className="flex h-full w-full items-center justify-center text-sm font-bold text-primary">
+                              {(customerProfile?.firstName?.[0] || "")}{(customerProfile?.lastName?.[0] || "")}
+                            </div>
                           )}
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {appointment.user.firstName} {appointment.user.lastName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {locale === "ar" ? "اضغط لعرض بيانات العميل" : "Tap to view customer data"}
-                          </p>
-                        </div>
                       </div>
-                      <svg
-                        className={`h-5 w-5 text-gray-400 transition ${customerExpanded ? "rotate-180" : ""}`}
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.18l3.71-3.95a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                      </svg>
-                    </button>
 
-                    {customerExpanded && (
-                      <div className="mt-4 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
-                        {customerLoading ? (
-                          <div className="text-sm text-gray-500">
-                            {locale === "ar" ? "جارٍ تحميل بيانات العميل..." : "Loading customer data..."}
-                          </div>
-                        ) : customerProfile ? (
-                          <div className="space-y-3">
-                            <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                  {locale === "ar" ? "ملف العميل" : "Customer profile"}
-                                </p>
-                                <p className="mt-1 text-sm font-semibold text-gray-900">
-                                  {customerProfile.firstName} {customerProfile.lastName}
-                                </p>
-                              </div>
-                              <Link
-                                href={`/${locale}/dashboard/customers/${customerProfile.id}`}
-                                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90"
-                              >
-                                {locale === "ar" ? "فتح الملف" : "Open profile"}
-                              </Link>
-                            </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {(["overview", "appointments", "transactions"] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setCustomerTab(tab)}
+                            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                              customerTab === tab
+                                ? "bg-primary text-white"
+                                : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                            }`}
+                          >
+                            {tab === "overview"
+                              ? (locale === "ar" ? "نظرة عامة" : "Overview")
+                              : tab === "appointments"
+                                ? (locale === "ar" ? "المواعيد" : "Appointments")
+                                : (locale === "ar" ? "المدفوعات" : "Transactions")}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                  {locale === "ar" ? "البريد" : "Email"}
-                                </p>
-                                <p className="mt-1 break-all text-sm text-gray-900">{customerProfile.email}</p>
-                              </div>
-                              <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                  {locale === "ar" ? "الهاتف" : "Phone"}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-900">{customerProfile.phone}</p>
-                              </div>
-                              <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                  {locale === "ar" ? "النوع" : "Gender"}
-                                </p>
-                                <p className="mt-1 text-sm capitalize text-gray-900">{customerProfile.gender || "-"}</p>
-                              </div>
-                              <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                  {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-900">{customerProfile.totalBookings ?? 0}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500">
-                            {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
-                          </div>
-                        )}
+                    {customerLoading ? (
+                      <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
+                        <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+                      </div>
+                    ) : customerProfile ? (
+                      <>
+                        {customerTab === "overview" && renderOverview()}
+                        {customerTab === "appointments" && renderAppointments()}
+                        {customerTab === "transactions" && renderTransactions()}
+                      </>
+                    ) : (
+                      <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                        {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
                       </div>
                     )}
-                  </div>
-                ) : null}
-
-                {appointment.notes && (
-                  <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "ملاحظات" : "Notes"}
-                    </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{appointment.notes}</p>
-                  </div>
+                  </>
                 )}
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={handleRebook}
-                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-                  >
-                    {locale === "ar" ? "إعادة الحجز" : "Rebook"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReschedule}
-                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
-                  </button>
-                </div>
-
-                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
-                    </p>
-                    <Link
-                      href={`/${locale}/dashboard/appointments/${appointment.id}`}
-                      className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100"
-                      onClick={onClose}
-                    >
-                      {locale === "ar" ? "عرض" : "View"}
-                    </Link>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
