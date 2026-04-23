@@ -1586,6 +1586,10 @@ class TenantApiClient {
     return this.put('/tenant/settings/localization', data);
   }
 
+  async updateDashboardSettings(data: any): Promise<any> {
+    return this.put('/tenant/settings/dashboard', data);
+  }
+
   async updateAppearanceSettings(data: any): Promise<any> {
     return this.put('/tenant/settings/appearance', data);
   }

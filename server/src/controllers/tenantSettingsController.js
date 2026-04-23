@@ -13,6 +13,14 @@ const {
     validateTenantPaymentSettings
 } = require('../utils/tenantPaymentSettings');
 
+const DASHBOARD_LANDING_PAGES = new Set(['home', 'appointments', 'pos']);
+
+const normalizeDashboardSettings = (value = {}) => ({
+    defaultLandingPage: DASHBOARD_LANDING_PAGES.has(value?.defaultLandingPage)
+        ? value.defaultLandingPage
+        : 'home'
+});
+
 /**
  * Get subscription limits and current usage for the tenant.
  */
@@ -116,7 +124,8 @@ exports.getSettings = async (req, res) => {
                 enableWhatsAppNotifications: false,
                 enableVoiceAlerts: true,
                 defaultLanguage: 'ar',
-                supportedLanguages: ['ar', 'en']
+                supportedLanguages: ['ar', 'en'],
+                dashboardSettings: normalizeDashboardSettings()
             }
         });
 
@@ -125,6 +134,7 @@ exports.getSettings = async (req, res) => {
             acceptCard: settings.acceptCard,
             acceptWallet: settings.acceptWallet
         });
+        const normalizedDashboardSettings = normalizeDashboardSettings(settings.dashboardSettings);
 
         res.json({
             success: true,
@@ -133,6 +143,7 @@ exports.getSettings = async (req, res) => {
                 settings: {
                     ...settings.toJSON(),
                     paymentSettings: normalizedPaymentSettings,
+                    dashboardSettings: normalizedDashboardSettings,
                     defaultDeliveryFee: normalizedPaymentSettings.defaultDeliveryFee
                 }
             }
@@ -485,6 +496,56 @@ exports.updateLocalizationSettings = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to update localization settings',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Update dashboard settings
+ */
+exports.updateDashboardSettings = async (req, res) => {
+    try {
+        const tenantId = req.tenant.id;
+        const incomingSettings = req.body?.dashboardSettings || req.body || {};
+
+        if (incomingSettings.defaultLandingPage !== undefined && !DASHBOARD_LANDING_PAGES.has(incomingSettings.defaultLandingPage)) {
+            return res.status(400).json({
+                success: false,
+                message: 'defaultLandingPage must be one of: home, appointments, pos'
+            });
+        }
+
+        const [settings] = await db.TenantSettings.findOrCreate({
+            where: { tenantId },
+            defaults: {
+                tenantId,
+                dashboardSettings: normalizeDashboardSettings()
+            }
+        });
+
+        const dashboardSettings = normalizeDashboardSettings({
+            ...(settings.dashboardSettings || {}),
+            ...incomingSettings
+        });
+
+        await settings.update({
+            dashboardSettings
+        });
+
+        res.json({
+            success: true,
+            message: 'Dashboard settings updated',
+            data: {
+                ...settings.toJSON(),
+                dashboardSettings
+            }
+        });
+    } catch (error) {
+        console.error('Update dashboard settings error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update dashboard settings',
             error: error.message
         });
     }

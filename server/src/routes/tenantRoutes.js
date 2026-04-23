@@ -205,6 +205,7 @@ router.put('/settings/booking', tenantSettingsController.updateBookingSettings);
 router.put('/settings/notifications', tenantSettingsController.updateNotificationSettings);
 router.put('/settings/payment', tenantSettingsController.updatePaymentSettings);
 router.put('/settings/localization', tenantSettingsController.updateLocalizationSettings);
+router.put('/settings/dashboard', tenantSettingsController.updateDashboardSettings);
 router.put('/settings/appearance', tenantSettingsController.updateAppearanceSettings);
 router.post('/settings/logo', settingsUpload.single('logo'), tenantSettingsController.uploadLogo);
 router.post('/settings/cover', settingsUpload.single('coverImage'), tenantSettingsController.uploadCoverImage);

@@ -450,7 +450,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     const billingVisible = billingChildren.some((child) => child.visible !== false && canAccessPermission(child.permissionKey));
 
     return [
-      { kind: "link", name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
+      { kind: "link", name: t("dashboard"), href: `/${locale}/dashboard?view=home`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
       {
         kind: "group",
         key: "catalog",
@@ -526,10 +526,12 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   }, [canAccessPermission, entitlements, entitlementsLoadFailed, entitlementsLoaded, locale, navigationItems, pathname, router]);
 
   const isActive = (href: string) => {
-    if (href === `/${locale}/dashboard`) {
+    const normalizedHref = href.split("?")[0];
+
+    if (normalizedHref === `/${locale}/dashboard`) {
       return pathname === `/${locale}/dashboard`;
     }
-    return pathname?.startsWith(href);
+    return pathname?.startsWith(normalizedHref);
   };
 
   const findActiveNavigationItem = (items: NavigationItem[]): NavigationLeafItem | NavigationGroupItem | undefined => {

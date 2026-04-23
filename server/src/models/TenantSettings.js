@@ -182,6 +182,13 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.JSON,
             defaultValue: ['ar', 'en'],
             comment: 'Supported languages'
+        },
+        dashboardSettings: {
+            type: DataTypes.JSONB,
+            defaultValue: {
+                defaultLandingPage: 'home'
+            },
+            comment: 'Tenant dashboard preferences such as default landing page'
         }
     }, {
         sequelize,

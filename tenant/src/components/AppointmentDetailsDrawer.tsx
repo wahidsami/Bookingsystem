@@ -100,7 +100,7 @@ interface CustomerOrderHistoryItem {
 
 interface CustomerTransactionRecord {
   id: string;
-  source: 'transaction' | 'ledger';
+  source: 'transaction' | 'ledger' | 'appointment';
   entityType: 'appointment' | 'order';
   entityId: string | null;
   reference: string;
@@ -806,7 +806,11 @@ export function AppointmentDetailsDrawer({
                         <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                              {item.source === "ledger" ? (locale === "ar" ? "سجل الدفع" : "Ledger") : (locale === "ar" ? "عملية مالية" : "Transaction")}
+                              {item.source === "ledger"
+                                ? (locale === "ar" ? "سجل الدفع" : "Ledger")
+                                : item.source === "appointment"
+                                  ? (locale === "ar" ? "مدفوع من الموعد" : "Appointment payment")
+                                  : (locale === "ar" ? "عملية مالية" : "Transaction")}
                             </span>
                             <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
                               {getTransactionTypeLabel(item.entityType, locale)}

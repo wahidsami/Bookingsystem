@@ -1040,7 +1040,7 @@ exports.getCustomerTransactions = async (req, res) => {
                         attributes: ['id', 'name', 'photo']
                     }
                 ],
-                attributes: ['id', 'bookingNumber', 'paymentMethod', 'startTime', 'endTime', 'price', 'status', 'paymentStatus', 'notes'],
+                attributes: ['id', 'bookingNumber', 'paymentMethod', 'startTime', 'endTime', 'price', 'status', 'paymentStatus', 'depositAmount', 'remainderAmount', 'totalPaid', 'notes'],
                 order: [['startTime', 'DESC']]
             }),
             db.Order.findAll({
@@ -1083,7 +1083,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     {
                         model: db.Appointment,
                         as: 'appointment',
-                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price'],
+                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price', 'depositAmount', 'remainderAmount', 'totalPaid'],
                         required: false,
                         include: [
                             {
@@ -1148,7 +1148,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     {
                         model: db.Appointment,
                         as: 'appointment',
-                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price'],
+                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price', 'depositAmount', 'remainderAmount', 'totalPaid'],
                         required: false,
                         include: [
                             {
@@ -1199,6 +1199,7 @@ exports.getCustomerTransactions = async (req, res) => {
 
         const transactions = [];
         const seenRecords = new Set();
+        const appointmentTransactionIds = new Set();
 
         gatewayTransactions.forEach((transaction) => {
             const entityType = transaction.appointment ? 'appointment' : 'order';
@@ -1210,6 +1211,9 @@ exports.getCustomerTransactions = async (req, res) => {
             }
 
             seenRecords.add(key);
+            if (transaction.appointment?.id) {
+                appointmentTransactionIds.add(transaction.appointment.id);
+            }
             transactions.push(mapCustomerTransactionRecord({
                 id: transaction.id,
                 source: 'transaction',
@@ -1245,6 +1249,9 @@ exports.getCustomerTransactions = async (req, res) => {
             }
 
             seenRecords.add(key);
+            if (transaction.appointment?.id) {
+                appointmentTransactionIds.add(transaction.appointment.id);
+            }
             transactions.push(mapCustomerTransactionRecord({
                 id: transaction.id,
                 source: 'ledger',
@@ -1267,6 +1274,60 @@ exports.getCustomerTransactions = async (req, res) => {
                     : transaction.order?.id
                         ? `/dashboard/orders/${transaction.order.id}`
                         : null
+            }, locale));
+        });
+
+        appointments.forEach((appointment) => {
+            const normalizedPaymentStatus = (appointment.paymentStatus || '').toLowerCase();
+            const isPaidAppointment = ['deposit_paid', 'fully_paid', 'paid', 'refunded', 'partially_refunded'].includes(normalizedPaymentStatus);
+
+            if (!isPaidAppointment || appointmentTransactionIds.has(appointment.id)) {
+                return;
+            }
+
+            const paidAmount = Number(
+                appointment.totalPaid ??
+                (normalizedPaymentStatus === 'deposit_paid' ? appointment.depositAmount : null) ??
+                appointment.price ??
+                0
+            );
+
+            if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+                return;
+            }
+
+            const syntheticStatus = normalizedPaymentStatus === 'refunded' || normalizedPaymentStatus === 'partially_refunded'
+                ? normalizedPaymentStatus
+                : 'completed';
+            const syntheticType = normalizedPaymentStatus === 'refunded' || normalizedPaymentStatus === 'partially_refunded'
+                ? 'refund'
+                : 'payment';
+
+            const syntheticRecordKey = `appointment-derived:${appointment.id}:${syntheticType}:${paidAmount}:${syntheticStatus}`;
+            if (seenRecords.has(syntheticRecordKey)) {
+                return;
+            }
+
+            seenRecords.add(syntheticRecordKey);
+            transactions.push(mapCustomerTransactionRecord({
+                id: `appointment-derived-${appointment.id}`,
+                source: 'appointment',
+                kind: 'appointment',
+                entityId: appointment.id,
+                appointment,
+                reference: appointment.bookingNumber || appointment.id,
+                amount: paidAmount,
+                currency: 'SAR',
+                type: syntheticType,
+                status: syntheticStatus,
+                paymentMethod: appointment.paymentMethod || null,
+                transactionRef: appointment.bookingNumber || null,
+                notes: locale === 'ar'
+                    ? 'مستخرج من حالة الدفع الخاصة بالموعد'
+                    : 'Derived from appointment payment status',
+                processedAt: appointment.endTime || appointment.startTime,
+                processor: null,
+                detailPath: `/dashboard/appointments/${appointment.id}`
             }, locale));
         });
 
