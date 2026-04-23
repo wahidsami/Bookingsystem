@@ -68,6 +68,10 @@ interface CustomerAppointmentHistoryItem {
   paymentStatus: AppointmentItem["paymentStatus"];
   paymentMethod?: string | null;
   price?: number;
+  depositAmount?: number | null;
+  remainderAmount?: number | null;
+  totalPaid?: number | null;
+  outstandingAmount?: number | null;
   notes?: string;
   bookingReference?: string | null;
   serviceVariantName?: string | null;
@@ -460,6 +464,30 @@ export function AppointmentDetailsDrawer({
     return customerProfile?.allAppointments || customerProfile?.recentAppointments || [];
   }, [customerProfile]);
 
+  const paymentSnapshot = useMemo(() => {
+    const pendingAppointments = customerAppointments.filter((item) => {
+      const paymentStatus = item.paymentStatus;
+      return paymentStatus === "pending" || paymentStatus === "deposit_paid" || Number(item.outstandingAmount || 0) > 0;
+    });
+
+    const pendingOutstandingTotal = pendingAppointments.reduce((sum, item) => sum + Number(item.outstandingAmount || 0), 0);
+    const recordedPayments = customerTransactions.filter((item) => item.status === "completed" || item.status === "paid");
+    const refundTransactions = customerTransactions.filter((item) =>
+      item.type === "refund" || item.status === "refunded" || item.status === "partially_refunded"
+    );
+    const recordedPaymentsTotal = recordedPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const refundTotal = refundTransactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    return {
+      pendingAppointments,
+      pendingOutstandingTotal,
+      recordedPayments,
+      refundTransactions,
+      recordedPaymentsTotal,
+      refundTotal
+    };
+  }, [customerAppointments, customerTransactions]);
+
   const handleReschedule = () => {
     if (!appointment) return;
     onClose();
@@ -611,223 +639,281 @@ export function AppointmentDetailsDrawer({
         <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
           <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
         </div>
-      ) : customerTransactions.length > 0 ? (
+      ) : (
         <>
-          {customerTransactionsSummary && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "عدد العمليات" : "Transactions"}
-                </p>
-                <p className="mt-2 text-2xl font-bold text-gray-900">{customerTransactionsSummary.totalTransactions}</p>
-              </div>
-              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "مدفوع" : "Completed"}
-                </p>
-                <p className="mt-2 text-2xl font-bold text-gray-900">
-                  <Currency amount={customerTransactionsSummary.completedTotal} />
-                </p>
-              </div>
-              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "مسترد" : "Refunded"}
-                </p>
-                <p className="mt-2 text-2xl font-bold text-gray-900">
-                  <Currency amount={customerTransactionsSummary.refundedTotal} />
-                </p>
-              </div>
-              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الصافي" : "Net"}
-                </p>
-                <p className="mt-2 text-2xl font-bold text-gray-900">
-                  <Currency amount={customerTransactionsSummary.netTotal} />
-                </p>
-              </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "مواعيد بانتظار الدفع" : "Pending appointments"}
+              </p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{paymentSnapshot.pendingAppointments.length}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                <Currency amount={paymentSnapshot.pendingOutstandingTotal} />
+              </p>
             </div>
-          )}
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "تصفية المعاملات" : "Transaction filters"}
-                </p>
-                <p className="mt-1 text-sm text-gray-500">
-                  {locale === "ar" ? "فلترة حسب النوع والحالة." : "Filter by type and status."}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  { key: "all", label: locale === "ar" ? "الكل" : "All" },
-                  { key: "appointment", label: locale === "ar" ? "المواعيد" : "Appointments" },
-                  { key: "order", label: locale === "ar" ? "الطلبات" : "Orders" },
-                  { key: "ledger", label: locale === "ar" ? "السجل" : "Ledger" }
-                ] as const).map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    onClick={() => setTransactionTypeFilter(chip.key)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      transactionTypeFilter === chip.key
-                        ? "bg-primary text-white shadow-sm"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "مدفوعات مسجلة" : "Recorded payments"}
+              </p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{paymentSnapshot.recordedPayments.length}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                <Currency amount={paymentSnapshot.recordedPaymentsTotal} />
+              </p>
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {([
-                { key: "all", label: locale === "ar" ? "كل الحالات" : "All statuses" },
-                { key: "completed", label: locale === "ar" ? "مكتمل" : "Completed" },
-                { key: "pending", label: locale === "ar" ? "قيد الانتظار" : "Pending" },
-                { key: "refunded", label: locale === "ar" ? "مسترد" : "Refunded" },
-                { key: "failed", label: locale === "ar" ? "فشل" : "Failed" },
-                { key: "cancelled", label: locale === "ar" ? "ملغي" : "Cancelled" }
-              ] as const).map((chip) => (
-                <button
-                  key={chip.key}
-                  type="button"
-                  onClick={() => setTransactionStatusFilter(chip.key)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    transactionStatusFilter === chip.key
-                      ? "bg-gray-900 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              ))}
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "المبالغ المستردة" : "Refunds"}
+              </p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{paymentSnapshot.refundTransactions.length}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                <Currency amount={paymentSnapshot.refundTotal} />
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "الصافي المسجل" : "Net recorded"}
+              </p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                <Currency amount={Math.max(paymentSnapshot.recordedPaymentsTotal - paymentSnapshot.refundTotal, 0)} />
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {locale === "ar" ? "يشمل المدفوعات والاستردادات" : "Payments minus refunds"}
+              </p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            {filteredTransactions.length > 0 ? filteredTransactions.map((item) => {
-              const isExpanded = expandedTransactionId === item.id;
-              return (
-                <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedTransactionId(isExpanded ? null : item.id)}
-                    className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
-                  >
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                          {item.source === "ledger" ? (locale === "ar" ? "سجل الدفع" : "Ledger") : (locale === "ar" ? "عملية مالية" : "Transaction")}
-                        </span>
-                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                          {getTransactionTypeLabel(item.entityType, locale)}
-                        </span>
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getTransactionStatusTone(item.status)}`}>
-                          {getTransactionStatusLabel(item.status, locale)}
-                        </span>
-                      </div>
-                      <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
-                      {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
-                        <span>{formatDateTime(item.processedAt, locale)}</span>
-                        <span>{item.paymentMethodLabel}</span>
-                        {item.transactionRef && <span>{item.transactionRef}</span>}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
-                      <span className="text-xs font-semibold text-primary">
-                        {isExpanded ? (locale === "ar" ? "إخفاء التفاصيل" : "Hide details") : (locale === "ar" ? "إظهار التفاصيل" : "Details")}
+          {paymentSnapshot.pendingAppointments.length > 0 && (
+            <div className="rounded-3xl border border-amber-200 bg-amber-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                    {locale === "ar" ? "مواعيد معلقة" : "Pending appointments"}
+                  </p>
+                  <p className="mt-1 text-sm text-amber-900">
+                    {locale === "ar"
+                      ? "هذه المواعيد لم تُسدّد بعد أو ما زال عليها رصيد متبقٍ."
+                      : "These appointments are unpaid or still have an outstanding balance."}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                    {locale === "ar" ? "المتبقي" : "Outstanding"}
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-amber-950">
+                    <Currency amount={paymentSnapshot.pendingOutstandingTotal} />
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {paymentSnapshot.pendingAppointments.slice(0, 4).map((item) => (
+                  <div key={item.id} className="rounded-2xl border border-amber-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {item.service?.name_en || item.service?.name_ar || (locale === "ar" ? "خدمة" : "Service")}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">{formatDateTime(item.date, locale)}</p>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        {getPaymentStatusLabel(item.paymentStatus, locale)}
                       </span>
+                      <Currency amount={Number(item.outstandingAmount || item.price || 0)} className="text-sm font-bold text-gray-900" />
                     </div>
-                  </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  {isExpanded && (
-                    <div className="border-t border-gray-100 px-4 pb-4">
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        <div className="rounded-2xl bg-gray-50 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "المصدر" : "Source"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.source}</p>
-                        </div>
-                        <div className="rounded-2xl bg-gray-50 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "الطريقة" : "Method"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.paymentMethodLabel}</p>
-                        </div>
-                        <div className="rounded-2xl bg-gray-50 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "المعالج" : "Processor"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.processorName || "-"}</p>
-                        </div>
-                        <div className="rounded-2xl bg-gray-50 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "المرجع" : "Reference"}
-                          </p>
-                          <p className="mt-1 break-all text-sm font-semibold text-gray-900">{item.reference}</p>
-                        </div>
-                        <div className="rounded-2xl bg-gray-50 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "المعرف" : "Entity"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">
-                            {item.entityType}
-                            {item.entityId ? ` · ${item.entityId}` : ""}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-gray-50 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "النوع" : "Type"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.type}</p>
-                        </div>
-                      </div>
+          {customerTransactions.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+              {paymentSnapshot.pendingAppointments.length > 0
+                ? (locale === "ar"
+                  ? "لا توجد مدفوعات مسجلة بعد، لكن توجد مواعيد بانتظار الدفع."
+                  : "No payments have been recorded yet, but the customer still has appointments waiting for payment.")
+                : (locale === "ar"
+                  ? "لا توجد معاملات مسجلة لهذا العميل بعد."
+                  : "No recorded transactions yet for this customer.")}
+            </div>
+          ) : (
+            <>
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "تصفية المعاملات" : "Transaction filters"}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {locale === "ar" ? "فلترة حسب النوع والحالة." : "Filter by type and status."}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: "all", label: locale === "ar" ? "الكل" : "All" },
+                      { key: "appointment", label: locale === "ar" ? "المواعيد" : "Appointments" },
+                      { key: "order", label: locale === "ar" ? "الطلبات" : "Orders" },
+                      { key: "ledger", label: locale === "ar" ? "السجل" : "Ledger" }
+                    ] as const).map((chip) => (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => setTransactionTypeFilter(chip.key)}
+                        className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                          transactionTypeFilter === chip.key
+                            ? "bg-primary text-white shadow-sm"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                      {(item.notes || item.detailPath) && (
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-                          <div className="min-w-0">
-                            {item.notes ? (
-                              <>
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                  {locale === "ar" ? "ملاحظات" : "Notes"}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-700">{item.notes}</p>
-                              </>
-                            ) : (
-                              <p className="text-sm text-gray-500">
-                                {locale === "ar" ? "لا توجد ملاحظات إضافية." : "No extra notes."}
-                              </p>
-                            )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {([
+                    { key: "all", label: locale === "ar" ? "كل الحالات" : "All statuses" },
+                    { key: "completed", label: locale === "ar" ? "مكتمل" : "Completed" },
+                    { key: "pending", label: locale === "ar" ? "قيد الانتظار" : "Pending" },
+                    { key: "refunded", label: locale === "ar" ? "مسترد" : "Refunded" },
+                    { key: "failed", label: locale === "ar" ? "فشل" : "Failed" },
+                    { key: "cancelled", label: locale === "ar" ? "ملغي" : "Cancelled" }
+                  ] as const).map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => setTransactionStatusFilter(chip.key)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        transactionStatusFilter === chip.key
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredTransactions.length > 0 ? filteredTransactions.map((item) => {
+                  const isExpanded = expandedTransactionId === item.id;
+                  return (
+                    <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedTransactionId(isExpanded ? null : item.id)}
+                        className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
+                      >
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                              {item.source === "ledger" ? (locale === "ar" ? "سجل الدفع" : "Ledger") : (locale === "ar" ? "عملية مالية" : "Transaction")}
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                              {getTransactionTypeLabel(item.entityType, locale)}
+                            </span>
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getTransactionStatusTone(item.status)}`}>
+                              {getTransactionStatusLabel(item.status, locale)}
+                            </span>
                           </div>
-                          {item.detailPath && (
-                            <Link
-                              href={`/${locale}${item.detailPath}`}
-                              className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
-                            >
-                              {locale === "ar" ? "فتح السجل" : "Open record"}
-                            </Link>
+                          <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
+                          {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
+                            <span>{formatDateTime(item.processedAt, locale)}</span>
+                            <span>{item.paymentMethodLabel}</span>
+                            {item.transactionRef && <span>{item.transactionRef}</span>}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
+                          <span className="text-xs font-semibold text-primary">
+                            {isExpanded ? (locale === "ar" ? "إخفاء التفاصيل" : "Hide details") : (locale === "ar" ? "إظهار التفاصيل" : "Details")}
+                          </span>
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 px-4 pb-4">
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                {locale === "ar" ? "المصدر" : "Source"}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.source}</p>
+                            </div>
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                {locale === "ar" ? "الطريقة" : "Method"}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.paymentMethodLabel}</p>
+                            </div>
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                {locale === "ar" ? "المعالج" : "Processor"}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.processorName || "-"}</p>
+                            </div>
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                {locale === "ar" ? "المرجع" : "Reference"}
+                              </p>
+                              <p className="mt-1 break-all text-sm font-semibold text-gray-900">{item.reference}</p>
+                            </div>
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                {locale === "ar" ? "المعرف" : "Entity"}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-gray-900">
+                                {item.entityType}
+                                {item.entityId ? ` · ${item.entityId}` : ""}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                {locale === "ar" ? "النوع" : "Type"}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.type}</p>
+                            </div>
+                          </div>
+
+                          {(item.notes || item.detailPath) && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                              <div className="min-w-0">
+                                {item.notes ? (
+                                  <>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                      {locale === "ar" ? "ملاحظات" : "Notes"}
+                                    </p>
+                                    <p className="mt-1 text-sm text-gray-700">{item.notes}</p>
+                                  </>
+                                ) : (
+                                  <p className="text-sm text-gray-500">
+                                    {locale === "ar" ? "لا توجد ملاحظات إضافية." : "No extra notes."}
+                                  </p>
+                                )}
+                              </div>
+                              {item.detailPath && (
+                                <Link
+                                  href={`/${locale}${item.detailPath}`}
+                                  className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                                >
+                                  {locale === "ar" ? "فتح السجل" : "Open record"}
+                                </Link>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            }) : (
-              <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-                {locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}
+                  );
+                }) : (
+                  <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+                    {locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </>
-      ) : (
-        <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-          {locale === "ar" ? "لا توجد معاملات متاحة." : "No transactions available."}
-        </div>
       )}
     </div>
   );

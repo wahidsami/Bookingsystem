@@ -137,6 +137,19 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
     };
 }
 
+function calculateAppointmentOutstandingAmount(appointment) {
+  const paymentStatus = appointment?.paymentStatus;
+  if (paymentStatus === 'pending') {
+    return Math.max(Number(appointment?.price || 0), 0);
+  }
+
+  if (paymentStatus === 'deposit_paid') {
+    return Math.max(Number(appointment?.remainderAmount || 0), 0);
+  }
+
+  return 0;
+}
+
 /**
  * Get all customers who have booked with this tenant
  */
@@ -188,7 +201,7 @@ exports.getCustomers = async (req, res) => {
                             attributes: ['id', 'name_en', 'name_ar']
                         }
                     ],
-                    attributes: ['id', 'startTime', 'status', 'price']
+                    attributes: ['id', 'startTime', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid']
                 }
             ],
             attributes: [
@@ -633,7 +646,11 @@ exports.getCustomer = async (req, res) => {
                 notes: a.notes,
                 bookingReference: a.bookingReference || null,
                 serviceVariantName: a.serviceVariantName || null,
-                serviceVariantDuration: a.serviceVariantDuration || null
+                serviceVariantDuration: a.serviceVariantDuration || null,
+                depositAmount: a.depositAmount ?? null,
+                remainderAmount: a.remainderAmount ?? null,
+                totalPaid: a.totalPaid ?? null,
+                outstandingAmount: calculateAppointmentOutstandingAmount(a)
             })),
             // All orders (complete history)
             allOrders: orders.map(o => ({
@@ -662,7 +679,11 @@ exports.getCustomer = async (req, res) => {
                 paymentMethod: a.paymentMethod,
                 bookingReference: a.bookingReference || null,
                 serviceVariantName: a.serviceVariantName || null,
-                serviceVariantDuration: a.serviceVariantDuration || null
+                serviceVariantDuration: a.serviceVariantDuration || null,
+                depositAmount: a.depositAmount ?? null,
+                remainderAmount: a.remainderAmount ?? null,
+                totalPaid: a.totalPaid ?? null,
+                outstandingAmount: calculateAppointmentOutstandingAmount(a)
             })),
             recentOrders: orders.slice(0, 10).map(o => ({
                 id: o.id,
