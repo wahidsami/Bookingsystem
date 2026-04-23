@@ -1738,7 +1738,21 @@ class TenantApiClient {
   }
 
   /**
-   * Delete a hot deal
+   * Pause a hot deal
+   */
+  async pauseHotDeal(id: string): Promise<any> {
+    return this.post(`/tenant/hot-deals/${id}/pause`, {});
+  }
+
+  /**
+   * Publish a paused hot deal
+   */
+  async resumeHotDeal(id: string): Promise<any> {
+    return this.post(`/tenant/hot-deals/${id}/resume`, {});
+  }
+
+  /**
+   * Hide a hot deal
    */
   async deleteHotDeal(id: string): Promise<any> {
     return this.delete(`/tenant/hot-deals/${id}`);

@@ -71,12 +71,10 @@ const canCreateHotDeal = async (tenantId) => {
         };
     }
 
-    // Count current active deals
+    // Count all created deals so the quota is tied to the number of offers
+    // the tenant has been allowed to create, not only the currently visible ones.
     const currentDeals = await db.HotDeal.count({
-        where: {
-            tenantId,
-            status: 'active'
-        }
+        where: { tenantId }
     });
 
     // Check if limit reached (-1 = unlimited)

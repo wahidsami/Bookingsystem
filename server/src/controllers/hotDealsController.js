@@ -5,7 +5,6 @@
 
 const db = require('../models');
 const promotionService = require('../services/promotionService');
-const { Op } = require('sequelize');
 
 const serializeHotDeal = (deal) => {
     if (!deal) return null;
@@ -34,6 +33,46 @@ const serializeHotDeal = (deal) => {
         serviceName: service?.name || null,
         redemptionCount: plainDeal.redemptionCount ?? plainDeal.currentRedemptions ?? 0
     };
+};
+
+const stripImmutableHotDealFields = (updates = {}) => {
+    const immutableFields = new Set([
+        'id',
+        'tenantId',
+        'approvedBy',
+        'approvedAt',
+        'currentRedemptions',
+        'createdAt',
+        'updatedAt',
+        'status',
+        'isActive',
+        'tenant',
+        'service',
+        'approver'
+    ]);
+
+    return Object.entries(updates).reduce((acc, [key, value]) => {
+        if (!immutableFields.has(key)) {
+            acc[key] = value;
+        }
+        return acc;
+    }, {});
+};
+
+const canBePublishedNow = (deal) => {
+    const now = new Date();
+    const validFrom = deal?.validFrom ? new Date(deal.validFrom) : null;
+    const validUntil = deal?.validUntil ? new Date(deal.validUntil) : null;
+
+    if (validUntil && !Number.isNaN(validUntil.getTime()) && validUntil < now) {
+        return false;
+    }
+
+    if (validFrom && !Number.isNaN(validFrom.getTime()) && validFrom > now) {
+        return true;
+    }
+
+    return true;
 };
 
 /**
@@ -75,12 +114,10 @@ const getHotDealsLimits = async (req, res) => {
         const maxHotDeals = packageLimits.maxHotDeals || 0;
         const autoApprove = packageLimits.autoApproveHotDeals || false;
 
-        // Count current active/pending deals
+        // Count all created deals for the tenant so the quota never resets after
+        // pausing, hiding, or expiring a deal.
         const currentCount = await db.HotDeal.count({
-            where: {
-                tenantId,
-                status: { [Op.in]: ['pending', 'active'] }
-            }
+            where: { tenantId }
         });
 
         const canCreate = maxHotDeals === -1 || currentCount < maxHotDeals;
@@ -323,15 +360,79 @@ const updateHotDeal = async (req, res) => {
             });
         }
 
-        // Reject updates to active deals
+        // Require the tenant to pause a live deal before editing it.
         if (deal.status === 'active') {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot update active deals'
+                message: 'Pause the hot deal before editing it'
             });
         }
 
-        await deal.update(updates);
+        const nextServiceId = updates.serviceId || deal.serviceId;
+        const service = await db.Service.findByPk(nextServiceId);
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        if (service.tenantId !== tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only update deals for your own services'
+            });
+        }
+
+        const originalPrice = parseFloat(
+            service.finalPrice || service.rawPrice || service.basePrice || 0
+        );
+
+        if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Service price is not configured correctly for hot deals'
+            });
+        }
+
+        const nextDiscountType = updates.discountType || deal.discountType;
+        const nextDiscountValue = updates.discountValue ?? deal.discountValue;
+        const nextValidFrom = updates.validFrom || deal.validFrom;
+        const nextValidUntil = updates.validUntil || deal.validUntil;
+
+        if (new Date(nextValidUntil) <= new Date(nextValidFrom)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid until must be after valid from'
+            });
+        }
+
+        let discountedPrice;
+        if (nextDiscountType === 'percentage') {
+            const discount = (originalPrice * parseFloat(nextDiscountValue)) / 100;
+            discountedPrice = originalPrice - discount;
+        } else {
+            discountedPrice = originalPrice - parseFloat(nextDiscountValue);
+        }
+
+        if (discountedPrice < originalPrice * 0.5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Maximum discount is 50%'
+            });
+        }
+
+        await deal.update({
+            ...stripImmutableHotDealFields(updates),
+            serviceId: nextServiceId,
+            discountType: nextDiscountType,
+            discountValue: nextDiscountValue,
+            originalPrice,
+            discountedPrice,
+            validFrom: nextValidFrom,
+            validUntil: nextValidUntil
+        });
 
         const hydratedDeal = await db.HotDeal.findByPk(id, {
             include: [{
@@ -355,7 +456,7 @@ const updateHotDeal = async (req, res) => {
 };
 
 /**
- * Delete a hot deal
+ * Pause/unpublish a hot deal
  * DELETE /api/v1/tenant/hot-deals/:id
  */
 const deleteHotDeal = async (req, res) => {
@@ -378,17 +479,146 @@ const deleteHotDeal = async (req, res) => {
             });
         }
 
-        await deal.destroy();
+        await deal.update({
+            status: 'paused',
+            isActive: false
+        });
 
         res.json({
             success: true,
-            message: 'Hot deal deleted successfully'
+            message: 'Hot deal hidden successfully'
         });
     } catch (error) {
         console.error('Delete hot deal error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete hot deal'
+            message: 'Failed to hide hot deal'
+        });
+    }
+};
+
+/**
+ * Pause a hot deal
+ * POST /api/v1/tenant/hot-deals/:id/pause
+ */
+const pauseHotDeal = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+
+        const deal = await db.HotDeal.findByPk(id);
+        if (!deal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Hot deal not found'
+            });
+        }
+
+        if (deal.tenantId !== tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized'
+            });
+        }
+
+        if (deal.status === 'paused' && !deal.isActive) {
+            return res.json({
+                success: true,
+                deal: serializeHotDeal(deal),
+                message: 'Hot deal is already paused'
+            });
+        }
+
+        await deal.update({
+            status: 'paused',
+            isActive: false
+        });
+
+        const hydratedDeal = await db.HotDeal.findByPk(id, {
+            include: [{
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar', 'duration']
+            }]
+        });
+
+        return res.json({
+            success: true,
+            deal: serializeHotDeal(hydratedDeal || deal),
+            message: 'Hot deal paused successfully'
+        });
+    } catch (error) {
+        console.error('Pause hot deal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to pause hot deal'
+        });
+    }
+};
+
+/**
+ * Publish a paused hot deal
+ * POST /api/v1/tenant/hot-deals/:id/resume
+ */
+const resumeHotDeal = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+
+        const deal = await db.HotDeal.findByPk(id);
+        if (!deal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Hot deal not found'
+            });
+        }
+
+        if (deal.tenantId !== tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized'
+            });
+        }
+
+        if (deal.status === 'active' && deal.isActive) {
+            return res.json({
+                success: true,
+                deal: serializeHotDeal(deal),
+                message: 'Hot deal is already live'
+            });
+        }
+
+        if (!canBePublishedNow(deal)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Extend the validity dates before publishing this hot deal'
+            });
+        }
+
+        const nextStatus = deal.approvedAt ? 'active' : 'pending';
+        await deal.update({
+            status: nextStatus,
+            isActive: true
+        });
+
+        const hydratedDeal = await db.HotDeal.findByPk(id, {
+            include: [{
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar', 'duration']
+            }]
+        });
+
+        return res.json({
+            success: true,
+            deal: serializeHotDeal(hydratedDeal || deal),
+            message: nextStatus === 'active' ? 'Hot deal published successfully' : 'Hot deal returned to review'
+        });
+    } catch (error) {
+        console.error('Resume hot deal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to publish hot deal'
         });
     }
 };
@@ -556,7 +786,7 @@ const getActiveHotDeals = async (req, res) => {
 
         const allDeals = await db.HotDeal.findAll({
             where: {
-                status: { [Op.in]: ['pending', 'active'] },
+                status: 'active',
                 isActive: true
             },
             include: [
@@ -639,6 +869,8 @@ module.exports = {
     createHotDeal,
     updateHotDeal,
     deleteHotDeal,
+    pauseHotDeal,
+    resumeHotDeal,
 
     // Admin endpoints
     getAdminHotDeals,

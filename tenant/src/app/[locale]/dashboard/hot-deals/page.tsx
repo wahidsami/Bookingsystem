@@ -17,6 +17,7 @@ export default function HotDealsPage() {
     const [deals, setDeals] = useState<any[]>([]);
     const [canCreate, setCanCreate] = useState(false);
     const [packageLimits, setPackageLimits] = useState<any>(null);
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchDeals();
@@ -47,10 +48,31 @@ export default function HotDealsPage() {
         }
     };
 
+    const refreshData = async () => {
+        await Promise.all([fetchDeals(), checkLimits()]);
+    };
+
+    const handleDealAction = async (dealId: string, action: 'pause' | 'publish') => {
+        try {
+            setActionLoadingId(dealId);
+            if (action === 'pause') {
+                await tenantApi.pauseHotDeal(dealId);
+            } else {
+                await tenantApi.resumeHotDeal(dealId);
+            }
+            await refreshData();
+        } catch (error) {
+            console.error(`Failed to ${action} hot deal:`, error);
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         const badges: Record<string, string> = {
             pending: 'bg-yellow-500/10 text-yellow-500',
             active: 'bg-green-500/10 text-green-500',
+            paused: 'bg-sky-500/10 text-sky-400',
             rejected: 'bg-red-500/10 text-red-500',
             expired: 'bg-gray-500/10 text-gray-500'
         };
@@ -215,9 +237,27 @@ export default function HotDealsPage() {
                                                     {t('pendingReview')}
                                                 </button>
                                             )}
+                                            {deal.status === 'active' && (
+                                                <button
+                                                    onClick={() => handleDealAction(deal.id, 'pause')}
+                                                disabled={actionLoadingId === deal.id}
+                                                className="px-4 py-2 bg-sky-500/10 text-sky-300 font-medium rounded-lg hover:bg-sky-500/20 transition-colors text-sm border border-sky-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                    {actionLoadingId === deal.id ? (isRTL ? 'جاري...' : 'Loading...') : t('pause')}
+                                                </button>
+                                            )}
+                                            {deal.status === 'paused' && (
+                                                <button
+                                                    onClick={() => handleDealAction(deal.id, 'publish')}
+                                                    disabled={actionLoadingId === deal.id}
+                                                    className="px-4 py-2 bg-green-500/10 text-green-300 font-medium rounded-lg hover:bg-green-500/20 transition-colors text-sm border border-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {actionLoadingId === deal.id ? (isRTL ? 'جاري...' : 'Loading...') : t('publish')}
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => router.push(`/${locale}/dashboard/hot-deals/${deal.id}`)}
-                                                className={`px-6 py-2 bg-dark-700 text-white font-medium rounded-lg hover:bg-dark-600 transition-colors text-sm ${deal.status !== 'pending' ? 'flex-1' : ''}`}
+                                                className={`px-6 py-2 bg-dark-700 text-white font-medium rounded-lg hover:bg-dark-600 transition-colors text-sm ${deal.status === 'pending' ? 'flex-1' : ''}`}
                                             >
                                                 {t('viewDetails')}
                                             </button>

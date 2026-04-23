@@ -458,9 +458,11 @@
     "title": "العروض الخاصة",
     "subtitle": "إنشاء وإدارة العروض الترويجية لتطبيق العملاء",
     "createDeal": "إنشاء عرض خاص",
+    "editDeal": "تعديل العرض الخاص",
     "createNewDeal": "إنشاء أول عرض",
     "backToList": "العودة للعروض",
     "createSubtitle": "إعداد عرض ترويجي لخدماتك",
+    "editSubtitle": "تحديث تفاصيل العرض ثم إعادة نشره عند الجاهزية",
     "noDealsYet": "لا توجد عروض",
     "noDealsDesc": "أنشئ أول عرض ترويجي لجذب المزيد من العملاء",
     "dealsLimit": "حد العروض",
@@ -469,6 +471,7 @@
     "status": {
       "pending": "قيد المراجعة",
       "active": "نشط",
+      "paused": "متوقف",
       "rejected": "مرفوض",
       "expired": "منتهي"
     },
@@ -477,6 +480,9 @@
     "valid": "صالح",
     "viewDetails": "عرض التفاصيل",
     "pendingReview": "قيد المراجعة",
+    "pause": "إيقاف",
+    "publish": "نشر",
+    "pausedLabel": "متوقف",
     "rejectedReason": "مرفوض",
     "form": {
       "service": "الخدمة",
@@ -505,11 +511,13 @@
       "changeImage": "تغيير الصورة",
       "cancel": "إلغاء",
       "creating": "جاري الإنشاء...",
-      "createBtn": "إنشاء العرض الخاص"
+      "createBtn": "إنشاء العرض الخاص",
+      "updateBtn": "تحديث العرض الخاص"
     },
     "alerts": {
       "success": "تم إنشاء العرض بنجاح.",
       "successAutoApproved": "تم إنشاء العرض وهو الآن نشط!",
+      "updateSuccess": "تم تحديث العرض بنجاح.",
       "error": "فشل في إنشاء العرض",
       "sizeErr": "حجم الملف يجب أن يكون أقل من 5 ميجابايت",
       "typeErr": "الملف يجب أن يكون صورة (JPG, PNG, WebP)"

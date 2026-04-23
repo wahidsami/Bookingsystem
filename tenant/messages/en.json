@@ -374,9 +374,11 @@
     "title": "Hot Deals & Offers",
     "subtitle": "Create and manage promotional offers for the mobile app",
     "createDeal": "Create Hot Deal",
+    "editDeal": "Edit Hot Deal",
     "createNewDeal": "Create Your First Deal",
     "backToList": "Back to Hot Deals",
     "createSubtitle": "Set up a promotional offer for your services",
+    "editSubtitle": "Update the hot deal details and republish when ready",
     "noDealsYet": "No hot deals yet",
     "noDealsDesc": "Create your first promotional offer to attract more customers",
     "dealsLimit": "Hot Deals Limit",
@@ -385,6 +387,7 @@
     "status": {
       "pending": "PENDING",
       "active": "ACTIVE",
+      "paused": "PAUSED",
       "rejected": "REJECTED",
       "expired": "EXPIRED"
     },
@@ -393,6 +396,9 @@
     "valid": "Valid",
     "viewDetails": "View Details",
     "pendingReview": "Pending Review",
+    "pause": "Pause",
+    "publish": "Publish",
+    "pausedLabel": "Paused",
     "rejectedReason": "Rejected",
     "form": {
       "service": "Service",
@@ -421,11 +427,13 @@
       "changeImage": "Change image",
       "cancel": "Cancel",
       "creating": "Creating...",
-      "createBtn": "Create Hot Deal"
+      "createBtn": "Create Hot Deal",
+      "updateBtn": "Update Hot Deal"
     },
     "alerts": {
       "success": "Hot deal created successfully.",
       "successAutoApproved": "Hot deal created and is now live!",
+      "updateSuccess": "Hot deal updated successfully.",
       "error": "Failed to create hot deal",
       "sizeErr": "File size must be less than 5MB",
       "typeErr": "File must be an image (JPG, PNG, WebP)"

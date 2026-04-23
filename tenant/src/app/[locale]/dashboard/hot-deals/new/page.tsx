@@ -1,19 +1,23 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { TenantLayout } from '@/components/TenantLayout';
-import { tenantApi } from '@/lib/api';
+import { tenantApi, getImageUrl } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 
 export default function NewHotDealPage() {
     const router = useRouter();
     const params = useParams();
+    const searchParams = useSearchParams();
     const locale = (params?.locale as string) || 'ar';
     const t = useTranslations('hotDeals');
     const isRTL = locale === 'ar';
+    const dealId = searchParams.get('dealId');
+    const isEditing = Boolean(dealId);
 
     const [loading, setLoading] = useState(false);
+    const [loadingDeal, setLoadingDeal] = useState(isEditing);
     const [services, setServices] = useState<any[]>([]);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [dateRangeError, setDateRangeError] = useState('');
@@ -55,10 +59,6 @@ export default function NewHotDealPage() {
         setDateRangeError('');
     };
 
-    useEffect(() => {
-        fetchServices();
-    }, []);
-
     const fetchServices = async () => {
         try {
             const response = await tenantApi.getServices();
@@ -67,6 +67,48 @@ export default function NewHotDealPage() {
             console.error('Error fetching services:', error);
         }
     };
+
+    const fetchDeal = async () => {
+        if (!dealId) {
+            setLoadingDeal(false);
+            return;
+        }
+
+        try {
+            const response = await tenantApi.getHotDeal(dealId);
+            const hotDeal = response.deal;
+
+            if (hotDeal) {
+                setFormData({
+                    serviceId: hotDeal.serviceId || '',
+                    title_en: hotDeal.title_en || '',
+                    title_ar: hotDeal.title_ar || '',
+                    description_en: hotDeal.description_en || '',
+                    description_ar: hotDeal.description_ar || '',
+                    discountType: hotDeal.discountType || 'percentage',
+                    discountValue: String(hotDeal.discountValue ?? ''),
+                    validFrom: hotDeal.validFrom ? new Date(hotDeal.validFrom).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                    validUntil: hotDeal.validUntil ? new Date(hotDeal.validUntil).toISOString().split('T')[0] : '',
+                    maxRedemptions: String(hotDeal.maxRedemptions ?? '50')
+                });
+                setImagePreview(hotDeal.image ? getImageUrl(hotDeal.image) : null);
+            }
+        } catch (error: any) {
+            console.error('Error fetching deal for edit:', error);
+            alert(error.message || (isRTL ? 'تعذر تحميل العرض للتعديل.' : 'Failed to load hot deal for editing.'));
+        } finally {
+            setLoadingDeal(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchServices();
+        if (isEditing) {
+            fetchDeal();
+        } else {
+            setLoadingDeal(false);
+        }
+    }, [dealId]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -117,9 +159,15 @@ export default function NewHotDealPage() {
                 submitData.append('image', selectedFile);
             }
 
-            const response = await tenantApi.createHotDeal(submitData);
-            alert(response?.autoApproved ? t('alerts.successAutoApproved') : t('alerts.success'));
-            router.push(`/${locale}/dashboard/hot-deals`);
+            if (isEditing && dealId) {
+                const response = await tenantApi.updateHotDeal(dealId, submitData);
+                alert(response?.message || t('alerts.updateSuccess'));
+                router.push(`/${locale}/dashboard/hot-deals/${dealId}`);
+            } else {
+                const response = await tenantApi.createHotDeal(submitData);
+                alert(response?.autoApproved ? t('alerts.successAutoApproved') : t('alerts.success'));
+                router.push(`/${locale}/dashboard/hot-deals`);
+            }
         } catch (error: any) {
             alert(error.message || t('alerts.error'));
         } finally {
@@ -140,10 +188,15 @@ export default function NewHotDealPage() {
                         <span>{isRTL ? '→' : '←'}</span>
                         <span>{t('backToList')}</span>
                     </button>
-                    <h1 className="text-2xl font-bold text-white">{t('createDeal')}</h1>
-                    <p className="text-dark-300 mt-1">{t('createSubtitle')}</p>
+                    <h1 className="text-2xl font-bold text-white">{isEditing ? t('editDeal') : t('createDeal')}</h1>
+                    <p className="text-dark-300 mt-1">{isEditing ? t('editSubtitle') : t('createSubtitle')}</p>
                 </div>
 
+                {(loadingDeal && isEditing) ? (
+                    <div className="flex justify-center py-20">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
+                    </div>
+                ) : (
                 <form onSubmit={handleSubmit} className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
 
                     {/* Image Upload Section */}
@@ -378,10 +431,11 @@ export default function NewHotDealPage() {
                             disabled={loading || isInvalidDateRange}
                             className="flex-1 px-8 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-purple-900/20"
                         >
-                            {loading ? t('form.creating') : t('form.createBtn')}
+                            {loading ? t('form.creating') : (isEditing ? t('form.updateBtn') : t('form.createBtn'))}
                         </button>
                     </div>
                 </form>
+                )}
             </div>
         </TenantLayout>
     );

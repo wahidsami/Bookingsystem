@@ -48,29 +48,30 @@ export default function HotDealDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [deal, setDeal] = useState<HotDeal | null>(null);
     const [error, setError] = useState('');
+    const [actionLoading, setActionLoading] = useState<'pause' | 'publish' | null>(null);
+
+    const fetchDeal = async () => {
+        if (!dealId) {
+            setError(isRTL ? 'لم يتم العثور على العرض.' : 'Hot deal not found.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await tenantApi.getHotDeal(dealId);
+            setDeal(response.deal || null);
+            if (!response.deal) {
+                setError(isRTL ? 'لم يتم العثور على العرض.' : 'Hot deal not found.');
+            }
+        } catch (fetchError: any) {
+            console.error('Error fetching hot deal details:', fetchError);
+            setError(fetchError?.message || (isRTL ? 'تعذر تحميل تفاصيل العرض.' : 'Failed to load hot deal details.'));
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchDeal = async () => {
-            if (!dealId) {
-                setError(isRTL ? 'لم يتم العثور على العرض.' : 'Hot deal not found.');
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const response = await tenantApi.getHotDeal(dealId);
-                setDeal(response.deal || null);
-                if (!response.deal) {
-                    setError(isRTL ? 'لم يتم العثور على العرض.' : 'Hot deal not found.');
-                }
-            } catch (fetchError: any) {
-                console.error('Error fetching hot deal details:', fetchError);
-                setError(fetchError?.message || (isRTL ? 'تعذر تحميل تفاصيل العرض.' : 'Failed to load hot deal details.'));
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchDeal();
     }, [dealId, isRTL]);
 
@@ -87,8 +88,31 @@ export default function HotDealDetailsPage() {
     const statusBadgeClasses: Record<string, string> = {
         pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
         active: 'bg-green-500/10 text-green-400 border-green-500/20',
+        paused: 'bg-sky-500/10 text-sky-300 border-sky-500/20',
         rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
         expired: 'bg-gray-500/10 text-gray-300 border-gray-500/20'
+    };
+
+    const handleLifecycleAction = async (action: 'pause' | 'publish') => {
+        if (!deal?.id) return;
+
+        try {
+            setActionLoading(action);
+            const response = action === 'pause'
+                ? await tenantApi.pauseHotDeal(deal.id)
+                : await tenantApi.resumeHotDeal(deal.id);
+
+            if (response?.deal) {
+                setDeal(response.deal);
+            } else {
+                await fetchDeal();
+            }
+        } catch (actionError: any) {
+            console.error(`Failed to ${action} hot deal:`, actionError);
+            setError(actionError?.message || (isRTL ? 'تعذر تنفيذ الإجراء.' : 'Failed to perform this action.'));
+        } finally {
+            setActionLoading(null);
+        }
     };
 
     return (
@@ -240,6 +264,46 @@ export default function HotDealDetailsPage() {
                                                 {deal.createdAt ? new Date(deal.createdAt).toLocaleDateString(locale) : '—'}
                                             </p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-dark-800 rounded-xl border border-dark-700 p-6 shadow-lg">
+                                    <h2 className="text-lg font-semibold text-white mb-4">
+                                        {isRTL ? 'إجراءات العرض' : 'Deal Actions'}
+                                    </h2>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {deal.status === 'active' && (
+                                            <button
+                                                onClick={() => handleLifecycleAction('pause')}
+                                                disabled={actionLoading !== null}
+                                                className="w-full px-4 py-3 rounded-lg bg-sky-500/10 text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {actionLoading === 'pause' ? (isRTL ? 'جاري الإيقاف...' : 'Pausing...') : (isRTL ? 'إيقاف العرض' : 'Pause deal')}
+                                            </button>
+                                        )}
+                                        {deal.status === 'paused' && (
+                                            <button
+                                                onClick={() => handleLifecycleAction('publish')}
+                                                disabled={actionLoading !== null}
+                                                className="w-full px-4 py-3 rounded-lg bg-green-500/10 text-green-300 border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {actionLoading === 'publish' ? (isRTL ? 'جاري النشر...' : 'Publishing...') : (isRTL ? 'نشر العرض' : 'Publish deal')}
+                                            </button>
+                                        )}
+                                        {deal.status === 'paused' && (
+                                            <button
+                                                onClick={() => router.push(`/${locale}/dashboard/hot-deals/new?dealId=${deal.id}`)}
+                                                className="w-full px-4 py-3 rounded-lg bg-dark-900 text-white border border-dark-700 hover:border-purple-500/50 transition-colors"
+                                            >
+                                                {isRTL ? 'تعديل العرض' : 'Edit deal'}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => router.push(`/${locale}/dashboard/hot-deals`)}
+                                            className="w-full px-4 py-3 rounded-lg bg-dark-900 text-white border border-dark-700 hover:border-dark-500 transition-colors"
+                                        >
+                                            {isRTL ? 'العودة للقائمة' : 'Back to list'}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
