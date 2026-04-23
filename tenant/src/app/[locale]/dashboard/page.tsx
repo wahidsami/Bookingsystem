@@ -666,6 +666,41 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        <section className="card border border-gray-100 bg-gradient-to-r from-white via-primary/5 to-secondary/5 px-5 py-4 shadow-sm">
+          <div className={`flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between ${isRTL ? "lg:flex-row-reverse" : ""}`}>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                {locale === "ar" ? "مقارنة سريعة" : "Quick compare"}
+              </p>
+              <h3 className="mt-2 text-lg font-bold text-gray-900">
+                {locale === "ar" ? "ماذا تغيّر منذ الأمس" : "What changed since yesterday"}
+              </h3>
+            </div>
+
+            <div className={`flex flex-wrap gap-2 ${isRTL ? "justify-end" : ""}`}>
+              <span className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">
+                {locale === "ar" ? "الحجوزات" : "Bookings"}{" "}
+                <span className={bookingsDelta > 0 ? "text-emerald-600" : bookingsDelta < 0 ? "text-rose-600" : "text-gray-500"}>
+                  {bookingsDelta > 0 ? "+" : ""}{bookingsDelta}
+                </span>
+              </span>
+              <span className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">
+                {locale === "ar" ? "الإيراد" : "Revenue"}{" "}
+                <span className={revenueDelta > 0 ? "text-emerald-600" : revenueDelta < 0 ? "text-rose-600" : "text-gray-500"}>
+                  {revenueDelta > 0 ? "+" : ""}
+                  {new Intl.NumberFormat(locale === "ar" ? "ar-SA" : "en-SA", { maximumFractionDigits: 0 }).format(
+                    Math.abs(revenueDelta)
+                  )}
+                </span>
+              </span>
+              <span className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">
+                {locale === "ar" ? "مواعيد تحتاج دفع" : "Needs payment"}{" "}
+                <span className="text-rose-600">{attentionAppointments.length}</span>
+              </span>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="card overflow-hidden">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
