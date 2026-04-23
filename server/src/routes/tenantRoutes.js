@@ -150,6 +150,7 @@ router.get('/customers/stats', tenantCustomerController.getCustomerStats);
 router.get('/customers/export', tenantCustomerController.exportCustomers);
 router.get('/customers/:id', tenantCustomerController.getCustomer);
 router.get('/customers/:id/history', tenantCustomerController.getCustomerHistory);
+router.get('/customers/:id/transactions', tenantCustomerController.getCustomerTransactions);
 router.patch('/customers/:id/notes', tenantCustomerController.updateCustomerNotes);
 
 // Order management

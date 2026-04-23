@@ -28,6 +28,115 @@ function parseDateValue(value, endOfDay = false) {
     return date;
 }
 
+function getCustomerName(user) {
+    const firstName = user?.firstName || '';
+    const lastName = user?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || user?.email || user?.phone || 'Guest Customer';
+}
+
+function formatPaymentMethodLabel(paymentMethod) {
+    if (paymentMethod && typeof paymentMethod === 'object') {
+        if (paymentMethod.cardBrand && paymentMethod.cardLast4) {
+            return `${paymentMethod.cardBrand} ••••${paymentMethod.cardLast4}`;
+        }
+
+        if (paymentMethod.type) {
+            return formatPaymentMethodLabel(paymentMethod.type);
+        }
+    }
+
+    return ({
+        online: 'Online',
+        cash: 'Cash',
+        card_pos: 'Card POS',
+        wallet: 'Wallet',
+        bank_transfer: 'Bank transfer',
+        pay_on_visit: 'Pay on visit',
+        cash_on_delivery: 'Cash on delivery'
+    }[paymentMethod] || paymentMethod || 'Not set');
+}
+
+function formatTransactionTitle(record) {
+    if (record.source === 'transaction') {
+        if (record.kind === 'appointment') {
+            return record.appointment?.service
+                ? `${record.appointment.service.name_en || record.appointment.service.name_ar || 'Service'}`
+                : 'Service booking';
+        }
+        if (record.kind === 'order') {
+            return record.order?.orderNumber ? `Order #${record.order.orderNumber}` : 'Product purchase';
+        }
+    }
+
+    if (record.kind === 'appointment') {
+        return record.appointment?.service
+            ? `${record.appointment.service.name_en || record.appointment.service.name_ar || 'Service'}`
+            : 'Service booking';
+    }
+    if (record.kind === 'order') {
+        return record.order?.orderNumber ? `Order #${record.order.orderNumber}` : 'Product purchase';
+    }
+
+    return 'Transaction';
+}
+
+function formatTransactionSubtitle(record, locale = 'en') {
+    if (record.kind === 'appointment') {
+        return record.appointment?.staff?.name || record.appointment?.bookingNumber || record.reference || '';
+    }
+
+    if (record.kind === 'order') {
+        const firstItem = Array.isArray(record.order?.items) ? record.order.items[0] : null;
+        if (!firstItem) return record.reference || '';
+        return locale === 'ar'
+            ? firstItem.product?.name_ar || firstItem.productNameAr || firstItem.productName || ''
+            : firstItem.product?.name_en || firstItem.productName || firstItem.productNameAr || '';
+    }
+
+    return record.reference || '';
+}
+
+function mapCustomerTransactionRecord(record, locale = 'en') {
+  const appointment = record.appointment || null;
+  const order = record.order || null;
+  const entityType = record.kind || (appointment ? 'appointment' : 'order');
+  const reference = record.reference
+        || appointment?.bookingNumber
+      || order?.orderNumber
+      || record.transactionRef
+      || record.id;
+  const processedAt = record.processedAt || record.createdAt || record.date;
+  const paymentMethodValue = typeof record.paymentMethod === 'string'
+      ? record.paymentMethod
+      : (record.paymentMethod?.type || appointment?.paymentMethod || order?.paymentMethod || 'cash');
+
+  return {
+    id: record.id,
+    source: record.source || 'transaction',
+        entityType,
+        entityId: record.entityId || appointment?.id || order?.id || null,
+        reference,
+        title: formatTransactionTitle({ ...record, appointment, order }),
+        subtitle: formatTransactionSubtitle({ ...record, appointment, order }, locale),
+    amount: parseFloat(record.amount || 0),
+    currency: record.currency || 'SAR',
+    type: record.type || 'booking',
+    status: record.status || 'completed',
+    paymentMethod: paymentMethodValue,
+    paymentMethodLabel: formatPaymentMethodLabel(record.paymentMethod || paymentMethodValue),
+    transactionRef: record.transactionRef || null,
+        notes: record.notes || null,
+        processedAt,
+        processorName: record.processor?.name || null,
+        detailPath: appointment
+            ? `/dashboard/appointments/${appointment.id}`
+            : order?.id
+                ? `/dashboard/orders/${order.id}`
+                : null
+    };
+}
+
 /**
  * Get all customers who have booked with this tenant
  */
@@ -861,6 +970,314 @@ exports.getCustomerHistory = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch customer history',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get customer financial transactions (online + at-center ledger)
+ */
+exports.getCustomerTransactions = async (req, res) => {
+    try {
+        const tenantId = req.tenant.id;
+        const { id } = req.params;
+        const { startDate, endDate, limit = 50 } = req.query;
+        const safeLimit = Math.max(parseInt(limit, 10) || 50, 1);
+
+        const appointmentStart = parseDateValue(startDate, false);
+        const appointmentEnd = parseDateValue(endDate, true);
+
+        const appointmentWhere = { platformUserId: id };
+        if (appointmentStart || appointmentEnd) {
+            appointmentWhere.startTime = {};
+            if (appointmentStart) appointmentWhere.startTime[Op.gte] = appointmentStart;
+            if (appointmentEnd) appointmentWhere.startTime[Op.lte] = appointmentEnd;
+        }
+
+        const orderWhere = { platformUserId: id, tenantId };
+        if (appointmentStart || appointmentEnd) {
+            orderWhere.createdAt = {};
+            if (appointmentStart) orderWhere.createdAt[Op.gte] = appointmentStart;
+            if (appointmentEnd) orderWhere.createdAt[Op.lte] = appointmentEnd;
+        }
+
+        const [appointments, orders] = await Promise.all([
+            db.Appointment.findAll({
+                where: appointmentWhere,
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        where: { tenantId },
+                        required: true,
+                        attributes: ['id', 'name_en', 'name_ar', 'duration']
+                    },
+                    {
+                        model: db.Staff,
+                        as: 'staff',
+                        attributes: ['id', 'name', 'photo']
+                    }
+                ],
+                attributes: ['id', 'bookingNumber', 'paymentMethod', 'startTime', 'endTime', 'price', 'status', 'paymentStatus', 'notes'],
+                order: [['startTime', 'DESC']]
+            }),
+            db.Order.findAll({
+                where: orderWhere,
+                include: [
+                    {
+                        model: db.OrderItem,
+                        as: 'items',
+                        include: [
+                            {
+                                model: db.Product,
+                                as: 'product',
+                                attributes: ['id', 'name_en', 'name_ar', 'image', 'category']
+                            }
+                        ],
+                        attributes: ['id', 'quantity', 'unitPrice', 'totalPrice', 'productName', 'productNameAr', 'productImage']
+                    }
+                ],
+                attributes: ['id', 'orderNumber', 'paymentMethod', 'paymentStatus', 'status', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'expectedDeliveryDate'],
+                order: [['createdAt', 'DESC']]
+            })
+        ]);
+
+        const appointmentIds = appointments.map((row) => row.id);
+        const orderIds = orders.map((row) => row.id);
+
+        const [gatewayTransactions, ledgerTransactions] = await Promise.all([
+            db.Transaction.findAll({
+                where: {
+                    platformUserId: id,
+                    tenantId,
+                    ...(appointmentStart || appointmentEnd ? {
+                        createdAt: {
+                            ...(appointmentStart ? { [Op.gte]: appointmentStart } : {}),
+                            ...(appointmentEnd ? { [Op.lte]: appointmentEnd } : {})
+                        }
+                    } : {})
+                },
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointment',
+                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price'],
+                        required: false,
+                        include: [
+                            {
+                                model: db.Service,
+                                as: 'service',
+                                attributes: ['id', 'name_en', 'name_ar', 'duration'],
+                                required: false
+                            },
+                            {
+                                model: db.Staff,
+                                as: 'staff',
+                                attributes: ['id', 'name', 'photo'],
+                                required: false
+                            }
+                        ]
+                    },
+                    {
+                        model: db.Order,
+                        as: 'order',
+                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'expectedDeliveryDate'],
+                        required: false,
+                        include: [
+                            {
+                                model: db.OrderItem,
+                                as: 'items',
+                                include: [
+                                    {
+                                        model: db.Product,
+                                        as: 'product',
+                                        attributes: ['id', 'name_en', 'name_ar', 'image', 'category'],
+                                        required: false
+                                    }
+                                ],
+                                required: false
+                            }
+                        ]
+                    },
+                    {
+                        model: db.PaymentMethod,
+                        as: 'paymentMethod',
+                        attributes: ['id', 'type', 'cardBrand', 'cardLast4'],
+                        required: false
+                    }
+                ],
+                order: [['createdAt', 'DESC']]
+            }),
+            db.PaymentTransaction.findAll({
+                where: {
+                    [Op.or]: [
+                        { appointmentId: { [Op.in]: appointmentIds.length ? appointmentIds : ['00000000-0000-0000-0000-000000000000'] } },
+                        { orderId: { [Op.in]: orderIds.length ? orderIds : ['00000000-0000-0000-0000-000000000000'] } }
+                    ],
+                    paymentMethod: { [Op.in]: ['cash', 'card_pos', 'wallet', 'bank_transfer'] },
+                    ...(appointmentStart || appointmentEnd ? {
+                        processedAt: {
+                            ...(appointmentStart ? { [Op.gte]: appointmentStart } : {}),
+                            ...(appointmentEnd ? { [Op.lte]: appointmentEnd } : {})
+                        }
+                    } : {})
+                },
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointment',
+                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price'],
+                        required: false,
+                        include: [
+                            {
+                                model: db.Service,
+                                as: 'service',
+                                attributes: ['id', 'name_en', 'name_ar', 'duration'],
+                                required: false
+                            },
+                            {
+                                model: db.Staff,
+                                as: 'staff',
+                                attributes: ['id', 'name', 'photo'],
+                                required: false
+                            }
+                        ]
+                    },
+                    {
+                        model: db.Order,
+                        as: 'order',
+                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'expectedDeliveryDate'],
+                        required: false,
+                        include: [
+                            {
+                                model: db.OrderItem,
+                                as: 'items',
+                                include: [
+                                    {
+                                        model: db.Product,
+                                        as: 'product',
+                                        attributes: ['id', 'name_en', 'name_ar', 'image', 'category'],
+                                        required: false
+                                    }
+                                ],
+                                required: false
+                            }
+                        ]
+                    },
+                    {
+                        model: db.Staff,
+                        as: 'processor',
+                        attributes: ['id', 'name'],
+                        required: false
+                    }
+                ],
+                order: [['processedAt', 'DESC']]
+            })
+        ]);
+
+        const transactions = [];
+        const seenRecords = new Set();
+
+        gatewayTransactions.forEach((transaction) => {
+            const entityType = transaction.appointment ? 'appointment' : 'order';
+            const entityId = transaction.appointment?.id || transaction.order?.id || transaction.id;
+            const key = `gateway:${entityType}:${entityId}:${transaction.type}:${transaction.amount}:${transaction.status}`;
+
+            if (seenRecords.has(key)) {
+                return;
+            }
+
+            seenRecords.add(key);
+            transactions.push(mapCustomerTransactionRecord({
+                id: transaction.id,
+                source: 'transaction',
+                kind: entityType,
+                entityId,
+                appointment: transaction.appointment,
+                order: transaction.order,
+                reference: transaction.appointment?.bookingNumber || transaction.order?.orderNumber || transaction.transactionRef || transaction.id,
+                amount: transaction.amount,
+                currency: transaction.currency,
+                type: transaction.type,
+                status: transaction.status,
+                paymentMethod: transaction.paymentMethod || transaction.appointment?.paymentMethod || transaction.order?.paymentMethod || null,
+                transactionRef: transaction.stripePaymentIntentId || transaction.stripeChargeId || transaction.transactionRef || null,
+                notes: transaction.failureReason || transaction.notes || null,
+                processedAt: transaction.createdAt,
+                processor: transaction.paymentMethod?.user || null,
+                detailPath: transaction.appointment
+                    ? `/dashboard/appointments/${transaction.appointment.id}`
+                    : transaction.order?.id
+                        ? `/dashboard/orders/${transaction.order.id}`
+                        : null
+            }, locale));
+        });
+
+        ledgerTransactions.forEach((transaction) => {
+            const entityType = transaction.appointment ? 'appointment' : 'order';
+            const entityId = transaction.appointment?.id || transaction.order?.id || transaction.id;
+            const key = `ledger:${entityType}:${entityId}:${transaction.type}:${transaction.amount}:${transaction.status}`;
+
+            if (seenRecords.has(key)) {
+                return;
+            }
+
+            seenRecords.add(key);
+            transactions.push(mapCustomerTransactionRecord({
+                id: transaction.id,
+                source: 'ledger',
+                kind: entityType,
+                entityId,
+                appointment: transaction.appointment,
+                order: transaction.order,
+                reference: transaction.appointment?.bookingNumber || transaction.order?.orderNumber || transaction.transactionRef || transaction.id,
+                amount: transaction.amount,
+                currency: transaction.currency,
+                type: transaction.type,
+                status: transaction.status,
+                paymentMethod: transaction.paymentMethod || transaction.appointment?.paymentMethod || transaction.order?.paymentMethod || null,
+                transactionRef: transaction.transactionRef || null,
+                notes: transaction.notes || null,
+                processedAt: transaction.processedAt,
+                processor: transaction.processor,
+                detailPath: transaction.appointment
+                    ? `/dashboard/appointments/${transaction.appointment.id}`
+                    : transaction.order?.id
+                        ? `/dashboard/orders/${transaction.order.id}`
+                        : null
+            }, locale));
+        });
+
+        transactions.sort((a, b) => new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime());
+
+        const pagedTransactions = transactions.slice(0, safeLimit);
+        const completedTotal = pagedTransactions
+            .filter((item) => item.status === 'completed' || item.status === 'paid')
+            .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const refundedTotal = pagedTransactions
+            .filter((item) => item.status === 'refunded' || item.type === 'refund')
+            .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+        res.json({
+            success: true,
+            data: {
+                transactions: pagedTransactions,
+                summary: {
+                    totalTransactions: transactions.length,
+                    completedTotal: parseFloat(completedTotal.toFixed(2)),
+                    refundedTotal: parseFloat(refundedTotal.toFixed(2)),
+                    netTotal: parseFloat((completedTotal - refundedTotal).toFixed(2)),
+                    appointmentCount: pagedTransactions.filter((item) => item.entityType === 'appointment').length,
+                    orderCount: pagedTransactions.filter((item) => item.entityType === 'order').length
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get customer transactions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch customer transactions',
             error: error.message
         });
     }

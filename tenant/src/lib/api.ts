@@ -1415,6 +1415,19 @@ class TenantApiClient {
     return this.get(`/tenant/customers/${id}/history${query ? `?${query}` : ''}`);
   }
 
+  async getCustomerTransactions(id: string, params?: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString();
+    return this.get(`/tenant/customers/${id}/transactions${query ? `?${query}` : ''}`);
+  }
+
   async getCustomerStats(): Promise<any> {
     return this.get('/tenant/customers/stats');
   }

@@ -94,6 +94,36 @@ interface CustomerOrderHistoryItem {
   expectedDeliveryDate?: string | null;
 }
 
+interface CustomerTransactionRecord {
+  id: string;
+  source: 'transaction' | 'ledger';
+  entityType: 'appointment' | 'order';
+  entityId: string | null;
+  reference: string;
+  title: string;
+  subtitle: string;
+  amount: number;
+  currency: string;
+  type: string;
+  status: string;
+  paymentMethod: string | null;
+  paymentMethodLabel: string;
+  transactionRef: string | null;
+  notes: string | null;
+  processedAt: string;
+  processorName: string | null;
+  detailPath: string | null;
+}
+
+interface CustomerTransactionsSummary {
+  totalTransactions: number;
+  completedTotal: number;
+  refundedTotal: number;
+  netTotal: number;
+  appointmentCount: number;
+  orderCount: number;
+}
+
 interface CustomerProfile {
   id: string;
   firstName: string;
@@ -208,6 +238,9 @@ export function AppointmentDetailsDrawer({
   const [appointment, setAppointment] = useState<AppointmentItem | null>(null);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerTransactions, setCustomerTransactions] = useState<CustomerTransactionRecord[]>([]);
+  const [customerTransactionsSummary, setCustomerTransactionsSummary] = useState<CustomerTransactionsSummary | null>(null);
+  const [customerTransactionsLoading, setCustomerTransactionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
   const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
 
@@ -215,6 +248,9 @@ export function AppointmentDetailsDrawer({
     if (!open || !appointmentId) {
       setAppointment(null);
       setCustomerProfile(null);
+      setCustomerTransactions([]);
+      setCustomerTransactionsSummary(null);
+      setCustomerTransactionsLoading(false);
       setViewMode("appointment");
       setCustomerTab("overview");
       setError("");
@@ -228,6 +264,10 @@ export function AppointmentDetailsDrawer({
       try {
         setLoading(true);
         setError("");
+        setCustomerProfile(null);
+        setCustomerTransactions([]);
+        setCustomerTransactionsSummary(null);
+        setCustomerTransactionsLoading(false);
         const response = await tenantApi.getAppointment(appointmentId);
         if (!cancelled) {
           if (response.success && response.appointment) {
@@ -292,6 +332,39 @@ export function AppointmentDetailsDrawer({
     };
   }, [open, appointment?.user?.id, viewMode, customerProfile?.id]);
 
+  useEffect(() => {
+    if (!open || viewMode !== "customer" || customerTab !== "transactions" || !appointment?.user?.id || !customerProfile) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadTransactions = async () => {
+      try {
+        setCustomerTransactionsLoading(true);
+        const response = await tenantApi.getCustomerTransactions(appointment.user!.id, { limit: 100 });
+        if (!cancelled && response.success) {
+          setCustomerTransactions(response.data?.transactions || []);
+          setCustomerTransactionsSummary(response.data?.summary || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load customer transactions:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setCustomerTransactionsLoading(false);
+        }
+      }
+    };
+
+    loadTransactions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, viewMode, customerTab, appointment?.user?.id, customerProfile?.id]);
+
   const serviceName = useMemo(() => {
     if (!appointment) return "";
     return locale === "ar" ? appointment.service.name_ar : appointment.service.name_en;
@@ -305,45 +378,6 @@ export function AppointmentDetailsDrawer({
   const customerAppointments = useMemo(() => {
     return customerProfile?.allAppointments || customerProfile?.recentAppointments || [];
   }, [customerProfile]);
-
-  const customerOrders = useMemo(() => {
-    return customerProfile?.allOrders || customerProfile?.recentOrders || [];
-  }, [customerProfile]);
-
-  const customerTransactions = useMemo(() => {
-    const appointmentTransactions = customerAppointments.map((item) => ({
-      key: `appointment-${item.id}`,
-      kind: "appointment" as const,
-      title: locale === "ar"
-        ? item.service?.name_ar || item.service?.name_en || item.bookingReference || item.id
-        : item.service?.name_en || item.service?.name_ar || item.bookingReference || item.id,
-      subtitle: item.staff?.name || "",
-      date: item.date,
-      amount: Number(item.price || 0),
-      status: item.paymentStatus,
-      paymentMethod: item.paymentMethod || null,
-      label: locale === "ar" ? "حجز خدمة" : "Service booking"
-    }));
-
-    const orderTransactions = customerOrders.map((item) => ({
-      key: `order-${item.id}`,
-      kind: "order" as const,
-      title: `${locale === "ar" ? "طلب" : "Order"} #${item.orderNumber || item.id.slice(0, 8)}`,
-      subtitle: item.items?.[0]
-        ? (locale === "ar"
-          ? item.items[0].productNameAr || item.items[0].productName || ""
-          : item.items[0].productName || item.items[0].productNameAr || "")
-        : "",
-      date: item.date,
-      amount: Number(item.totalAmount || 0),
-      status: item.paymentStatus,
-      paymentMethod: item.deliveryType || null,
-      label: locale === "ar" ? "عملية شراء" : "Purchase"
-    }));
-
-    return [...appointmentTransactions, ...orderTransactions]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [customerAppointments, customerOrders, locale]);
 
   const handleReschedule = () => {
     if (!appointment) return;
@@ -492,38 +526,83 @@ export function AppointmentDetailsDrawer({
 
   const renderTransactions = () => (
     <div className="space-y-3">
-      {customerTransactions.length > 0 ? customerTransactions.map((item) => (
-        <div key={item.key} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  {item.label}
-                </span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                  {item.kind === "appointment"
-                    ? (locale === "ar" ? "حجز خدمة" : "Service")
-                    : (locale === "ar" ? "طلب" : "Order")}
-                </span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                  {getPaymentStatusLabel(item.status, locale)}
-                </span>
-              </div>
-              <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
-              {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
-              <p className="text-sm text-gray-500">{formatDateTime(item.date, locale)}</p>
-              {item.paymentMethod && (
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الطريقة" : "Method"}: {item.paymentMethod}
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
-            </div>
-          </div>
+      {customerTransactionsLoading ? (
+        <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
+          <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
         </div>
-      )) : (
+      ) : customerTransactions.length > 0 ? (
+        <>
+          {customerTransactionsSummary && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "عدد العمليات" : "Transactions"}
+                </p>
+                <p className="mt-2 text-2xl font-bold text-gray-900">{customerTransactionsSummary.totalTransactions}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "مدفوع" : "Completed"}
+                </p>
+                <p className="mt-2 text-2xl font-bold text-gray-900">
+                  <Currency amount={customerTransactionsSummary.completedTotal} />
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "مسترد" : "Refunded"}
+                </p>
+                <p className="mt-2 text-2xl font-bold text-gray-900">
+                  <Currency amount={customerTransactionsSummary.refundedTotal} />
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الصافي" : "Net"}
+                </p>
+                <p className="mt-2 text-2xl font-bold text-gray-900">
+                  <Currency amount={customerTransactionsSummary.netTotal} />
+                </p>
+              </div>
+            </div>
+          )}
+          {customerTransactions.map((item) => (
+            <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                      {item.source === "ledger" ? (locale === "ar" ? "سجل الدفع" : "Ledger") : (locale === "ar" ? "عملية مالية" : "Transaction")}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                      {item.entityType === "appointment"
+                        ? (locale === "ar" ? "حجز خدمة" : "Service")
+                        : (locale === "ar" ? "طلب" : "Order")}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                      {getPaymentStatusLabel(item.status, locale)}
+                    </span>
+                  </div>
+                  <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
+                  {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
+                  <p className="text-sm text-gray-500">{formatDateTime(item.processedAt, locale)}</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الطريقة" : "Method"}: {item.paymentMethodLabel}
+                  </p>
+                  {item.transactionRef && (
+                    <p className="text-xs text-gray-500">
+                      {locale === "ar" ? "المرجع" : "Ref"}: {item.transactionRef}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
         <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
           {locale === "ar" ? "لا توجد معاملات متاحة." : "No transactions available."}
         </div>
