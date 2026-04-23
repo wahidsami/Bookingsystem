@@ -224,6 +224,60 @@ function getPaymentStatusLabel(status: string, locale: string) {
   }
 }
 
+function getTransactionTypeLabel(type: string, locale: string) {
+  switch (type) {
+    case "appointment":
+    case "booking":
+      return locale === "ar" ? "خدمة" : "Appointment";
+    case "order":
+      return locale === "ar" ? "طلب" : "Order";
+    case "payment":
+      return locale === "ar" ? "دفعة" : "Payment";
+    case "refund":
+      return locale === "ar" ? "استرداد" : "Refund";
+    default:
+      return type || (locale === "ar" ? "أخرى" : "Other");
+  }
+}
+
+function getTransactionStatusLabel(status: string, locale: string) {
+  switch (status) {
+    case "completed":
+    case "paid":
+      return locale === "ar" ? "مكتمل" : "Completed";
+    case "pending":
+      return locale === "ar" ? "قيد الانتظار" : "Pending";
+    case "refunded":
+      return locale === "ar" ? "مسترد" : "Refunded";
+    case "partially_refunded":
+      return locale === "ar" ? "مسترد جزئياً" : "Partially refunded";
+    case "failed":
+      return locale === "ar" ? "فشل" : "Failed";
+    case "cancelled":
+      return locale === "ar" ? "ملغي" : "Cancelled";
+    default:
+      return status;
+  }
+}
+
+function getTransactionStatusTone(status: string) {
+  switch (status) {
+    case "completed":
+    case "paid":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+    case "pending":
+      return "bg-amber-50 text-amber-700 ring-amber-200";
+    case "refunded":
+    case "partially_refunded":
+      return "bg-sky-50 text-sky-700 ring-sky-200";
+    case "failed":
+    case "cancelled":
+      return "bg-rose-50 text-rose-700 ring-rose-200";
+    default:
+      return "bg-gray-100 text-gray-700 ring-gray-200";
+  }
+}
+
 export function AppointmentDetailsDrawer({
   open,
   appointmentId,
@@ -243,6 +297,9 @@ export function AppointmentDetailsDrawer({
   const [customerTransactionsLoading, setCustomerTransactionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
   const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
+  const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
+  const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !appointmentId) {
@@ -253,6 +310,9 @@ export function AppointmentDetailsDrawer({
       setCustomerTransactionsLoading(false);
       setViewMode("appointment");
       setCustomerTab("overview");
+      setTransactionTypeFilter("all");
+      setTransactionStatusFilter("all");
+      setExpandedTransactionId(null);
       setError("");
       setLoading(false);
       return;
@@ -264,11 +324,12 @@ export function AppointmentDetailsDrawer({
       try {
         setLoading(true);
         setError("");
-        setCustomerProfile(null);
-        setCustomerTransactions([]);
-        setCustomerTransactionsSummary(null);
-        setCustomerTransactionsLoading(false);
-        const response = await tenantApi.getAppointment(appointmentId);
+      setCustomerProfile(null);
+      setCustomerTransactions([]);
+      setCustomerTransactionsSummary(null);
+      setCustomerTransactionsLoading(false);
+      setExpandedTransactionId(null);
+      const response = await tenantApi.getAppointment(appointmentId);
         if (!cancelled) {
           if (response.success && response.appointment) {
             setAppointment(response.appointment);
@@ -342,6 +403,7 @@ export function AppointmentDetailsDrawer({
     const loadTransactions = async () => {
       try {
         setCustomerTransactionsLoading(true);
+        setExpandedTransactionId(null);
         const response = await tenantApi.getCustomerTransactions(appointment.user!.id, { limit: 100 });
         if (!cancelled && response.success) {
           setCustomerTransactions(response.data?.transactions || []);
@@ -364,6 +426,25 @@ export function AppointmentDetailsDrawer({
       cancelled = true;
     };
   }, [open, viewMode, customerTab, appointment?.user?.id, customerProfile?.id]);
+
+  const filteredTransactions = useMemo(() => {
+    return customerTransactions.filter((item) => {
+      const matchesType =
+        transactionTypeFilter === "all" ||
+        (transactionTypeFilter === "ledger" ? item.source === "ledger" : item.entityType === transactionTypeFilter);
+
+      const normalizedStatus = item.status?.toLowerCase?.() || "";
+      const matchesStatus =
+        transactionStatusFilter === "all" ||
+        (transactionStatusFilter === "completed" && (normalizedStatus === "completed" || normalizedStatus === "paid")) ||
+        (transactionStatusFilter === "pending" && normalizedStatus === "pending") ||
+        (transactionStatusFilter === "refunded" && (normalizedStatus === "refunded" || normalizedStatus === "partially_refunded")) ||
+        (transactionStatusFilter === "failed" && normalizedStatus === "failed") ||
+        (transactionStatusFilter === "cancelled" && normalizedStatus === "cancelled");
+
+      return matchesType && matchesStatus;
+    });
+  }, [customerTransactions, transactionStatusFilter, transactionTypeFilter]);
 
   const serviceName = useMemo(() => {
     if (!appointment) return "";
@@ -566,41 +647,182 @@ export function AppointmentDetailsDrawer({
               </div>
             </div>
           )}
-          {customerTransactions.map((item) => (
-            <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                      {item.source === "ledger" ? (locale === "ar" ? "سجل الدفع" : "Ledger") : (locale === "ar" ? "عملية مالية" : "Transaction")}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                      {item.entityType === "appointment"
-                        ? (locale === "ar" ? "حجز خدمة" : "Service")
-                        : (locale === "ar" ? "طلب" : "Order")}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                      {getPaymentStatusLabel(item.status, locale)}
-                    </span>
-                  </div>
-                  <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
-                  {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
-                  <p className="text-sm text-gray-500">{formatDateTime(item.processedAt, locale)}</p>
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الطريقة" : "Method"}: {item.paymentMethodLabel}
-                  </p>
-                  {item.transactionRef && (
-                    <p className="text-xs text-gray-500">
-                      {locale === "ar" ? "المرجع" : "Ref"}: {item.transactionRef}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
-                </div>
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "تصفية المعاملات" : "Transaction filters"}
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {locale === "ar" ? "فلترة حسب النوع والحالة." : "Filter by type and status."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { key: "all", label: locale === "ar" ? "الكل" : "All" },
+                  { key: "appointment", label: locale === "ar" ? "المواعيد" : "Appointments" },
+                  { key: "order", label: locale === "ar" ? "الطلبات" : "Orders" },
+                  { key: "ledger", label: locale === "ar" ? "السجل" : "Ledger" }
+                ] as const).map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => setTransactionTypeFilter(chip.key)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      transactionTypeFilter === chip.key
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {([
+                { key: "all", label: locale === "ar" ? "كل الحالات" : "All statuses" },
+                { key: "completed", label: locale === "ar" ? "مكتمل" : "Completed" },
+                { key: "pending", label: locale === "ar" ? "قيد الانتظار" : "Pending" },
+                { key: "refunded", label: locale === "ar" ? "مسترد" : "Refunded" },
+                { key: "failed", label: locale === "ar" ? "فشل" : "Failed" },
+                { key: "cancelled", label: locale === "ar" ? "ملغي" : "Cancelled" }
+              ] as const).map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setTransactionStatusFilter(chip.key)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    transactionStatusFilter === chip.key
+                      ? "bg-gray-900 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {filteredTransactions.length > 0 ? filteredTransactions.map((item) => {
+              const isExpanded = expandedTransactionId === item.id;
+              return (
+                <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTransactionId(isExpanded ? null : item.id)}
+                    className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
+                  >
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                          {item.source === "ledger" ? (locale === "ar" ? "سجل الدفع" : "Ledger") : (locale === "ar" ? "عملية مالية" : "Transaction")}
+                        </span>
+                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                          {getTransactionTypeLabel(item.entityType, locale)}
+                        </span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getTransactionStatusTone(item.status)}`}>
+                          {getTransactionStatusLabel(item.status, locale)}
+                        </span>
+                      </div>
+                      <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
+                      {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
+                        <span>{formatDateTime(item.processedAt, locale)}</span>
+                        <span>{item.paymentMethodLabel}</span>
+                        {item.transactionRef && <span>{item.transactionRef}</span>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
+                      <span className="text-xs font-semibold text-primary">
+                        {isExpanded ? (locale === "ar" ? "إخفاء التفاصيل" : "Hide details") : (locale === "ar" ? "إظهار التفاصيل" : "Details")}
+                      </span>
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 px-4 pb-4">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="rounded-2xl bg-gray-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "المصدر" : "Source"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.source}</p>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "الطريقة" : "Method"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.paymentMethodLabel}</p>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "المعالج" : "Processor"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.processorName || "-"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "المرجع" : "Reference"}
+                          </p>
+                          <p className="mt-1 break-all text-sm font-semibold text-gray-900">{item.reference}</p>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "المعرف" : "Entity"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">
+                            {item.entityType}
+                            {item.entityId ? ` · ${item.entityId}` : ""}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "النوع" : "Type"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-900">{item.type}</p>
+                        </div>
+                      </div>
+
+                      {(item.notes || item.detailPath) && (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                          <div className="min-w-0">
+                            {item.notes ? (
+                              <>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                  {locale === "ar" ? "ملاحظات" : "Notes"}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-700">{item.notes}</p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-gray-500">
+                                {locale === "ar" ? "لا توجد ملاحظات إضافية." : "No extra notes."}
+                              </p>
+                            )}
+                          </div>
+                          {item.detailPath && (
+                            <Link
+                              href={`/${locale}${item.detailPath}`}
+                              className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                            >
+                              {locale === "ar" ? "فتح السجل" : "Open record"}
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }) : (
+              <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+                {locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
