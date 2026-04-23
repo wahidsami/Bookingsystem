@@ -428,8 +428,26 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     ];
   }, [hasProductsAndOrders, locale, t]);
 
+  const marketingChildren = useMemo<NavigationLeafItem[]>(() => {
+    return [
+      { kind: "link", name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP['hot-deals'] },
+      { kind: "link", name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
+      { kind: "link", name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reviews }
+    ];
+  }, [hasHotDeals, hasPushNotifications, locale, t]);
+
+  const billingChildren = useMemo<NavigationLeafItem[]>(() => {
+    return [
+      { kind: "link", name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.bills },
+      { kind: "link", name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.subscription },
+      { kind: "link", name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.financial }
+    ];
+  }, [locale, t]);
+
   const navigationItems = useMemo<NavigationItem[]>(() => {
     const catalogVisible = catalogChildren.some((child) => child.visible !== false && canAccessPermission(child.permissionKey));
+    const marketingVisible = marketingChildren.some((child) => child.visible !== false && canAccessPermission(child.permissionKey));
+    const billingVisible = billingChildren.some((child) => child.visible !== false && canAccessPermission(child.permissionKey));
 
     return [
       { kind: "link", name: t("dashboard"), href: `/${locale}/dashboard`, icon: HomeIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.dashboard },
@@ -452,20 +470,30 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         badgeCount: posDueCount,
         permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.pos
       },
-      { kind: "link", name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP['hot-deals'] },
       { kind: "link", name: locale === 'ar' ? 'الرسائل' : 'Messages', href: `/${locale}/dashboard/messages`, icon: ChatBubbleLeftRightIcon, visible: hasInternalMessaging, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.messages },
-      { kind: "link", name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
       { kind: "link", name: t("customers"), href: `/${locale}/dashboard/customers`, icon: UsersIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.customers },
-      { kind: "link", name: locale === 'ar' ? 'فواتيري' : 'My Bills', href: `/${locale}/dashboard/bills`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.bills },
-      { kind: "link", name: locale === 'ar' ? 'اشتراكي' : 'My Subscription', href: `/${locale}/dashboard/subscription`, icon: DocumentTextIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.subscription },
-      { kind: "link", name: t("financial"), href: `/${locale}/dashboard/financial`, icon: BanknotesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.financial },
+      {
+        kind: "group",
+        key: "marketing",
+        name: locale === 'ar' ? 'التسويق' : 'Marketing',
+        icon: MegaphoneIcon,
+        visible: marketingVisible,
+        children: marketingChildren
+      },
+      {
+        kind: "group",
+        key: "billing",
+        name: locale === 'ar' ? 'الفواتير والمالية' : 'Billing & Finance',
+        icon: BanknotesIcon,
+        visible: billingVisible,
+        children: billingChildren
+      },
       { kind: "link", name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.payroll },
-      { kind: "link", name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reviews },
       { kind: "link", name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reports },
       { kind: "link", name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.mypage },
       { kind: "link", name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.settings },
     ];
-  }, [canAccessPermission, catalogChildren, hasHotDeals, hasInternalMessaging, hasPayroll, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, posDueCount, t]);
+  }, [billingChildren, canAccessPermission, catalogChildren, hasHotDeals, hasInternalMessaging, hasPayroll, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, marketingChildren, posDueCount, t]);
   const navigation = navigationItems.filter((item) => item.visible !== false && (item.kind === "group" || canAccessPermission(item.permissionKey)));
   const mobileNavigation = useMemo(() => {
     return navigation.flatMap((item) => {
@@ -523,16 +551,36 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   };
 
   useEffect(() => {
-    const catalogIsActive = catalogChildren.some((child) => isActive(child.href));
-    if (!catalogIsActive || expandedNavGroups.catalog !== undefined) {
+    const activeGroupKeys: Array<"catalog" | "marketing" | "billing"> = [];
+
+    if (catalogChildren.some((child) => isActive(child.href))) {
+      activeGroupKeys.push("catalog");
+    }
+    if (marketingChildren.some((child) => isActive(child.href))) {
+      activeGroupKeys.push("marketing");
+    }
+    if (billingChildren.some((child) => isActive(child.href))) {
+      activeGroupKeys.push("billing");
+    }
+
+    if (activeGroupKeys.length === 0) {
       return;
     }
 
-    setExpandedNavGroups((current) => ({
-      ...current,
-      catalog: true
-    }));
-  }, [catalogChildren, expandedNavGroups.catalog]);
+    setExpandedNavGroups((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      activeGroupKeys.forEach((key) => {
+        if (next[key] === undefined) {
+          next[key] = true;
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [billingChildren, catalogChildren, marketingChildren]);
 
   const currentSection = findActiveNavigationItem(navigation)?.name || t("dashboard");
   const sidebarWidth = sidebarCollapsed ? 88 : 280;
