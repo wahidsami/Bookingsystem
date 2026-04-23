@@ -221,6 +221,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       }))
     ].sort((left, right) => right.timestamp - left.timestamp).slice(0, 6);
   }, [locale, posAlerts, usageAlerts]);
+  const notificationBadgeCount = notificationMenuOpen ? 0 : notificationCount;
   const handleDismissNotification = (item: { kind: 'pos' | 'usage'; originalId: string }) => {
     if (item.kind === 'pos') {
       dismissPosAlert(item.originalId);
@@ -240,9 +241,9 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         aria-label={locale === 'ar' ? 'الإشعارات' : 'Notifications'}
       >
           <BellIcon className="h-5 w-5 text-gray-600" />
-          {notificationCount > 0 ? (
-          <span className={`absolute -top-1 ${isRTL ? '-left-1' : '-right-1'} flex min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold text-white`}>
-            {notificationCount > 99 ? '99+' : notificationCount}
+          {notificationBadgeCount > 0 ? (
+            <span className={`absolute -top-1 ${isRTL ? '-left-1' : '-right-1'} flex min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold text-white`}>
+            {notificationBadgeCount > 99 ? '99+' : notificationBadgeCount}
           </span>
         ) : null}
       </button>
