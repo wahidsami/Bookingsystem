@@ -95,6 +95,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [expandedNavGroups, setExpandedNavGroups] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState(() => new Date());
+  const [notificationSeenAt, setNotificationSeenAt] = useState(0);
+  const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -191,7 +193,16 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       minute: '2-digit',
     }).format(now);
   }, [locale, now, tenantTimeZone]);
-  const notificationCount = posAlerts.length + usageAlerts.length;
+  const notificationCount = useMemo(() => {
+    const unreadUsageCount = usageAlerts.length;
+    const unreadPosCount = posAlerts.filter((alert) => {
+      const timestamp = alert?.scheduledAt || alert?.createdAt;
+      const parsed = timestamp ? new Date(timestamp) : null;
+      return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() > notificationSeenAt : true;
+    }).length;
+
+    return unreadUsageCount + unreadPosCount;
+  }, [notificationSeenAt, posAlerts, usageAlerts]);
   const notificationFeed = useMemo(() => {
     const toTimestamp = (value: any) => {
       const parsed = value ? new Date(value) : null;
@@ -219,9 +230,12 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         timestamp: toTimestamp(alert.createdAt),
         severity: alert.priority === 'high' || alert.priority === 'critical' ? 'high' : 'medium'
       }))
-    ].sort((left, right) => right.timestamp - left.timestamp).slice(0, 6);
-  }, [locale, posAlerts, usageAlerts]);
-  const notificationBadgeCount = notificationMenuOpen ? 0 : notificationCount;
+    ]
+      .filter((item) => item.kind !== 'pos' || item.timestamp > notificationSeenAt)
+      .sort((left, right) => right.timestamp - left.timestamp)
+      .slice(0, 6);
+  }, [locale, posAlerts, usageAlerts, notificationSeenAt]);
+  const notificationBadgeCount = notificationCount;
   const handleDismissNotification = (item: { kind: 'pos' | 'usage'; originalId: string }) => {
     if (item.kind === 'pos') {
       dismissPosAlert(item.originalId);
@@ -229,6 +243,24 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       dismissAlert(item.originalId);
     }
   };
+
+  const markAllNotificationsAsRead = async () => {
+    if (markingNotificationsRead) return;
+
+    setMarkingNotificationsRead(true);
+    try {
+      await Promise.all(usageAlerts.map((alert) => tenantApi.acknowledgeSubscriptionAlert(alert.id).catch(() => null)));
+      setUsageAlerts([]);
+      const timestamp = Date.now();
+      setNotificationSeenAt(timestamp);
+      if (typeof window !== 'undefined' && user?.id) {
+        window.localStorage.setItem(`rifah_tenant_notification_seen_at:${user.id}`, String(timestamp));
+      }
+    } finally {
+      setMarkingNotificationsRead(false);
+    }
+  };
+
   const renderNotificationMenu = () => (
     <div ref={notificationMenuRef} className="relative z-50">
       <button
@@ -262,6 +294,16 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     : (locale === 'ar' ? 'لا توجد إشعارات جديدة' : 'No new notifications')}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={markAllNotificationsAsRead}
+                disabled={markingNotificationsRead || notificationCount === 0}
+                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {markingNotificationsRead
+                  ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Marking...')
+                  : (locale === 'ar' ? 'تعيين الكل كمقروء' : 'Mark all as read')}
+              </button>
               <button
                 type="button"
                 onClick={() => setNotificationMenuOpen(false)}
@@ -330,6 +372,18 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       router.replace(`/${locale}/onboarding/more-info`);
     }
   }, [pathname, router, user?.status, locale]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!user?.id) {
+      setNotificationSeenAt(0);
+      return;
+    }
+
+    const storedValue = window.localStorage.getItem(`rifah_tenant_notification_seen_at:${user.id}`);
+    const parsedValue = storedValue ? Number(storedValue) : 0;
+    setNotificationSeenAt(Number.isFinite(parsedValue) ? parsedValue : 0);
+  }, [user?.id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
