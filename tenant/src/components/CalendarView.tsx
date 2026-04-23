@@ -119,6 +119,9 @@ export function CalendarView({
   );
   const pixelsPerHour = Math.max(120, Math.min(360, Number(hourHeight) || 240));
   const pixelsPerMinute = pixelsPerHour / 60;
+  const boardScale = Math.max(0.85, Math.min(1.35, pixelsPerHour / 240));
+  const timeColumnWidth = Math.round(72 * boardScale);
+  const staffColumnWidth = Math.round(240 * boardScale);
 
   useEffect(() => {
     setVisibleStaffIds((previous) => {
@@ -206,6 +209,7 @@ export function CalendarView({
   const visibleStaff = useMemo(() => {
     return employees.filter(emp => visibleStaffIds.has(emp.id));
   }, [employees, visibleStaffIds]);
+  const boardMinWidth = timeColumnWidth + (visibleStaff.length * staffColumnWidth);
 
   // Generate time slots
   const timeSlots = useMemo(() => {
@@ -712,9 +716,15 @@ export function CalendarView({
       {/* Calendar Grid */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-360px)]">
-          <div className="inline-flex min-w-full items-start">
+          <div
+            className="inline-flex min-w-full items-start"
+            style={{ minWidth: `${boardMinWidth}px` }}
+          >
             {/* Time Column */}
-            <div className="flex-shrink-0 w-16 md:w-20 border-r border-gray-200 sticky left-0 z-20 bg-white">
+            <div
+              className="flex-shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white"
+              style={{ width: `${timeColumnWidth}px` }}
+            >
               <div className="sticky top-0 z-30 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
               <div className="relative" style={{ height: `${totalHeight}px` }}>
                 {timeSlots.map((slot, index) => (
@@ -755,7 +765,7 @@ export function CalendarView({
                   <div
                     key={staff.id}
                     className={`flex-shrink-0 border-r border-gray-200 transition-colors ${dragOverStaffId === staff.id ? 'bg-primary/5' : ''}`}
-                    style={{ minWidth: '240px', width: '240px' }}
+                    style={{ minWidth: `${staffColumnWidth}px`, width: `${staffColumnWidth}px` }}
                     onDragOver={(event) => handleStaffDragOver(event, staff.id)}
                     onDrop={(event) => handleStaffDrop(event, staff.id)}
                     onDragLeave={() => handleStaffDropLeave(staff.id)}
