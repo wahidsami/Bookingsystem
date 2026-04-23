@@ -94,7 +94,7 @@ const canCreateHotDeal = async (tenantId) => {
         allowed: true,
         maxDeals,
         currentDeals,
-        autoApprove: limits.hotDealsAutoApprove || false
+        autoApprove: true
     };
 };
 
@@ -164,7 +164,7 @@ const getTenantFeatures = async (tenantId) => {
         featuredCarousel: limits.featuredCarousel || false,
         carouselPriority: limits.carouselPriority || null,
         maxHotDeals: limits.maxHotDeals || 0,
-        hotDealsAutoApprove: limits.hotDealsAutoApprove || false,
+        hotDealsAutoApprove: (limits.maxHotDeals || 0) !== 0,
         searchRankingBoost: limits.searchRankingBoost || 'standard',
         homepageBanner: limits.homepageBanner || false,
         featuredProducts: limits.featuredProducts || 0,

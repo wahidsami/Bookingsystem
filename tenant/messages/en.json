@@ -424,7 +424,7 @@
       "createBtn": "Create Hot Deal"
     },
     "alerts": {
-      "success": "Hot deal created! It will be reviewed by admin.",
+      "success": "Hot deal created successfully.",
       "successAutoApproved": "Hot deal created and is now live!",
       "error": "Failed to create hot deal",
       "sizeErr": "File size must be less than 5MB",

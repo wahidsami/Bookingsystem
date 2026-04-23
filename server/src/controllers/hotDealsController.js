@@ -547,7 +547,7 @@ const rejectHotDeal = async (req, res) => {
 // ============================================
 
 /**
- * Get all active hot deals
+ * Get all customer-visible hot deals
  * GET /api/v1/hot-deals
  */
 const getActiveHotDeals = async (req, res) => {
@@ -556,7 +556,7 @@ const getActiveHotDeals = async (req, res) => {
 
         const deals = await db.HotDeal.findAll({
             where: {
-                status: 'active',
+                status: { [Op.in]: ['pending', 'active'] },
                 isActive: true,
                 validFrom: { [Op.lte]: now },
                 validUntil: { [Op.gte]: now }
