@@ -171,6 +171,15 @@ const getTodaysAppointments = async (req, res) => {
         const formattedAppointments = appointments.map(apt => {
             const startTime = new Date(apt.startTime);
             const endTime = new Date(apt.endTime);
+            const paymentStatus = apt.paymentStatus || APPOINTMENT_PAYMENT_STATUS.PENDING;
+            const price = parseFloat(apt.price || 0);
+            const totalPaid = parseFloat(apt.totalPaid || 0);
+            const remainderAmount = parseFloat(apt.remainderAmount || 0);
+            const outstandingAmount = paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                ? remainderAmount
+                : paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID || paymentStatus === 'paid'
+                    ? 0
+                    : Math.max(price - totalPaid, 0);
 
             return {
                 id: apt.id,
@@ -182,7 +191,13 @@ const getTodaysAppointments = async (req, res) => {
                 startTime: startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
                 endTime: endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
                 status: apt.status,
-                price: parseFloat(apt.price || 0),
+                price,
+                paymentStatus,
+                paymentMethod: apt.paymentMethod || null,
+                depositAmount: parseFloat(apt.depositAmount || 0),
+                remainderAmount,
+                totalPaid,
+                outstandingAmount,
                 employeeName: apt.staff?.name || 'Unknown Employee'
             };
         });

@@ -24,6 +24,12 @@ interface Appointment {
   endTime: string;
   status: string;
   price: number;
+  paymentStatus?: string;
+  paymentMethod?: string | null;
+  depositAmount?: number;
+  remainderAmount?: number;
+  totalPaid?: number;
+  outstandingAmount?: number;
 }
 
 interface PosAlert {
@@ -139,7 +145,13 @@ export default function DashboardPage() {
           startTime: apt.startTime,
           endTime: apt.endTime,
           status: apt.status,
-          price: apt.price || 0
+          price: apt.price || 0,
+          paymentStatus: apt.paymentStatus || "pending",
+          paymentMethod: apt.paymentMethod || null,
+          depositAmount: apt.depositAmount || 0,
+          remainderAmount: apt.remainderAmount || 0,
+          totalPaid: apt.totalPaid || 0,
+          outstandingAmount: apt.outstandingAmount ?? Math.max((apt.price || 0) - (apt.totalPaid || 0), 0)
         }));
         setTodaysAppointments(formattedAppointments);
       } else {
@@ -237,6 +249,15 @@ export default function DashboardPage() {
       locale === "ar" ? "يفتح اللوحة مباشرة على المواعيد" : "Open directly into the appointment board",
     pos: locale === "ar" ? "يفتح مباشرة على التحصيل والمبيعات" : "Open directly into collections and sales"
   };
+
+  const attentionAppointments = todaysAppointments.filter((appointment) => {
+    const paymentStatus = (appointment.paymentStatus || "pending").toLowerCase();
+    return paymentStatus === "pending" || paymentStatus === "deposit_paid" || Number(appointment.outstandingAmount || 0) > 0;
+  });
+
+  const attentionAmountDue = attentionAppointments.reduce((sum, appointment) => sum + Number(appointment.outstandingAmount || 0), 0);
+  const urgentAlerts = paymentAlerts.filter((alert) => alert.severity === "high");
+  const otherAlerts = paymentAlerts.filter((alert) => alert.severity !== "high");
 
   return (
     <TenantLayout>
@@ -419,6 +440,141 @@ export default function DashboardPage() {
               <button type="button" onClick={() => router.push(`/${locale}/dashboard/pos`)} className="btn-primary w-full">
                 {locale === "ar" ? "فتح نقطة البيع" : "Open POS"}
               </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="card overflow-hidden">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-600">
+                  {locale === "ar" ? "ما يحتاج انتباهك الآن" : "Needs attention now"}
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-gray-900">
+                  {locale === "ar" ? "المدفوعات والمواعيد غير المكتملة" : "Unpaid appointments and urgent collections"}
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  {locale === "ar"
+                    ? "أهم ما يحتاج تدخل اليوم بدون فتح صفحات كثيرة."
+                    : "The highest-priority items to act on today without jumping across pages."}
+                </p>
+              </div>
+              <div className="rounded-3xl bg-rose-50 px-4 py-3 text-right">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
+                  {locale === "ar" ? "مبلغ يحتاج تحصيل" : "Amount due"}
+                </p>
+                <p className="mt-1 text-2xl font-bold text-rose-900">
+                  <Currency amount={attentionAmountDue} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 px-6 py-5 sm:grid-cols-3">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                  {locale === "ar" ? "مواعيد تحتاج دفع" : "Appointments needing payment"}
+                </p>
+                <p className="mt-2 text-3xl font-bold text-amber-950">{attentionAppointments.length}</p>
+              </div>
+              <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                  {locale === "ar" ? "تنبيهات عاجلة" : "Urgent alerts"}
+                </p>
+                <p className="mt-2 text-3xl font-bold text-sky-950">{urgentAlerts.length}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                  {locale === "ar" ? "تنبيهات إضافية" : "Other alerts"}
+                </p>
+                <p className="mt-2 text-3xl font-bold text-emerald-950">{otherAlerts.length}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 px-6 pb-6">
+              {attentionAppointments.length > 0 ? (
+                attentionAppointments.slice(0, 3).map((appointment) => {
+                  const dueAmount = Number(appointment.outstandingAmount || 0);
+                  return (
+                    <button
+                      key={`attention-${appointment.id}`}
+                      type="button"
+                      onClick={() => router.push(`/${locale}/dashboard/appointments`)}
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-4 text-left transition hover:border-primary hover:bg-primary/5"
+                    >
+                      <div className={`flex items-start justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={isRTL ? 'text-end' : ''}>
+                          <p className="text-sm font-semibold text-gray-900">{appointment.customerName}</p>
+                          <p className="mt-1 text-sm text-gray-600">{appointment.serviceName}</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {appointment.startTime} - {appointment.endTime}
+                            {appointment.paymentMethod ? ` • ${appointment.paymentMethod}` : ''}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {locale === "ar" ? "المتبقي" : "Due"}
+                          </p>
+                          <p className="mt-1 text-lg font-bold text-rose-700">
+                            <Currency amount={dueAmount} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="rounded-2xl bg-green-50 px-4 py-4 text-sm text-green-700">
+                  {locale === "ar"
+                    ? "لا توجد مواعيد بانتظار الدفع حالياً."
+                    : "No appointments are waiting for payment right now."}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="card overflow-hidden">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+                {locale === "ar" ? "ملخص سريع" : "Quick snapshot"}
+              </p>
+              <h3 className="mt-2 text-2xl font-bold text-gray-900">
+                {locale === "ar" ? "أرقام اليوم في لقطة واحدة" : "Today’s numbers at a glance"}
+              </h3>
+            </div>
+
+            <div className="space-y-3 p-6">
+              <div className="rounded-2xl bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "مستحقات اليوم" : "Today’s due amount"}
+                </p>
+                <p className="mt-2 text-3xl font-bold text-gray-900">
+                  <Currency amount={paymentDueSummary.totalDueAmount} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
+                </p>
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-white p-4">
+                <p className="text-sm font-semibold text-gray-900">
+                  {locale === "ar" ? "التنبيهات الحرجة" : "Critical alerts"}
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  {locale === "ar"
+                    ? `${urgentAlerts.length} تنبيه/تنبيهات تحتاج مراجعة سريعة.`
+                    : `${urgentAlerts.length} alert(s) need a quick review.`}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-white p-4">
+                <p className="text-sm font-semibold text-gray-900">
+                  {locale === "ar" ? "الوصول السريع" : "Fast access"}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => router.push(`/${locale}/dashboard/appointments`)} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
+                    {locale === "ar" ? "الحجوزات" : "Appointments"}
+                  </button>
+                  <button type="button" onClick={() => router.push(`/${locale}/dashboard/pos`)} className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">
+                    {locale === "ar" ? "نقطة البيع" : "POS"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
