@@ -41,6 +41,21 @@ const getDashboardStats = async (req, res) => {
 
         const todaysBookingCount = parseInt(todaysBookings[0]?.count || 0);
 
+        const yesterdayBookingsResult = await db.sequelize.query(`
+            SELECT COUNT(*) as count
+            FROM appointments a
+            INNER JOIN staff s ON a."staffId" = s.id
+            WHERE s."tenantId" = :tenantId
+            AND DATE(a."startTime") = CURRENT_DATE - INTERVAL '1 day'
+            AND a.status IN (:activeStatuses)
+        `, {
+            replacements: { tenantId, activeStatuses: ACTIVE_APPOINTMENT_STATUSES },
+            type: db.sequelize.QueryTypes.SELECT,
+            raw: true
+        });
+
+        const yesterdayBookingCount = parseInt(yesterdayBookingsResult[0]?.count || 0);
+
         // Get total revenue from appointments (all time)
         // Join with Staff to filter by tenant
         // Include both completed and confirmed appointments to match financial overview
@@ -57,6 +72,61 @@ const getDashboardStats = async (req, res) => {
         });
 
         const appointmentRevenue = parseFloat(appointmentRevenueResult[0]?.totalRevenue || 0);
+
+        const todaysAppointmentRevenueResult = await db.sequelize.query(`
+            SELECT SUM(a.price) as "totalRevenue"
+            FROM appointments a
+            INNER JOIN staff s ON a."staffId" = s.id
+            WHERE s."tenantId" = :tenantId
+            AND DATE(a."startTime") = CURRENT_DATE
+            AND a.status IN (:revenueStatuses)
+        `, {
+            replacements: { tenantId, revenueStatuses: REVENUE_TRACKED_APPOINTMENT_STATUSES },
+            type: db.sequelize.QueryTypes.SELECT,
+            raw: true
+        });
+
+        const yesterdayAppointmentRevenueResult = await db.sequelize.query(`
+            SELECT SUM(a.price) as "totalRevenue"
+            FROM appointments a
+            INNER JOIN staff s ON a."staffId" = s.id
+            WHERE s."tenantId" = :tenantId
+            AND DATE(a."startTime") = CURRENT_DATE - INTERVAL '1 day'
+            AND a.status IN (:revenueStatuses)
+        `, {
+            replacements: { tenantId, revenueStatuses: REVENUE_TRACKED_APPOINTMENT_STATUSES },
+            type: db.sequelize.QueryTypes.SELECT,
+            raw: true
+        });
+
+        const todaysPurchaseRevenueResult = await db.sequelize.query(`
+            SELECT
+                COALESCE(SUM(o."totalAmount"), 0) - COALESCE(SUM(o."platformFee"), 0) as "totalRevenue"
+            FROM orders o
+            WHERE o."tenantId" = :tenantId
+            AND DATE(o."createdAt") = CURRENT_DATE
+            AND o.status IN ('confirmed', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'completed')
+        `, {
+            replacements: { tenantId },
+            type: db.sequelize.QueryTypes.SELECT,
+            raw: true
+        });
+
+        const yesterdayPurchaseRevenueResult = await db.sequelize.query(`
+            SELECT
+                COALESCE(SUM(o."totalAmount"), 0) - COALESCE(SUM(o."platformFee"), 0) as "totalRevenue"
+            FROM orders o
+            WHERE o."tenantId" = :tenantId
+            AND DATE(o."createdAt") = CURRENT_DATE - INTERVAL '1 day'
+            AND o.status IN ('confirmed', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'completed')
+        `, {
+            replacements: { tenantId },
+            type: db.sequelize.QueryTypes.SELECT,
+            raw: true
+        });
+
+        const todaysRevenue = parseFloat(todaysAppointmentRevenueResult[0]?.totalRevenue || 0) + parseFloat(todaysPurchaseRevenueResult[0]?.totalRevenue || 0);
+        const yesterdayRevenue = parseFloat(yesterdayAppointmentRevenueResult[0]?.totalRevenue || 0) + parseFloat(yesterdayPurchaseRevenueResult[0]?.totalRevenue || 0);
 
         // Get total revenue from product purchases (all time)
         // Include all active order statuses to match financial overview
@@ -110,6 +180,9 @@ const getDashboardStats = async (req, res) => {
             success: true,
             stats: {
                 todaysBookings: todaysBookingCount,
+                todaysRevenue,
+                yesterdayBookings: yesterdayBookingCount,
+                yesterdayRevenue,
                 totalRevenue,
                 activeEmployees,
                 totalCustomers

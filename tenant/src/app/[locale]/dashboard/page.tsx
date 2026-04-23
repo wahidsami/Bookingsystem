@@ -11,6 +11,9 @@ type DashboardLandingPage = "home" | "appointments" | "pos";
 
 interface DashboardStats {
   todaysBookings: number;
+  todaysRevenue: number;
+  yesterdayBookings: number;
+  yesterdayRevenue: number;
   totalRevenue: number;
   activeEmployees: number;
   totalCustomers: number;
@@ -20,6 +23,7 @@ interface Appointment {
   id: string;
   customerName: string;
   serviceName: string;
+  employeeName?: string;
   startTime: string;
   endTime: string;
   status: string;
@@ -71,6 +75,9 @@ export default function DashboardPage() {
   const [savingLandingPage, setSavingLandingPage] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     todaysBookings: 0,
+    todaysRevenue: 0,
+    yesterdayBookings: 0,
+    yesterdayRevenue: 0,
     totalRevenue: 0,
     activeEmployees: 0,
     totalCustomers: 0
@@ -129,6 +136,9 @@ export default function DashboardPage() {
       if (statsResponse.status === "fulfilled" && statsResponse.value.success && statsResponse.value.stats) {
         setStats({
           todaysBookings: statsResponse.value.stats.todaysBookings || 0,
+          todaysRevenue: statsResponse.value.stats.todaysRevenue || 0,
+          yesterdayBookings: statsResponse.value.stats.yesterdayBookings || 0,
+          yesterdayRevenue: statsResponse.value.stats.yesterdayRevenue || 0,
           totalRevenue: statsResponse.value.stats.totalRevenue || 0,
           activeEmployees: statsResponse.value.stats.activeEmployees || 0,
           totalCustomers: statsResponse.value.stats.totalCustomers || 0
@@ -142,6 +152,7 @@ export default function DashboardPage() {
           id: apt.id,
           customerName: apt.customerName || "Unknown Customer",
           serviceName: locale === "ar" ? (apt.serviceName_ar || apt.serviceName) : apt.serviceName,
+          employeeName: apt.employeeName || "",
           startTime: apt.startTime,
           endTime: apt.endTime,
           status: apt.status,
@@ -183,6 +194,9 @@ export default function DashboardPage() {
       console.error("Failed to load dashboard data:", error);
       setStats({
         todaysBookings: 0,
+        todaysRevenue: 0,
+        yesterdayBookings: 0,
+        yesterdayRevenue: 0,
         totalRevenue: 0,
         activeEmployees: 0,
         totalCustomers: 0
@@ -258,6 +272,35 @@ export default function DashboardPage() {
   const attentionAmountDue = attentionAppointments.reduce((sum, appointment) => sum + Number(appointment.outstandingAmount || 0), 0);
   const urgentAlerts = paymentAlerts.filter((alert) => alert.severity === "high");
   const otherAlerts = paymentAlerts.filter((alert) => alert.severity !== "high");
+  const staffSnapshot = Object.values(
+    todaysAppointments.reduce<Record<string, { name: string; count: number; due: number }>>((acc, appointment) => {
+      const name = appointment.employeeName || (locale === "ar" ? "موظف غير معروف" : "Unknown employee");
+      if (!acc[name]) {
+        acc[name] = { name, count: 0, due: 0 };
+      }
+
+      acc[name].count += 1;
+      acc[name].due += Number(appointment.outstandingAmount || 0);
+      return acc;
+    }, {})
+  ).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const busiestStaff = staffSnapshot[0];
+  const maxStaffBookings = Math.max(1, ...staffSnapshot.map((item) => item.count));
+  const bookingsDelta = stats.todaysBookings - stats.yesterdayBookings;
+  const revenueDelta = stats.todaysRevenue - stats.yesterdayRevenue;
+  const formatDeltaText = (value: number, isCurrency: boolean) => {
+    const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
+    const absoluteValue = Math.abs(value);
+
+    if (isCurrency) {
+      const formatter = new Intl.NumberFormat(locale === "ar" ? "ar-SA" : "en-SA", {
+        maximumFractionDigits: 0
+      });
+      return `${prefix}${formatter.format(absoluteValue)} ${locale === "ar" ? "عن أمس" : "vs yesterday"}`;
+    }
+
+    return `${prefix}${absoluteValue} ${locale === "ar" ? "عن أمس" : "vs yesterday"}`;
+  };
 
   return (
     <TenantLayout>
@@ -619,6 +662,120 @@ export default function DashboardPage() {
                 <p className="mt-2 text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-2xl">🤝</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="card overflow-hidden">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+                  {locale === "ar" ? "ملخص الفريق" : "Staff snapshot"}
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-gray-900">
+                  {locale === "ar" ? "من هو الأكثر انشغالاً اليوم" : "Who is busiest today"}
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  {locale === "ar"
+                    ? `${stats.activeEmployees} موظف نشط، والبطاقات التالية تشرح الحمل الحالي بسرعة.`
+                    : `${stats.activeEmployees} active employee(s), with the current workload summarized below.`}
+                </p>
+              </div>
+              <div className="rounded-3xl bg-primary/10 px-4 py-3 text-right">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                  {locale === "ar" ? "الأكثر انشغالاً" : "Busiest"}
+                </p>
+                <p className="mt-1 text-sm font-bold text-gray-900">
+                  {busiestStaff?.name || (locale === "ar" ? "لا يوجد بعد" : "Not yet")}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 p-6">
+              {staffSnapshot.length > 0 ? (
+                staffSnapshot.slice(0, 3).map((item) => (
+                  <div key={item.name} className="rounded-2xl border border-gray-100 bg-white p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {locale === "ar" ? `${item.count} حجز اليوم` : `${item.count} appointment(s) today`}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900">{item.count}</p>
+                        <p className="text-xs font-medium text-gray-500">
+                          {locale === "ar" ? "حجوزات" : "bookings"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-secondary"
+                        style={{ width: `${Math.max(8, (item.count / maxStaffBookings) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {locale === "ar"
+                        ? `المتبقي: ${new Intl.NumberFormat(locale === "ar" ? "ar-SA" : "en-SA").format(item.due)}`
+                        : `Outstanding: ${new Intl.NumberFormat(locale === "ar" ? "ar-SA" : "en-SA").format(item.due)}`}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-2xl bg-gray-50 px-4 py-4 text-sm text-gray-600">
+                  {locale === "ar"
+                    ? "لم تبدأ الحجوزات بعد، لذلك لا يوجد توزيع فريق اليوم."
+                    : "No appointments yet, so there is no staff workload to show today."}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="card overflow-hidden">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-600">
+                {locale === "ar" ? "مؤشر الحركة" : "Trend strip"}
+              </p>
+              <h3 className="mt-2 text-2xl font-bold text-gray-900">
+                {locale === "ar" ? "اليوم مقارنة بالأمس" : "Today compared with yesterday"}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                {locale === "ar"
+                  ? "نظرة سريعة على هل المواعيد والإيراد يتحركان للأعلى أم للأسفل."
+                  : "A quick read on whether bookings and revenue are moving up or down."}
+              </p>
+            </div>
+
+            <div className="grid gap-3 p-6 sm:grid-cols-2">
+              <div className="rounded-3xl border border-gray-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  {locale === "ar" ? "الحجوزات" : "Bookings"}
+                </p>
+                <p className="mt-2 text-3xl font-bold text-gray-900">{stats.todaysBookings}</p>
+                <p className={`mt-2 text-sm font-semibold ${bookingsDelta > 0 ? "text-emerald-600" : bookingsDelta < 0 ? "text-rose-600" : "text-gray-500"}`}>
+                  {bookingsDelta > 0 ? "▲" : bookingsDelta < 0 ? "▼" : "•"} {formatDeltaText(bookingsDelta, false)}
+                </p>
+                <p className="mt-2 text-xs text-gray-500">
+                  {locale === "ar" ? `أمس: ${stats.yesterdayBookings}` : `Yesterday: ${stats.yesterdayBookings}`}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-gray-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  {locale === "ar" ? "الإيراد" : "Revenue"}
+                </p>
+                <p className="mt-2 text-3xl font-bold text-gray-900">
+                  <Currency amount={stats.todaysRevenue} locale={locale === "ar" ? "ar-SA" : "en-SA"} />
+                </p>
+                <p className={`mt-2 text-sm font-semibold ${revenueDelta > 0 ? "text-emerald-600" : revenueDelta < 0 ? "text-rose-600" : "text-gray-500"}`}>
+                  {revenueDelta > 0 ? "▲" : revenueDelta < 0 ? "▼" : "•"} {formatDeltaText(revenueDelta, true)}
+                </p>
+                <p className="mt-2 text-xs text-gray-500">
+                  {locale === "ar" ? "اليوم مقارنة بالأمس" : "Compared with yesterday"}
+                </p>
+              </div>
             </div>
           </div>
         </section>
