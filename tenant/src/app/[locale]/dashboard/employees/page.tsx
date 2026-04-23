@@ -370,7 +370,18 @@ export default function EmployeesPage() {
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1120px] w-full border-separate border-spacing-0">
+            <table
+              className="min-w-[1120px] w-full table-fixed border-separate border-spacing-0"
+              dir={isRTL ? "rtl" : "ltr"}
+            >
+              <colgroup>
+                <col className="w-14" />
+                <col className="w-[340px]" />
+                <col className="w-[220px]" />
+                <col className="w-[140px]" />
+                <col className="w-[160px]" />
+                <col className="w-[240px]" />
+              </colgroup>
               <thead className="bg-gray-50">
                 <tr className="text-sm text-gray-600">
                   <th className="border-b border-gray-200 px-4 py-4 text-center">
@@ -381,19 +392,19 @@ export default function EmployeesPage() {
                       className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                   </th>
-                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                  <th className="border-b border-gray-200 px-4 py-4 font-medium text-start">
                     {locale === "ar" ? "العضو" : "Team member"}
                   </th>
-                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                  <th className="border-b border-gray-200 px-4 py-4 font-medium text-start">
                     {locale === "ar" ? "المسمى الوظيفي" : "Job title"}
                   </th>
-                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                  <th className="border-b border-gray-200 px-4 py-4 font-medium text-start">
                     {locale === "ar" ? "الحالة" : "Status"}
                   </th>
-                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-right" : "text-left"}`}>
+                  <th className="border-b border-gray-200 px-4 py-4 font-medium text-start">
                     {locale === "ar" ? "تاريخ الإنشاء" : "Date created"}
                   </th>
-                  <th className={`border-b border-gray-200 px-4 py-4 font-medium ${isRTL ? "text-left" : "text-right"}`}>
+                  <th className="border-b border-gray-200 px-4 py-4 font-medium text-start">
                     {locale === "ar" ? "الإجراءات" : "Actions"}
                   </th>
                 </tr>
@@ -415,8 +426,8 @@ export default function EmployeesPage() {
                           className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                         />
                       </td>
-                      <td className="px-4 py-4 align-middle">
-                        <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse text-right" : ""}`}>
+                      <td className="px-4 py-4 align-middle overflow-hidden">
+                        <div className={`flex items-center gap-3 min-w-0 ${isRTL ? "text-right" : "text-left"}`}>
                           <div className="h-12 w-12 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                             {employee.photo ? (
                               <img
@@ -431,17 +442,17 @@ export default function EmployeesPage() {
                             )}
                           </div>
                           <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-semibold text-gray-900">{employee.name}</span>
+                            <div className={`flex flex-wrap items-center gap-2 ${isRTL ? "justify-end" : "justify-start"}`}>
+                              <span className="min-w-0 truncate font-semibold text-gray-900">{employee.name}</span>
                               <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${employee.isActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>
                                 {employee.isActive ? (locale === "ar" ? "نشط" : "Active") : (locale === "ar" ? "غير نشط" : "Inactive")}
                               </span>
                             </div>
-                            <div className="mt-1 text-sm text-gray-500 break-all">{employee.email || "-"}</div>
+                            <div className={`mt-1 text-sm text-gray-500 break-all ${isRTL ? "text-right" : "text-left"}`}>{employee.email || "-"}</div>
                           </div>
                         </div>
                       </td>
-                      <td className={`px-4 py-4 align-middle ${isRTL ? "text-right" : "text-left"}`}>
+                      <td className="px-4 py-4 align-middle text-start">
                         <div className="font-medium text-gray-900">
                           {employee.position
                             ? getEmployeePositionLabel(employee.position, locale as "ar" | "en")
@@ -453,16 +464,16 @@ export default function EmployeesPage() {
                           </div>
                         )}
                       </td>
-                      <td className={`px-4 py-4 align-middle ${isRTL ? "text-right" : "text-left"}`}>
+                      <td className="px-4 py-4 align-middle text-start">
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${employee.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
                           {employee.isActive ? (locale === "ar" ? "مفعل" : "Enabled") : (locale === "ar" ? "معطل" : "Disabled")}
                         </span>
                       </td>
-                      <td className={`px-4 py-4 align-middle text-sm text-gray-600 ${isRTL ? "text-right" : "text-left"}`}>
+                      <td className="px-4 py-4 align-middle text-sm text-gray-600 text-start">
                         {formatCreatedAt(employee.createdAt)}
                       </td>
-                      <td className={`px-4 py-4 align-middle ${isRTL ? "text-left" : "text-right"}`}>
-                        <div className={`flex flex-wrap gap-2 ${isRTL ? "justify-start" : "justify-end"}`}>
+                      <td className="px-4 py-4 align-middle text-start">
+                        <div className={`flex flex-wrap gap-2 ${isRTL ? "justify-end" : "justify-start"}`}>
                           <Link
                             href={`/${locale}/dashboard/employees/${employee.id}`}
                             className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10"
