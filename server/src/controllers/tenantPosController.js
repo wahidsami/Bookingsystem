@@ -1,10 +1,10 @@
 const { Op } = require('sequelize');
+const { ACTIVE_APPOINTMENT_STATUSES } = require('../utils/appointmentStatus');
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const db = require('../models');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
-const { ACTIVE_APPOINTMENT_STATUSES } = require('../utils/appointmentStatus');
 
 const POS_QUEUE_LIMIT = 100;
 const POS_TRANSACTION_LIMIT = 100;
@@ -361,6 +361,39 @@ const mapPaymentTransaction = (transaction) => {
     };
 };
 
+const mapAppointmentAttentionAlert = (appointment, now = new Date()) => {
+    const startTime = new Date(appointment.startTime);
+    const endTime = new Date(appointment.endTime);
+    const isOverdue = endTime.getTime() <= now.getTime();
+    const reference = appointment.bookingNumber || appointment.id;
+    const customerName = getCustomerName(appointment.user);
+    const serviceName = getServiceName(appointment.service);
+    const scheduledAt = appointment.startTime;
+
+    return {
+        id: `appointment-attention-${appointment.id}-${isOverdue ? 'overdue' : 'due'}`,
+        kind: 'appointment',
+        entityType: 'appointment',
+        entityId: appointment.id,
+        reference,
+        severity: isOverdue ? 'high' : 'medium',
+        title: isOverdue
+            ? `Appointment overdue for booking ${reference}`
+            : `Appointment needs check-in for booking ${reference}`,
+        title_ar: isOverdue
+            ? `الموعد متأخر للحجز ${reference}`
+            : `الموعد يحتاج تسجيل حضور للحجز ${reference}`,
+        message: isOverdue
+            ? `${customerName} has not checked in for ${serviceName}; the booking time has passed.`
+            : `${customerName} is scheduled for ${serviceName} and has not checked in yet.`,
+        message_ar: isOverdue
+            ? `لم يقم ${customerName} بتسجيل الحضور لخدمة ${serviceName} وقد انتهى وقت الموعد.`
+            : `تم تحديد موعد ${serviceName} لـ ${customerName} ولم يتم تسجيل الحضور بعد.`,
+        scheduledAt,
+        detailPath: appointment.id ? `/dashboard/appointments/${appointment.id}` : null
+    };
+};
+
 const buildAppointmentSearchWhere = (tenantId, search) => {
     const where = {
         tenantId,
@@ -398,6 +431,52 @@ const buildAppointmentSearchWhere = (tenantId, search) => {
     }
 
     return where;
+};
+
+const fetchAppointmentAttentionAlerts = async (tenantId, limit = POS_ALERT_LIMIT) => {
+    const now = new Date();
+    const activeAppointments = await db.Appointment.findAll({
+        where: {
+            tenantId,
+            status: { [Op.in]: ['pending', 'confirmed'] },
+            startTime: { [Op.lte]: now }
+        },
+        include: [
+            {
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar'],
+                required: false
+            },
+            {
+                model: db.Staff,
+                as: 'staff',
+                attributes: ['id', 'name'],
+                required: false
+            },
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            }
+        ],
+        order: [['startTime', 'ASC']],
+        limit
+    });
+
+    const alerts = activeAppointments
+        .map((appointment) => mapAppointmentAttentionAlert(appointment, now))
+        .filter(Boolean);
+
+    return {
+        alerts,
+        summary: {
+            appointmentAttentionCount: alerts.length,
+            overdueAppointmentCount: alerts.filter((alert) => alert.severity === 'high').length,
+            checkInDueCount: alerts.filter((alert) => alert.severity !== 'high').length
+        }
+    };
 };
 
 const buildOrderSearchWhere = (tenantId, search) => {
@@ -768,10 +847,24 @@ exports.getOperationalAlerts = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const limit = Math.min(parseInt(req.query.limit || POS_ALERT_LIMIT, 10), POS_ALERT_LIMIT);
-        const { queue, summary } = await fetchQueueData(tenantId, '', POS_QUEUE_LIMIT);
-        const alerts = queue
-            .map(mapPosAlertFromQueueItem)
+        const [queueResult, appointmentResult] = await Promise.all([
+            fetchQueueData(tenantId, '', POS_QUEUE_LIMIT),
+            fetchAppointmentAttentionAlerts(tenantId, limit)
+        ]);
+        const alerts = [
+            ...queueResult.queue.map(mapPosAlertFromQueueItem).map((alert) => ({
+                ...alert,
+                kind: 'pos'
+            })),
+            ...appointmentResult.alerts
+        ]
+            .sort((left, right) => new Date(right.scheduledAt).getTime() - new Date(left.scheduledAt).getTime())
             .slice(0, limit);
+
+        const summary = {
+            ...queueResult.summary,
+            ...appointmentResult.summary
+        };
 
         res.json({
             success: true,

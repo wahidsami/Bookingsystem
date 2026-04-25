@@ -195,13 +195,13 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   }, [locale, now, tenantTimeZone]);
   const notificationCount = useMemo(() => {
     const unreadUsageCount = usageAlerts.length;
-    const unreadPosCount = posAlerts.filter((alert) => {
+    const unreadOperationalCount = posAlerts.filter((alert) => {
       const timestamp = alert?.scheduledAt || alert?.createdAt;
       const parsed = timestamp ? new Date(timestamp) : null;
       return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() > notificationSeenAt : true;
     }).length;
 
-    return unreadUsageCount + unreadPosCount;
+    return unreadUsageCount + unreadOperationalCount;
   }, [notificationSeenAt, posAlerts, usageAlerts]);
   const notificationFeed = useMemo(() => {
     const toTimestamp = (value: any) => {
@@ -212,7 +212,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     return [
       ...posAlerts.map((alert) => ({
         key: `pos-${alert.id}`,
-        kind: 'pos' as const,
+        kind: (alert.kind || 'pos') as 'pos' | 'appointment',
         originalId: alert.id,
         title: locale === 'ar' ? (alert.title_ar || alert.title) : alert.title,
         message: locale === 'ar' ? (alert.message_ar || alert.message) : alert.message,
@@ -231,13 +231,13 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         severity: alert.priority === 'high' || alert.priority === 'critical' ? 'high' : 'medium'
       }))
     ]
-      .filter((item) => item.kind !== 'pos' || item.timestamp > notificationSeenAt)
+      .filter((item) => (item.kind !== 'pos' && item.kind !== 'appointment') || item.timestamp > notificationSeenAt)
       .sort((left, right) => right.timestamp - left.timestamp)
       .slice(0, 6);
   }, [locale, posAlerts, usageAlerts, notificationSeenAt]);
   const notificationBadgeCount = notificationCount;
-  const handleDismissNotification = (item: { kind: 'pos' | 'usage'; originalId: string }) => {
-    if (item.kind === 'pos') {
+  const handleDismissNotification = (item: { kind: 'pos' | 'appointment' | 'usage'; originalId: string }) => {
+    if (item.kind === 'pos' || item.kind === 'appointment') {
       dismissPosAlert(item.originalId);
     } else {
       dismissAlert(item.originalId);
@@ -332,14 +332,18 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     <p className="mt-1 text-xs leading-5 text-gray-600">{item.message}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                       item.kind === 'pos'
                         ? 'bg-sky-100 text-sky-700'
-                        : 'bg-amber-100 text-amber-700'
+                        : item.kind === 'appointment'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-amber-100 text-amber-700'
                     }`}>
                       {item.kind === 'pos'
                         ? (locale === 'ar' ? 'تحصيل' : 'POS')
-                        : (locale === 'ar' ? 'اشتراك' : 'Subscription')}
+                        : item.kind === 'appointment'
+                          ? (locale === 'ar' ? 'موعد' : 'Appointment')
+                          : (locale === 'ar' ? 'اشتراك' : 'Subscription')}
                     </span>
                     <button
                       type="button"
