@@ -58,6 +58,19 @@ interface PrefillCustomer {
   phone?: string;
 }
 
+interface ExistingBreakItem {
+  id: string;
+  staffId: string;
+  type?: string;
+  label?: string | null;
+  specificDate?: string | null;
+  startTime: string;
+  endTime: string;
+  isRecurring?: boolean;
+  startDateTime?: string | null;
+  endDateTime?: string | null;
+}
+
 export interface AppointmentActionDrawerPrefill {
   customer?: PrefillCustomer | null;
   serviceId?: string;
@@ -82,9 +95,10 @@ interface AppointmentActionDrawerProps {
   defaultDate?: string;
   defaultTime?: string;
   prefill?: AppointmentActionDrawerPrefill;
+  existingBreak?: ExistingBreakItem | null;
   onClose: () => void;
   onAppointmentCreated?: () => void;
-  onBreakCreated?: () => void;
+  onBreakSaved?: () => void;
 }
 
 function parseArrayValue<T = any>(value: unknown): T[] {
@@ -111,6 +125,22 @@ function getTodayDateKey() {
   return new Date().toISOString().split("T")[0];
 }
 
+function getLocalDateKeyFromValue(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function addMinutesToTime(time: string, minutesToAdd: number) {
   const [hoursString, minutesString] = time.split(":");
   const base = new Date();
@@ -130,9 +160,10 @@ export function AppointmentActionDrawer({
   defaultDate,
   defaultTime,
   prefill,
+  existingBreak,
   onClose,
   onAppointmentCreated,
-  onBreakCreated
+  onBreakSaved
 }: AppointmentActionDrawerProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -168,6 +199,7 @@ export function AppointmentActionDrawer({
   const [breakEndTime, setBreakEndTime] = useState("10:30");
   const [breakType, setBreakType] = useState<"lunch" | "prayer" | "cleaning" | "other">("other");
   const [breakLabel, setBreakLabel] = useState("");
+  const isEditingBlockedTime = mode === "blocked_time" && Boolean(existingBreak);
 
   useEffect(() => {
     if (!open) {
@@ -207,13 +239,19 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    setBreakEmployeeId(defaultStaffId || "");
-    setBreakDate(defaultDate || getTodayDateKey());
-    setBreakStartTime(defaultTime || "10:00");
-    setBreakEndTime(addMinutesToTime(defaultTime || "10:00", 30));
-    setBreakType("other");
-    setBreakLabel("");
-  }, [open, mode, defaultStaffId, defaultDate, defaultTime, prefill]);
+    const breakDateValue =
+      getLocalDateKeyFromValue(existingBreak?.specificDate) ||
+      getLocalDateKeyFromValue(existingBreak?.startDateTime) ||
+      defaultDate ||
+      getTodayDateKey();
+
+    setBreakEmployeeId(existingBreak?.staffId || defaultStaffId || "");
+    setBreakDate(breakDateValue);
+    setBreakStartTime(existingBreak?.startTime?.slice(0, 5) || defaultTime || "10:00");
+    setBreakEndTime(existingBreak?.endTime?.slice(0, 5) || addMinutesToTime(defaultTime || "10:00", 30));
+    setBreakType((existingBreak?.type as any) || "other");
+    setBreakLabel(existingBreak?.label || "");
+  }, [open, mode, defaultStaffId, defaultDate, defaultTime, prefill, existingBreak]);
 
   useEffect(() => {
     if (!open || mode !== "appointment") {
@@ -428,18 +466,23 @@ export function AppointmentActionDrawer({
 
     setSaving(true);
     try {
+      const isRecurringBreak = existingBreak?.isRecurring === true;
+      const dayOfWeek = isRecurringBreak ? new Date(`${breakDate}T00:00:00`).getDay() : null;
       const response = await tenantApi.createEmployeeBreak(breakEmployeeId, {
-        specificDate: breakDate,
+        specificDate: isRecurringBreak ? null : breakDate,
         startTime: breakStartTime,
         endTime: breakEndTime,
         type: breakType,
         label: breakLabel.trim() || undefined,
-        isRecurring: false
+        isRecurring: isRecurringBreak,
+        dayOfWeek,
+        startDate: isRecurringBreak ? breakDate : undefined,
+        referenceDate: breakDate
       });
 
       if (response.success) {
         setSuccess(locale === "ar" ? "تم حفظ الوقت المحجوز." : "Blocked time saved successfully.");
-        onBreakCreated?.();
+        onBreakSaved?.();
         onClose();
       } else {
         setError(response.message || (locale === "ar" ? "فشل حفظ الوقت المحجوز." : "Failed to save blocked time."));
@@ -447,6 +490,40 @@ export function AppointmentActionDrawer({
     } catch (err: any) {
       console.error("Failed to create blocked time:", err);
       setError(err.message || (locale === "ar" ? "فشل حفظ الوقت المحجوز." : "Failed to save blocked time."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBreakDelete = async () => {
+    if (!existingBreak) {
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+
+    const confirmed = typeof window === "undefined"
+      ? true
+      : window.confirm(locale === "ar" ? "هل تريد حذف الوقت المحجوز؟" : "Delete this blocked time?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await tenantApi.deleteEmployeeBreak(breakEmployeeId || existingBreak.staffId, existingBreak.id);
+      if (response.success) {
+        setSuccess(locale === "ar" ? "تم حذف الوقت المحجوز." : "Blocked time deleted successfully.");
+        onBreakSaved?.();
+        onClose();
+      } else {
+        setError(response.message || (locale === "ar" ? "فشل حذف الوقت المحجوز." : "Failed to delete blocked time."));
+      }
+    } catch (err: any) {
+      console.error("Failed to delete blocked time:", err);
+      setError(err.message || (locale === "ar" ? "فشل حذف الوقت المحجوز." : "Failed to delete blocked time."));
     } finally {
       setSaving(false);
     }
@@ -820,6 +897,7 @@ export function AppointmentActionDrawer({
                   <select
                     value={breakEmployeeId}
                     onChange={(e) => setBreakEmployeeId(e.target.value)}
+                    disabled={isEditingBlockedTime}
                     className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
@@ -830,6 +908,11 @@ export function AppointmentActionDrawer({
                       </option>
                     ))}
                   </select>
+                  {isEditingBlockedTime && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      {locale === "ar" ? "لا يمكن تغيير الموظف أثناء تعديل الوقت المحجوز." : "The employee stays fixed while editing blocked time."}
+                    </p>
+                  )}
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <input
@@ -879,18 +962,43 @@ export function AppointmentActionDrawer({
           </div>
 
           <div className="border-t border-gray-100 px-5 py-4">
-            <button
-              type="button"
-              onClick={mode === "appointment" ? handleAppointmentSubmit : handleBreakSubmit}
-              disabled={saving}
-              className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {saving
-                ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
-                : (mode === "appointment"
-                  ? (locale === "ar" ? "حفظ الموعد" : "Save Appointment")
-                  : (locale === "ar" ? "حفظ الوقت المحجوز" : "Save Blocked Time"))}
-            </button>
+            {mode === "blocked_time" && existingBreak ? (
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleBreakDelete}
+                  disabled={saving}
+                  className="flex-1 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {saving
+                    ? (locale === "ar" ? "جارٍ الحذف..." : "Deleting...")
+                    : (locale === "ar" ? "حذف الوقت المحجوز" : "Delete Blocked Time")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBreakSubmit}
+                  disabled={saving}
+                  className="flex-[1.4] rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {saving
+                    ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                    : (locale === "ar" ? "حفظ التغييرات" : "Save Changes")}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={mode === "appointment" ? handleAppointmentSubmit : handleBreakSubmit}
+                disabled={saving}
+                className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {saving
+                  ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                  : (mode === "appointment"
+                    ? (locale === "ar" ? "حفظ الموعد" : "Save Appointment")
+                    : (locale === "ar" ? "حفظ الوقت المحجوز" : "Save Blocked Time"))}
+              </button>
+            )}
           </div>
         </div>
       </aside>

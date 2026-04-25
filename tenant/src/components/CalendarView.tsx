@@ -52,6 +52,8 @@ interface EmployeeBreak {
   staffId: string;
   type: string;
   label?: string | null;
+  isRecurring?: boolean;
+  specificDate?: string | null;
   startTime: string;
   endTime: string;
   startDateTime?: string | null;
@@ -73,6 +75,7 @@ interface CalendarViewProps {
     startTime: string;
     appointmentId?: string;
   }) => void;
+  onBreakClick?: (breakItem: EmployeeBreak) => void;
   onAppointmentSettingsClick?: (appointmentId: string) => void;
   onOpenTools?: () => void;
   activeFilterCount?: number;
@@ -99,6 +102,7 @@ export function CalendarView({
   onReassignAppointment,
   onAppointmentClick,
   onGridContextMenu,
+  onBreakClick,
   onAppointmentSettingsClick,
   onOpenTools,
   activeFilterCount = 0,
@@ -872,9 +876,10 @@ export function CalendarView({
                         return (
                           <div
                             key={`break-${breakItem.id}`}
-                            className="absolute z-[1] rounded-xl border border-rose-200 bg-rose-100/90 px-3 py-2 text-rose-700 shadow-sm"
+                            className={`absolute z-[1] rounded-xl border border-rose-200 bg-rose-100/90 px-3 py-2 text-rose-700 shadow-sm transition hover:shadow-md ${onBreakClick ? 'cursor-pointer hover:border-rose-300 hover:bg-rose-100' : ''}`}
                             style={breakStyle}
                             title={`${getBreakLabel(breakItem)} • ${startLabel} - ${endLabel}`}
+                            onClick={() => onBreakClick?.(breakItem)}
                           >
                             <div className="flex items-center justify-between gap-2 text-xs font-semibold">
                               <span className="truncate">{getBreakLabel(breakItem)}</span>

@@ -703,6 +703,7 @@ class TenantApiClient {
     isRecurring?: boolean;
     startDate?: string | null;
     endDate?: string | null;
+    referenceDate?: string | null;
   }): Promise<any> {
     return this.request(`/tenant/employees/${employeeId}/breaks`, {
       method: 'POST',

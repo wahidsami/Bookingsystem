@@ -69,6 +69,9 @@ interface EmployeeBreak {
   staffId: string;
   type: string;
   label?: string | null;
+  isRecurring?: boolean;
+  specificDate?: string | null;
+  dayOfWeek?: number | null;
   startTime: string;
   endTime: string;
   startDateTime?: string | null;
@@ -122,6 +125,7 @@ export default function AppointmentsPage() {
   const [showQuickDrawer, setShowQuickDrawer] = useState(false);
   const [quickDrawerMode, setQuickDrawerMode] = useState<'appointment' | 'blocked_time'>('appointment');
   const [drawerPrefill, setDrawerPrefill] = useState<AppointmentActionDrawerPrefill>({});
+  const [selectedBreak, setSelectedBreak] = useState<EmployeeBreak | null>(null);
   const [showAppointmentDetailsDrawer, setShowAppointmentDetailsDrawer] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [gridHourHeight, setGridHourHeight] = useState(() => {
@@ -471,15 +475,20 @@ export default function AppointmentsPage() {
   const openQuickAppointmentDrawer = (prefill?: { staffId?: string; date?: string; time?: string }) => {
     setDrawerPrefill(prefill || {});
     setQuickDrawerMode('appointment');
+    setSelectedBreak(null);
     setShowQuickDrawer(true);
     setShowAppointmentDetailsDrawer(false);
     setShowFilters(false);
     setBoardContextMenu(null);
   };
 
-  const openBlockedTimeDrawer = (prefill?: { staffId?: string; date?: string; time?: string }) => {
+  const openBlockedTimeDrawer = (
+    prefill?: { staffId?: string; date?: string; time?: string },
+    breakItem?: EmployeeBreak | null
+  ) => {
     setDrawerPrefill(prefill || {});
     setQuickDrawerMode('blocked_time');
+    setSelectedBreak(breakItem || null);
     setShowQuickDrawer(true);
     setShowAppointmentDetailsDrawer(false);
     setShowFilters(false);
@@ -515,8 +524,20 @@ export default function AppointmentsPage() {
       notes: appointment.notes || undefined
     });
     setQuickDrawerMode('appointment');
+    setSelectedBreak(null);
     setShowQuickDrawer(true);
     setShowAppointmentDetailsDrawer(false);
+  };
+
+  const handleOpenBlockedTime = (breakItem: EmployeeBreak) => {
+    const start = breakItem.startDateTime ? new Date(breakItem.startDateTime) : new Date(`${selectedDateKey}T${breakItem.startTime}`);
+    const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    openBlockedTimeDrawer({
+      staffId: breakItem.staffId,
+      date,
+      time
+    }, breakItem);
   };
 
   const handleGridContextMenu = (payload: {
@@ -1082,6 +1103,7 @@ export default function AppointmentsPage() {
           onReassignAppointment={handleReassignAppointment}
           onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
+          onBreakClick={handleOpenBlockedTime}
           onAppointmentSettingsClick={handleOpenAppointmentDetails}
           onOpenTools={() => setShowFilters(true)}
           activeFilterCount={activeFilterCount}
@@ -1116,7 +1138,11 @@ export default function AppointmentsPage() {
         defaultDate={drawerPrefill.date}
         defaultTime={drawerPrefill.time}
         prefill={drawerPrefill}
-        onClose={() => setShowQuickDrawer(false)}
+        existingBreak={selectedBreak}
+        onClose={() => {
+          setShowQuickDrawer(false);
+          setSelectedBreak(null);
+        }}
         onAppointmentCreated={() => {
           if (viewMode === 'calendar') {
             loadAppointmentsBoard();
@@ -1124,7 +1150,8 @@ export default function AppointmentsPage() {
             loadAppointments();
           }
         }}
-        onBreakCreated={() => {
+        onBreakSaved={() => {
+          setSelectedBreak(null);
           if (viewMode === 'calendar') {
             loadAppointmentsBoard();
           } else {

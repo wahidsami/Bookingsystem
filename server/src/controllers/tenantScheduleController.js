@@ -522,6 +522,19 @@ exports.updateBreak = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id: employeeId, breakId } = req.params;
+        const {
+            dayOfWeek,
+            specificDate,
+            startTime,
+            endTime,
+            type,
+            label,
+            isRecurring,
+            startDate,
+            endDate,
+            referenceDate,
+            ...rest
+        } = req.body;
 
         const employee = await db.Staff.findOne({
             where: { id: employeeId, tenantId }
@@ -545,7 +558,139 @@ exports.updateBreak = async (req, res) => {
             });
         }
 
-        await breakRecord.update(req.body);
+        const nextIsRecurring = isRecurring !== undefined ? isRecurring : breakRecord.isRecurring;
+        const nextSpecificDate = nextIsRecurring ? null : (specificDate ?? breakRecord.specificDate);
+        const nextStartTime = startTime || breakRecord.startTime;
+        const nextEndTime = endTime || breakRecord.endTime;
+        const validationDate = referenceDate || nextSpecificDate || breakRecord.specificDate;
+
+        if (validationDate) {
+            const nextStart = combineDateAndTime(validationDate, nextStartTime);
+            const nextEnd = combineDateAndTime(validationDate, nextEndTime);
+
+            if (!nextStart || !nextEnd || nextEnd <= nextStart) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Break end time must be after start time'
+                });
+            }
+
+            const validationDayOfWeek = new Date(validationDate).getDay();
+            const [overlappingAppointments, overlappingBreaks, overlappingTimeOff] = await Promise.all([
+                db.Appointment.findAll({
+                    where: {
+                        staffId: employeeId,
+                        status: { [Op.in]: ACTIVE_APPOINTMENT_STATUSES },
+                        startTime: {
+                            [Op.lte]: new Date(`${validationDate}T23:59:59.999`)
+                        },
+                        endTime: {
+                            [Op.gte]: new Date(`${validationDate}T00:00:00`)
+                        },
+                        [Op.and]: [
+                            {
+                                [Op.or]: [
+                                    {
+                                        startTime: { [Op.lte]: nextStart },
+                                        endTime: { [Op.gt]: nextStart }
+                                    },
+                                    {
+                                        startTime: { [Op.lt]: nextEnd },
+                                        endTime: { [Op.gte]: nextEnd }
+                                    },
+                                    {
+                                        startTime: { [Op.gte]: nextStart },
+                                        endTime: { [Op.lte]: nextEnd }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    attributes: ['id', 'startTime', 'endTime', 'status']
+                }),
+                db.StaffBreak.findAll({
+                    where: {
+                        staffId: employeeId,
+                        isActive: true,
+                        id: { [Op.ne]: breakId },
+                        [Op.or]: [
+                            {
+                                isRecurring: false,
+                                specificDate: validationDate
+                            },
+                            {
+                                isRecurring: true,
+                                dayOfWeek: validationDayOfWeek,
+                                [Op.and]: [
+                                    {
+                                        [Op.or]: [
+                                            { startDate: null },
+                                            { startDate: { [Op.lte]: validationDate } }
+                                        ]
+                                    },
+                                    {
+                                        [Op.or]: [
+                                            { endDate: null },
+                                            { endDate: { [Op.gte]: validationDate } }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    attributes: ['id', 'startTime', 'endTime', 'specificDate', 'dayOfWeek', 'isRecurring']
+                }),
+                db.StaffTimeOff.findOne({
+                    where: {
+                        staffId: employeeId,
+                        isApproved: true,
+                        startDate: { [Op.lte]: validationDate },
+                        endDate: { [Op.gte]: validationDate }
+                    },
+                    attributes: ['id', 'startDate', 'endDate', 'type']
+                })
+            ]);
+
+            if (overlappingAppointments.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Blocked time overlaps with an existing appointment'
+                });
+            }
+
+            const conflictingBreak = overlappingBreaks.find((breakItem) => {
+                const existingStart = combineDateAndTime(validationDate, breakItem.startTime);
+                const existingEnd = combineDateAndTime(validationDate, breakItem.endTime);
+                return existingStart && existingEnd && windowsOverlap(nextStart, nextEnd, existingStart, existingEnd);
+            });
+
+            if (conflictingBreak) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Blocked time overlaps with an existing break'
+                });
+            }
+
+            if (overlappingTimeOff) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Employee already has approved time off on this date'
+                });
+            }
+        }
+
+        await breakRecord.update({
+            ...(dayOfWeek !== undefined ? { dayOfWeek } : {}),
+            ...(specificDate !== undefined ? { specificDate } : {}),
+            ...(startTime !== undefined ? { startTime } : {}),
+            ...(endTime !== undefined ? { endTime } : {}),
+            ...(type !== undefined ? { type } : {}),
+            ...(label !== undefined ? { label } : {}),
+            ...(isRecurring !== undefined ? { isRecurring } : {}),
+            ...(startDate !== undefined ? { startDate } : {}),
+            ...(endDate !== undefined ? { endDate } : {}),
+            ...rest
+        });
 
         res.json({
             success: true,
