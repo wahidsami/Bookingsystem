@@ -1345,30 +1345,63 @@ export default function EditEmployeePage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDashboardInvite}
-                      disabled={dashboardInviteLoading}
-                      className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {dashboardInviteLoading
-                        ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
-                        : (locale === 'ar' ? 'إرسال دعوة' : 'Send invite')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDashboardResetPassword}
-                      disabled={dashboardResetLoading}
-                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {dashboardResetLoading
-                        ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
-                        : (locale === 'ar' ? 'إعادة كلمة المرور' : 'Reset password')}
-                    </button>
-                  </div>
                 </div>
               )}
+
+              <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {locale === 'ar' ? 'إدارة الوصول' : 'Access management'}
+                    </h4>
+                    <p className="mt-1 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {isServiceProvider
+                        ? (locale === 'ar'
+                          ? 'أرسل دعوة التطبيق أو أعد تعيين كلمة المرور الخاصة بتطبيق الموظف.'
+                          : 'Send the staff app invite or reset the staff app password.')
+                        : (locale === 'ar'
+                          ? 'أرسل دعوة الحساب أو أعد تعيين كلمة المرور لحساب لوحة التحكم المرتبط.'
+                          : 'Send the dashboard invite or reset the linked dashboard password.')}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    {isServiceProvider
+                      ? (locale === 'ar' ? 'تطبيق الموظف' : 'Staff app')
+                      : (locale === 'ar' ? 'لوحة التحكم' : 'Dashboard')}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={isServiceProvider ? handleSendInvite : handleDashboardInvite}
+                    disabled={isServiceProvider ? inviteLoading : dashboardInviteLoading}
+                    className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isServiceProvider
+                      ? (inviteLoading
+                        ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                        : (locale === 'ar' ? 'إرسال دعوة التطبيق' : 'Send app invite'))
+                      : (dashboardInviteLoading
+                        ? (locale === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                        : (locale === 'ar' ? 'إرسال دعوة الحساب' : 'Send account invite'))}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={isServiceProvider ? handleResetPassword : handleDashboardResetPassword}
+                    disabled={isServiceProvider ? resetLoading : dashboardResetLoading}
+                    className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isServiceProvider
+                      ? (resetLoading
+                        ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
+                        : (locale === 'ar' ? 'إعادة كلمة مرور التطبيق' : 'Reset app password'))
+                      : (dashboardResetLoading
+                        ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
+                        : (locale === 'ar' ? 'إعادة كلمة مرور الحساب' : 'Reset account password'))}
+                  </button>
+                </div>
+              </div>
             </section>
           </div>
       </form>
