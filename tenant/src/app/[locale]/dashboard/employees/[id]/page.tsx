@@ -514,6 +514,14 @@ export default function EditEmployeePage() {
     setDashboardPermissions(nextPermissions);
   };
 
+  const staffPermissionItems = [
+    { key: 'view_earnings', label: locale === 'ar' ? 'عرض الأرباح' : 'View earnings' },
+    { key: 'view_reviews', label: locale === 'ar' ? 'عرض التقييمات' : 'View reviews' },
+    { key: 'reply_reviews', label: locale === 'ar' ? 'الرد على التقييمات' : 'Reply to reviews' },
+    { key: 'view_clients', label: locale === 'ar' ? 'عرض العملاء' : 'View clients' },
+    { key: 'view_booking_notes', label: locale === 'ar' ? 'عرض ملاحظات الحجز' : 'View booking notes' }
+  ] as const;
+
   const resolveDashboardAccountId = async () => {
     if (dashboardAccountId) {
       return dashboardAccountId;
@@ -1234,6 +1242,39 @@ export default function EditEmployeePage() {
                       <div className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
                         {locale === 'ar' ? 'مفعل تلقائياً' : 'Auto-managed'}
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 p-4">
+                    <div className="mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'صلاحيات تطبيق الموظف' : 'Staff app permissions'}
+                      </h4>
+                      <p className="text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar'
+                          ? 'هذه الصلاحيات تتحكم بما يظهر في تطبيق الموظف لهذا العضو.'
+                          : 'These permissions control what this employee can access in the staff app.'}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {staffPermissionItems.map(({ key, label }) => {
+                        const checked = permissions[key as keyof typeof permissions] === true;
+
+                        return (
+                          <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
+                            <span className="text-sm font-medium text-gray-700">
+                              {label}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={permissionsLoading}
+                              onChange={(event) => handlePermissionChange(key as keyof typeof permissions, event.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                            />
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
