@@ -421,6 +421,11 @@ export function AppointmentActionDrawer({
       return;
     }
 
+    if (breakEndTime <= breakStartTime) {
+      setError(locale === "ar" ? "وقت الانتهاء يجب أن يكون بعد وقت البداية." : "End time must be after start time.");
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await tenantApi.createEmployeeBreak(breakEmployeeId, {

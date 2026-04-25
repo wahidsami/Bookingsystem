@@ -5,6 +5,33 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const { ACTIVE_APPOINTMENT_STATUSES } = require('../utils/appointmentStatus');
+
+function combineDateAndTime(dateValue, timeValue) {
+    if (!dateValue || !timeValue) {
+        return null;
+    }
+
+    const datePart = typeof dateValue === 'string'
+        ? dateValue
+        : new Date(dateValue).toISOString().split('T')[0];
+    const timePart = `${timeValue}`.slice(0, 5);
+
+    if (!/^\d{2}:\d{2}$/.test(timePart)) {
+        return null;
+    }
+
+    const combined = new Date(`${datePart}T${timePart}:00`);
+    if (Number.isNaN(combined.getTime())) {
+        return null;
+    }
+
+    return combined;
+}
+
+function windowsOverlap(startA, endA, startB, endB) {
+    return startA < endB && endA > startB;
+}
 
 /**
  * Get all shifts for an employee
@@ -340,6 +367,123 @@ exports.createBreak = async (req, res) => {
                 success: false,
                 message: 'specificDate is required for one-time breaks'
             });
+        }
+
+        if (!isRecurring) {
+            const breakStart = combineDateAndTime(specificDate, startTime);
+            const breakEnd = combineDateAndTime(specificDate, endTime);
+
+            if (!breakStart || !breakEnd || breakEnd <= breakStart) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Break end time must be after start time'
+                });
+            }
+
+            const dayStart = new Date(`${specificDate}T00:00:00`);
+            const dayEnd = new Date(`${specificDate}T23:59:59.999`);
+            const breakDayOfWeek = new Date(specificDate).getDay();
+
+            const [overlappingAppointments, overlappingBreaks, overlappingTimeOff] = await Promise.all([
+                db.Appointment.findAll({
+                    where: {
+                        staffId: employeeId,
+                        status: { [Op.in]: ACTIVE_APPOINTMENT_STATUSES },
+                        startTime: {
+                            [Op.lte]: dayEnd
+                        },
+                        endTime: {
+                            [Op.gte]: dayStart
+                        },
+                        [Op.and]: [
+                            {
+                                [Op.or]: [
+                                    {
+                                        startTime: { [Op.lte]: breakStart },
+                                        endTime: { [Op.gt]: breakStart }
+                                    },
+                                    {
+                                        startTime: { [Op.lt]: breakEnd },
+                                        endTime: { [Op.gte]: breakEnd }
+                                    },
+                                    {
+                                        startTime: { [Op.gte]: breakStart },
+                                        endTime: { [Op.lte]: breakEnd }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    attributes: ['id', 'startTime', 'endTime', 'status']
+                }),
+                db.StaffBreak.findAll({
+                    where: {
+                        staffId: employeeId,
+                        isActive: true,
+                        [Op.or]: [
+                            {
+                                isRecurring: false,
+                                specificDate
+                            },
+                            {
+                                isRecurring: true,
+                                dayOfWeek: breakDayOfWeek,
+                                [Op.and]: [
+                                    {
+                                        [Op.or]: [
+                                            { startDate: null },
+                                            { startDate: { [Op.lte]: specificDate } }
+                                        ]
+                                    },
+                                    {
+                                        [Op.or]: [
+                                            { endDate: null },
+                                            { endDate: { [Op.gte]: specificDate } }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    attributes: ['id', 'startTime', 'endTime', 'specificDate', 'dayOfWeek', 'isRecurring']
+                }),
+                db.StaffTimeOff.findOne({
+                    where: {
+                        staffId: employeeId,
+                        isApproved: true,
+                        startDate: { [Op.lte]: specificDate },
+                        endDate: { [Op.gte]: specificDate }
+                    },
+                    attributes: ['id', 'startDate', 'endDate', 'type']
+                })
+            ]);
+
+            if (overlappingAppointments.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Blocked time overlaps with an existing appointment'
+                });
+            }
+
+            const conflictingBreak = overlappingBreaks.find((breakRecord) => {
+                const existingStart = combineDateAndTime(specificDate, breakRecord.startTime);
+                const existingEnd = combineDateAndTime(specificDate, breakRecord.endTime);
+                return existingStart && existingEnd && windowsOverlap(breakStart, breakEnd, existingStart, existingEnd);
+            });
+
+            if (conflictingBreak) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Blocked time overlaps with an existing break'
+                });
+            }
+
+            if (overlappingTimeOff) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Employee already has approved time off on this date'
+                });
+            }
         }
 
         const breakRecord = await db.StaffBreak.create({
