@@ -286,6 +286,16 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             allowNull: true
         },
+        customerReminderSentAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'When the latest customer reminder was sent'
+        },
+        noShowMarkedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'When the appointment was auto-marked or manually marked as no-show'
+        },
         // Split Payment Support
         depositAmount: {
             type: DataTypes.DECIMAL(10, 2),

@@ -12,6 +12,9 @@ const {
     normalizeTenantPaymentSettings,
     validateTenantPaymentSettings
 } = require('../utils/tenantPaymentSettings');
+const {
+    normalizeAppointmentNotificationSettings
+} = require('../services/appointmentAutomationService');
 
 const DASHBOARD_LANDING_PAGES = new Set(['home', 'appointments', 'pos']);
 
@@ -20,6 +23,8 @@ const normalizeDashboardSettings = (value = {}) => ({
         ? value.defaultLandingPage
         : 'home'
 });
+
+const normalizeNotificationSettings = (value = {}) => normalizeAppointmentNotificationSettings(value);
 
 /**
  * Get subscription limits and current usage for the tenant.
@@ -125,7 +130,8 @@ exports.getSettings = async (req, res) => {
                 enableVoiceAlerts: true,
                 defaultLanguage: 'ar',
                 supportedLanguages: ['ar', 'en'],
-                dashboardSettings: normalizeDashboardSettings()
+                dashboardSettings: normalizeDashboardSettings(),
+                notificationSettings: normalizeNotificationSettings()
             }
         });
 
@@ -135,6 +141,7 @@ exports.getSettings = async (req, res) => {
             acceptWallet: settings.acceptWallet
         });
         const normalizedDashboardSettings = normalizeDashboardSettings(settings.dashboardSettings);
+        const normalizedNotificationSettings = normalizeNotificationSettings(settings.notificationSettings);
 
         res.json({
             success: true,
@@ -143,6 +150,7 @@ exports.getSettings = async (req, res) => {
                 settings: {
                     ...settings.toJSON(),
                     paymentSettings: normalizedPaymentSettings,
+                    notificationSettings: normalizedNotificationSettings,
                     dashboardSettings: normalizedDashboardSettings,
                     defaultDeliveryFee: normalizedPaymentSettings.defaultDeliveryFee
                 }
@@ -367,7 +375,12 @@ exports.updateNotificationSettings = async (req, res) => {
             enableEmailNotifications,
             enableSmsNotifications,
             enableWhatsAppNotifications,
-            enableVoiceAlerts
+            enableVoiceAlerts,
+            remindRemainderToCollect,
+            appointmentGracePeriodMinutes,
+            autoMarkNoShowAfterGracePeriod,
+            customerReminderEnabled,
+            customerReminderMinutesBefore
         } = req.body;
 
         let [settings] = await db.TenantSettings.findOrCreate({
@@ -375,17 +388,31 @@ exports.updateNotificationSettings = async (req, res) => {
             defaults: { tenantId }
         });
 
+        const currentNotificationSettings = normalizeNotificationSettings(settings.notificationSettings);
+        const nextNotificationSettings = normalizeNotificationSettings({
+            ...currentNotificationSettings,
+            remindRemainderToCollect,
+            appointmentGracePeriodMinutes,
+            autoMarkNoShowAfterGracePeriod,
+            customerReminderEnabled,
+            customerReminderMinutesBefore
+        });
+
         await settings.update({
             enableEmailNotifications: enableEmailNotifications !== undefined ? enableEmailNotifications : settings.enableEmailNotifications,
             enableSmsNotifications: enableSmsNotifications !== undefined ? enableSmsNotifications : settings.enableSmsNotifications,
             enableWhatsAppNotifications: enableWhatsAppNotifications !== undefined ? enableWhatsAppNotifications : settings.enableWhatsAppNotifications,
-            enableVoiceAlerts: enableVoiceAlerts !== undefined ? enableVoiceAlerts : settings.enableVoiceAlerts
+            enableVoiceAlerts: enableVoiceAlerts !== undefined ? enableVoiceAlerts : settings.enableVoiceAlerts,
+            notificationSettings: nextNotificationSettings
         });
 
         res.json({
             success: true,
             message: 'Notification settings updated',
-            data: settings
+            data: {
+                ...settings.toJSON(),
+                notificationSettings: nextNotificationSettings
+            }
         });
 
     } catch (error) {

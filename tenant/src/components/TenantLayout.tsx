@@ -97,44 +97,19 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [now, setNow] = useState(() => new Date());
   const [notificationSeenAt, setNotificationSeenAt] = useState(0);
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
+  const announcedAppointmentAlertIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedAppointmentAlertsRef = useRef(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!user) return;
 
-    Promise.all([
-      tenantApi.getSubscriptionLimits(),
-      tenantApi.getSubscriptionConsumption().catch(() => null),
-      tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null),
-      tenantApi.getPosAlerts({ limit: 3 }).catch(() => null)
-    ])
-      .then(([limitsResponse, consumptionResponse, alertsResponse, posResponse]) => {
-        const resolvedLimits = limitsResponse?.success && limitsResponse?.limits
-          ? limitsResponse.limits
-          : consumptionResponse?.data?.limits;
+    refreshDashboardAlerts(false);
+    const timer = window.setInterval(() => {
+      refreshDashboardAlerts(true);
+    }, 60_000);
 
-        setEntitlements(resolvedLimits || {});
-        setEntitlementsLoadFailed(false);
-
-        const alerts = alertsResponse?.success && Array.isArray(alertsResponse.alerts)
-          ? alertsResponse.alerts
-          : consumptionResponse?.data?.alerts || [];
-        setUsageAlerts(alerts.filter((alert: any) => !alert?.acknowledged).slice(0, 3));
-
-        if (posResponse?.success) {
-          setPosAlerts(Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 3) : []);
-          setPosDueCount(posResponse.summary?.totalDueCount || 0);
-        } else {
-          setPosAlerts([]);
-          setPosDueCount(0);
-        }
-      })
-      .catch(() => {
-        setEntitlements(null);
-        setEntitlementsLoadFailed(true);
-        setPosAlerts([]);
-        setPosDueCount(0);
-      })
-      .finally(() => setEntitlementsLoaded(true));
+    return () => window.clearInterval(timer);
   }, [user?.id, user?.status]);
 
   const dismissAlert = async (alertId: string) => {
@@ -241,6 +216,101 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       dismissPosAlert(item.originalId);
     } else {
       dismissAlert(item.originalId);
+    }
+  };
+
+  const playAppointmentAlertTone = () => {
+    if (typeof window === 'undefined') return;
+
+    const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined;
+    if (!AudioContextClass) return;
+
+    try {
+      const context = new AudioContextClass();
+      if (context.state === 'suspended') {
+        void context.resume();
+      }
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, context.currentTime);
+      gainNode.gain.setValueAtTime(0.0001, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.03);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.42);
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.45);
+      oscillator.onended = () => {
+        void context.close().catch(() => null);
+      };
+    } catch (error) {
+      console.warn('Failed to play appointment alert tone:', error);
+    }
+  };
+
+  const refreshDashboardAlerts = async (allowSound = false) => {
+    if (!user) return;
+
+    try {
+      const [limitsResponse, consumptionResponse, alertsResponse, posResponse, settingsResponse] = await Promise.all([
+        tenantApi.getSubscriptionLimits(),
+        tenantApi.getSubscriptionConsumption().catch(() => null),
+        tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null),
+        tenantApi.getPosAlerts({ limit: 3 }).catch(() => null),
+        tenantApi.getSettings().catch(() => null)
+      ]);
+
+      const resolvedLimits = limitsResponse?.success && limitsResponse?.limits
+        ? limitsResponse.limits
+        : consumptionResponse?.data?.limits;
+
+      setEntitlements(resolvedLimits || {});
+      setEntitlementsLoadFailed(false);
+
+      const alerts = alertsResponse?.success && Array.isArray(alertsResponse.alerts)
+        ? alertsResponse.alerts
+        : consumptionResponse?.data?.alerts || [];
+      setUsageAlerts(alerts.filter((alert: any) => !alert?.acknowledged).slice(0, 3));
+
+      const nextDashboardPreferences = {
+        enableVoiceAlerts: settingsResponse?.success
+          ? settingsResponse.data?.settings?.enableVoiceAlerts !== false
+          : true
+      };
+        if (posResponse?.success) {
+          const nextPosAlerts = Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 3) : [];
+          const nextAppointmentAlertIds = nextPosAlerts
+          .filter((alert: any) => alert?.kind === 'appointment')
+          .map((alert: any) => String(alert.id));
+
+        if (allowSound && hasLoadedAppointmentAlertsRef.current && nextDashboardPreferences.enableVoiceAlerts) {
+          const newAppointmentAlertExists = nextAppointmentAlertIds.some(
+            (alertId: string) => !announcedAppointmentAlertIdsRef.current.has(alertId)
+          );
+          if (newAppointmentAlertExists) {
+            playAppointmentAlertTone();
+          }
+        }
+
+        announcedAppointmentAlertIdsRef.current = new Set(nextAppointmentAlertIds);
+        hasLoadedAppointmentAlertsRef.current = true;
+
+        setPosAlerts(nextPosAlerts);
+        setPosDueCount(posResponse.summary?.totalDueCount || 0);
+      } else {
+        setPosAlerts([]);
+        setPosDueCount(0);
+        announcedAppointmentAlertIdsRef.current = new Set();
+        hasLoadedAppointmentAlertsRef.current = false;
+      }
+    } catch {
+      setEntitlements(null);
+      setEntitlementsLoadFailed(true);
+      setPosAlerts([]);
+      setPosDueCount(0);
+    } finally {
+      setEntitlementsLoaded(true);
     }
   };
 
@@ -381,6 +451,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     if (typeof window === 'undefined') return;
     if (!user?.id) {
       setNotificationSeenAt(0);
+      announcedAppointmentAlertIdsRef.current = new Set();
+      hasLoadedAppointmentAlertsRef.current = false;
       return;
     }
 

@@ -5,6 +5,10 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const db = require('../models');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const {
+    loadTenantNotificationSettingsMap,
+    normalizeAppointmentNotificationSettings
+} = require('../services/appointmentAutomationService');
 
 const POS_QUEUE_LIMIT = 100;
 const POS_TRANSACTION_LIMIT = 100;
@@ -363,8 +367,12 @@ const mapPaymentTransaction = (transaction) => {
 
 const mapAppointmentAttentionAlert = (appointment, now = new Date()) => {
     const startTime = new Date(appointment.startTime);
-    const endTime = new Date(appointment.endTime);
-    const isOverdue = endTime.getTime() <= now.getTime();
+    const graceMinutes = Number(
+        appointment?.notificationSettings?.appointmentGracePeriodMinutes
+        || 5
+    );
+    const overdueThreshold = new Date(startTime.getTime() + graceMinutes * 60 * 1000);
+    const isOverdue = overdueThreshold.getTime() <= now.getTime();
     const reference = appointment.bookingNumber || appointment.id;
     const customerName = getCustomerName(appointment.user);
     const serviceName = getServiceName(appointment.service);
@@ -465,7 +473,15 @@ const fetchAppointmentAttentionAlerts = async (tenantId, limit = POS_ALERT_LIMIT
         limit
     });
 
+    const settingsMap = await loadTenantNotificationSettingsMap([tenantId]);
+    const tenantNotificationSettings = settingsMap.get(String(tenantId))?.notificationSettings
+        || normalizeAppointmentNotificationSettings();
+
     const alerts = activeAppointments
+        .map((appointment) => ({
+            ...appointment.toJSON(),
+            notificationSettings: tenantNotificationSettings
+        }))
         .map((appointment) => mapAppointmentAttentionAlert(appointment, now))
         .filter(Boolean);
 

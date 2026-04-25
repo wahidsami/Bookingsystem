@@ -600,6 +600,7 @@ exports.getAppointmentsBoard = async (req, res) => {
             label: breakRecord.label,
             isRecurring: breakRecord.isRecurring,
             specificDate: breakRecord.specificDate,
+            dayOfWeek: breakRecord.dayOfWeek,
             startTime: breakRecord.startTime,
             endTime: breakRecord.endTime,
             startDateTime: buildBreakDateTime(dateKey, breakRecord.startTime),
@@ -750,6 +751,9 @@ exports.updateAppointmentStatus = async (req, res) => {
         appointment.status = normalizedStatus;
         if (notes !== undefined) {
             appointment.notes = notes;
+        }
+        if (normalizedStatus === 'no_show' && !appointment.noShowMarkedAt) {
+            appointment.noShowMarkedAt = new Date();
         }
 
         await appointment.save({ transaction });
@@ -1254,6 +1258,8 @@ exports.rescheduleAppointment = async (req, res) => {
         appointment.staffId = requestedStaffId;
         appointment.startTime = requestedStart;
         appointment.endTime = requestedEnd;
+        appointment.customerReminderSentAt = null;
+        appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });
         await transaction.commit();
 

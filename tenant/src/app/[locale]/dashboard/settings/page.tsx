@@ -107,6 +107,10 @@ export default function SettingsPage() {
     enableWhatsAppNotifications: false,
     enableVoiceAlerts: true,
     remindRemainderToCollect: true,
+    appointmentGracePeriodMinutes: 5,
+    autoMarkNoShowAfterGracePeriod: false,
+    customerReminderEnabled: true,
+    customerReminderMinutesBefore: 30,
   });
 
   // Payment settings
@@ -202,6 +206,10 @@ export default function SettingsPage() {
             enableWhatsAppNotifications: settings.enableWhatsAppNotifications ?? false,
             enableVoiceAlerts: settings.enableVoiceAlerts ?? true,
             remindRemainderToCollect: (settings.notificationSettings as { remindRemainderToCollect?: boolean } | undefined)?.remindRemainderToCollect !== false,
+            appointmentGracePeriodMinutes: Number((settings.notificationSettings as { appointmentGracePeriodMinutes?: number } | undefined)?.appointmentGracePeriodMinutes ?? 5),
+            autoMarkNoShowAfterGracePeriod: (settings.notificationSettings as { autoMarkNoShowAfterGracePeriod?: boolean } | undefined)?.autoMarkNoShowAfterGracePeriod !== false,
+            customerReminderEnabled: (settings.notificationSettings as { customerReminderEnabled?: boolean } | undefined)?.customerReminderEnabled !== false,
+            customerReminderMinutesBefore: Number((settings.notificationSettings as { customerReminderMinutesBefore?: number } | undefined)?.customerReminderMinutesBefore ?? 30),
           });
 
           setPaymentSettings({
@@ -952,8 +960,75 @@ export default function SettingsPage() {
                       onChange={(e) => setNotificationSettings(prev => ({ ...prev, enableVoiceAlerts: e.target.checked }))}
                       className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
-                    <span className="text-gray-700">{t('voiceAlerts')}</span>
+                    <span className="text-gray-700">
+                      {locale === 'ar' ? 'تنبيهات صوتية للموعد' : 'Appointment sound alerts'}
+                    </span>
                   </label>
+
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar' ? 'أتمتة الحضور والتنبيه' : 'Attendance automation'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === 'ar'
+                          ? 'نحدد مدة السماح، والتحول إلى "لم يحضر" تلقائياً، وتذكير العميل قبل الموعد.'
+                          : 'Configure the grace period, automatic no-show marking, and customer reminders.'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <label className="flex items-center gap-3 cursor-pointer rounded-xl bg-white border border-gray-200 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <input
+                          type="checkbox"
+                          checked={notificationSettings.autoMarkNoShowAfterGracePeriod}
+                          onChange={(e) => setNotificationSettings(prev => ({ ...prev, autoMarkNoShowAfterGracePeriod: e.target.checked }))}
+                          className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-gray-700">{locale === 'ar' ? 'تحويل تلقائي إلى لم يحضر' : 'Auto mark no-show'}</span>
+                      </label>
+
+                      <label className="flex items-center gap-3 cursor-pointer rounded-xl bg-white border border-gray-200 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <input
+                          type="checkbox"
+                          checked={notificationSettings.customerReminderEnabled}
+                          onChange={(e) => setNotificationSettings(prev => ({ ...prev, customerReminderEnabled: e.target.checked }))}
+                          className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-gray-700">{locale === 'ar' ? 'تذكير العميل قبل الموعد' : 'Customer reminder'}</span>
+                      </label>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'مدة السماح بالدقائق' : 'Grace period minutes'}
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={240}
+                          value={notificationSettings.appointmentGracePeriodMinutes}
+                          onChange={(e) => setNotificationSettings(prev => ({ ...prev, appointmentGracePeriodMinutes: Number(e.target.value || 0) }))}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                          style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'التذكير قبل الموعد (بالدقائق)' : 'Reminder before appointment (minutes)'}
+                        </label>
+                        <input
+                          type="number"
+                          min={5}
+                          max={1440}
+                          value={notificationSettings.customerReminderMinutesBefore}
+                          onChange={(e) => setNotificationSettings(prev => ({ ...prev, customerReminderMinutesBefore: Number(e.target.value || 0) }))}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                          style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
                   <label className="flex items-center gap-3 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                     <input

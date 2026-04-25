@@ -18,6 +18,7 @@ const parsedTrustProxy = Number.parseInt(process.env.TRUST_PROXY || '1', 10);
 const trustProxyValue = Number.isNaN(parsedTrustProxy) ? process.env.TRUST_PROXY : parsedTrustProxy;
 let server = null;
 let expiryInterval = null;
+let appointmentAutomationInterval = null;
 
 app.disable('x-powered-by');
 app.set('trust proxy', trustProxyValue);
@@ -524,6 +525,12 @@ const ensureAppointmentSchema = async () => {
                 SET "assignmentMode" = 'unknown'
                 WHERE "assignmentMode" IS NULL
                    OR "assignmentMode" NOT IN ('unknown', 'customer_selected', 'auto_assigned', 'tenant_reassigned');
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerReminderSentAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "noShowMarkedAt" TIMESTAMP WITH TIME ZONE NULL;
             END $$;
         `);
 
@@ -632,6 +639,11 @@ const startServer = async () => {
             // Expire payment_pending tenants every hour (48h window)
             const { expirePaymentPendingTenants } = require('./utils/initializeTenantSubscription');
             expiryInterval = setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
+            const { processAppointmentAutomation } = require('./services/appointmentAutomationService');
+            appointmentAutomationInterval = setInterval(
+                () => processAppointmentAutomation().catch((error) => console.error('Appointment automation job failed:', error)),
+                60 * 1000
+            );
         });
     } catch (error) {
         console.error('Unable to connect to the database:', error);
@@ -645,6 +657,10 @@ const shutdown = async (signal) => {
     if (expiryInterval) {
         clearInterval(expiryInterval);
         expiryInterval = null;
+    }
+    if (appointmentAutomationInterval) {
+        clearInterval(appointmentAutomationInterval);
+        appointmentAutomationInterval = null;
     }
 
     try {
