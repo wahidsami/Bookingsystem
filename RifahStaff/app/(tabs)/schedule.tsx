@@ -306,6 +306,9 @@ export default function ScheduleScreen() {
         const rowHeight = 36;
         const totalRows = Math.max(1, Math.ceil((gridEndMinute - gridStartMinute) / slotMinutes));
         const gridHeight = totalRows * rowHeight + 24;
+        const hasTimeOff = timeOffForSelectedDate.length > 0;
+        const hasTimelineItems = selectedDayAppointments.length > 0 || breaksForSelectedDate.length > 0 || hasTimeOff;
+        const clampToGrid = (minute: number) => Math.min(gridEndMinute, Math.max(gridStartMinute, minute));
 
         return (
             <View style={styles.gridCard}>
@@ -316,10 +319,19 @@ export default function ScheduleScreen() {
                     </Text>
                 </View>
 
-                {selectedDayAppointments.length === 0 ? (
+                {hasTimeOff ? (
+                    <View style={styles.gridNotice}>
+                        <Ionicons name="moon-outline" size={16} color="#b45309" />
+                        <Text style={styles.gridNoticeText}>
+                            Time off is active for this day. Blocked time and rest windows are shaded below.
+                        </Text>
+                    </View>
+                ) : null}
+
+                {!hasTimelineItems ? (
                     <View style={styles.infoCard}>
                         <Ionicons name="calendar-outline" size={18} color="#6b7280" />
-                        <Text style={styles.infoCardText}>No appointments for this day.</Text>
+                        <Text style={styles.infoCardText}>No appointments, blocked time, or leave recorded for this day.</Text>
                     </View>
                 ) : (
                     <View style={[styles.gridTimeline, { height: gridHeight }]}>
@@ -357,8 +369,10 @@ export default function ScheduleScreen() {
                             {selectedDayAppointments.map((appointment) => {
                                 const startMinute = getRiyadhMinutes(appointment.startTime);
                                 const endMinute = getRiyadhMinutes(appointment.endTime);
-                                const topOffset = Math.max(0, ((startMinute - gridStartMinute) / slotMinutes) * rowHeight);
-                                const height = Math.max(72, Math.max(1, ((endMinute - startMinute) / slotMinutes) * rowHeight));
+                                const normalizedStart = clampToGrid(startMinute);
+                                const normalizedEnd = clampToGrid(endMinute);
+                                const topOffset = Math.max(0, ((normalizedStart - gridStartMinute) / slotMinutes) * rowHeight);
+                                const height = Math.max(72, Math.max(1, ((normalizedEnd - normalizedStart) / slotMinutes) * rowHeight));
                                 const urgency = getUrgencyInfo(appointment);
                                 const isStarted = appointment.status === 'started';
                                 const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
@@ -411,6 +425,38 @@ export default function ScheduleScreen() {
                                             </Text>
                                             <Text style={[styles.gridAppointmentAction, isStarted && { color: '#047857' }]} numberOfLines={1}>
                                                 {isStarted ? 'In Service' : 'Upcoming'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+
+                            {breaksForSelectedDate.map((breakItem) => {
+                                const startMinute = getRiyadhMinutes(breakItem.startTime);
+                                const endMinute = getRiyadhMinutes(breakItem.endTime);
+                                const normalizedStart = clampToGrid(startMinute);
+                                const normalizedEnd = clampToGrid(endMinute);
+                                const topOffset = Math.max(0, ((normalizedStart - gridStartMinute) / slotMinutes) * rowHeight);
+                                const height = Math.max(24, Math.max(1, ((normalizedEnd - normalizedStart) / slotMinutes) * rowHeight));
+
+                                return (
+                                    <View
+                                        key={`break-${breakItem.id}`}
+                                        style={[
+                                            styles.gridBreakBlock,
+                                            {
+                                                top: topOffset,
+                                                height,
+                                            }
+                                        ]}
+                                    >
+                                        <View style={styles.gridBreakDot} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.gridBreakLabel} numberOfLines={1}>
+                                                {breakItem.label || 'Blocked time'}
+                                            </Text>
+                                            <Text style={styles.gridBreakTime} numberOfLines={1}>
+                                                {formatTime(breakItem.startTime)} - {formatTime(breakItem.endTime)}
                                             </Text>
                                         </View>
                                     </View>
@@ -1129,6 +1175,23 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#6b7280',
     },
+    gridNotice: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: '#fffbeb',
+        borderWidth: 1,
+        borderColor: '#fcd34d',
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 14,
+    },
+    gridNoticeText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#92400e',
+        lineHeight: 17,
+    },
     gridTimeline: {
         flexDirection: 'row',
     },
@@ -1167,6 +1230,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 12,
         overflow: 'hidden',
+        zIndex: 2,
     },
     gridAppointmentCardCompleted: {
         backgroundColor: '#f8fafc',
@@ -1247,6 +1311,37 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
         color: '#6d28d9',
+    },
+    gridBreakBlock: {
+        position: 'absolute',
+        left: 10,
+        right: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(245, 158, 11, 0.16)',
+        borderWidth: 1,
+        borderColor: '#fbbf24',
+        borderRadius: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        zIndex: 1,
+    },
+    gridBreakDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#f59e0b',
+    },
+    gridBreakLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#92400e',
+    },
+    gridBreakTime: {
+        fontSize: 11,
+        color: '#b45309',
+        marginTop: 1,
     },
     dayOverviewValue: {
         fontSize: 16,

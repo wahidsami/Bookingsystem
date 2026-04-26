@@ -16,12 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { getTodayAppointments, updateAppointmentStatus, Appointment } from '../../src/services/appointments';
+import { BreakWindow, Shift, TimeOff, getSchedule } from '../../src/services/schedule';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { getImageUrl } from '../../src/services/api';
 import { canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { router, useFocusEffect } from 'expo-router';
-import { RIYADH_TIME_ZONE } from '../../src/utils/riyadhDate';
+import { RIYADH_TIME_ZONE, formatRiyadhLongDate, getRiyadhDateKey } from '../../src/utils/riyadhDate';
 import { AppState } from 'react-native';
 import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 import { useAppointmentArrivalAlert } from '../../src/hooks/useAppointmentArrivalAlert';
@@ -35,6 +36,10 @@ export default function TodayScreen() {
   const [updatingId, setUpdatingId] = useState<string | null>(null); // tracks which appointment is being updated
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'in_progress' | 'done'>('all');
+  const [todayShifts, setTodayShifts] = useState<Shift[]>([]);
+  const [todayBreaks, setTodayBreaks] = useState<BreakWindow[]>([]);
+  const [todayTimeOff, setTodayTimeOff] = useState<TimeOff[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
   const canViewClientContext = canViewClients(user);
   const canSeeBookingNotes = canViewBookingNotes(user);
   const { notification } = usePushNotifications();
@@ -64,6 +69,23 @@ export default function TodayScreen() {
     }
   }, [syncAppointments]);
 
+  const loadTodaySchedule = useCallback(async () => {
+    try {
+      const todayKey = getRiyadhDateKey();
+      const data = await getSchedule(todayKey, todayKey);
+      setTodayShifts(data.shifts);
+      setTodayBreaks(data.breaks);
+      setTodayTimeOff(data.timeOff.filter((item) => item.startDate <= todayKey && item.endDate >= todayKey));
+    } catch (error) {
+      console.error('Failed to load today schedule', error);
+      setTodayShifts([]);
+      setTodayBreaks([]);
+      setTodayTimeOff([]);
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Wait until auth session is fully restored before making any API calls.
     // Without this guard, the screen fires requests before the JWT is loaded
@@ -71,17 +93,20 @@ export default function TodayScreen() {
     if (authLoading) return;
     if (!user) {
       setLoading(false);
+      setScheduleLoading(false);
       return;
     }
     loadAppointments(false);
+    loadTodaySchedule();
   }, [authLoading, user, loadAppointments]);
 
   useFocusEffect(
     useCallback(() => {
       if (user) {
         loadAppointments(true);
+        loadTodaySchedule();
       }
-    }, [user, loadAppointments])
+    }, [user, loadAppointments, loadTodaySchedule])
   );
 
   useEffect(() => {
@@ -89,26 +114,29 @@ export default function TodayScreen() {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         loadAppointments(true);
+        loadTodaySchedule();
       }
     });
     return () => subscription.remove();
-  }, [user, loadAppointments]);
+  }, [user, loadAppointments, loadTodaySchedule]);
 
   useEffect(() => {
     if (user && notification) {
       markPushReceived();
       loadAppointments(false);
+      loadTodaySchedule();
     }
-  }, [notification, user, loadAppointments, markPushReceived]);
+  }, [notification, user, loadAppointments, loadTodaySchedule, markPushReceived]);
 
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
       loadAppointments(true);
+      loadTodaySchedule();
     }, 45000);
 
     return () => clearInterval(interval);
-  }, [user, loadAppointments]);
+  }, [user, loadAppointments, loadTodaySchedule]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -201,6 +229,10 @@ export default function TodayScreen() {
     { label: 'In Service', value: appointments.filter((item) => item.status === 'started').length },
     { label: 'Revenue', value: `SAR ${appointments.reduce((sum, item) => sum + Number(item.service?.finalPrice || item.service?.basePrice || 0), 0).toFixed(0)}` },
   ];
+  const todayBlockedMinutes = todayBreaks.reduce((sum, item) => sum + Math.max(
+    new Date(`1970-01-01T${item.endTime}:00Z`).getTime() - new Date(`1970-01-01T${item.startTime}:00Z`).getTime(),
+    0
+  ) / 60000, 0);
 
   const renderAppointmentCard = ({ item }: { item: Appointment }) => {
     const isCompleted = item.status === 'completed' || item.status === 'no_show';
@@ -332,6 +364,98 @@ export default function TodayScreen() {
     );
   };
 
+  const renderTodaySchedule = () => {
+    const hasItems = todayShifts.length > 0 || todayBreaks.length > 0 || todayTimeOff.length > 0;
+
+    return (
+      <View style={styles.scheduleSummaryCard}>
+        <View style={styles.scheduleSummaryHeader}>
+          <View>
+            <Text style={styles.scheduleSummaryTitle}>Today&apos;s schedule</Text>
+            <Text style={styles.scheduleSummarySubtitle}>
+              {formatRiyadhLongDate(getRiyadhDateKey())}
+            </Text>
+          </View>
+          <View style={styles.scheduleSummaryBadge}>
+            <Text style={styles.scheduleSummaryBadgeText}>
+              {scheduleLoading ? 'Loading' : hasItems ? 'Active' : 'Clear'}
+            </Text>
+          </View>
+        </View>
+
+        {scheduleLoading ? (
+          <View style={styles.infoCard}>
+            <ActivityIndicator size="small" color="#8B5ADF" />
+            <Text style={styles.infoCardText}>Loading today&apos;s schedule...</Text>
+          </View>
+        ) : !hasItems ? (
+          <View style={styles.infoCard}>
+            <Ionicons name="calendar-outline" size={18} color="#6b7280" />
+            <Text style={styles.infoCardText}>No shifts, blocked time, or leave recorded for today.</Text>
+          </View>
+        ) : (
+          <>
+            {todayShifts.length > 0 ? (
+              <View style={styles.scheduleGroup}>
+                <Text style={styles.scheduleGroupLabel}>Shifts</Text>
+                {todayShifts.map((shift) => (
+                  <View key={shift.id} style={styles.scheduleRow}>
+                    <View style={styles.scheduleDot} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scheduleRowTitle}>{shift.label || 'Work shift'}</Text>
+                      <Text style={styles.scheduleRowMeta}>
+                        {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {todayBreaks.length > 0 ? (
+              <View style={styles.scheduleGroup}>
+                <Text style={styles.scheduleGroupLabel}>Blocked time</Text>
+                {todayBreaks.map((breakItem) => (
+                  <View key={breakItem.id} style={styles.scheduleRow}>
+                    <View style={[styles.scheduleDot, styles.scheduleDotBlocked]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scheduleRowTitle}>{breakItem.label || 'Break'}</Text>
+                      <Text style={styles.scheduleRowMeta}>
+                        {formatTime(breakItem.startTime)} - {formatTime(breakItem.endTime)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {todayTimeOff.length > 0 ? (
+              <View style={styles.scheduleGroup}>
+                <Text style={styles.scheduleGroupLabel}>Time off</Text>
+                {todayTimeOff.map((timeOffItem) => (
+                  <View key={timeOffItem.id} style={styles.scheduleRow}>
+                    <View style={[styles.scheduleDot, styles.scheduleDotTimeOff]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scheduleRowTitle}>{timeOffItem.type.toUpperCase()}</Text>
+                      <Text style={styles.scheduleRowMeta}>
+                        {timeOffItem.startDate} to {timeOffItem.endDate}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.scheduleFooter}>
+              <Text style={styles.scheduleFooterText}>Blocked minutes today</Text>
+              <Text style={styles.scheduleFooterValue}>{formatDurationHours(todayBlockedMinutes)}</Text>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
@@ -451,16 +575,19 @@ export default function TodayScreen() {
                 Showing {filteredAppointments.length} of {appointments.length} appointments
               </Text>
 
-              <View style={styles.signalRow}>
-                {todaySignals.map((signal) => (
-                  <View key={signal.label} style={styles.signalCard}>
-                    <Text style={styles.signalValue}>{signal.value}</Text>
-                    <Text style={styles.signalLabel}>{signal.label}</Text>
-                  </View>
-                ))}
+          <View style={styles.signalRow}>
+            {todaySignals.map((signal) => (
+              <View key={signal.label} style={styles.signalCard}>
+                <Text style={styles.signalValue}>{signal.value}</Text>
+                <Text style={styles.signalLabel}>{signal.label}</Text>
               </View>
-            </>
-          ) : null}
+            ))}
+          </View>
+
+          </>
+        ) : null}
+
+          {renderTodaySchedule()}
 
           {loading ? (
             <View style={styles.centerContainer}>
@@ -695,6 +822,121 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     textTransform: 'uppercase',
+  },
+  scheduleSummaryCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  scheduleSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  scheduleSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  scheduleSummarySubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  scheduleSummaryBadge: {
+    backgroundColor: '#f5f3ff',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  scheduleSummaryBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6d28d9',
+  },
+  scheduleGroup: {
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  scheduleGroupLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#f9fafb',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+  },
+  scheduleDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#8B5ADF',
+    marginTop: 4,
+  },
+  scheduleDotBlocked: {
+    backgroundColor: '#f59e0b',
+  },
+  scheduleDotTimeOff: {
+    backgroundColor: '#ef4444',
+  },
+  scheduleRowTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  scheduleRowMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  scheduleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  scheduleFooterText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  },
+  scheduleFooterValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6d28d9',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  },
+  infoCardText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
   },
   listContainer: {
     paddingBottom: 30,
