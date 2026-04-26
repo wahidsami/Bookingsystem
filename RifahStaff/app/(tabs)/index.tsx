@@ -24,6 +24,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { RIYADH_TIME_ZONE } from '../../src/utils/riyadhDate';
 import { AppState } from 'react-native';
 import { usePushNotifications } from '../../src/hooks/usePushNotifications';
+import { useAppointmentArrivalAlert } from '../../src/hooks/useAppointmentArrivalAlert';
 
 export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
@@ -37,6 +38,7 @@ export default function TodayScreen() {
   const canViewClientContext = canViewClients(user);
   const canSeeBookingNotes = canViewBookingNotes(user);
   const { notification } = usePushNotifications();
+  const { alert: appointmentAlert, clearAlert, markPushReceived, syncAppointments } = useAppointmentArrivalAlert();
 
   // Format time as h:mm A
   const formatTime = (dateString: string) => {
@@ -48,9 +50,10 @@ export default function TodayScreen() {
     }).format(date);
   };
 
-  const loadAppointments = useCallback(async () => {
+  const loadAppointments = useCallback(async (shouldNotify = false) => {
     try {
       const data = await getTodayAppointments();
+      await syncAppointments(data, shouldNotify);
       setAppointments(data);
     } catch (error) {
       console.error('Failed to load appointments', error);
@@ -59,7 +62,7 @@ export default function TodayScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [syncAppointments]);
 
   useEffect(() => {
     // Wait until auth session is fully restored before making any API calls.
@@ -70,13 +73,13 @@ export default function TodayScreen() {
       setLoading(false);
       return;
     }
-    loadAppointments();
+    loadAppointments(false);
   }, [authLoading, user, loadAppointments]);
 
   useFocusEffect(
     useCallback(() => {
       if (user) {
-        loadAppointments();
+        loadAppointments(true);
       }
     }, [user, loadAppointments])
   );
@@ -85,7 +88,7 @@ export default function TodayScreen() {
     if (!user) return;
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        loadAppointments();
+        loadAppointments(true);
       }
     });
     return () => subscription.remove();
@@ -93,14 +96,15 @@ export default function TodayScreen() {
 
   useEffect(() => {
     if (user && notification) {
-      loadAppointments();
+      markPushReceived();
+      loadAppointments(false);
     }
-  }, [notification, user, loadAppointments]);
+  }, [notification, user, loadAppointments, markPushReceived]);
 
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
-      loadAppointments();
+      loadAppointments(true);
     }, 45000);
 
     return () => clearInterval(interval);
@@ -390,6 +394,18 @@ export default function TodayScreen() {
         </LinearGradient>
 
         <View style={styles.content}>
+          {appointmentAlert && (
+            <TouchableOpacity style={styles.alertBanner} activeOpacity={0.9} onPress={clearAlert}>
+              <View style={styles.alertIconWrap}>
+                <Ionicons name="notifications-outline" size={18} color="#7c3aed" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.alertTitle}>{appointmentAlert.title}</Text>
+                <Text style={styles.alertBody} numberOfLines={2}>{appointmentAlert.body}</Text>
+              </View>
+              <Ionicons name="close" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
           <Text style={styles.sectionTitle}>{t('home.todayQueue')}</Text>
 
           {!loading && appointments.length > 0 ? (
@@ -560,6 +576,36 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 20,
+  },
+  alertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#f5f3ff',
+    borderWidth: 1,
+    borderColor: '#ddd6fe',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  alertIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ede9fe',
+  },
+  alertTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4c1d95',
+    marginBottom: 2,
+  },
+  alertBody: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
   },
   sectionTitle: {
     fontSize: 18,

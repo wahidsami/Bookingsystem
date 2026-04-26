@@ -22,6 +22,7 @@ import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '..
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
 import { getImageUrl } from '../../src/services/api';
 import { usePushNotifications } from '../../src/hooks/usePushNotifications';
+import { useAppointmentArrivalAlert } from '../../src/hooks/useAppointmentArrivalAlert';
 import { AppState } from 'react-native';
 import {
     addRiyadhDays,
@@ -53,6 +54,7 @@ const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minut
 export default function ScheduleScreen() {
     const { user } = useAuth();
     const { notification } = usePushNotifications();
+    const { alert: appointmentAlert, clearAlert, markPushReceived, syncAppointments } = useAppointmentArrivalAlert();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -90,10 +92,11 @@ export default function ScheduleScreen() {
         }
     }, [weekStartKey]);
 
-    const loadAppointmentsForSelectedDate = useCallback(async () => {
+    const loadAppointmentsForSelectedDate = useCallback(async (shouldNotify = false) => {
         try {
             setAppointmentsLoading(true);
             const data = await getAppointmentsForDate(selectedDateKey);
+            await syncAppointments(data, shouldNotify);
             setAppointments(data);
         } catch (error) {
             console.error('Failed to load appointments for selected day', error);
@@ -101,7 +104,7 @@ export default function ScheduleScreen() {
         } finally {
             setAppointmentsLoading(false);
         }
-    }, [selectedDateKey]);
+    }, [selectedDateKey, syncAppointments]);
 
     const handleAppointmentStatusUpdate = async (id: string, newStatus: 'started' | 'completed' | 'no-show') => {
         if (updatingId) {
@@ -111,7 +114,7 @@ export default function ScheduleScreen() {
         try {
             setUpdatingId(id);
             await updateAppointmentStatus(id, newStatus);
-            loadAppointmentsForSelectedDate();
+            loadAppointmentsForSelectedDate(false);
         } catch (error) {
             console.error('Failed to update appointment status', error);
         } finally {
@@ -134,14 +137,14 @@ export default function ScheduleScreen() {
             return;
         }
 
-        loadAppointmentsForSelectedDate();
+        loadAppointmentsForSelectedDate(false);
     }, [loadAppointmentsForSelectedDate, user]);
 
     useFocusEffect(
         useCallback(() => {
             if (user) {
                 loadData();
-                loadAppointmentsForSelectedDate();
+                loadAppointmentsForSelectedDate(true);
             }
         }, [user, loadData, loadAppointmentsForSelectedDate])
     );
@@ -151,7 +154,7 @@ export default function ScheduleScreen() {
         const subscription = AppState.addEventListener('change', (state) => {
             if (state === 'active') {
                 loadData();
-                loadAppointmentsForSelectedDate();
+                loadAppointmentsForSelectedDate(true);
             }
         });
 
@@ -160,15 +163,16 @@ export default function ScheduleScreen() {
 
     useEffect(() => {
         if (user && notification) {
+            markPushReceived();
             loadData();
-            loadAppointmentsForSelectedDate();
+            loadAppointmentsForSelectedDate(false);
         }
-    }, [notification, user, loadData, loadAppointmentsForSelectedDate]);
+    }, [notification, user, loadData, loadAppointmentsForSelectedDate, markPushReceived]);
 
     useEffect(() => {
         if (!user) return;
         const interval = setInterval(() => {
-            loadAppointmentsForSelectedDate();
+            loadAppointmentsForSelectedDate(true);
         }, 45000);
 
         return () => clearInterval(interval);
@@ -557,6 +561,19 @@ export default function ScheduleScreen() {
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
             >
+                {appointmentAlert && (
+                    <TouchableOpacity style={styles.alertBanner} activeOpacity={0.9} onPress={clearAlert}>
+                        <View style={styles.alertIconWrap}>
+                            <Ionicons name="notifications-outline" size={18} color="#7c3aed" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.alertTitle}>{appointmentAlert.title}</Text>
+                            <Text style={styles.alertBody} numberOfLines={2}>{appointmentAlert.body}</Text>
+                        </View>
+                        <Ionicons name="close" size={18} color="#9ca3af" />
+                    </TouchableOpacity>
+                )}
+
                 <View style={styles.statsGrid}>
                     <View style={styles.statCard}>
                         <Text style={styles.statValue}>{formatDurationHours(weekShiftMinutes)}</Text>
@@ -711,6 +728,36 @@ const styles = StyleSheet.create({
     content: {
         padding: 16,
         paddingBottom: 40,
+    },
+    alertBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#f5f3ff',
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 18,
+    },
+    alertIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ede9fe',
+    },
+    alertTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#4c1d95',
+        marginBottom: 2,
+    },
+    alertBody: {
+        fontSize: 13,
+        color: '#6b7280',
+        lineHeight: 18,
     },
     statsGrid: {
         flexDirection: 'row',
