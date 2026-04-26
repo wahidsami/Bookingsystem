@@ -57,6 +57,12 @@ export default function TodayScreen() {
     }).format(date);
   };
 
+  const formatDurationHours = (minutes: number) => {
+    const safeMinutes = Number.isFinite(minutes) ? Math.max(0, minutes) : 0;
+    const hours = safeMinutes / 60;
+    return `${hours.toFixed(safeMinutes % 60 === 0 ? 0 : 1)}h`;
+  };
+
   const loadAppointments = useCallback(async (shouldNotify = false) => {
     try {
       const data = await getTodayAppointments();

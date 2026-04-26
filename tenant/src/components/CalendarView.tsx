@@ -79,6 +79,7 @@ interface CalendarViewProps {
   onAppointmentSettingsClick?: (appointmentId: string) => void;
   onOpenTools?: () => void;
   activeFilterCount?: number;
+  serviceCapabilityMap?: Map<string, Set<string>>;
   locale: string;
   isRTL: boolean;
   t: (key: string) => string;
@@ -106,6 +107,7 @@ export function CalendarView({
   onAppointmentSettingsClick,
   onOpenTools,
   activeFilterCount = 0,
+  serviceCapabilityMap,
   locale,
   isRTL,
   t,
@@ -582,6 +584,43 @@ export function CalendarView({
 
     const appointment = dayAppointments.find((item) => item.id === appointmentId);
     if (!appointment || appointment.staff.id === staffId) {
+      return;
+    }
+
+    const allowedStaffIds = serviceCapabilityMap?.get(appointment.service.id);
+    if (allowedStaffIds && !allowedStaffIds.has(staffId)) {
+      const message = locale === 'ar'
+        ? 'لا يمكن نقل هذا الموعد لأن الموظف المحدد غير مخصّص لهذه الخدمة.'
+        : 'Cannot move this booking because the selected staff member is not assigned to this service.';
+      alert(message);
+      return;
+    }
+
+    const appointmentStart = new Date(appointment.startTime).getTime();
+    const appointmentEnd = new Date(appointment.endTime).getTime();
+    const hasConflict = dayAppointments.some((item) => {
+      if (item.id === appointment.id) {
+        return false;
+      }
+
+      if (item.staff.id !== staffId) {
+        return false;
+      }
+
+      if (['cancelled', 'no_show'].includes(item.status)) {
+        return false;
+      }
+
+      const itemStart = new Date(item.startTime).getTime();
+      const itemEnd = new Date(item.endTime).getTime();
+      return itemStart < appointmentEnd && itemEnd > appointmentStart;
+    });
+
+    if (hasConflict) {
+      const message = locale === 'ar'
+        ? 'لا يمكن نقل الموعد لأن الموظف المحدد لديه حجز متداخل في نفس الفترة.'
+        : 'Cannot move this booking because the selected staff member has an overlapping appointment.';
+      alert(message);
       return;
     }
 

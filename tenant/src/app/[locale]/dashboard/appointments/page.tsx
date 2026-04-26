@@ -23,6 +23,12 @@ interface Service {
   name_en: string;
   name_ar: string;
   duration: number;
+  employees?: Array<{
+    id: string;
+    name: string;
+    photo?: string | null;
+    isActive?: boolean;
+  }>;
 }
 
 interface Employee {
@@ -171,6 +177,20 @@ export default function AppointmentsPage() {
   }, []);
 
   const selectedDateKey = useMemo(() => getLocalDateKey(selectedDate), [selectedDate]);
+  const serviceCapabilityMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    services.forEach((service) => {
+      const staffIds = (service.employees || [])
+        .map((employee) => employee.id)
+        .filter((id): id is string => Boolean(id));
+
+      if (staffIds.length > 0) {
+        map.set(service.id, new Set(staffIds));
+      }
+    });
+
+    return map;
+  }, [services]);
   const requestKey = useMemo(() => {
     const filterKey = [
       viewMode,
@@ -1107,6 +1127,7 @@ export default function AppointmentsPage() {
           onAppointmentSettingsClick={handleOpenAppointmentDetails}
           onOpenTools={() => setShowFilters(true)}
           activeFilterCount={activeFilterCount}
+          serviceCapabilityMap={serviceCapabilityMap}
           locale={locale}
           isRTL={isRTL}
           t={t}

@@ -10,6 +10,8 @@ export interface Appointment {
     notes?: string;
     paymentStatus?: string;
     paymentMethod?: string;
+    price?: string | number | null;
+    assignmentMode?: 'customer_selected' | 'auto_assigned' | string;
     serviceStartedAt?: string | null;
     serviceCompletedAt?: string | null;
     user?: {
@@ -54,6 +56,8 @@ const normalizeAppointment = (appointment: any): Appointment => {
         notes: appointment.notes,
         paymentStatus: appointment.paymentStatus,
         paymentMethod: appointment.paymentMethod,
+        price: appointment.price,
+        assignmentMode: appointment.assignmentMode,
         serviceStartedAt: appointment.serviceStartedAt || null,
         serviceCompletedAt: appointment.serviceCompletedAt || null,
         user: appointment.user,

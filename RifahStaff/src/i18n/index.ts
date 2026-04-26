@@ -35,6 +35,7 @@ const getDeviceLanguage = () => {
     return 'en';
 };
 
+// eslint-disable-next-line import/no-named-as-default-member
 i18n
     .use(initReactI18next)
     .init({
@@ -44,7 +45,7 @@ i18n
         interpolation: {
             escapeValue: false, // React already safeguards from XSS
         },
-        compatibilityJSON: 'v3' as any, // Required for React Native
+        compatibilityJSON: 'v4',
     });
 
 export default i18n;

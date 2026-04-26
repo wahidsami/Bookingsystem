@@ -1778,6 +1778,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 40,
     },
+    centerContainerCompact: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 24,
+        marginBottom: 12,
+    },
     emptyTitle: {
         fontSize: 18,
         fontWeight: 'bold',
