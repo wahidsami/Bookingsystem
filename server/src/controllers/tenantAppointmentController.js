@@ -10,6 +10,7 @@ const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatu
 const pushNotificationService = require('../services/pushNotificationService');
 const customerNotificationService = require('../services/customerNotificationService');
 const bookingService = require('../services/bookingService');
+const appointmentLifecycleService = require('../services/appointmentLifecycleService');
 const { createStaffAppointmentMessage } = require('../services/staffNotificationService');
 const { calculateSplitPayment } = require('../services/splitPaymentService');
 const userService = require('../services/userService');
@@ -762,6 +763,12 @@ exports.updateAppointmentStatus = async (req, res) => {
         if (notes !== undefined) {
             appointment.notes = notes;
         }
+        if (normalizedStatus === 'in_service' && !appointment.serviceStartedAt) {
+            appointment.serviceStartedAt = new Date();
+        }
+        if (normalizedStatus === 'completed' && !appointment.serviceCompletedAt) {
+            appointment.serviceCompletedAt = new Date();
+        }
         if (normalizedStatus === 'no_show' && !appointment.noShowMarkedAt) {
             appointment.noShowMarkedAt = new Date();
         }
@@ -770,15 +777,21 @@ exports.updateAppointmentStatus = async (req, res) => {
         await transaction.commit();
 
         try {
-            await pushNotificationService.sendToUser(appointment.platformUserId, {
-                title: 'Booking updated',
-                body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
-                data: {
-                    type: 'booking_status_updated',
-                    appointmentId: appointment.id,
-                    status: normalizedStatus
-                }
-            });
+            if (normalizedStatus === 'in_service') {
+                await appointmentLifecycleService.notifyServiceStarted(appointment);
+            } else if (normalizedStatus === 'completed') {
+                await appointmentLifecycleService.notifyServiceCompleted(appointment);
+            } else {
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+            }
         } catch (notificationError) {
             console.warn('Tenant booking status notification warning:', notificationError.message);
         }
@@ -933,14 +946,11 @@ exports.updatePaymentStatus = async (req, res) => {
         await transaction.commit();
 
         try {
-            await pushNotificationService.sendToUser(appointment.platformUserId, {
-                title: 'Booking payment updated',
-                body: `Payment status for your appointment is now ${paymentStatus.replace(/_/g, ' ')}.`,
-                data: {
-                    type: 'booking_payment_updated',
-                    appointmentId: appointment.id,
-                    paymentStatus
-                }
+            await appointmentLifecycleService.notifyPaymentCollected(appointment, {
+                paymentStatus,
+                paymentDelta,
+                paymentMethod: appointment.paymentMethod,
+                transactionRef
             });
         } catch (notificationError) {
             console.warn('Tenant booking payment notification warning:', notificationError.message);

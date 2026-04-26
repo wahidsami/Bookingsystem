@@ -296,6 +296,16 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             comment: 'When the appointment was auto-marked or manually marked as no-show'
         },
+        serviceStartedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'When the service actually started'
+        },
+        serviceCompletedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'When the service was marked completed'
+        },
         // Split Payment Support
         depositAmount: {
             type: DataTypes.DECIMAL(10, 2),

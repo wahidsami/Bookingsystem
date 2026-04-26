@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const db = require('../models');
 const pushNotificationService = require('../services/pushNotificationService');
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const appointmentLifecycleService = require('../services/appointmentLifecycleService');
 const { normalizePackageEntitlements, isFeatureEnabled } = require('../utils/packageEntitlements');
 const {
     STAFF_APPOINTMENT_TRANSITIONS,
@@ -1034,20 +1035,32 @@ const updateAppointmentStatus = async (req, res) => {
         if (notes !== undefined) {
             appointment.notes = notes;
         }
+        if (normalizedStatus === 'in_service' && !appointment.serviceStartedAt) {
+            appointment.serviceStartedAt = new Date();
+        }
+        if (normalizedStatus === 'completed' && !appointment.serviceCompletedAt) {
+            appointment.serviceCompletedAt = new Date();
+        }
 
         await appointment.save({ transaction });
         await transaction.commit();
 
         try {
-            await pushNotificationService.sendToUser(appointment.platformUserId, {
-                title: 'Booking updated',
-                body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
-                data: {
-                    type: 'booking_status_updated',
-                    appointmentId: appointment.id,
-                    status: normalizedStatus
-                }
-            });
+            if (normalizedStatus === 'in_service') {
+                await appointmentLifecycleService.notifyServiceStarted(appointment);
+            } else if (normalizedStatus === 'completed') {
+                await appointmentLifecycleService.notifyServiceCompleted(appointment);
+            } else {
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+            }
         } catch (notificationError) {
             console.warn('Staff booking status notification warning:', notificationError.message);
         }

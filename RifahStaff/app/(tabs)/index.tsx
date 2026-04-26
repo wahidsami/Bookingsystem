@@ -31,6 +31,7 @@ export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
   const { t } = useTranslation();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [clockTick, setClockTick] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null); // tracks which appointment is being updated
@@ -138,6 +139,14 @@ export default function TodayScreen() {
     return () => clearInterval(interval);
   }, [user, loadAppointments, loadTodaySchedule]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setClockTick(Date.now());
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadAppointments();
@@ -174,6 +183,31 @@ export default function TodayScreen() {
     }
 
     return { label: 'Upcoming', color: '#1d4ed8', background: '#dbeafe', priority: 3 };
+  };
+
+  const getServiceCountdownInfo = (item: Appointment) => {
+    if (item.status !== 'started') {
+      return null;
+    }
+
+    const startedAt = new Date(item.serviceStartedAt || item.startTime);
+    const durationMinutes = Number(item.service?.duration || 0);
+    if (!durationMinutes || Number.isNaN(startedAt.getTime())) {
+      return null;
+    }
+
+    const endsAt = startedAt.getTime() + durationMinutes * 60000;
+    const remainingMinutes = Math.ceil((endsAt - clockTick) / 60000);
+
+    if (remainingMinutes > 0) {
+      return { label: `Ends in ${remainingMinutes}m`, overdue: false };
+    }
+
+    const overtimeMinutes = Math.abs(remainingMinutes);
+    return {
+      label: overtimeMinutes <= 0 ? 'Ending now' : `Overtime ${overtimeMinutes}m`,
+      overdue: true
+    };
   };
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -240,6 +274,7 @@ export default function TodayScreen() {
     const customerInitial = item.user?.firstName?.charAt(0)?.toUpperCase() || item.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
     const amount = Number(item.service?.finalPrice || item.service?.basePrice || 0);
     const urgency = getUrgencyInfo(item);
+    const countdown = getServiceCountdownInfo(item);
 
     return (
       <View style={[styles.card, isCompleted && styles.cardCompleted]}>
@@ -262,6 +297,19 @@ export default function TodayScreen() {
                 {t(`status.${item.status === 'no_show' ? 'noShow' : item.status}`).toUpperCase()}
               </Text>
             </View>
+            {countdown ? (
+              <View style={[styles.runningBadge, countdown.overdue && styles.runningBadgeOverdue]}>
+                <Ionicons
+                  name="time-outline"
+                  size={12}
+                  color={countdown.overdue ? '#991b1b' : '#92400e'}
+                  style={styles.runningBadgeIcon}
+                />
+                <Text style={[styles.runningBadgeText, countdown.overdue && styles.runningBadgeTextOverdue]}>
+                  {countdown.label}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -983,6 +1031,29 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     marginTop: 6,
+  },
+  runningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  runningBadgeOverdue: {
+    backgroundColor: '#fee2e2',
+  },
+  runningBadgeIcon: {
+    marginRight: 4,
+  },
+  runningBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400e',
+  },
+  runningBadgeTextOverdue: {
+    color: '#991b1b',
   },
   urgencyBadge: {
     paddingHorizontal: 10,

@@ -402,6 +402,96 @@ const mapAppointmentAttentionAlert = (appointment, now = new Date()) => {
     };
 };
 
+const mapCompletedPaymentDueAlert = (appointment) => {
+    const dueAmount = getAppointmentDueAmount(appointment);
+    const reference = appointment.bookingNumber || appointment.id;
+    const customerName = getCustomerName(appointment.user);
+    const serviceName = getServiceName(appointment.service);
+    const isDepositRemainder = appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
+
+    return {
+        id: `appointment-completed-due-${appointment.id}`,
+        kind: 'appointment',
+        entityType: 'appointment',
+        entityId: appointment.id,
+        reference,
+        severity: 'high',
+        title: isDepositRemainder
+            ? `Remainder due after completed booking ${reference}`
+            : `Payment due after completed booking ${reference}`,
+        title_ar: isDepositRemainder
+            ? `المتبقي مستحق بعد اكتمال الحجز ${reference}`
+            : `الدفع مستحق بعد اكتمال الحجز ${reference}`,
+        message: isDepositRemainder
+            ? `${customerName} still has ${dueAmount.toFixed(2)} SAR due for ${serviceName} after the service was completed.`
+            : `${customerName} still has ${dueAmount.toFixed(2)} SAR due for ${serviceName} after the service was completed.`,
+        message_ar: isDepositRemainder
+            ? `لا يزال لدى ${customerName} مبلغ ${dueAmount.toFixed(2)} ر.س مستحق مقابل ${serviceName} بعد اكتمال الخدمة.`
+            : `لا يزال لدى ${customerName} مبلغ ${dueAmount.toFixed(2)} ر.س مستحق مقابل ${serviceName} بعد اكتمال الخدمة.`,
+        amountDue: dueAmount,
+        paymentIntent: isDepositRemainder ? 'deposit_remainder_due' : 'payment_due_after_completion',
+        scheduledAt: appointment.serviceCompletedAt || appointment.updatedAt || appointment.startTime,
+        detailPath: appointment.id ? `/dashboard/appointments/${appointment.id}` : null
+    };
+};
+
+const fetchCompletedPaymentDueAlerts = async (tenantId, limit = POS_ALERT_LIMIT) => {
+    const recentCutoff = new Date();
+    recentCutoff.setDate(recentCutoff.getDate() - 7);
+
+    const completedAppointments = await db.Appointment.findAll({
+        where: {
+            tenantId,
+            status: 'completed',
+            updatedAt: { [Op.gte]: recentCutoff },
+            [Op.or]: [
+                { paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING },
+                {
+                    [Op.and]: [
+                        { paymentStatus: APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID },
+                        { remainderPaid: false },
+                        { remainderAmount: { [Op.gt]: 0 } }
+                    ]
+                }
+            ]
+        },
+        include: [
+            {
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar'],
+                required: false
+            },
+            {
+                model: db.Staff,
+                as: 'staff',
+                attributes: ['id', 'name'],
+                required: false
+            },
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            }
+        ],
+        order: [['updatedAt', 'DESC']],
+        limit
+    });
+
+    const alerts = completedAppointments
+        .map((appointment) => mapCompletedPaymentDueAlert(appointment))
+        .filter(Boolean)
+        .slice(0, limit);
+
+    return {
+        alerts,
+        summary: {
+            completedPaymentDueCount: alerts.length
+        }
+    };
+};
+
 const buildAppointmentSearchWhere = (tenantId, search) => {
     const where = {
         tenantId,
@@ -867,19 +957,22 @@ exports.getOperationalAlerts = async (req, res) => {
             fetchQueueData(tenantId, '', POS_QUEUE_LIMIT),
             fetchAppointmentAttentionAlerts(tenantId, limit)
         ]);
+        const completedDueResult = await fetchCompletedPaymentDueAlerts(tenantId, limit);
         const alerts = [
             ...queueResult.queue.map(mapPosAlertFromQueueItem).map((alert) => ({
                 ...alert,
                 kind: 'pos'
             })),
-            ...appointmentResult.alerts
+            ...appointmentResult.alerts,
+            ...completedDueResult.alerts
         ]
             .sort((left, right) => new Date(right.scheduledAt).getTime() - new Date(left.scheduledAt).getTime())
             .slice(0, limit);
 
         const summary = {
             ...queueResult.summary,
-            ...appointmentResult.summary
+            ...appointmentResult.summary,
+            ...completedDueResult.summary
         };
 
         res.json({
