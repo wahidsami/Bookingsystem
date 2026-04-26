@@ -65,6 +65,7 @@ export default function ScheduleScreen() {
     const [weekOffset, setWeekOffset] = useState(0);
     const [appointmentsLoading, setAppointmentsLoading] = useState(true);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [scheduleViewMode, setScheduleViewMode] = useState<'overview' | 'grid'>('overview');
     const timeOffEnabled = canRequestTimeOff(user);
     const canSeeBookingNotes = canViewBookingNotes(user);
     const canViewClientContext = canViewClients(user);
@@ -215,6 +216,7 @@ export default function ScheduleScreen() {
     const shiftsForSelectedDate = shifts.filter((shift) => shift.date === selectedDateKey);
     const breaksForSelectedDate = breaks.filter((item) => item.date === selectedDateKey);
     const timeOffForSelectedDate = timeOff.filter((item) => item.startDate <= selectedDateKey && item.endDate >= selectedDateKey);
+    const selectedDayAppointments = appointments;
 
     const weekShiftMinutes = shifts.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
     const workingDays = new Set(shifts.map((shift) => shift.date)).size;
@@ -282,6 +284,145 @@ export default function ScheduleScreen() {
         return { label: 'Upcoming', color: '#1d4ed8', background: '#dbeafe', priority: 3 };
     };
 
+    const getMinutesFromClock = (timeString: string) => {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        return (hours * 60) + minutes;
+    };
+
+    const getRiyadhMinutes = (value: string) => {
+        const formatted = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Riyadh',
+            hourCycle: 'h23',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(new Date(value));
+        return getMinutesFromClock(formatted);
+    };
+
+    const renderGridView = () => {
+        const gridStartMinute = 6 * 60;
+        const gridEndMinute = 22 * 60;
+        const slotMinutes = 30;
+        const rowHeight = 36;
+        const totalRows = Math.max(1, Math.ceil((gridEndMinute - gridStartMinute) / slotMinutes));
+        const gridHeight = totalRows * rowHeight + 24;
+
+        return (
+            <View style={styles.gridCard}>
+                <View style={styles.gridHeaderRow}>
+                    <Text style={styles.sectionTitle}>Day Grid</Text>
+                    <Text style={styles.gridHint}>
+                        {selectedDayAppointments.length} appointment{selectedDayAppointments.length === 1 ? '' : 's'}
+                    </Text>
+                </View>
+
+                {selectedDayAppointments.length === 0 ? (
+                    <View style={styles.infoCard}>
+                        <Ionicons name="calendar-outline" size={18} color="#6b7280" />
+                        <Text style={styles.infoCardText}>No appointments for this day.</Text>
+                    </View>
+                ) : (
+                    <View style={[styles.gridTimeline, { height: gridHeight }]}>
+                        <View style={styles.gridTimeColumn}>
+                            {Array.from({ length: totalRows }, (_, index) => {
+                                const minuteMark = gridStartMinute + (index * slotMinutes);
+                                const hours = Math.floor(minuteMark / 60);
+                                const minutes = minuteMark % 60;
+                                const labelHour = hours % 12 || 12;
+                                const ampm = hours >= 12 ? 'PM' : 'AM';
+
+                                return (
+                                    <View key={`time-${minuteMark}`} style={[styles.gridTimeSlot, { height: rowHeight }]}>
+                                        <Text style={styles.gridTimeLabel}>
+                                            {minutes === 0 ? `${labelHour} ${ampm}` : `${labelHour}:${minutes.toString().padStart(2, '0')}`}
+                                        </Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
+
+                        <View style={[styles.gridCanvas, { height: gridHeight }]}>
+                            {Array.from({ length: totalRows + 1 }, (_, index) => (
+                                <View
+                                    key={`line-${index}`}
+                                    style={[
+                                        styles.gridLine,
+                                        {
+                                            top: index * rowHeight
+                                        }
+                                    ]}
+                                />
+                            ))}
+
+                            {selectedDayAppointments.map((appointment) => {
+                                const startMinute = getRiyadhMinutes(appointment.startTime);
+                                const endMinute = getRiyadhMinutes(appointment.endTime);
+                                const topOffset = Math.max(0, ((startMinute - gridStartMinute) / slotMinutes) * rowHeight);
+                                const height = Math.max(72, Math.max(1, ((endMinute - startMinute) / slotMinutes) * rowHeight));
+                                const urgency = getUrgencyInfo(appointment);
+                                const isStarted = appointment.status === 'started';
+                                const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
+                                const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
+
+                                return (
+                                    <View
+                                        key={`grid-${appointment.id}`}
+                                        style={[
+                                            styles.gridAppointmentCard,
+                                            { top: topOffset, height },
+                                            isCompleted && styles.gridAppointmentCardCompleted
+                                        ]}
+                                    >
+                                        <View style={styles.gridAppointmentHeader}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.gridAppointmentTitle} numberOfLines={1}>
+                                                    {appointment.service?.name_en || 'Service'}
+                                                </Text>
+                                                <Text style={styles.gridAppointmentTime}>
+                                                    {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
+                                                </Text>
+                                            </View>
+                                            <View style={[styles.gridUrgencyBadge, { backgroundColor: urgency.background }]}>
+                                                <Text style={[styles.gridUrgencyText, { color: urgency.color }]}>{urgency.label}</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.gridAppointmentCustomer}>
+                                            <View style={styles.gridAppointmentAvatar}>
+                                                {appointment.user?.profileImage ? (
+                                                    <Image source={{ uri: getImageUrl(appointment.user.profileImage) }} style={styles.gridAppointmentAvatarImage} />
+                                                ) : (
+                                                    <Text style={styles.gridAppointmentAvatarInitial}>{customerInitial}</Text>
+                                                )}
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.gridAppointmentCustomerName} numberOfLines={1}>
+                                                    {appointment.user?.firstName} {appointment.user?.lastName}
+                                                </Text>
+                                                <Text style={styles.gridAppointmentMeta} numberOfLines={1}>
+                                                    {appointment.status.toUpperCase().replace('_', ' ')}{appointment.paymentStatus ? ` • ${appointment.paymentStatus.replace(/_/g, ' ')}` : ''}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.gridAppointmentFooter}>
+                                            <Text style={styles.gridAppointmentPrice}>
+                                                SAR {Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0).toFixed(2)}
+                                            </Text>
+                                            <Text style={[styles.gridAppointmentAction, isStarted && { color: '#047857' }]} numberOfLines={1}>
+                                                {isStarted ? 'In Service' : 'Upcoming'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
     const renderSelectedDayContent = () => {
         if (loading) {
             return (
@@ -291,18 +432,22 @@ export default function ScheduleScreen() {
             );
         }
 
-        if (shiftsForSelectedDate.length === 0 && timeOffForSelectedDate.length === 0) {
-            return (
-                <View style={styles.centerContainer}>
-                    <Ionicons name="calendar-clear-outline" size={64} color="#d1d5db" />
-                    <Text style={styles.emptyTitle}>No schedule for this day</Text>
-                    <Text style={styles.emptySubtitle}>This day is currently clear with no shifts or approved time off.</Text>
-                </View>
-            );
+        const hasScheduleEntries = shiftsForSelectedDate.length > 0 || breaksForSelectedDate.length > 0 || timeOffForSelectedDate.length > 0;
+
+        if (scheduleViewMode === 'grid') {
+            return renderGridView();
         }
 
         return (
             <>
+                {!hasScheduleEntries ? (
+                    <View style={styles.centerContainerCompact}>
+                        <Ionicons name="calendar-clear-outline" size={52} color="#d1d5db" />
+                        <Text style={styles.emptyTitle}>No schedule for this day</Text>
+                        <Text style={styles.emptySubtitle}>This day is currently clear with no shifts or approved time off.</Text>
+                    </View>
+                ) : null}
+
                 {shiftsForSelectedDate.map((shift) => (
                     <View key={shift.id} style={styles.shiftCard}>
                         <View style={styles.shiftTopRow}>
@@ -435,7 +580,7 @@ export default function ScheduleScreen() {
                                         <View style={styles.appointmentMetaRow}>
                                             <View style={styles.appointmentMetaBadge}>
                                                 <Ionicons name="card-outline" size={13} color="#6b7280" />
-                                                <Text style={styles.appointmentMetaBadgeText}>{appointment.paymentStatus.replace(/_/g, ' ')}</Text>
+                                                <Text style={styles.appointmentMetaBadgeText}>{appointment.paymentStatus ? appointment.paymentStatus.replace(/_/g, ' ') : 'payment unknown'}</Text>
                                             </View>
                                             {appointment.paymentMethod ? (
                                                 <View style={styles.appointmentMetaBadge}>
@@ -619,6 +764,21 @@ export default function ScheduleScreen() {
                         disabled={!canGoNext}
                     >
                         <Ionicons name="chevron-forward" size={18} color={canGoNext ? '#6d28d9' : '#9ca3af'} />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.viewModeSwitcher}>
+                    <TouchableOpacity
+                        style={[styles.viewModeButton, scheduleViewMode === 'overview' && styles.viewModeButtonActive]}
+                        onPress={() => setScheduleViewMode('overview')}
+                    >
+                        <Text style={[styles.viewModeButtonText, scheduleViewMode === 'overview' && styles.viewModeButtonTextActive]}>Overview</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.viewModeButton, scheduleViewMode === 'grid' && styles.viewModeButtonActive]}
+                        onPress={() => setScheduleViewMode('grid')}
+                    >
+                        <Text style={[styles.viewModeButtonText, scheduleViewMode === 'grid' && styles.viewModeButtonTextActive]}>Grid</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -807,6 +967,37 @@ const styles = StyleSheet.create({
     weekNavButtonDisabled: {
         backgroundColor: '#f3f4f6',
     },
+    viewModeSwitcher: {
+        flexDirection: 'row',
+        backgroundColor: '#ede9fe',
+        borderRadius: 999,
+        padding: 4,
+        marginBottom: 18,
+        gap: 4,
+    },
+    viewModeButton: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 999,
+    },
+    viewModeButtonActive: {
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowOffset: { width: 0, height: 1 },
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    viewModeButtonText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#6b7280',
+    },
+    viewModeButtonTextActive: {
+        color: '#6d28d9',
+    },
     statCard: {
         width: '48%',
         backgroundColor: '#ffffff',
@@ -916,6 +1107,146 @@ const styles = StyleSheet.create({
     },
     dayOverviewStats: {
         alignItems: 'flex-end',
+    },
+    gridCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    gridHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+    gridHint: {
+        fontSize: 12,
+        color: '#6b7280',
+    },
+    gridTimeline: {
+        flexDirection: 'row',
+    },
+    gridTimeColumn: {
+        width: 56,
+        paddingTop: 8,
+    },
+    gridTimeSlot: {
+        justifyContent: 'flex-start',
+    },
+    gridTimeLabel: {
+        fontSize: 11,
+        color: '#6b7280',
+    },
+    gridCanvas: {
+        flex: 1,
+        marginLeft: 6,
+        borderLeftWidth: 1,
+        borderLeftColor: '#e5e7eb',
+        position: 'relative',
+    },
+    gridLine: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 1,
+        backgroundColor: '#f3f4f6',
+    },
+    gridAppointmentCard: {
+        position: 'absolute',
+        left: 10,
+        right: 10,
+        backgroundColor: '#f5f3ff',
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+        borderRadius: 16,
+        padding: 12,
+        overflow: 'hidden',
+    },
+    gridAppointmentCardCompleted: {
+        backgroundColor: '#f8fafc',
+        borderColor: '#e5e7eb',
+    },
+    gridAppointmentHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+        gap: 10,
+    },
+    gridAppointmentTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1f2937',
+        marginBottom: 2,
+    },
+    gridAppointmentTime: {
+        fontSize: 12,
+        color: '#6b7280',
+    },
+    gridUrgencyBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 999,
+        alignSelf: 'flex-start',
+    },
+    gridUrgencyText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    gridAppointmentCustomer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 10,
+    },
+    gridAppointmentAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#ede9fe',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    gridAppointmentAvatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    gridAppointmentAvatarInitial: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#6d28d9',
+    },
+    gridAppointmentCustomerName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    gridAppointmentMeta: {
+        fontSize: 11,
+        color: '#6b7280',
+        marginTop: 2,
+    },
+    gridAppointmentFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    gridAppointmentPrice: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#4c1d95',
+    },
+    gridAppointmentAction: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6d28d9',
     },
     dayOverviewValue: {
         fontSize: 16,
