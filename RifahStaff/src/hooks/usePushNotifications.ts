@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
 import { registerFcmToken } from '../services/messages';
 import { useAuth } from '../context/AuthContext';
 
@@ -40,6 +41,14 @@ export function usePushNotifications() {
 
         notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
             setNotification(notification);
+
+            if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {
+                    // Ignore haptics failures on devices that do not support it.
+                });
+
+                Vibration.vibrate([0, 140, 80, 140]);
+            }
         });
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
