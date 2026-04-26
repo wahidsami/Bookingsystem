@@ -10,7 +10,8 @@ import {
   Platform,
   ScrollView,
   Image,
-  TextInput
+  TextInput,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -157,9 +158,22 @@ export default function TodayScreen() {
     try {
       setUpdatingId(id);
       await updateAppointmentStatus(id, newStatus);
-      loadAppointments();
+      await loadAppointments(true);
+      Alert.alert(
+        newStatus === 'started' ? 'Service started' : newStatus === 'completed' ? 'Service completed' : 'Marked as no-show',
+        newStatus === 'started'
+          ? 'The appointment is now in service.'
+          : newStatus === 'completed'
+            ? 'The appointment was completed successfully.'
+            : 'The appointment was marked as no-show.'
+      );
     } catch (error) {
       console.error('Failed to update status', error);
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error as any)?.message ||
+        'Could not update the appointment status.';
+      Alert.alert('Update failed', message);
     } finally {
       setUpdatingId(null);
     }
