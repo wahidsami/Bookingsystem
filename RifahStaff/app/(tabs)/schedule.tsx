@@ -15,12 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { differenceInCalendarDays } from 'date-fns';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { canRequestTimeOff, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '../../src/services/appointments';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
 import { getImageUrl } from '../../src/services/api';
+import { usePushNotifications } from '../../src/hooks/usePushNotifications';
+import { AppState } from 'react-native';
 import {
     addRiyadhDays,
     formatRiyadhLongDate,
@@ -50,6 +52,7 @@ const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minut
 
 export default function ScheduleScreen() {
     const { user } = useAuth();
+    const { notification } = usePushNotifications();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -133,6 +136,43 @@ export default function ScheduleScreen() {
 
         loadAppointmentsForSelectedDate();
     }, [loadAppointmentsForSelectedDate, user]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (user) {
+                loadData();
+                loadAppointmentsForSelectedDate();
+            }
+        }, [user, loadData, loadAppointmentsForSelectedDate])
+    );
+
+    useEffect(() => {
+        if (!user) return;
+        const subscription = AppState.addEventListener('change', (state) => {
+            if (state === 'active') {
+                loadData();
+                loadAppointmentsForSelectedDate();
+            }
+        });
+
+        return () => subscription.remove();
+    }, [user, loadData, loadAppointmentsForSelectedDate]);
+
+    useEffect(() => {
+        if (user && notification) {
+            loadData();
+            loadAppointmentsForSelectedDate();
+        }
+    }, [notification, user, loadData, loadAppointmentsForSelectedDate]);
+
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(() => {
+            loadAppointmentsForSelectedDate();
+        }, 45000);
+
+        return () => clearInterval(interval);
+    }, [user, loadAppointmentsForSelectedDate]);
 
     useEffect(() => {
         setSelectedDateKey(weekOffset === 0 ? getRiyadhDateKey() : weekStartKey);
@@ -310,7 +350,7 @@ export default function ScheduleScreen() {
                                     <View style={styles.typeBadge}>
                                         <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
                                     </View>
-                                    <Text style={[styles.statusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
+                                    <Text style={[styles.timeOffStatusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
                                         {item.isApproved ? 'APPROVED' : 'PENDING'}
                                     </Text>
                                 </View>
@@ -357,7 +397,7 @@ export default function ScheduleScreen() {
                                                 <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
                                             </View>
                                             <View style={styles.statusBadge}>
-                                                <Text style={[styles.statusText, appointment.status === 'started' && { color: '#fbbf24' }, appointment.status === 'completed' && { color: '#10b981' }, appointment.status === 'cancelled' && { color: '#ef4444' }]}>
+                                                <Text style={[styles.appointmentStatusText, appointment.status === 'started' && { color: '#fbbf24' }, appointment.status === 'completed' && { color: '#10b981' }, appointment.status === 'cancelled' && { color: '#ef4444' }]}>
                                                     {appointment.status.toUpperCase().replace('_', ' ')}
                                                 </Text>
                                             </View>
@@ -484,7 +524,7 @@ export default function ScheduleScreen() {
                             <View style={styles.typeBadge}>
                                 <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
                             </View>
-                            <Text style={[styles.statusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
+                            <Text style={[styles.timeOffStatusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
                                 {item.isApproved ? 'APPROVED' : 'PENDING'}
                             </Text>
                         </View>
@@ -1022,7 +1062,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#6b21a8',
     },
-    statusText: {
+    timeOffStatusText: {
         fontSize: 13,
         fontWeight: '600',
     },
@@ -1069,7 +1109,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginTop: 6,
     },
-    statusText: {
+    appointmentStatusText: {
         fontSize: 12,
         fontWeight: 'bold',
         color: '#6b7280',

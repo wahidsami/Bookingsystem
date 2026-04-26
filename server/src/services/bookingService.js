@@ -2,6 +2,7 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const userService = require('./userService');
 const pushNotificationService = require('./pushNotificationService');
+const { createStaffAppointmentMessage } = require('./staffNotificationService');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const {
     getTenantPaymentSettings,
@@ -335,6 +336,15 @@ class BookingService {
                             platformUserId
                         }
                     });
+
+                    await createStaffAppointmentMessage({
+                        tenantId,
+                        staffId: finalStaffId,
+                        customerName,
+                        serviceName,
+                        appointmentDate,
+                        action: 'assigned'
+                    });
                 } catch (notificationError) {
                     console.warn('Booking notification warning:', notificationError.message);
                 }
@@ -492,6 +502,33 @@ class BookingService {
                             customerName
                         }
                     });
+
+                    for (const appointment of appointments) {
+                        const serviceName = appointment?.service?.name_en || appointment?.service?.name_ar || 'service';
+                        const appointmentDate = formatNotificationDate(appointment.startTime);
+                        const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
+                        if (appointment.staffId) {
+                            await pushNotificationService.sendToStaff(appointment.staffId, {
+                                title: 'New appointment assigned',
+                                body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                                data: {
+                                    type: 'staff_appointment_assigned',
+                                    appointmentId: appointment.id,
+                                    tenantId,
+                                    platformUserId
+                                }
+                            });
+                        }
+
+                        await createStaffAppointmentMessage({
+                            tenantId,
+                            staffId: appointment.staffId,
+                            customerName,
+                            serviceName,
+                            appointmentDate,
+                            action: 'assigned'
+                        });
+                    }
                 } catch (notificationError) {
                     console.warn('Booking session notification warning:', notificationError.message);
                 }

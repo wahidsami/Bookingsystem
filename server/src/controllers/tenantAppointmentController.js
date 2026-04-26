@@ -10,6 +10,7 @@ const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatu
 const pushNotificationService = require('../services/pushNotificationService');
 const customerNotificationService = require('../services/customerNotificationService');
 const bookingService = require('../services/bookingService');
+const { createStaffAppointmentMessage } = require('../services/staffNotificationService');
 const { calculateSplitPayment } = require('../services/splitPaymentService');
 const userService = require('../services/userService');
 const {
@@ -267,6 +268,15 @@ exports.createAppointment = async (req, res) => {
                     tenantId,
                     platformUserId: customerUser.id
                 }
+            });
+
+            await createStaffAppointmentMessage({
+                tenantId,
+                staffId: appointment.staffId,
+                customerName,
+                serviceName,
+                appointmentDate,
+                action: 'assigned'
             });
         } catch (notificationError) {
             console.warn('Tenant appointment notification warning:', notificationError.message);
@@ -1111,6 +1121,15 @@ exports.reassignAppointmentStaff = async (req, res) => {
                     platformUserId: appointment.platformUserId
                 }
             });
+
+            await createStaffAppointmentMessage({
+                tenantId,
+                staffId,
+                customerName,
+                serviceName,
+                appointmentDate,
+                action: 'reassigned'
+            });
         } catch (notificationError) {
             console.warn('Tenant appointment reassignment notification warning:', notificationError.message);
         }
@@ -1264,6 +1283,18 @@ exports.rescheduleAppointment = async (req, res) => {
         await transaction.commit();
 
         try {
+            const customerName = appointment.user
+                ? `${appointment.user.firstName || ''} ${appointment.user.lastName || ''}`.trim()
+                : 'A customer';
+            const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+            const appointmentDate = requestedStart.toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+
             await pushNotificationService.sendToUser(appointment.platformUserId, {
                 title: 'Booking rescheduled',
                 body: 'Your appointment time has been updated.',
@@ -1274,6 +1305,28 @@ exports.rescheduleAppointment = async (req, res) => {
                     staffId: requestedStaffId
                 }
             });
+
+            if (appointment.staffId) {
+                await pushNotificationService.sendToStaff(appointment.staffId, {
+                    title: 'Appointment rescheduled',
+                    body: `${customerName} updated ${serviceName} for ${appointmentDate}.`,
+                    data: {
+                        type: 'staff_appointment_rescheduled',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        platformUserId: appointment.platformUserId
+                    }
+                });
+
+                await createStaffAppointmentMessage({
+                    tenantId,
+                    staffId: appointment.staffId,
+                    customerName,
+                    serviceName,
+                    appointmentDate,
+                    action: 'assigned'
+                });
+            }
         } catch (notificationError) {
             console.warn('Tenant booking reschedule notification warning:', notificationError.message);
         }

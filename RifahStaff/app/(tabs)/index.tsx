@@ -18,10 +18,12 @@ import { useAuth } from '../../src/context/AuthContext';
 import { getTodayAppointments, updateAppointmentStatus, Appointment } from '../../src/services/appointments';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
-import api, { getImageUrl } from '../../src/services/api';
+import { getImageUrl } from '../../src/services/api';
 import { canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { RIYADH_TIME_ZONE } from '../../src/utils/riyadhDate';
+import { AppState } from 'react-native';
+import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 
 export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
@@ -34,6 +36,7 @@ export default function TodayScreen() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'in_progress' | 'done'>('all');
   const canViewClientContext = canViewClients(user);
   const canSeeBookingNotes = canViewBookingNotes(user);
+  const { notification } = usePushNotifications();
 
   // Format time as h:mm A
   const formatTime = (dateString: string) => {
@@ -69,6 +72,39 @@ export default function TodayScreen() {
     }
     loadAppointments();
   }, [authLoading, user, loadAppointments]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        loadAppointments();
+      }
+    }, [user, loadAppointments])
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        loadAppointments();
+      }
+    });
+    return () => subscription.remove();
+  }, [user, loadAppointments]);
+
+  useEffect(() => {
+    if (user && notification) {
+      loadAppointments();
+    }
+  }, [notification, user, loadAppointments]);
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      loadAppointments();
+    }, 45000);
+
+    return () => clearInterval(interval);
+  }, [user, loadAppointments]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -149,7 +185,7 @@ export default function TodayScreen() {
     return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
   });
 
-  const filterOptions: Array<{ key: 'all' | 'upcoming' | 'in_progress' | 'done'; label: string; count: number }> = [
+    const filterOptions: { key: 'all' | 'upcoming' | 'in_progress' | 'done'; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: appointments.length },
     { key: 'upcoming', label: 'Upcoming', count: appointments.filter((item) => ['pending', 'confirmed'].includes(item.status)).length },
     { key: 'in_progress', label: 'In Progress', count: appointments.filter((item) => item.status === 'started').length },
