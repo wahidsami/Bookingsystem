@@ -70,7 +70,7 @@ const sanitizeDashboardAccount = (account) => {
   };
 };
 
-const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+const blockedStatuses = ['pending_approval', 'payment_pending', 'rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
 
 const isMissingTenantDashboardAccountTableError = (error) => {
   const message = String(error?.message || '').toLowerCase();
@@ -114,6 +114,10 @@ const getBlockedTenantMessage = (status) => {
     ? 'Your account has been rejected. Please contact support.'
     : status === 'suspended'
       ? 'Your account has been suspended. Please contact support.'
+      : status === 'pending_approval'
+        ? 'Your tenant registration is still under review. Please wait for approval.'
+        : status === 'payment_pending'
+          ? 'Your tenant is approved, but access is not active until payment is completed.'
       : status === 'payment_expired'
         ? 'Payment window expired. Please contact support.'
         : `Account is ${status}. Please contact support.`;
@@ -310,7 +314,7 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+    const blockedStatuses = ['pending_approval', 'payment_pending', 'rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
     if (blockedStatuses.includes(tenant.status)) {
       return res.status(403).json({
         success: false,

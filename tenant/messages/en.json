@@ -1114,8 +1114,8 @@
     },
     "success": {
       "title": "Registration completed successfully!",
-      "message": "Thank you for registering your business with Rifah. We've sent you a confirmation email, and your account is now under review by our team.",
-      "goToDashboard": "Go to Dashboard"
+      "message": "Thank you for registering your business with Rifah. We've sent you a confirmation email. Your application is under review, and dashboard access will be enabled after approval and payment.",
+      "goToHome": "Go to Home"
     },
     "step1": {
       "title": "Entity Details",
@@ -1185,7 +1185,8 @@
         "licenseRequired": "License number is required",
         "crFileRequired": "CR document must be uploaded",
         "taxFileRequired": "Tax certificate must be uploaded",
-        "licenseFileRequired": "License must be uploaded"
+        "licenseFileRequired": "License must be uploaded",
+        "stepIncomplete": "Please complete the required fields before continuing"
       }
     },
     "step3": {
@@ -1196,7 +1197,14 @@
       "email": "Email",
       "mobile": "Mobile Number",
       "position": "Job Title",
-      "positionPlaceholder": "E.g., Manager, Owner, Supervisor"
+      "positionPlaceholder": "E.g., Manager, Owner, Supervisor",
+      "errors": {
+        "nameArRequired": "Contact person name in Arabic is required",
+        "nameEnRequired": "Contact person name in English is required",
+        "emailRequired": "Contact person email is required",
+        "mobileRequired": "Contact person mobile number is required",
+        "positionRequired": "Job title is required"
+      }
     },
     "step4": {
       "title": "Business Owner Details",
@@ -1206,7 +1214,14 @@
       "phone": "Owner Phone Number",
       "email": "Owner Email",
       "nationalId": "National ID / Iqama Number",
-      "nationalIdPlaceholder": "Enter National ID or Iqama number"
+      "nationalIdPlaceholder": "Enter National ID or Iqama number",
+      "errors": {
+        "nameArRequired": "Owner name in Arabic is required",
+        "nameEnRequired": "Owner name in English is required",
+        "phoneRequired": "Owner phone is required",
+        "emailRequired": "Owner email is required",
+        "nationalIdRequired": "National ID / Iqama is required"
+      }
     },
     "step5": {
       "title": "Business Details",

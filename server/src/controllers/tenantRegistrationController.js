@@ -2,7 +2,6 @@ const db = require('../models');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const jwt = require('jsonwebtoken');
 const { notifyTenantRegistered } = require('../services/adminNotificationService');
 
 const VALID_BUSINESS_TYPES = ['salon', 'spa', 'barbershop', 'beauty_center', 'clinic', 'nail_studio', 'other'];
@@ -411,35 +410,6 @@ exports.register = async (req, res) => {
         // Commit transaction
         await transaction.commit();
 
-        // Generate JWT token (for immediate login after registration)
-        const accessToken = jwt.sign(
-            {
-                id: tenant.id,
-                email: tenant.email,
-                type: 'tenant'
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        const refreshToken = jwt.sign(
-            {
-                id: tenant.id,
-                type: 'tenant',
-                isRefresh: true
-            },
-            process.env.JWT_REFRESH_SECRET,
-            { expiresIn: '30d' }
-        );
-
-        // Set refresh token as HTTP-only cookie
-        res.cookie('tenant_refresh_token', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        });
-
         // Send welcome email (don't wait for it, don't fail if it errors)
         const { sendWelcomeEmail } = require('../utils/emailService');
         sendWelcomeEmail(tenant).catch(err => {
@@ -461,9 +431,7 @@ exports.register = async (req, res) => {
                 status: tenant.status,
                 logo: tenant.logo,
                 createdAt: tenant.createdAt
-            },
-            accessToken,
-            refreshToken
+            }
         });
 
     } catch (error) {

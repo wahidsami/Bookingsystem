@@ -68,7 +68,7 @@ const authenticateTenant = async (req, res, next) => {
     }
 
     // Block access for terminal/invalid statuses (allow onboarding + payment_pending + active)
-    const blockedStatuses = ['rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
+    const blockedStatuses = ['pending_approval', 'payment_pending', 'rejected', 'suspended', 'inactive', 'payment_failed', 'payment_expired'];
     if (blockedStatuses.includes(tenant.status)) {
       return res.status(403).json({
         success: false,
@@ -167,7 +167,7 @@ const optionalTenantAuth = async (req, res, next) => {
         attributes: { exclude: ['password'] }
       });
 
-      if (tenant && (tenant.status === 'active' || tenant.status === 'approved' || tenant.status === 'payment_pending')) {
+      if (tenant && (tenant.status === 'active' || tenant.status === 'approved' || tenant.status === 'more_info_required')) {
         req.tenantId = tenant.id;
         req.tenant = tenant;
         req.userId = decoded.type === 'tenant_account' ? decoded.accountId : decoded.id;

@@ -376,10 +376,11 @@ const Step2Documentation = ({ formData, handleChange, handleFileChange, errors }
                         name="crDocument"
                         accept=".pdf,image/*"
                         onChange={handleFileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.crDocument ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
                     <p className="text-sm text-gray-500 mt-1">{t('step2.fileHint')}</p>
+                    {errors.crDocument && <p className="text-red-500 text-sm mt-1">{errors.crDocument}</p>}
                 </div>
             </div>
 
@@ -411,10 +412,11 @@ const Step2Documentation = ({ formData, handleChange, handleFileChange, errors }
                         name="taxDocument"
                         accept=".pdf,image/*"
                         onChange={handleFileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.taxDocument ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
                     <p className="text-sm text-gray-500 mt-1">{t('step2.fileHint')}</p>
+                    {errors.taxDocument && <p className="text-red-500 text-sm mt-1">{errors.taxDocument}</p>}
                 </div>
             </div>
 
@@ -446,10 +448,11 @@ const Step2Documentation = ({ formData, handleChange, handleFileChange, errors }
                         name="licenseDocument"
                         accept=".pdf,image/*"
                         onChange={handleFileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.licenseDocument ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
                     <p className="text-sm text-gray-500 mt-1">{t('step2.fileHint')}</p>
+                    {errors.licenseDocument && <p className="text-red-500 text-sm mt-1">{errors.licenseDocument}</p>}
                 </div>
             </div>
         </div>
@@ -477,9 +480,10 @@ const Step3ContactPerson = ({ formData, handleChange, errors }: any) => {
                         name="contactPersonNameAr"
                         value={formData.contactPersonNameAr}
                         onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.contactPersonNameAr ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
+                    {errors.contactPersonNameAr && <p className="text-red-500 text-sm mt-1">{errors.contactPersonNameAr}</p>}
                 </div>
 
                 <div>
@@ -491,9 +495,10 @@ const Step3ContactPerson = ({ formData, handleChange, errors }: any) => {
                         name="contactPersonNameEn"
                         value={formData.contactPersonNameEn}
                         onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.contactPersonNameEn ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
+                    {errors.contactPersonNameEn && <p className="text-red-500 text-sm mt-1">{errors.contactPersonNameEn}</p>}
                 </div>
             </div>
 
@@ -507,9 +512,10 @@ const Step3ContactPerson = ({ formData, handleChange, errors }: any) => {
                         name="contactPersonEmail"
                         value={formData.contactPersonEmail}
                         onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.contactPersonEmail ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
+                    {errors.contactPersonEmail && <p className="text-red-500 text-sm mt-1">{errors.contactPersonEmail}</p>}
                 </div>
 
                 <div>
@@ -521,9 +527,10 @@ const Step3ContactPerson = ({ formData, handleChange, errors }: any) => {
                         name="contactPersonMobile"
                         value={formData.contactPersonMobile}
                         onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.contactPersonMobile ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                         required
                     />
+                    {errors.contactPersonMobile && <p className="text-red-500 text-sm mt-1">{errors.contactPersonMobile}</p>}
                 </div>
             </div>
 
@@ -536,10 +543,11 @@ const Step3ContactPerson = ({ formData, handleChange, errors }: any) => {
                     name="contactPersonPosition"
                     value={formData.contactPersonPosition}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${errors.contactPersonPosition ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                     required
                     placeholder={t('step3.positionPlaceholder')}
                 />
+                {errors.contactPersonPosition && <p className="text-red-500 text-sm mt-1">{errors.contactPersonPosition}</p>}
             </div>
         </div>
     );
@@ -980,6 +988,14 @@ export default function RegisterPage() {
                 ...prev,
                 [name]: fileList[0]
             }));
+
+            if (errors[name]) {
+                setErrors((prev: any) => {
+                    const newErrors = { ...prev };
+                    delete newErrors[name];
+                    return newErrors;
+                });
+            }
         }
     };
 
@@ -1011,12 +1027,20 @@ export default function RegisterPage() {
             if (!files.licenseDocument) newErrors.licenseDocument = t('step2.errors.licenseFileRequired');
         }
 
+        if (step === 3) {
+            if (!formData.contactPersonNameAr) newErrors.contactPersonNameAr = t('step3.errors.nameArRequired');
+            if (!formData.contactPersonNameEn) newErrors.contactPersonNameEn = t('step3.errors.nameEnRequired');
+            if (!formData.contactPersonEmail) newErrors.contactPersonEmail = t('step3.errors.emailRequired');
+            if (!formData.contactPersonMobile) newErrors.contactPersonMobile = t('step3.errors.mobileRequired');
+            if (!formData.contactPersonPosition) newErrors.contactPersonPosition = t('step3.errors.positionRequired');
+        }
+
         if (step === 4) {
-            if (!formData.ownerNameAr) newErrors.ownerNameAr = 'Owner name in Arabic is required';
-            if (!formData.ownerNameEn) newErrors.ownerNameEn = 'Owner name in English is required';
-            if (!formData.ownerPhone) newErrors.ownerPhone = 'Owner phone is required';
-            if (!formData.ownerEmail) newErrors.ownerEmail = 'Owner email is required';
-            if (!formData.ownerNationalId) newErrors.ownerNationalId = 'National ID / Iqama is required';
+            if (!formData.ownerNameAr) newErrors.ownerNameAr = t('step4.errors.nameArRequired');
+            if (!formData.ownerNameEn) newErrors.ownerNameEn = t('step4.errors.nameEnRequired');
+            if (!formData.ownerPhone) newErrors.ownerPhone = t('step4.errors.phoneRequired');
+            if (!formData.ownerEmail) newErrors.ownerEmail = t('step4.errors.emailRequired');
+            if (!formData.ownerNationalId) newErrors.ownerNationalId = t('step4.errors.nationalIdRequired');
         }
 
         if (step === 5) {
@@ -1028,7 +1052,15 @@ export default function RegisterPage() {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+
+        const firstError = Object.values(newErrors)[0];
+        if (firstError) {
+            setError(String(firstError));
+            return false;
+        }
+
+        setError('');
+        return true;
     };
 
     const nextStep = () => {
@@ -1102,14 +1134,6 @@ export default function RegisterPage() {
 
             if (!response.ok) {
                 throw new Error(data.message || t('errors.registrationFailed'));
-            }
-
-            // Store tokens in the same keys used by tenant login
-            if (data.accessToken) {
-                sessionStorage.setItem('rifah_tenant_access_token', data.accessToken);
-            }
-            if (data.refreshToken) {
-                localStorage.setItem('rifah_tenant_refresh_token', data.refreshToken);
             }
 
             // Show success screen instead of immediate redirect
@@ -1211,10 +1235,10 @@ export default function RegisterPage() {
                                 {t('success.message')}
                             </p>
                             <Link
-                                href={`/${locale}/dashboard`}
+                                href={`/${locale}`}
                                 className="inline-flex w-full items-center justify-center rounded-lg bg-purple-600 px-8 py-4 text-center font-semibold text-white shadow-lg transition hover:bg-purple-700 hover:shadow-xl sm:w-auto"
                             >
-                                {t('success.goToDashboard')}
+                                {t('success.goToHome')}
                             </Link>
                         </div>
                     ) : (
