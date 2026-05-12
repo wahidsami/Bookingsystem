@@ -11,9 +11,12 @@ router.get('/recommendations', optionalAuth, bookingController.getRecommendation
 
 // Get next available slot for a service and staff (public - no auth required)
 router.get('/next-available', bookingController.getNextAvailableSlot);
+router.get('/invites/:token', bookingController.getInviteDetails);
+router.get('/invites/:token/open', bookingController.openInvite);
 
 // Create a new booking (requires authentication)
 router.post('/create', authenticateUser, bookingController.createBooking);
+router.post('/:id/respond', authenticateUser, bookingController.respondToInvite);
 
 // Get all bookings (optional auth - returns user's bookings if authenticated)
 router.get('/', optionalAuth, bookingController.listBookings);

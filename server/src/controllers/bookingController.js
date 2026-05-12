@@ -2,6 +2,7 @@ const bookingService = require('../services/bookingService');
 const db = require('../models');
 const { Op } = require('sequelize');
 const { SERVICE_PAYMENT_METHOD_RULES } = require('../utils/tenantPaymentSettings');
+const { getServerPublicUrl } = require('../utils/url');
 
 const normalizeBookingItemPaymentMethod = (value) => {
     const normalized = `${value || 'at-center'}`.trim().toLowerCase();
@@ -501,6 +502,143 @@ const getNextAvailableSlot = async (req, res) => {
     }
 };
 
+/**
+ * Public invite details endpoint (token-based).
+ * GET /api/v1/bookings/invites/:token
+ */
+const getInviteDetails = async (req, res) => {
+    try {
+        const { token } = req.params;
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'Invite token is required' });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: { inviteToken: token },
+            include: [
+                { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar', 'duration'] },
+                { model: db.Staff, as: 'staff', attributes: ['id', 'name'] },
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+            ]
+        });
+
+        if (!appointment) {
+            return res.status(404).json({ success: false, message: 'Invite not found' });
+        }
+
+        const isExpired = !!appointment.inviteExpiresAt && new Date(appointment.inviteExpiresAt).getTime() < Date.now();
+
+        return res.json({
+            success: true,
+            invite: {
+                token,
+                isExpired,
+                appointmentId: appointment.id,
+                platformUserId: appointment.platformUserId,
+                customerConfirmationRequired: !!appointment.customerConfirmationRequired,
+                customerConfirmationStatus: appointment.customerConfirmationStatus || 'not_required',
+                inviteExpiresAt: appointment.inviteExpiresAt,
+                startTime: appointment.startTime,
+                endTime: appointment.endTime,
+                status: appointment.status,
+                service: appointment.service || null,
+                staff: appointment.staff || null,
+                tenant: appointment.tenant || null
+            }
+        });
+    } catch (error) {
+        console.error('Get invite details error:', error);
+        return res.status(500).json({ success: false, message: error.message || 'Failed to load invite details' });
+    }
+};
+
+/**
+ * Public invite landing page to open app deep-link.
+ * GET /api/v1/bookings/invites/:token/open
+ */
+const openInvite = async (req, res) => {
+    const { token } = req.params;
+    const deepLink = `refah://appointment-invite/${encodeURIComponent(token || '')}`;
+    const androidStore = process.env.ANDROID_APP_URL || 'https://play.google.com/store';
+    const iosStore = process.env.IOS_APP_URL || 'https://apps.apple.com';
+    const apiBase = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1`;
+    const inviteApiUrl = `${apiBase}/bookings/invites/${encodeURIComponent(token || '')}`;
+
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Refah Appointment Invite</title>
+<style>body{font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:0 auto;color:#111}a.button{display:inline-block;margin-top:8px;padding:10px 14px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px}small{display:block;margin-top:16px;color:#666}</style>
+</head><body>
+<h2>Refah Appointment Invite</h2>
+<p>Opening Refah app to confirm your appointment.</p>
+<a class="button" href="${deepLink}">Open Refah App</a>
+<p>If you do not have the app yet, install it first:</p>
+<a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a>
+<small>If the app did not open automatically, use the button above.</small>
+<script>
+setTimeout(function(){ window.location.href='${deepLink}'; }, 400);
+setTimeout(function(){
+fetch('${inviteApiUrl}').then(r=>r.json()).then(data=>{
+if(data && data.success && data.invite && data.invite.platformUserId){
+console.log('Invite is linked to an existing Refah user');
+}
+});
+}, 1200);
+</script>
+</body></html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(html);
+};
+
+/**
+ * Authenticated customer response to tenant-created invite.
+ * POST /api/v1/bookings/:id/respond
+ */
+const respondToInvite = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { response } = req.body || {};
+        const platformUserId = req.userId;
+
+        if (!['confirm', 'decline'].includes(`${response || ''}`)) {
+            return res.status(400).json({ success: false, message: 'response must be confirm or decline' });
+        }
+
+        const appointment = await db.Appointment.findByPk(id);
+        if (!appointment) {
+            return res.status(404).json({ success: false, message: 'Appointment not found' });
+        }
+        if (appointment.platformUserId !== platformUserId) {
+            return res.status(403).json({ success: false, message: 'You are not authorized for this appointment' });
+        }
+        if (!appointment.customerConfirmationRequired) {
+            return res.status(400).json({ success: false, message: 'This appointment does not require confirmation' });
+        }
+        if (appointment.customerConfirmationStatus !== 'pending') {
+            return res.status(400).json({ success: false, message: 'This invite has already been handled' });
+        }
+
+        appointment.customerConfirmationStatus = response === 'confirm' ? 'confirmed' : 'declined';
+        appointment.customerConfirmedAt = new Date();
+        if (response === 'confirm') {
+            appointment.status = 'confirmed';
+        } else {
+            appointment.status = 'cancelled';
+        }
+        await appointment.save();
+
+        return res.json({
+            success: true,
+            message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment declined',
+            appointment
+        });
+    } catch (error) {
+        console.error('Respond to invite error:', error);
+        return res.status(500).json({ success: false, message: error.message || 'Failed to submit response' });
+    }
+};
+
 module.exports = {
     searchAvailability,
     getRecommendations,
@@ -508,5 +646,8 @@ module.exports = {
     getBooking,
     cancelBooking,
     listBookings,
-    getNextAvailableSlot
+    getNextAvailableSlot,
+    getInviteDetails,
+    openInvite,
+    respondToInvite
 };

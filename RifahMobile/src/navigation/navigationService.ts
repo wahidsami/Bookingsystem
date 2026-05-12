@@ -19,3 +19,12 @@ export const navigateToNotificationDetail = (campaignId: string): boolean => {
     navigationRef.navigate('NotificationDetail', { campaignId });
     return true;
 };
+
+export const navigateToAppointmentInvite = (token: string): boolean => {
+    if (!token || !navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('AppointmentInvite', { token });
+    return true;
+};

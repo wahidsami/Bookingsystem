@@ -296,6 +296,34 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             comment: 'When the appointment was auto-marked or manually marked as no-show'
         },
+        customerConfirmationRequired: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+            comment: 'Whether customer must confirm attendance from the app'
+        },
+        customerConfirmationStatus: {
+            type: DataTypes.STRING(24),
+            allowNull: false,
+            defaultValue: 'not_required',
+            comment: 'Customer confirmation state: not_required, pending, confirmed, declined'
+        },
+        customerConfirmedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'When the customer responded to appointment confirmation'
+        },
+        inviteToken: {
+            type: DataTypes.STRING(128),
+            allowNull: true,
+            unique: true,
+            comment: 'Secure token for appointment invite deep links'
+        },
+        inviteExpiresAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'Invite token expiry timestamp'
+        },
         serviceStartedAt: {
             type: DataTypes.DATE,
             allowNull: true,
@@ -402,6 +430,11 @@ module.exports = (sequelize, DataTypes) => {
                 fields: ['bookingNumber'],
                 unique: true,
                 name: 'idx_appointments_booking_number'
+            },
+            {
+                fields: ['inviteToken'],
+                unique: true,
+                name: 'idx_appointments_invite_token'
             }
         ]
     });

@@ -87,6 +87,7 @@ export default function NewAppointmentPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [createdInviteLink, setCreatedInviteLink] = useState("");
 
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -219,6 +220,7 @@ export default function NewAppointmentPage() {
   const handleSubmit = async () => {
     setError("");
     setSuccess("");
+    setCreatedInviteLink("");
 
     if (!selectedServiceId) {
       setError(locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.");
@@ -291,7 +293,7 @@ export default function NewAppointmentPage() {
       const response = await tenantApi.createAppointment(payload);
       if (response.success) {
         setSuccess(locale === "ar" ? "تم إنشاء الموعد بنجاح." : "Appointment created successfully.");
-        router.push(`/${locale}/dashboard/appointments`);
+        setCreatedInviteLink(response?.appointmentInvite?.link || "");
       } else {
         setError(response.message || (locale === "ar" ? "فشل إنشاء الموعد." : "Failed to create appointment."));
       }
@@ -346,7 +348,43 @@ export default function NewAppointmentPage() {
 
       {success && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
-          {success}
+          <div className="flex flex-col gap-3">
+            <span>{success}</span>
+            {createdInviteLink && (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-green-800">
+                  {locale === "ar" ? "رابط تأكيد الموعد للعميل" : "Customer appointment confirmation link"}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    value={createdInviteLink}
+                    readOnly
+                    className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-xs text-gray-800"
+                    style={{ direction: "ltr" }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary whitespace-nowrap"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(createdInviteLink);
+                      setSuccess(locale === "ar" ? "تم نسخ الرابط. يمكنك إرساله عبر واتساب أو البريد." : "Link copied. You can send it via WhatsApp or email.");
+                    }}
+                  >
+                    {locale === "ar" ? "نسخ الرابط" : "Copy link"}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => router.push(`/${locale}/dashboard/appointments`)}
+              >
+                {locale === "ar" ? "العودة إلى المواعيد" : "Back to appointments"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

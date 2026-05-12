@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
+import { AppState, AppStateStatus, Linking, StyleSheet, Text, View } from 'react-native';
 import * as Font from 'expo-font';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { LanguageSelection } from './src/screens/LanguageSelection';
@@ -9,6 +9,7 @@ import { OnboardingScreens } from './src/screens/OnboardingScreens';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
+import { GoogleOnboardingScreen } from './src/screens/GoogleOnboardingScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LanguageProvider, useLanguage } from './src/contexts/LanguageContext';
 import { CartProvider } from './src/contexts/CartContext';
@@ -22,9 +23,9 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
-import { navigationRef, navigateToNotifications } from './src/navigation/navigationService';
+import { navigationRef, navigateToAppointmentInvite, navigateToNotifications } from './src/navigation/navigationService';
 
-type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'forgotPassword' | 'home';
+type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'googleOnboarding' | 'forgotPassword' | 'home';
 
 // Load Cairo fonts
 const loadFonts = async () => {
@@ -48,6 +49,16 @@ function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+
+  const extractInviteToken = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    const decoded = decodeURIComponent(url);
+    const deepLinkMatch = decoded.match(/appointment-invite\/([^/?#]+)/i);
+    if (deepLinkMatch?.[1]) return deepLinkMatch[1];
+    const queryMatch = decoded.match(/[?&]inviteToken=([^&#]+)/i) || decoded.match(/[?&]token=([^&#]+)/i);
+    return queryMatch?.[1] || null;
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -59,6 +70,26 @@ function AppContent() {
   useEffect(() => {
     const cleanup = initializeNotificationHandling();
     return cleanup;
+  }, []);
+
+  useEffect(() => {
+    const handleUrl = (url?: string | null) => {
+      const token = extractInviteToken(url);
+      if (!token) return;
+      setPendingInviteToken(token);
+    };
+
+    Linking.getInitialURL()
+      .then((url) => handleUrl(url))
+      .catch(() => undefined);
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -100,6 +131,17 @@ function AppContent() {
       subscription.remove();
     };
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!pendingInviteToken || !isAuthenticated || currentScreen !== 'home') {
+      return;
+    }
+
+    if (navigationRef.isReady()) {
+      navigateToAppointmentInvite(pendingInviteToken);
+      setPendingInviteToken(null);
+    }
+  }, [pendingInviteToken, isAuthenticated, currentScreen]);
 
   const loadFontsAndLanguage = async () => {
     await loadFonts();
@@ -211,6 +253,7 @@ function AppContent() {
             onBackToWelcome={() => setCurrentScreen('welcome')}
             onGoToRegister={() => setCurrentScreen('register')}
             onForgotPassword={() => setCurrentScreen('forgotPassword')}
+            onGoogleSignIn={() => setCurrentScreen('googleOnboarding')}
           />
           <StatusBar style="dark" />
         </>
@@ -222,6 +265,17 @@ function AppContent() {
             onRegisterSuccess={handleRegisterSuccess}
             onBackToWelcome={() => setCurrentScreen('welcome')}
             onGoToLogin={() => setCurrentScreen('login')}
+            onGoogleSignIn={() => setCurrentScreen('googleOnboarding')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
+
+      {currentScreen === 'googleOnboarding' ? (
+        <>
+          <GoogleOnboardingScreen
+            onSuccess={handleLoginSuccess}
+            onBack={() => setCurrentScreen('welcome')}
           />
           <StatusBar style="dark" />
         </>
@@ -242,6 +296,10 @@ function AppContent() {
           <NavigationContainer
             ref={navigationRef}
             onReady={() => {
+              if (pendingInviteToken) {
+                navigateToAppointmentInvite(pendingInviteToken);
+                setPendingInviteToken(null);
+              }
               consumePendingNotificationCampaignId()
                 .then((pendingNotification) => {
                   if (pendingNotification) {

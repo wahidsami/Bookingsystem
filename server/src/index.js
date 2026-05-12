@@ -531,6 +531,25 @@ const ensureAppointmentSchema = async () => {
 
                 ALTER TABLE public.appointments
                     ADD COLUMN IF NOT EXISTS "noShowMarkedAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerConfirmationRequired" BOOLEAN NOT NULL DEFAULT FALSE;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerConfirmationStatus" VARCHAR(24) NOT NULL DEFAULT 'not_required';
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerConfirmedAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "inviteToken" VARCHAR(128) NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "inviteExpiresAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_invite_token
+                    ON public.appointments ("inviteToken")
+                    WHERE "inviteToken" IS NOT NULL;
             END $$;
         `);
 

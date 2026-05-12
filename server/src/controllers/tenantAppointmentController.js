@@ -6,6 +6,7 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const { Sequelize } = require('sequelize');
+const crypto = require('crypto');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('../services/pushNotificationService');
 const customerNotificationService = require('../services/customerNotificationService');
@@ -24,6 +25,18 @@ const {
     isValidAppointmentStatus,
     normalizeAppointmentStatus
 } = require('../utils/appointmentStatus');
+const { getServerPublicUrl } = require('../utils/url');
+
+const INVITE_EXPIRY_HOURS = 72;
+
+function generateInviteToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+function buildAppointmentInviteLink(token) {
+    const baseUrl = getServerPublicUrl() || 'http://localhost:5000';
+    return `${baseUrl.replace(/\/+$/, '')}/api/v1/bookings/invites/${encodeURIComponent(token)}/open`;
+}
 
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
@@ -196,6 +209,14 @@ exports.createAppointment = async (req, res) => {
             skipAdvanceValidation: true
         }, { transaction });
 
+        const inviteToken = generateInviteToken();
+        const inviteExpiresAt = new Date(Date.now() + (INVITE_EXPIRY_HOURS * 60 * 60 * 1000));
+        appointment.customerConfirmationRequired = true;
+        appointment.customerConfirmationStatus = 'pending';
+        appointment.inviteToken = inviteToken;
+        appointment.inviteExpiresAt = inviteExpiresAt;
+        await appointment.save({ transaction });
+
         const fullAppointment = await db.Appointment.findByPk(appointment.id, {
             include: [
                 {
@@ -234,13 +255,14 @@ exports.createAppointment = async (req, res) => {
             });
 
             await pushNotificationService.sendToUser(customerUser.id, {
-                title: 'Booking confirmed',
-                body: `Your ${serviceName} booking for ${appointmentDate} is confirmed.`,
+                title: 'New appointment from your center',
+                body: `Your ${serviceName} appointment for ${appointmentDate} needs your confirmation.`,
                 data: {
-                    type: 'booking_created',
+                    type: 'booking_confirmation_required',
                     appointmentId: appointment.id,
                     tenantId,
-                    staffId: appointment.staffId
+                    staffId: appointment.staffId,
+                    inviteToken
                 }
             });
 
@@ -286,7 +308,12 @@ exports.createAppointment = async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Appointment created successfully',
-            appointment: fullAppointment
+            appointment: fullAppointment,
+            appointmentInvite: {
+                token: inviteToken,
+                expiresAt: inviteExpiresAt.toISOString(),
+                link: buildAppointmentInviteLink(inviteToken)
+            }
         });
     } catch (error) {
         try {

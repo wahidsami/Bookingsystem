@@ -66,6 +66,7 @@ export interface User {
     totalBookings: number;
     totalSpent: number;
     preferredLanguage?: string;
+    authProvider?: 'local' | 'google';
     addressStreet?: string;
     addressCity?: string;
     addressBuilding?: string;
@@ -135,6 +136,33 @@ export interface Tenant {
         serviceDepositFixedAmount: number;
         serviceDepositPercentage: number;
     };
+}
+
+export interface GoogleStartResponse {
+    success: boolean;
+    message: string;
+    onboardingToken: string;
+    profile: {
+        email: string;
+        firstName: string | null;
+        lastName: string | null;
+        picture?: string | null;
+    };
+}
+
+export interface GoogleSendOtpResponse {
+    success: boolean;
+    message: string;
+    phone: string;
+    testCodeEnabled: boolean;
+}
+
+export interface GoogleCompleteResponse {
+    success: boolean;
+    message: string;
+    accessToken: string;
+    refreshToken: string;
+    user: User;
 }
 
 export interface Service {
@@ -233,6 +261,32 @@ export interface Booking {
         logo?: string;
     };
     duration?: number; // Calculated or from service
+    customerConfirmationRequired?: boolean;
+    customerConfirmationStatus?: 'not_required' | 'pending' | 'confirmed' | 'declined';
+    customerConfirmedAt?: string;
+    inviteToken?: string;
+    inviteExpiresAt?: string;
+}
+
+export interface AppointmentInviteDetails {
+    token: string;
+    isExpired: boolean;
+    appointmentId: string;
+    platformUserId?: string;
+    customerConfirmationRequired: boolean;
+    customerConfirmationStatus: 'not_required' | 'pending' | 'confirmed' | 'declined';
+    inviteExpiresAt?: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    service?: Service | null;
+    staff?: Staff | null;
+    tenant?: {
+        id: string;
+        name: string;
+        slug?: string;
+        logo?: string;
+    } | null;
 }
 
 export interface CustomerNotification {
@@ -640,6 +694,11 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
         duration: appointment?.duration !== undefined
             ? toNumber(appointment.duration)
             : normalizedService?.duration,
+        customerConfirmationRequired: toBoolean(appointment?.customerConfirmationRequired, false),
+        customerConfirmationStatus: (appointment?.customerConfirmationStatus as Booking['customerConfirmationStatus']) || 'not_required',
+        customerConfirmedAt: toOptionalString(appointment?.customerConfirmedAt),
+        inviteToken: toOptionalString(appointment?.inviteToken),
+        inviteExpiresAt: toOptionalString(appointment?.inviteExpiresAt),
     };
 };
 
@@ -1124,6 +1183,27 @@ class ApiClient {
         });
     }
 
+    async googleStart(idToken: string): Promise<GoogleStartResponse> {
+        return this.post<GoogleStartResponse>('/auth/user/google/start', { idToken });
+    }
+
+    async googleSendPhoneOtp(onboardingToken: string, phone: string): Promise<GoogleSendOtpResponse> {
+        return this.post<GoogleSendOtpResponse>('/auth/user/google/send-phone-otp', {
+            onboardingToken,
+            phone,
+        });
+    }
+
+    async googleComplete(data: {
+        onboardingToken: string;
+        phone: string;
+        otp: string;
+        firstName?: string;
+        lastName?: string;
+    }): Promise<GoogleCompleteResponse> {
+        return this.post<GoogleCompleteResponse>('/auth/user/google/complete', data);
+    }
+
     /**
      * Get authenticated user profile from backend.
      */
@@ -1247,6 +1327,21 @@ class ApiClient {
             `/bookings/${id}`
         );
         return normalizeBooking(response.appointment);
+    }
+
+    async getAppointmentInvite(token: string): Promise<AppointmentInviteDetails> {
+        const response = await this.get<{ success: boolean; invite: AppointmentInviteDetails }>(
+            `/bookings/invites/${encodeURIComponent(token)}`
+        );
+        return response.invite;
+    }
+
+    async respondToAppointmentInvite(appointmentId: string, response: 'confirm' | 'decline'): Promise<Booking> {
+        const payload = await this.post<{ success: boolean; appointment: Booking }>(
+            `/bookings/${appointmentId}/respond`,
+            { response }
+        );
+        return normalizeBooking(payload.appointment);
     }
 
     /**
