@@ -37,6 +37,9 @@ module.exports = (sequelize, DataTypes) => {
 
         // Instance method to check password
         async validatePassword(password) {
+            if (!this.password) {
+                return false;
+            }
             return await bcrypt.compare(password, this.password);
         }
 
@@ -71,7 +74,27 @@ module.exports = (sequelize, DataTypes) => {
         },
         password: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: true
+        },
+        authProvider: {
+            type: DataTypes.ENUM('local', 'google'),
+            allowNull: false,
+            defaultValue: 'local',
+            field: 'auth_provider'
+        },
+        googleSub: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            unique: true,
+            field: 'google_sub'
+        },
+        googleEmail: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            field: 'google_email',
+            validate: {
+                isEmail: true
+            }
         },
         firstName: {
             type: DataTypes.STRING,

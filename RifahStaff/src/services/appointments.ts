@@ -34,6 +34,12 @@ export interface Appointment {
 
 const getTodayDateKey = () => getRiyadhDateKey();
 
+const toText = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return '';
+    return String(value);
+};
+
 const normalizeAppointment = (appointment: any): Appointment => {
     const backendStatus = `${appointment?.status || ''}`;
     const normalizedStatus: Appointment['status'] =
@@ -48,20 +54,20 @@ const normalizeAppointment = (appointment: any): Appointment => {
                         : 'pending';
 
     return {
-        id: appointment.id,
-        bookingNumber: appointment.bookingNumber || appointment.id,
-        startTime: appointment.startTime,
-        endTime: appointment.endTime,
+        id: toText(appointment?.id),
+        bookingNumber: toText(appointment?.bookingNumber || appointment?.id),
+        startTime: toText(appointment?.startTime),
+        endTime: toText(appointment?.endTime),
         status: normalizedStatus,
-        notes: appointment.notes,
-        paymentStatus: appointment.paymentStatus,
-        paymentMethod: appointment.paymentMethod,
-        price: appointment.price,
-        assignmentMode: appointment.assignmentMode,
-        serviceStartedAt: appointment.serviceStartedAt || null,
-        serviceCompletedAt: appointment.serviceCompletedAt || null,
-        user: appointment.user,
-        service: appointment.service,
+        notes: appointment?.notes,
+        paymentStatus: appointment?.paymentStatus,
+        paymentMethod: appointment?.paymentMethod,
+        price: appointment?.price,
+        assignmentMode: appointment?.assignmentMode,
+        serviceStartedAt: appointment?.serviceStartedAt || null,
+        serviceCompletedAt: appointment?.serviceCompletedAt || null,
+        user: appointment?.user,
+        service: appointment?.service,
     };
 };
 

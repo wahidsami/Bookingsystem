@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { I18nManager, NativeModules, Alert, Text, TextInput } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import i18n from '../i18n';
@@ -28,28 +28,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     const [isRTL, setIsRTL] = useState<boolean>(I18nManager.isRTL);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        // Load saved language on startup
-        const loadSavedLanguage = async () => {
-            try {
-                const savedLanguage = await SecureStore.getItemAsync(LANGUAGE_STORAGE_KEY);
-                if (savedLanguage && savedLanguage !== i18n.language) {
-                    await applyLanguage(savedLanguage, false); // Don't reload on initial boot
-                } else {
-                    // If no stored language, ensure RTL orientation matches device locale
-                    checkRTL(i18n.language, false);
-                }
-            } catch (error) {
-                console.error('Failed to load language', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadSavedLanguage();
-    }, []);
-
-    const checkRTL = (langCode: string, shouldReload = true) => {
+    const checkRTL = useCallback((langCode: string, shouldReload = true) => {
         const isLangRTL = RTL_LANGUAGES.includes(langCode);
 
         if (isLangRTL !== I18nManager.isRTL) {
@@ -94,9 +73,9 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setIsRTL(isLangRTL);
-    };
+    }, []);
 
-    const applyLanguage = async (code: string, shouldReload = true) => {
+    const applyLanguage = useCallback(async (code: string, shouldReload = true) => {
         try {
             await i18n.changeLanguage(code);
             setLanguageState(code);
@@ -105,7 +84,28 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
             console.error('Error changing language:', error);
         }
-    };
+    }, [checkRTL]);
+
+    useEffect(() => {
+        // Load saved language on startup
+        const loadSavedLanguage = async () => {
+            try {
+                const savedLanguage = await SecureStore.getItemAsync(LANGUAGE_STORAGE_KEY);
+                if (savedLanguage && savedLanguage !== i18n.language) {
+                    await applyLanguage(savedLanguage, false); // Don't reload on initial boot
+                } else {
+                    // If no stored language, ensure RTL orientation matches device locale
+                    checkRTL(i18n.language, false);
+                }
+            } catch (error) {
+                console.error('Failed to load language', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadSavedLanguage();
+    }, [applyLanguage, checkRTL]);
 
     const setLanguage = async (code: string) => {
         await applyLanguage(code, true);

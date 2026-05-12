@@ -3,7 +3,6 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '../../src/context/AuthContext';
-import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 import { useTranslation } from 'react-i18next';
 import { canViewEarnings, canViewMessages, canViewReviews } from '../../src/utils/capabilities';
 
@@ -15,11 +14,9 @@ export default function TabLayout() {
   const earningsVisible = canViewEarnings(user);
   const messagesVisible = canViewMessages(user);
 
-  // Initialize push notification listeners
-  usePushNotifications();
-
   return (
     <Tabs
+      initialRouteName="schedule"
       screenOptions={{
         tabBarActiveTintColor: '#8B5ADF',
         tabBarInactiveTintColor: colorScheme === 'dark' ? '#9ca3af' : '#6b7280',
@@ -33,8 +30,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t('home.today'),
-          tabBarIcon: ({ color }) => <Ionicons name="today" size={24} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

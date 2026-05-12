@@ -128,7 +128,7 @@ function useProtectedRoute(user: User | null, isLoading: boolean) {
                 router.replace('/(tabs)');
             }
         }
-    }, [user, isLoading, segments]);
+    }, [user, isLoading, segments, router]);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -147,8 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         setUser(normalizeUserPayload(response.data.staff));
                     }
                 }
-            } catch (e) {
-                console.error('Failed to restore session', e);
+            } catch (error) {
+                console.error('Failed to restore session', error);
                 // Clean up bad tokens
                 await SecureStore.deleteItemAsync('refah_staff_access_token');
                 await SecureStore.deleteItemAsync('refah_staff_refresh_token');
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const signOut = async () => {
         try {
             await api.post('/staff/auth/logout');
-        } catch (e) {
+        } catch {
             // Ignore network errors on logout, we still want to wipe local state
         } finally {
             await SecureStore.deleteItemAsync('refah_staff_access_token');

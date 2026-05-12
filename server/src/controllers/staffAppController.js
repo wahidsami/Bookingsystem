@@ -23,6 +23,15 @@ const DEFAULT_STAFF_PERMISSIONS = {
     view_clients: false,
     view_booking_notes: false
 };
+const STAFF_BLOCKING_SESSION_STATUSES = Object.freeze(['pending', 'confirmed', 'checked_in', 'in_service']);
+
+const toValidDate = (value) => {
+    const parsed = value ? new Date(value) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+    return parsed;
+};
 
 const getStaffPermissions = async (staffId) => {
     const permissionRecord = await db.StaffPermission.findOne({
@@ -1029,6 +1038,64 @@ const updateAppointmentStatus = async (req, res) => {
                 success: false,
                 message: `Cannot change appointment from ${currentStatus} to ${normalizedStatus}`
             });
+        }
+
+        if (normalizedStatus === 'in_service' && currentStatus !== 'in_service') {
+            const startAt = toValidDate(appointment.startTime);
+            const endAt = toValidDate(appointment.endTime);
+            if (!startAt || !endAt || endAt.getTime() <= startAt.getTime()) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Appointment time is invalid. Please contact admin support.'
+                });
+            }
+
+            const overlappingAppointment = await db.Appointment.findOne({
+                where: {
+                    tenantId: req.tenantId,
+                    staffId: req.staffId,
+                    id: { [Op.ne]: appointment.id },
+                    status: { [Op.in]: STAFF_BLOCKING_SESSION_STATUSES },
+                    startTime: { [Op.lt]: endAt },
+                    endTime: { [Op.gt]: startAt }
+                },
+                attributes: ['id', 'status', 'startTime', 'endTime'],
+                order: [['startTime', 'ASC']],
+                transaction
+            });
+
+            if (overlappingAppointment) {
+                await transaction.rollback();
+                return res.status(409).json({
+                    success: false,
+                    message: 'Cannot start this appointment because it overlaps with another active or upcoming appointment.'
+                });
+            }
+
+            const now = new Date();
+            if (now.getTime() > endAt.getTime()) {
+                const activeOrUpcomingSession = await db.Appointment.findOne({
+                    where: {
+                        tenantId: req.tenantId,
+                        staffId: req.staffId,
+                        id: { [Op.ne]: appointment.id },
+                        status: { [Op.in]: STAFF_BLOCKING_SESSION_STATUSES },
+                        endTime: { [Op.gt]: now }
+                    },
+                    attributes: ['id', 'status', 'startTime', 'endTime'],
+                    order: [['startTime', 'ASC']],
+                    transaction
+                });
+
+                if (activeOrUpcomingSession) {
+                    await transaction.rollback();
+                    return res.status(409).json({
+                        success: false,
+                        message: 'This appointment window has already passed, and you already have another active or upcoming session.'
+                    });
+                }
+            }
         }
 
         appointment.status = normalizedStatus;

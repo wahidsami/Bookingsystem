@@ -22,9 +22,10 @@ interface LoginScreenProps {
     onBackToWelcome: () => void;
     onGoToRegister: () => void;
     onForgotPassword: () => void;
+    onGoogleSignIn: () => void;
 }
 
-export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, onForgotPassword }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, onForgotPassword, onGoogleSignIn }: LoginScreenProps) {
     const { t, isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [loading, setLoading] = useState(false);
@@ -261,6 +262,14 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                         )}
                     </TouchableOpacity>
 
+                    <TouchableOpacity
+                        style={[styles.googleButton, loading && styles.loginButtonDisabled]}
+                        onPress={onGoogleSignIn}
+                        disabled={loading}
+                    >
+                        <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+                    </TouchableOpacity>
+
                     {/* Register Link */}
                     <View style={styles.registerContainer}>
                         <Text style={styles.registerText}>{t('noAccount')} </Text>
@@ -423,6 +432,21 @@ const styles = StyleSheet.create({
     loginButtonText: {
         color: colors.textInverse,
         fontSize: fontSize.xl,
+        fontWeight: '700',
+    },
+    googleButton: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#ffffff',
+        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.md + 2,
+        alignItems: 'center',
+        marginTop: spacing.sm,
+        minHeight: 48,
+    },
+    googleButtonText: {
+        color: '#111827',
+        fontSize: fontSize.lg,
         fontWeight: '700',
     },
     registerContainer: {

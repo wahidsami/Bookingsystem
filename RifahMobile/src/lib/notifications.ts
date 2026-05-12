@@ -3,11 +3,12 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from '../api/client';
-import { navigateToNotifications } from '../navigation/navigationService';
+import { navigateToAppointmentInvite, navigateToNotifications } from '../navigation/navigationService';
 
 const PUSH_TOKEN_STORAGE_KEY = 'refah_customer_push_token';
 const PUSH_DEBUG_STORAGE_KEY = 'refah_customer_push_debug';
 const PENDING_NOTIFICATION_CAMPAIGN_KEY = 'refah_pending_notification_campaign';
+const PENDING_NOTIFICATION_INVITE_TOKEN_KEY = 'refah_pending_notification_invite_token';
 
 export type CustomerPushDebugState = {
     status:
@@ -67,6 +68,8 @@ const clearStoredPushToken = async () =>
 
 const setPendingNotificationCampaignId = async (campaignId: string) =>
     AsyncStorage.setItem(PENDING_NOTIFICATION_CAMPAIGN_KEY, campaignId);
+const setPendingNotificationInviteToken = async (inviteToken: string) =>
+    AsyncStorage.setItem(PENDING_NOTIFICATION_INVITE_TOKEN_KEY, inviteToken);
 
 export const consumePendingNotificationCampaignId = async (): Promise<string | null> => {
     const campaignId = await AsyncStorage.getItem(PENDING_NOTIFICATION_CAMPAIGN_KEY);
@@ -74,6 +77,14 @@ export const consumePendingNotificationCampaignId = async (): Promise<string | n
         await AsyncStorage.removeItem(PENDING_NOTIFICATION_CAMPAIGN_KEY);
     }
     return campaignId;
+};
+
+export const consumePendingNotificationInviteToken = async (): Promise<string | null> => {
+    const inviteToken = await AsyncStorage.getItem(PENDING_NOTIFICATION_INVITE_TOKEN_KEY);
+    if (inviteToken) {
+        await AsyncStorage.removeItem(PENDING_NOTIFICATION_INVITE_TOKEN_KEY);
+    }
+    return inviteToken;
 };
 
 const setPushDebugState = async (state: CustomerPushDebugState) =>
@@ -137,13 +148,21 @@ export const initializeNotificationHandling = () => {
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
-        const campaignId = `${response?.notification?.request?.content?.data?.campaignId || ''}`.trim();
-        if (!campaignId) {
+        const payload = response?.notification?.request?.content?.data || {};
+        const inviteToken = `${(payload as any).inviteToken || ''}`.trim();
+        const campaignId = `${(payload as any).campaignId || ''}`.trim();
+        const type = `${(payload as any).type || ''}`.trim();
+
+        if (inviteToken || type === 'booking_confirmation_required') {
+            const navigated = inviteToken ? navigateToAppointmentInvite(inviteToken) : false;
+            if (!navigated && inviteToken) {
+                await setPendingNotificationInviteToken(inviteToken);
+            }
             return;
         }
 
         const navigated = navigateToNotifications();
-        if (!navigated) {
+        if (!navigated && campaignId) {
             await setPendingNotificationCampaignId(campaignId);
         }
     });

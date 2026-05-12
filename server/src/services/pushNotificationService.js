@@ -28,6 +28,11 @@ class PushNotificationService {
     async registerUserDevice({ platformUserId, token, platform, appVersion, deviceName }) {
         const normalizedToken = normalizeToken(token);
         if (!this.isValidExpoPushToken(normalizedToken)) {
+            logger.warn('Rejected invalid customer Expo push token', {
+                platformUserId,
+                platform: normalizePlatform(platform),
+                tokenPreview: normalizedToken.slice(0, 18)
+            });
             throw new Error('Invalid Expo push token');
         }
 
@@ -67,6 +72,13 @@ class PushNotificationService {
     async registerStaffDevice({ staffUserId, staffId, tenantId, token, platform, appVersion, deviceName }) {
         const normalizedToken = normalizeToken(token);
         if (!this.isValidExpoPushToken(normalizedToken)) {
+            logger.warn('Rejected invalid staff Expo push token', {
+                staffUserId,
+                staffId,
+                tenantId,
+                platform: normalizePlatform(platform),
+                tokenPreview: normalizedToken.slice(0, 18)
+            });
             throw new Error('Invalid Expo push token');
         }
 

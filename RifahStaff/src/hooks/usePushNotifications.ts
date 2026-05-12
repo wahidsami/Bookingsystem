@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { registerFcmToken } from '../services/messages';
 import { useAuth } from '../context/AuthContext';
+import { router } from 'expo-router';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -53,7 +54,22 @@ export function usePushNotifications() {
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
             console.log('Notification clicked', response);
-            // We can handle navigation here based on response.notification.request.content.data
+            const data = response?.notification?.request?.content?.data || {};
+            const type = `${(data as any).type || ''}`.trim();
+            const appointmentId = `${(data as any).appointmentId || ''}`.trim();
+
+            // Route all appointment-related events to schedule tab for immediate visibility.
+            if (
+                type.startsWith('staff_appointment_')
+                || type.startsWith('booking_')
+                || appointmentId
+            ) {
+                router.push('/(tabs)/schedule');
+                return;
+            }
+
+            // Route message-like and unknown events to messages tab as a safe default.
+            router.push('/(tabs)/messages');
         });
 
         return () => {

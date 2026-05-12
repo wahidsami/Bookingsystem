@@ -22,9 +22,10 @@ interface RegisterScreenProps {
     onRegisterSuccess: () => void;
     onBackToWelcome: () => void;
     onGoToLogin: () => void;
+    onGoogleSignIn: () => void;
 }
 
-export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin }: RegisterScreenProps) {
+export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin, onGoogleSignIn }: RegisterScreenProps) {
     const { t, isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [loading, setLoading] = useState(false);
@@ -411,6 +412,14 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                         )}
                     </TouchableOpacity>
 
+                    <TouchableOpacity
+                        style={[styles.googleButton, loading && styles.registerButtonDisabled]}
+                        onPress={onGoogleSignIn}
+                        disabled={loading}
+                    >
+                        <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+                    </TouchableOpacity>
+
                     {/* Login Link */}
                     <View style={styles.loginContainer}>
                         <Text style={styles.loginText}>{t('hasAccount')} </Text>
@@ -571,6 +580,21 @@ const styles = StyleSheet.create({
     registerButtonText: {
         color: colors.textInverse,
         fontSize: fontSize.xl,
+        fontWeight: '700',
+    },
+    googleButton: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#ffffff',
+        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.md + 2,
+        alignItems: 'center',
+        marginTop: spacing.sm,
+        minHeight: 48,
+    },
+    googleButtonText: {
+        color: '#111827',
+        fontSize: fontSize.lg,
         fontWeight: '700',
     },
     loginContainer: {

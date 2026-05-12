@@ -152,7 +152,7 @@ export function PurchasesScreen({ navigation }: any) {
 
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
-                    <Text style={styles.price}>{item.totalAmount} SAR</Text>
+                    <Text style={styles.price}>{Number(item.totalAmount || 0).toFixed(2)} SAR</Text>
                     <View style={styles.actions}>
                         {orderNeedsPayment(item) && (
                             <TouchableOpacity

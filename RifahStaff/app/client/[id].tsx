@@ -13,9 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { format } from 'date-fns';
 import { getImageUrl } from '../../src/services/api';
 import { getClientSummary, StaffClientSummary } from '../../src/services/clients';
+import { formatDateSafe } from '../../src/utils/safeDate';
 
 const formatMoney = (value: number) => `SAR ${Number(value || 0).toFixed(2)}`;
 
@@ -141,7 +141,7 @@ export default function ClientProfileScreen() {
                 <View style={styles.sectionCard}>
                     <Text style={styles.sectionTitle}>Visit Signals</Text>
                     <Text style={styles.sectionBody}>
-                        Last visit: {client.summary.lastVisit ? format(new Date(client.summary.lastVisit), 'MMM d, yyyy h:mm a') : 'No completed visit yet'}
+                        Last visit: {client.summary.lastVisit ? formatDateSafe(client.summary.lastVisit, 'MMM d, yyyy h:mm a') : 'No completed visit yet'}
                     </Text>
                     <Text style={styles.sectionBody}>
                         Average booking value: {formatMoney(client.summary.averageBookingValue)}
@@ -163,7 +163,7 @@ export default function ClientProfileScreen() {
                                         {appointment.service?.name_en || appointment.service?.name_ar || 'Service'}
                                     </Text>
                                     <Text style={styles.appointmentMeta}>
-                                        {format(new Date(appointment.startTime), 'MMM d, yyyy h:mm a')}
+                                        {formatDateSafe(appointment.startTime, 'MMM d, yyyy h:mm a')}
                                     </Text>
                                     {appointment.staff?.name ? (
                                         <Text style={styles.appointmentMeta}>With {appointment.staff.name}</Text>

@@ -37,6 +37,20 @@ export interface ScheduleData {
     timeOff: TimeOff[];
 }
 
+const toText = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return '';
+    return String(value);
+};
+
+const normalizeTimeOffType = (value: unknown): TimeOff['type'] => {
+    const normalized = `${value || ''}`.toLowerCase();
+    if (normalized === 'vacation' || normalized === 'sick' || normalized === 'personal' || normalized === 'training') {
+        return normalized;
+    }
+    return 'other';
+};
+
 const buildDateRange = (startDate: string, endDate: string) => {
     const dates: string[] = [];
     let cursor = startDate;
@@ -50,33 +64,33 @@ const buildDateRange = (startDate: string, endDate: string) => {
 };
 
 const normalizeShift = (shift: any, date: string): Shift => ({
-    id: `${date}-${shift.id}`,
-    shiftId: shift.id,
+    id: `${date}-${toText(shift?.id)}`,
+    shiftId: toText(shift?.id),
     date,
-    startTime: shift.startTime,
-    endTime: shift.endTime,
-    label: shift.label || undefined,
-    type: shift.specificDate ? 'specific' : 'shift',
+    startTime: toText(shift?.startTime),
+    endTime: toText(shift?.endTime),
+    label: shift?.label || undefined,
+    type: shift?.specificDate ? 'specific' : 'shift',
 });
 
 const normalizeTimeOff = (item: any): TimeOff => ({
-    id: item.id,
-    startDate: item.startDate,
-    endDate: item.endDate,
-    type: item.type || 'other',
-    reason: item.reason,
-    isApproved: Boolean(item.isApproved),
-    createdAt: item.createdAt,
+    id: toText(item?.id),
+    startDate: toText(item?.startDate),
+    endDate: toText(item?.endDate),
+    type: normalizeTimeOffType(item?.type),
+    reason: item?.reason,
+    isApproved: Boolean(item?.isApproved),
+    createdAt: toText(item?.createdAt),
 });
 
 const normalizeBreak = (item: any, date: string): BreakWindow => ({
-    id: `${date}-${item.id}`,
-    breakId: item.id,
+    id: `${date}-${toText(item?.id)}`,
+    breakId: toText(item?.id),
     date,
-    startTime: item.startTime,
-    endTime: item.endTime,
-    label: item.label || undefined,
-    type: item.specificDate ? 'specific' : 'break',
+    startTime: toText(item?.startTime),
+    endTime: toText(item?.endTime),
+    label: item?.label || undefined,
+    type: item?.specificDate ? 'specific' : 'break',
 });
 
 /**

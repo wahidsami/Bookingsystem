@@ -22,7 +22,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
-import { consumePendingNotificationCampaignId, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
+import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
 import { navigationRef, navigateToAppointmentInvite, navigateToNotifications } from './src/navigation/navigationService';
 
 type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'googleOnboarding' | 'forgotPassword' | 'home';
@@ -296,6 +296,13 @@ function AppContent() {
           <NavigationContainer
             ref={navigationRef}
             onReady={() => {
+              consumePendingNotificationInviteToken()
+                .then((pendingInviteTokenFromNotification) => {
+                  if (pendingInviteTokenFromNotification) {
+                    navigateToAppointmentInvite(pendingInviteTokenFromNotification);
+                  }
+                })
+                .catch(() => undefined);
               if (pendingInviteToken) {
                 navigateToAppointmentInvite(pendingInviteToken);
                 setPendingInviteToken(null);

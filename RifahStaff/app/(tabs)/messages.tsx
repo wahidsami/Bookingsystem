@@ -16,12 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getMessages, markMessageAsRead, StaffMessage } from '../../src/services/messages';
 import { useAuth } from '../../src/context/AuthContext';
-import { formatDistanceToNow } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 
 import { useRouter, useFocusEffect } from 'expo-router';
-import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 import { canViewMessages } from '../../src/utils/capabilities';
+import { formatDistanceToNowSafe, getTimeMsSafe } from '../../src/utils/safeDate';
 
 export default function MessagesScreen() {
     const { user } = useAuth();
@@ -54,13 +53,6 @@ export default function MessagesScreen() {
     );
 
     // Also reload if a new notification arrives while staring at the screen
-    const { notification } = usePushNotifications();
-    useEffect(() => {
-        if (notification && user) {
-            loadMessages();
-        }
-    }, [notification, user, loadMessages]);
-
     const onRefresh = () => {
         setRefreshing(true);
         loadMessages();
@@ -75,11 +67,11 @@ export default function MessagesScreen() {
 
     const normalizedSearch = searchQuery.trim().toLowerCase();
     const filteredMessages = messages.filter((msg) => {
-        const matchesFilter =
-            filterKey === 'all' ? true :
-                filterKey === 'unread' ? isUnread(msg) :
-                    filterKey === 'pinned' ? msg.isPinned :
-                        Date.now() - new Date(msg.createdAt).getTime() <= 1000 * 60 * 60 * 24 * 3;
+                const matchesFilter =
+                    filterKey === 'all' ? true :
+                        filterKey === 'unread' ? isUnread(msg) :
+                            filterKey === 'pinned' ? msg.isPinned :
+                        Date.now() - getTimeMsSafe(msg.createdAt) <= 1000 * 60 * 60 * 24 * 3;
 
         if (!matchesFilter) {
             return false;
@@ -101,8 +93,8 @@ export default function MessagesScreen() {
 
     const unreadCount = messages.filter((msg) => isUnread(msg)).length;
     const pinnedCount = messages.filter((msg) => msg.isPinned).length;
-    const recentCount = messages.filter((msg) => Date.now() - new Date(msg.createdAt).getTime() <= 1000 * 60 * 60 * 24 * 3).length;
-    const filterOptions: Array<{ key: 'all' | 'unread' | 'pinned' | 'recent'; label: string; count: number }> = [
+    const recentCount = messages.filter((msg) => Date.now() - getTimeMsSafe(msg.createdAt) <= 1000 * 60 * 60 * 24 * 3).length;
+    const filterOptions: { key: 'all' | 'unread' | 'pinned' | 'recent'; label: string; count: number }[] = [
         { key: 'all', label: 'All', count: messages.length },
         { key: 'unread', label: 'Unread', count: unreadCount },
         { key: 'pinned', label: 'Pinned', count: pinnedCount },
@@ -160,7 +152,7 @@ export default function MessagesScreen() {
                     </View>
 
                     <Text style={styles.timestamp}>
-                        {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                        {formatDistanceToNowSafe(item.createdAt)}
                     </Text>
                 </View>
 

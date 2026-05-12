@@ -28,3 +28,45 @@ export function getApiUrl(): string {
 export function getServerUrl(): string {
     return getApiUrl().replace(/\/api\/v1$/, '');
 }
+
+export function getGoogleWebClientId(): string {
+    const publicEnv = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    if (publicEnv && publicEnv.trim().length > 0) {
+        return publicEnv.trim();
+    }
+
+    const extraClientId = Constants.expoConfig?.extra?.googleWebClientId as string | undefined;
+    if (extraClientId && extraClientId.trim().length > 0) {
+        return extraClientId.trim();
+    }
+
+    return '';
+}
+
+export function getGoogleAndroidClientId(): string {
+    const publicEnv = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+    if (publicEnv && publicEnv.trim().length > 0) {
+        return publicEnv.trim();
+    }
+
+    const extraClientId = Constants.expoConfig?.extra?.googleAndroidClientId as string | undefined;
+    if (extraClientId && extraClientId.trim().length > 0) {
+        return extraClientId.trim();
+    }
+
+    return '';
+}
+
+export function getGoogleIosClientId(): string {
+    const publicEnv = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+    if (publicEnv && publicEnv.trim().length > 0) {
+        return publicEnv.trim();
+    }
+
+    const extraClientId = Constants.expoConfig?.extra?.googleIosClientId as string | undefined;
+    if (extraClientId && extraClientId.trim().length > 0) {
+        return extraClientId.trim();
+    }
+
+    return '';
+}

@@ -7,10 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getMyReviews, replyToReview, ReviewsSummary, Review } from '../../src/services/financials';
-import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { canReplyToReviews, canViewReviews } from '../../src/utils/capabilities';
+import { formatDistanceToNowSafe } from '../../src/utils/safeDate';
 
 const StarRating = ({ rating }: { rating: number }) => (
     <View style={{ flexDirection: 'row', gap: 2 }}>
@@ -56,7 +56,7 @@ export default function ReviewsScreen() {
             setReplyModal(null);
             setReplyText('');
             load();
-        } catch (e) {
+        } catch {
             Alert.alert('Error', 'Could not post reply');
         } finally {
             setSubmitting(false);
@@ -94,7 +94,7 @@ export default function ReviewsScreen() {
     const fiveStarCount = (data?.reviews || []).filter((item) => Number(item.rating) === 5).length;
     const lowRatedCount = (data?.reviews || []).filter((item) => Number(item.rating) <= 3).length;
 
-    const filterOptions: Array<{ key: 'all' | 'pending_reply' | 'five_star' | 'low_rated'; label: string; count: number }> = [
+    const filterOptions: { key: 'all' | 'pending_reply' | 'five_star' | 'low_rated'; label: string; count: number }[] = [
         { key: 'all', label: 'All', count: data?.total || 0 },
         { key: 'pending_reply', label: 'Need Reply', count: pendingReplies },
         { key: 'five_star', label: '5 Stars', count: fiveStarCount },
@@ -110,10 +110,10 @@ export default function ReviewsScreen() {
         <View style={styles.reviewCard}>
             <View style={styles.reviewHeader}>
                 <StarRating rating={item.rating} />
-                <Text style={styles.timestamp}>{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</Text>
+                <Text style={styles.timestamp}>{formatDistanceToNowSafe(item.createdAt)}</Text>
             </View>
             {item.customerName && <Text style={styles.customerName}>— {item.customerName}</Text>}
-            {item.comment && <Text style={styles.comment}>"{item.comment}"</Text>}
+            {item.comment && <Text style={styles.comment}>&quot;{item.comment}&quot;</Text>}
             {item.staffReply ? (
                 <View style={styles.replyBox}>
                     <Text style={styles.replyLabel}>{t('reviews.yourReply')}</Text>
@@ -256,7 +256,7 @@ export default function ReviewsScreen() {
                     {replyModal && (
                         <View style={styles.reviewPreview}>
                             <StarRating rating={replyModal.rating} />
-                            <Text style={styles.comment} numberOfLines={3}>"{replyModal.comment}"</Text>
+                            <Text style={styles.comment} numberOfLines={3}>&quot;{replyModal.comment}&quot;</Text>
                         </View>
                     )}
                     <TextInput

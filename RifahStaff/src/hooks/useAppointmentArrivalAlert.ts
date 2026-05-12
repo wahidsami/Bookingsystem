@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Vibration } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
+import { getTimeMsSafe } from '../utils/safeDate';
 
 type AppointmentLike = {
     id: string;
@@ -70,9 +71,7 @@ export function useAppointmentArrivalAlert() {
             return newAppointments;
         }
 
-        const newest = [...newAppointments].sort((a, b) => {
-            return new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime();
-        })[0];
+        const newest = [...newAppointments].sort((a, b) => getTimeMsSafe(b.startTime) - getTimeMsSafe(a.startTime))[0];
 
         const customerName = `${newest?.user?.firstName || ''} ${newest?.user?.lastName || ''}`.trim() || 'A customer';
         const serviceName = newest?.service?.name_en || newest?.service?.name_ar || 'service';

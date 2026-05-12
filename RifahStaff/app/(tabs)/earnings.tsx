@@ -7,10 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getEarnings, EarningsSummary } from '../../src/services/financials';
-import { format } from 'date-fns';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { canViewEarnings } from '../../src/utils/capabilities';
+import { formatDateSafe } from '../../src/utils/safeDate';
 
 export default function EarningsScreen() {
     const { user } = useAuth();
@@ -49,7 +49,7 @@ export default function EarningsScreen() {
     const paidCount = payrolls.filter((item) => item.status === 'paid').length;
     const processedCount = payrolls.filter((item) => item.status === 'processed').length;
     const draftCount = payrolls.filter((item) => item.status === 'draft').length;
-    const statusOptions: Array<{ key: 'all' | 'paid' | 'processed' | 'draft'; label: string; count: number }> = [
+    const statusOptions: { key: 'all' | 'paid' | 'processed' | 'draft'; label: string; count: number }[] = [
         { key: 'all', label: 'All', count: payrolls.length },
         { key: 'paid', label: 'Paid', count: paidCount },
         { key: 'processed', label: 'Processed', count: processedCount },
@@ -93,7 +93,7 @@ export default function EarningsScreen() {
                             </View>
                             <Text style={styles.heroAmount}>{currency(data.currentMonth.totalNet)}</Text>
                             <Text style={styles.heroPeriod}>
-                                {format(new Date(data.currentMonth.periodStart), 'MMM d')} – {format(new Date(data.currentMonth.periodEnd), 'MMM d, yyyy')}
+                                {formatDateSafe(data.currentMonth.periodStart, 'MMM d')} – {formatDateSafe(data.currentMonth.periodEnd, 'MMM d, yyyy')}
                             </Text>
                         </View>
                     ) : null}
@@ -162,10 +162,10 @@ export default function EarningsScreen() {
                                 <View style={styles.paySlipHeader}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.payPeriod}>
-                                            {format(new Date(p.periodStart), 'MMM d')} – {format(new Date(p.periodEnd), 'MMM d, yyyy')}
+                                            {formatDateSafe(p.periodStart, 'MMM d')} – {formatDateSafe(p.periodEnd, 'MMM d, yyyy')}
                                         </Text>
                                         <Text style={styles.payCreatedAt}>
-                                            Added {format(new Date(p.createdAt), 'MMM d, yyyy')}
+                                            Added {formatDateSafe(p.createdAt, 'MMM d, yyyy')}
                                         </Text>
                                     </View>
                                     <View style={styles.paySlipHeaderRight}>

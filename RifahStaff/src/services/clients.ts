@@ -24,7 +24,7 @@ export interface StaffClientSummary {
         tags: string[];
         isRepeatClient: boolean;
     };
-    recentAppointments: Array<{
+    recentAppointments: {
         id: string;
         startTime: string;
         status: string;
@@ -39,7 +39,7 @@ export interface StaffClientSummary {
             id: string;
             name: string;
         } | null;
-    }>;
+    }[];
 }
 
 export const getClientSummary = async (clientId: string): Promise<StaffClientSummary> => {

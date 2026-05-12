@@ -7,6 +7,26 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m'; // Access token expires in 15 minutes
 const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d'; // Refresh token expires in 7 days
+const GOOGLE_ONBOARDING_EXPIRES_IN = process.env.GOOGLE_ONBOARDING_EXPIRES_IN || '15m';
+const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
+const GOOGLE_CLIENT_IDS = [
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_IDS,
+    process.env.GOOGLE_OAUTH_ANDROID_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_IOS_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_WEB_CLIENT_ID,
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+]
+    .filter(Boolean)
+    .flatMap((value) => `${value}`.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
+const TEST_OTP_ENABLED = `${process.env.ALLOW_TEST_OTP || ''}`.toLowerCase() === 'true';
+const TEST_OTP_CODE = `${process.env.TEST_OTP_CODE || '1234'}`;
+const GOOGLE_OTP_TTL_MS = Math.max(60_000, Number.parseInt(process.env.GOOGLE_OTP_TTL_MS || '', 10) || (10 * 60 * 1000));
+const GOOGLE_OTP_MAX_ATTEMPTS = Math.max(1, Number.parseInt(process.env.GOOGLE_OTP_MAX_ATTEMPTS || '', 10) || 5);
 
 /**
  * User Authentication Service
@@ -39,8 +59,40 @@ const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d'; // 
  * @class UserAuthService
  */
 class UserAuthService {
+    constructor() {
+        this.googleOnboardingStore = new Map();
+    }
+
     normalizeEmail(email) {
         return `${email || ''}`.trim().toLowerCase();
+    }
+
+    normalizePhone(phone) {
+        const raw = `${phone || ''}`.trim();
+        if (!raw) return '';
+
+        const stripped = raw.replace(/[\s\-()]/g, '');
+        if (stripped.startsWith('+')) {
+            return stripped;
+        }
+
+        if (stripped.startsWith('00')) {
+            return `+${stripped.slice(2)}`;
+        }
+
+        if (stripped.startsWith('966')) {
+            return `+${stripped}`;
+        }
+
+        if (stripped.startsWith('0')) {
+            return `+966${stripped.slice(1)}`;
+        }
+
+        return `+${stripped}`;
+    }
+
+    validatePhoneE164(phone) {
+        return /^\+?[1-9]\d{1,14}$/.test(`${phone || ''}`);
     }
 
     buildSafeUserPayload(user) {
@@ -58,6 +110,7 @@ class UserAuthService {
             gender: user.gender || null,
             profileImage: user.profileImage || null,
             preferredLanguage: user.preferredLanguage || 'en',
+            authProvider: user.authProvider || 'local',
             notificationPreferences: user.notificationPreferences || {
                 email: true,
                 sms: true,
@@ -153,6 +206,7 @@ class UserAuthService {
             password,
             firstName,
             lastName,
+            authProvider: 'local',
             emailVerificationToken
         });
 
@@ -186,6 +240,9 @@ class UserAuthService {
                 'email',
                 'phone',
                 'password',
+                'authProvider',
+                'googleSub',
+                'googleEmail',
                 'firstName',
                 'lastName',
                 'dateOfBirth',
@@ -263,6 +320,205 @@ class UserAuthService {
 
         return {
             user: safeUser,
+            tokens
+        };
+    }
+
+    async verifyGoogleIdToken(idToken) {
+        if (!idToken || typeof idToken !== 'string') {
+            throw new Error('Google token is required');
+        }
+
+        const url = `${GOOGLE_TOKENINFO_URL}?id_token=${encodeURIComponent(idToken)}`;
+        const response = await fetch(url, { method: 'GET' });
+
+        if (!response.ok) {
+            throw new Error('Invalid Google token');
+        }
+
+        const payload = await response.json();
+        if (!payload?.sub || !payload?.email) {
+            throw new Error('Google account payload is incomplete');
+        }
+
+        if (payload.email_verified !== 'true' && payload.email_verified !== true) {
+            throw new Error('Google email is not verified');
+        }
+
+        if (GOOGLE_CLIENT_IDS.length > 0 && !GOOGLE_CLIENT_IDS.includes(`${payload.aud || ''}`)) {
+            throw new Error('Google token audience mismatch');
+        }
+
+        const email = this.normalizeEmail(payload.email);
+        const firstName = `${payload.given_name || payload.name || ''}`.trim();
+        const lastName = `${payload.family_name || ''}`.trim();
+
+        const onboardingToken = jwt.sign({
+            type: 'google_onboarding',
+            sub: payload.sub,
+            email,
+            firstName,
+            lastName,
+            picture: payload.picture || null,
+            jti: crypto.randomUUID()
+        }, JWT_SECRET, {
+            expiresIn: GOOGLE_ONBOARDING_EXPIRES_IN
+        });
+
+        return {
+            onboardingToken,
+            profile: {
+                email,
+                firstName: firstName || null,
+                lastName: lastName || null,
+                picture: payload.picture || null,
+            }
+        };
+    }
+
+    verifyGoogleOnboardingToken(onboardingToken) {
+        if (!onboardingToken) {
+            throw new Error('Onboarding token is required');
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(onboardingToken, JWT_SECRET);
+        } catch (error) {
+            throw new Error('Invalid or expired onboarding token');
+        }
+
+        if (decoded?.type !== 'google_onboarding' || !decoded?.jti || !decoded?.sub || !decoded?.email) {
+            throw new Error('Invalid onboarding token payload');
+        }
+
+        return decoded;
+    }
+
+    async sendGooglePhoneOtp({ onboardingToken, phone }) {
+        const decoded = this.verifyGoogleOnboardingToken(onboardingToken);
+        const normalizedPhone = this.normalizePhone(phone);
+        if (!this.validatePhoneE164(normalizedPhone)) {
+            throw new Error('Invalid phone format. Use international format (e.g., +966501234567)');
+        }
+
+        const otpCode = TEST_OTP_ENABLED
+            ? TEST_OTP_CODE
+            : Math.floor(100000 + Math.random() * 900000).toString();
+
+        this.googleOnboardingStore.set(decoded.jti, {
+            phone: normalizedPhone,
+            otpCode,
+            createdAt: Date.now(),
+            sub: decoded.sub,
+            email: decoded.email,
+            attempts: 0,
+        });
+
+        // TODO: integrate SMS provider. For now OTP can be fixed by env in dev.
+        return {
+            message: 'Verification code sent to your phone',
+            phone: normalizedPhone,
+            testCodeEnabled: TEST_OTP_ENABLED,
+        };
+    }
+
+    async completeGoogleRegistration({ onboardingToken, phone, otp, firstName, lastName }) {
+        const decoded = this.verifyGoogleOnboardingToken(onboardingToken);
+        const normalizedPhone = this.normalizePhone(phone);
+        if (!this.validatePhoneE164(normalizedPhone)) {
+            throw new Error('Invalid phone format. Use international format (e.g., +966501234567)');
+        }
+
+        const otpRecord = this.googleOnboardingStore.get(decoded.jti);
+        if (!otpRecord) {
+            throw new Error('OTP session not found. Please request a new code.');
+        }
+
+        const sessionAgeMs = Date.now() - Number(otpRecord.createdAt || 0);
+        if (!Number.isFinite(sessionAgeMs) || sessionAgeMs > GOOGLE_OTP_TTL_MS) {
+            this.googleOnboardingStore.delete(decoded.jti);
+            throw new Error('OTP expired. Please request a new code.');
+        }
+
+        if (otpRecord.phone !== normalizedPhone) {
+            throw new Error('Phone number does not match the OTP session.');
+        }
+
+        otpRecord.attempts = Number(otpRecord.attempts || 0) + 1;
+        if (`${otp || ''}`.trim() !== `${otpRecord.otpCode}`) {
+            if (otpRecord.attempts >= GOOGLE_OTP_MAX_ATTEMPTS) {
+                this.googleOnboardingStore.delete(decoded.jti);
+                throw new Error('Too many invalid OTP attempts. Please request a new code.');
+            }
+            this.googleOnboardingStore.set(decoded.jti, otpRecord);
+            throw new Error('Invalid verification code');
+        }
+
+        const resolvedFirstName = `${firstName || decoded.firstName || ''}`.trim();
+        const resolvedLastName = `${lastName || decoded.lastName || ''}`.trim();
+
+        if (!resolvedFirstName || resolvedFirstName.length < 2) {
+            throw new Error('First name is required');
+        }
+
+        if (!resolvedLastName || resolvedLastName.length < 2) {
+            throw new Error('Last name is required');
+        }
+
+        const normalizedEmail = this.normalizeEmail(decoded.email);
+
+        let user = await db.PlatformUser.findOne({ where: { googleSub: decoded.sub } });
+
+        if (!user) {
+            user = await db.PlatformUser.findOne({ where: { email: normalizedEmail } });
+        }
+
+        if (!user) {
+            const phoneOwner = await db.PlatformUser.findOne({ where: { phone: normalizedPhone } });
+            if (phoneOwner) {
+                throw new Error('Phone number already registered');
+            }
+
+            user = await db.PlatformUser.create({
+                email: normalizedEmail,
+                phone: normalizedPhone,
+                password: null,
+                firstName: resolvedFirstName,
+                lastName: resolvedLastName,
+                authProvider: 'google',
+                googleSub: decoded.sub,
+                googleEmail: normalizedEmail,
+                profileImage: decoded.picture || null,
+                emailVerified: true,
+                phoneVerified: true,
+                emailVerificationToken: null,
+                phoneVerificationCode: null,
+            });
+        } else {
+            if (user.phone !== normalizedPhone) {
+                throw new Error('This Google account is already linked to a different phone number.');
+            }
+
+            user.firstName = resolvedFirstName || user.firstName;
+            user.lastName = resolvedLastName || user.lastName;
+            user.authProvider = user.authProvider || 'google';
+            user.googleSub = user.googleSub || decoded.sub;
+            user.googleEmail = normalizedEmail;
+            user.emailVerified = true;
+            user.phoneVerified = true;
+            if (!user.profileImage && decoded.picture) {
+                user.profileImage = decoded.picture;
+            }
+            await user.save();
+        }
+
+        const tokens = this.generateTokens(user);
+        this.persistLoginMetadata(user, tokens.refreshToken);
+        this.googleOnboardingStore.delete(decoded.jti);
+
+        return {
+            user: this.buildSafeUserPayload(user),
             tokens
         };
     }

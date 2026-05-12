@@ -98,7 +98,7 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
                         <Image source={{ uri: logoUrl }} style={styles.tenantLogo} resizeMode="contain" />
                     ) : (
                         <View style={styles.tenantLogoPlaceholder}>
-                            <Text style={styles.tenantLogoLetter}>{tenantName.charAt(0)}</Text>
+                            <Text style={styles.tenantLogoLetter}>{(tenantName || '?').charAt(0)}</Text>
                         </View>
                     )}
 

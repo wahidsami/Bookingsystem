@@ -3,6 +3,7 @@ const router = express.Router();
 const userAuthController = require('../controllers/userAuthController');
 const { authenticateUser } = require('../middleware/authUser');
 const {
+    authLimiter,
     passwordResetLimiter,
     emailVerificationLimiter,
     phoneVerificationLimiter
@@ -77,5 +78,26 @@ router.post('/reset-password/:token', passwordResetLimiter, userAuthController.r
  * @access  Private
  */
 router.post('/resend-verification', emailVerificationLimiter, authenticateUser, userAuthController.resendVerification);
+
+/**
+ * @route   POST /api/v1/auth/user/google/start
+ * @desc    Verify Google ID token and start onboarding
+ * @access  Public
+ */
+router.post('/google/start', authLimiter, userAuthController.googleStart);
+
+/**
+ * @route   POST /api/v1/auth/user/google/send-phone-otp
+ * @desc    Send phone OTP during Google onboarding
+ * @access  Public
+ */
+router.post('/google/send-phone-otp', phoneVerificationLimiter, userAuthController.googleSendPhoneOtp);
+
+/**
+ * @route   POST /api/v1/auth/user/google/complete
+ * @desc    Complete Google onboarding and login
+ * @access  Public
+ */
+router.post('/google/complete', authLimiter, userAuthController.googleComplete);
 
 module.exports = router;

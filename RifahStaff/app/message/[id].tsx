@@ -4,12 +4,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { StaffMessage } from '../../src/services/messages';
+import { formatDateSafe } from '../../src/utils/safeDate';
 
 export default function MessageDetailScreen() {
-    const { id, message: messageStr } = useLocalSearchParams();
+    const { message: messageStr } = useLocalSearchParams();
     const router = useRouter();
     const { t } = useTranslation();
 
@@ -35,7 +35,7 @@ export default function MessageDetailScreen() {
         );
     }
 
-    const dateFormatted = format(new Date(message.createdAt), 'MMM d, yyyy • h:mm a');
+    const dateFormatted = formatDateSafe(message.createdAt, 'MMM d, yyyy • h:mm a');
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

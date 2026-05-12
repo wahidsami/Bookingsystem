@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Refres
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, User, Booking, getImageUrl } from '../api/client';
+import { api, User, Booking, bookingNeedsPayment, getImageUrl } from '../api/client';
 import { useNavigation } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -30,8 +30,8 @@ export function DashboardScreen() {
 
             // api.getBookings() already returns Booking[] (unwrapped)
             const bookings = await api.getBookings();
-            const upcoming = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
-            const pendingPayment = bookings.filter(b => b.paymentStatus === 'pending');
+            const upcoming = bookings.filter((booking) => ['pending', 'confirmed', 'checked_in', 'in_service'].includes(booking.status));
+            const pendingPayment = bookings.filter((booking) => bookingNeedsPayment(booking.paymentStatus));
 
             setStats({
                 upcomingCount: upcoming.length,
@@ -39,7 +39,7 @@ export function DashboardScreen() {
             });
 
             // Show the next 3 bookings on the dashboard
-            setRecentBookings(bookings.slice(0, 3));
+            setRecentBookings(upcoming.slice(0, 3));
 
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
@@ -158,11 +158,11 @@ export function DashboardScreen() {
                                 <Text style={styles.bookingService}>
                                     {booking.Service
                                         ? (isRTL ? booking.Service.name_ar : booking.Service.name_en)
-                                        : `Booking #${booking.id.slice(0, 8)}`}
+                                        : `Booking #${booking.bookingNumber || booking.id.slice(0, 8).toUpperCase()}`}
                                 </Text>
                                 <Text style={[
                                     styles.bookingStatus,
-                                    booking.status === 'confirmed' ? styles.statusConfirmed : styles.statusPending
+                                    ['confirmed', 'checked_in', 'in_service'].includes(booking.status) ? styles.statusConfirmed : styles.statusPending
                                 ]}>
                                     {booking.status}
                                 </Text>

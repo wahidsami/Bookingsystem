@@ -332,6 +332,94 @@ const resendVerification = async (req, res) => {
     }
 };
 
+/**
+ * Start Google onboarding (verify Google ID token and issue onboarding token)
+ */
+const googleStart = async (req, res) => {
+    try {
+        const { idToken } = req.body || {};
+        const result = await userAuthService.verifyGoogleIdToken(idToken);
+
+        res.json({
+            success: true,
+            message: 'Google account verified',
+            onboardingToken: result.onboardingToken,
+            profile: result.profile
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+/**
+ * Send phone OTP during Google onboarding
+ */
+const googleSendPhoneOtp = async (req, res) => {
+    try {
+        const { onboardingToken, phone } = req.body || {};
+        if (!onboardingToken || !phone) {
+            return res.status(400).json({
+                success: false,
+                message: 'Onboarding token and phone are required'
+            });
+        }
+
+        const result = await userAuthService.sendGooglePhoneOtp({ onboardingToken, phone });
+
+        res.json({
+            success: true,
+            message: result.message,
+            phone: result.phone,
+            testCodeEnabled: result.testCodeEnabled
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+/**
+ * Complete Google onboarding (phone OTP + names)
+ */
+const googleComplete = async (req, res) => {
+    try {
+        const { onboardingToken, phone, otp, firstName, lastName } = req.body || {};
+
+        if (!onboardingToken || !phone || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: 'Onboarding token, phone, and otp are required'
+            });
+        }
+
+        const result = await userAuthService.completeGoogleRegistration({
+            onboardingToken,
+            phone,
+            otp,
+            firstName,
+            lastName,
+        });
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            accessToken: result.tokens.accessToken,
+            refreshToken: result.tokens.refreshToken,
+            user: result.user
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 module.exports = {
     register,
     login,
@@ -342,5 +430,8 @@ module.exports = {
     verifyPhone,
     forgotPassword,
     resetPassword,
-    resendVerification
+    resendVerification,
+    googleStart,
+    googleSendPhoneOtp,
+    googleComplete
 };
