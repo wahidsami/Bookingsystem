@@ -8,7 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import Link from "next/link";
-import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 
 const CATEGORIES = [
   "Hair Care",
@@ -305,6 +305,16 @@ export default function EditProductPage() {
     <TenantLayout>
       {/* Header */}
       <div className="mb-8 animate-fade-in">
+        <div className={`mb-3 ${isRTL ? 'text-right' : 'text-left'}`}>
+          <Link
+            href={`/${locale}/dashboard/products`}
+            className={`inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-primary ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}
+          >
+            <ArrowLeftIcon className={`h-4 w-4 ${isRTL ? 'rotate-180' : ''}`} />
+            <span>{locale === 'ar' ? 'رجوع' : 'Back'}</span>
+          </Link>
+        </div>
+
         <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>

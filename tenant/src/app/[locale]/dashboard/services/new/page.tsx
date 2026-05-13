@@ -489,6 +489,7 @@ export default function NewServicePage() {
         isRTL={isRTL}
         title={t("addService")}
         subtitle={locale === 'ar' ? 'أضف خدمة جديدة إلى الكتالوج' : 'Add a new service to your catalog'}
+        backHref={`/${locale}/dashboard/services`}
         cancelHref={`/${locale}/dashboard/services`}
         saveLabel={t("save")}
         loadingLabel={t("loading")}

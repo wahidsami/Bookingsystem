@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 export type ServiceEditorSection = {
   id: string;
@@ -15,6 +16,7 @@ interface ServiceEditorFrameProps {
   isRTL: boolean;
   title: string;
   subtitle: string;
+  backHref?: string;
   cancelHref: string;
   saveLabel: string;
   loadingLabel: string;
@@ -33,6 +35,7 @@ export function ServiceEditorFrame({
   isRTL,
   title,
   subtitle,
+  backHref,
   cancelHref,
   saveLabel,
   loadingLabel,
@@ -45,9 +48,22 @@ export function ServiceEditorFrame({
   onSectionSelect,
   children
 }: ServiceEditorFrameProps) {
+  const resolvedBackHref = backHref || cancelHref;
+  const backLabel = locale === 'ar' ? 'رجوع' : 'Back';
+
   return (
     <div className="space-y-6">
       <div className="mb-2 animate-fade-in">
+        <div className={`mb-3 ${isRTL ? 'text-right' : 'text-left'}`}>
+          <Link
+            href={resolvedBackHref}
+            className={`inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-primary ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}
+          >
+            <ArrowLeftIcon className={`h-4 w-4 ${isRTL ? 'rotate-180' : ''}`} />
+            <span>{backLabel}</span>
+          </Link>
+        </div>
+
         <div className={`flex flex-col gap-4 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
           <div className="flex-1">
             <h2 className="mb-2 text-3xl font-bold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>

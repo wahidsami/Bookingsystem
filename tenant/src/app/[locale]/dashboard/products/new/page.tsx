@@ -378,7 +378,8 @@ export default function NewProductPage() {
         locale={locale}
         isRTL={isRTL}
         title={t("addProduct")}
-        subtitle={locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج (UI v2)' : 'Add a new product to your catalog (UI v2)'}
+        subtitle={locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج' : 'Add a new product to your catalog'}
+        backHref={`/${locale}/dashboard/products`}
         cancelHref={`/${locale}/dashboard/products`}
         saveLabel={t("save")}
         loadingLabel={t("loading")}
@@ -432,9 +433,8 @@ export default function NewProductPage() {
 
       {/* Form */}
       <form id={formId} onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 gap-6">
+          <div className="space-y-6">
             {/* Basic Information */}
             <div id="product-basic" className="card">
               <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -806,7 +806,6 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          {/* Right Column - Image & Pricing */}
           <div className="space-y-6">
             {/* Image Upload */}
             <div id="product-media" className="card">

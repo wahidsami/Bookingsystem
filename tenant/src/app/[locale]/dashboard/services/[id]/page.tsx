@@ -573,6 +573,7 @@ export default function EditServicePage() {
         isRTL={isRTL}
         title={`${t("edit")} ${t("title")}`}
         subtitle={locale === 'ar' ? 'تعديل معلومات الخدمة' : 'Edit service information'}
+        backHref={`/${locale}/dashboard/services`}
         cancelHref={`/${locale}/dashboard/services`}
         saveLabel={t("save")}
         loadingLabel={t("loading")}
