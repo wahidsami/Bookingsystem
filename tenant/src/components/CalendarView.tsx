@@ -255,8 +255,20 @@ export function CalendarView({
       return { display: 'none' };
     }
 
-    const top = (startHour - START_HOUR) * pixelsPerHour + startMinute * pixelsPerMinute;
-    const duration = (endHour - startHour) * 60 + (endMinute - startMinute);
+    const boardStartMinutes = START_HOUR * 60;
+    const boardEndMinutes = END_HOUR * 60;
+    const appointmentStartMinutes = (startHour * 60) + startMinute;
+    const appointmentEndMinutes = (endHour * 60) + endMinute;
+
+    // If appointment is fully outside the board range, don't render it.
+    if (appointmentEndMinutes <= boardStartMinutes || appointmentStartMinutes >= boardEndMinutes) {
+      return { display: 'none' };
+    }
+
+    const clampedStartMinutes = Math.max(appointmentStartMinutes, boardStartMinutes);
+    const clampedEndMinutes = Math.min(appointmentEndMinutes, boardEndMinutes);
+    const top = (clampedStartMinutes - boardStartMinutes) * pixelsPerMinute;
+    const duration = Math.max(0, clampedEndMinutes - clampedStartMinutes);
     const height = duration * pixelsPerMinute;
     const appointmentHeight = Math.max(height, MIN_APPOINTMENT_HEIGHT);
 
@@ -768,7 +780,7 @@ export function CalendarView({
               className="flex-shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white"
               style={{ width: `${timeColumnWidth}px` }}
             >
-              <div className="sticky top-0 z-30 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
+              <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
               <div className="relative" style={{ height: `${totalHeight}px` }}>
                 {timeSlots.map((slot, index) => (
                   <div
@@ -814,7 +826,7 @@ export function CalendarView({
                     onDragLeave={() => handleStaffDropLeave(staff.id)}
                   >
                     {/* Staff Header */}
-                    <div className="sticky top-0 z-30 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
+                    <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
                       <div className="flex-shrink-0 mb-1.5 relative">
                         {staff.photo ? (
                           <>
@@ -862,7 +874,7 @@ export function CalendarView({
 
                     {/* Appointments Column */}
                     <div
-                      className="relative"
+                      className="relative overflow-hidden"
                       style={{ height: `${totalHeight}px` }}
                       onContextMenu={(event) => {
                         if (!onGridContextMenu) {
