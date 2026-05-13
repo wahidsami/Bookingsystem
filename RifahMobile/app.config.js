@@ -6,6 +6,7 @@ module.exports = {
   expo: {
     name: 'Refah - Beauty & Wellness',
     slug: 'refah-mobile',
+    scheme: 'com.refah.mobile',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',

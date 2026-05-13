@@ -28,6 +28,43 @@ interface GoogleOnboardingScreenProps {
 
 type Step = 'google' | 'phone' | 'otp' | 'name';
 
+const extractIdToken = (authResult: any, responseState: any): string => {
+    const directToken =
+        authResult?.params?.id_token ||
+        responseState?.params?.id_token ||
+        authResult?.authentication?.idToken ||
+        responseState?.authentication?.idToken;
+
+    if (directToken) {
+        return `${directToken}`;
+    }
+
+    const rawUrl = `${authResult?.url || ''}`;
+    if (!rawUrl) {
+        return '';
+    }
+
+    const hashIndex = rawUrl.indexOf('#');
+    if (hashIndex >= 0) {
+        const hashParams = new URLSearchParams(rawUrl.slice(hashIndex + 1));
+        const tokenFromHash = hashParams.get('id_token');
+        if (tokenFromHash) {
+            return tokenFromHash;
+        }
+    }
+
+    const queryIndex = rawUrl.indexOf('?');
+    if (queryIndex >= 0) {
+        const queryParams = new URLSearchParams(rawUrl.slice(queryIndex + 1));
+        const tokenFromQuery = queryParams.get('id_token');
+        if (tokenFromQuery) {
+            return tokenFromQuery;
+        }
+    }
+
+    return '';
+};
+
 const normalizePhoneForApi = (value: string) => {
     const stripped = value.replace(/[\s\-()]/g, '');
     if (!stripped) return '';
@@ -89,10 +126,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 return;
             }
 
-            const idToken =
-                (result as any)?.params?.id_token ||
-                (response as any)?.params?.id_token ||
-                (result as any)?.authentication?.idToken;
+            const idToken = extractIdToken(result as any, response as any);
             if (!idToken) {
                 throw new Error(t('googleTokenMissing'));
             }
