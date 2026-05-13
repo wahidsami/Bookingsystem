@@ -1,4 +1,5 @@
 const db = require('../models');
+const pushNotificationService = require('../services/pushNotificationService');
 
 const toNumber = (value) => {
     const parsed = Number(value);
@@ -117,6 +118,22 @@ exports.createCustomerReview = async (req, res) => {
         });
 
         await recalculateStaffRating(resolvedStaffId);
+        if (resolvedStaffId) {
+            try {
+                await pushNotificationService.sendToStaff(resolvedStaffId, {
+                    title: 'New customer review',
+                    body: `You received a ${Math.round(parsedRating)}/5 review.`,
+                    data: {
+                        type: 'staff_new_review',
+                        reviewId: review.id,
+                        appointmentId,
+                        tenantId
+                    }
+                });
+            } catch (pushError) {
+                console.warn('Staff review push warning:', pushError.message);
+            }
+        }
 
         return res.status(201).json({
             success: true,

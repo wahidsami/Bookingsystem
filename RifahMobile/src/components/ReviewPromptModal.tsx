@@ -49,7 +49,14 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                 Alert.alert('Error', res.message || 'Failed to submit review.');
             }
         } catch (error: any) {
-            Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to submit review.');
+            const backendMessage = error?.response?.data?.message || error?.message || 'Failed to submit review.';
+            const isDuplicate = `${backendMessage}`.toLowerCase().includes('already submitted a review');
+            if (isDuplicate) {
+                Alert.alert('Info', 'You have already reviewed this appointment.');
+                onClose();
+                return;
+            }
+            Alert.alert('Error', backendMessage);
         } finally {
             setSubmitting(false);
         }

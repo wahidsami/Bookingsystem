@@ -48,6 +48,7 @@ export function BookingsScreen({ navigation }: any) {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
     const [selectedBookingGroup, setSelectedBookingGroup] = useState<BookingGroup | null>(null);
     const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+    const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
 
     useFocusEffect(
         React.useCallback(() => {
@@ -64,7 +65,16 @@ export function BookingsScreen({ navigation }: any) {
                 return;
             }
             setIsAuthenticated(true);
-            const data = await api.getBookings(activeTab === 'upcoming' ? 'upcoming' : 'completed');
+            const [data, reviews] = await Promise.all([
+                api.getBookings(activeTab === 'upcoming' ? 'upcoming' : 'completed'),
+                api.getMyReviews(200).catch(() => []),
+            ]);
+            const reviewedIds = new Set<string>(
+                (reviews || [])
+                    .map((review: any) => review?.appointmentId)
+                    .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+            );
+            setReviewedAppointmentIds(reviewedIds);
             setBookings(data);
         } catch (error: any) {
             if (error.status === 401 || error.message?.includes('unauthorized') || error.message?.includes('Invalid or expired token')) {
@@ -497,13 +507,22 @@ export function BookingsScreen({ navigation }: any) {
                                                 </TouchableOpacity>
                                             )}
                                             {booking.status === 'completed' && activeTab === 'history' && (
-                                                <TouchableOpacity
-                                                    style={styles.reviewButton}
-                                                    onPress={() => setReviewBooking(booking)}
-                                                >
-                                                    <AppIcon name="star" size={16} color="#FFFFFF" />
-                                                    <Text style={styles.reviewButtonText}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
-                                                </TouchableOpacity>
+                                                reviewedAppointmentIds.has(booking.id) ? (
+                                                    <View style={[styles.reviewButton, styles.reviewedButton]}>
+                                                        <AppIcon name="star" size={16} color="#065f46" />
+                                                        <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>
+                                                            {language === 'ar' ? 'تم التقييم' : 'Reviewed'}
+                                                        </Text>
+                                                    </View>
+                                                ) : (
+                                                    <TouchableOpacity
+                                                        style={styles.reviewButton}
+                                                        onPress={() => setReviewBooking(booking)}
+                                                    >
+                                                        <AppIcon name="star" size={16} color="#FFFFFF" />
+                                                        <Text style={styles.reviewButtonText}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
+                                                    </TouchableOpacity>
+                                                )
                                             )}
                                         </View>
                                     ))}
@@ -763,6 +782,14 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: fontSize.sm,
         fontWeight: '600',
+    },
+    reviewedButton: {
+        backgroundColor: '#ECFDF3',
+        borderWidth: 1,
+        borderColor: '#86EFAC',
+    },
+    reviewedButtonText: {
+        color: '#166534',
     },
     emptyContainer: {
         flex: 1,

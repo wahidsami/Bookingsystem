@@ -23,34 +23,34 @@ Build a complete reviews system across:
 - [x] Add backend endpoint to list tenant public reviews
 - [x] Wire customer app review submit API to new backend endpoint
 - [x] Replace tenant page reviews placeholder with real data list
-- [ ] Commit + push
+- [x] Commit + push
 
 ### Phase 2: Staff Reviews Read Model
 - [x] Add backend endpoint to list public staff reviews
 - [x] Add backend endpoint to list "my reviews" for customer (optional helper)
 - [x] Staff app: verify/adjust reviews screen mapping and reply behavior
-- [ ] Push notifications on new staff review
-- [ ] Commit + push
+- [x] Push notifications on new staff review
+- [x] Commit + push
 
 ### Phase 3: Customer Staff Profile + Review UX
 - [x] Add customer-facing staff profile page
 - [x] Show staff bio/skills/rating/reviews
 - [x] Add "Write review" entry from eligible completed appointments
-- [ ] Add duplicate-review prevention UX
-- [ ] Commit + push
+- [x] Add duplicate-review prevention UX
+- [x] Commit + push
 
 ### Phase 4: Tenant Dashboard Improvements
 - [x] Advanced filters (rating/staff/date/visibility)
 - [x] Reply/edit reply UX polish
 - [x] Dashboard alert on new review
-- [ ] Commit + push
+- [x] Commit + push
 
 ### Phase 5: QA + Release Hardening
-- [ ] E2E test matrix across all apps
-- [ ] Rate limiting / abuse checks
-- [ ] Performance checks + DB indexes review
-- [ ] Release notes and rollout checklist
-- [ ] Commit + push
+- [x] E2E test matrix across all apps
+- [x] Rate limiting / abuse checks
+- [x] Performance checks + DB indexes review
+- [x] Release notes and rollout checklist
+- [x] Commit + push
 
 ## Data Rules
 - Only authenticated customer can submit review.
