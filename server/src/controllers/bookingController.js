@@ -558,7 +558,9 @@ const getInviteDetails = async (req, res) => {
  */
 const openInvite = async (req, res) => {
     const { token } = req.params;
-    const deepLink = `refah://appointment-invite/${encodeURIComponent(token || '')}`;
+    const normalizedToken = encodeURIComponent(token || '');
+    const deepLinkPrimary = `com.refah.mobile://appointment-invite/${normalizedToken}`;
+    const deepLinkLegacy = `refah://appointment-invite/${normalizedToken}`;
     const androidStore = process.env.ANDROID_APP_URL || 'https://play.google.com/store';
     const iosStore = process.env.IOS_APP_URL || 'https://apps.apple.com';
     const apiBase = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1`;
@@ -571,12 +573,16 @@ const openInvite = async (req, res) => {
 </head><body>
 <h2>Refah Appointment Invite</h2>
 <p>Opening Refah app to confirm your appointment.</p>
-<a class="button" href="${deepLink}">Open Refah App</a>
+<a class="button" href="${deepLinkPrimary}">Open Refah App</a>
 <p>If you do not have the app yet, install it first:</p>
 <a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a>
 <small>If the app did not open automatically, use the button above.</small>
 <script>
-setTimeout(function(){ window.location.href='${deepLink}'; }, 400);
+function tryOpenRefahApp() {
+  window.location.href='${deepLinkPrimary}';
+  setTimeout(function(){ window.location.href='${deepLinkLegacy}'; }, 450);
+}
+setTimeout(tryOpenRefahApp, 300);
 setTimeout(function(){
 fetch('${inviteApiUrl}').then(r=>r.json()).then(data=>{
 if(data && data.success && data.invite && data.invite.platformUserId){

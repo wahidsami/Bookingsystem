@@ -192,6 +192,13 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
     const sendOtp = async () => {
         setError('');
+        const token = onboardingToken.trim();
+        if (!token) {
+            setError(t('googleSignInFailed'));
+            setStep('google');
+            setGooglePromptStarted(false);
+            return;
+        }
         const normalizedPhone = normalizePhoneForApi(phone);
         if (!normalizedPhone) {
             setError(t('enterPhoneNumber'));
@@ -200,7 +207,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
         try {
             setLoading(true);
-            const sendResult = await api.googleSendPhoneOtp(onboardingToken, normalizedPhone);
+            const sendResult = await api.googleSendPhoneOtp(token, normalizedPhone);
             setPhone(sendResult.phone || normalizedPhone);
             setOtpHint(sendResult.testCodeEnabled ? t('devOtpHint') : t('otpSentToPhone'));
             setStep('otp');
@@ -213,6 +220,14 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
     const completeFlow = async (forceNameStep = false) => {
         setError('');
+        const token = onboardingToken.trim();
+        const normalizedPhone = normalizePhoneForApi(phone);
+
+        if (!token || !normalizedPhone) {
+            setError(t('googleSignInFailed'));
+            setStep('phone');
+            return;
+        }
 
         if (!otp.trim()) {
             setError(t('enterOtp'));
@@ -227,8 +242,8 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
         try {
             setLoading(true);
             const completeResult = await api.googleComplete({
-                onboardingToken,
-                phone: normalizePhoneForApi(phone),
+                onboardingToken: token,
+                phone: normalizedPhone,
                 otp: otp.trim(),
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
