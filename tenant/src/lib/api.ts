@@ -1707,6 +1707,22 @@ class TenantApiClient {
     return this.get(`/tenant/reports/full?${queryParams.toString()}`);
   }
 
+  async downloadReportPdf(params: {
+    startDate: string;
+    endDate: string;
+    sections: string[];
+    title?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('startDate', params.startDate);
+    queryParams.append('endDate', params.endDate);
+    queryParams.append('sections', params.sections.join(','));
+    if (params.title) {
+      queryParams.append('title', params.title);
+    }
+    return this.requestBlob(`/tenant/reports/pdf?${queryParams.toString()}`);
+  }
+
   // ==================== Hot Deals Management ====================
 
   /**

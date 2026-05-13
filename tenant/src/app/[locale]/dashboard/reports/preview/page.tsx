@@ -37,6 +37,7 @@ export default function ReportPreviewPage() {
   const notes = searchParams.get('notes') || '';
 
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [data, setData] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -74,6 +75,30 @@ export default function ReportPreviewPage() {
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const file = await tenantApi.downloadReportPdf({
+        startDate,
+        endDate,
+        sections,
+        title: reportTitle || undefined,
+      });
+      const url = URL.createObjectURL(file.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.filename || 'report.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download report PDF:', err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const tenantName = user?.businessName || (locale === 'ar' ? 'النشاط' : 'Business');
 
   if (!startDate || !endDate) {
@@ -90,6 +115,16 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-white p-6" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
       <div className="no-print flex gap-4 mb-6">
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={downloadingPdf}
+          className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:opacity-90 disabled:opacity-60"
+        >
+          {downloadingPdf
+            ? (locale === 'ar' ? 'جاري إنشاء PDF...' : 'Generating PDF...')
+            : (locale === 'ar' ? 'تنزيل PDF' : 'Download PDF')}
+        </button>
         <button
           type="button"
           onClick={handlePrint}

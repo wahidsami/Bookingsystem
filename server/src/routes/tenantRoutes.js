@@ -215,6 +215,7 @@ router.post('/settings/cover', settingsUpload.single('coverImage'), tenantSettin
 // Reports and analytics
 router.get('/reports/summary', checkTenantFeature('reports'), tenantReportsController.getDashboardSummary);
 router.get('/reports/full', checkTenantFeature('reports'), tenantReportsController.getFullReport);
+router.get('/reports/pdf', checkTenantFeature('reports'), tenantReportsController.downloadReportPdf);
 router.get('/reports/booking-trends', checkTenantFeature('reports'), tenantReportsController.getBookingTrends);
 router.get('/reports/service-performance', checkTenantFeature('reports'), tenantReportsController.getServicePerformance);
 router.get('/reports/employee-performance', checkTenantFeature('reports'), tenantReportsController.getEmployeePerformance);

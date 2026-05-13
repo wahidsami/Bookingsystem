@@ -5,6 +5,11 @@
 
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const {
+    generateReportPdfBuffer,
+    resolveUploadPath,
+    sanitizeFileNamePart
+} = require('../services/tenantReportPdfService');
 
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
@@ -514,6 +519,89 @@ function runHandler(handler, req) {
     });
 }
 
+async function buildFullReportData(req, sections, startDate, endDate) {
+    const result = {};
+    const queryWithRange = { ...req.query, startDate, endDate };
+
+    if (sections.includes('overview')) {
+        const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
+        if (response?.success && response?.overview) {
+            result.overview = response.overview;
+        }
+    }
+
+    if (sections.includes('employees')) {
+        const response = await runHandler(tenantFinancialController.getEmployeeRevenue, req);
+        if (response?.success) {
+            result.employees = response.employees;
+            result.employeeTotals = response.totals;
+        }
+    }
+
+    if (sections.includes('services')) {
+        const response = await runHandler(tenantFinancialController.getServiceRevenue, req);
+        if (response?.success) {
+            result.services = response.services;
+            result.serviceTotals = response.totals;
+        }
+    }
+
+    if (sections.includes('products')) {
+        const response = await runHandler(tenantFinancialController.getProductRevenue, req);
+        if (response?.success) {
+            result.products = response.products;
+            result.productTotals = response.totals;
+        }
+    }
+
+    if (sections.includes('daily')) {
+        const response = await runHandler(tenantFinancialController.getDailyRevenue, req);
+        if (response?.success && response?.dailyRevenue) {
+            result.dailyRevenue = response.dailyRevenue;
+        }
+    }
+
+    if (sections.includes('bookingTrends')) {
+        const response = await runHandler(exports.getBookingTrends, {
+            ...req,
+            query: { ...queryWithRange, groupBy: 'day' }
+        });
+        if (response?.success && response?.data) {
+            result.bookingTrends = response.data;
+        }
+    }
+
+    if (sections.includes('servicePerformance')) {
+        const response = await runHandler(exports.getServicePerformance, req);
+        if (response?.success && response?.data) {
+            result.servicePerformance = response.data;
+        }
+    }
+
+    if (sections.includes('employeePerformance')) {
+        const response = await runHandler(exports.getEmployeePerformance, req);
+        if (response?.success && response?.data) {
+            result.employeePerformance = response.data;
+        }
+    }
+
+    if (sections.includes('peakHours')) {
+        const response = await runHandler(exports.getPeakHoursAnalysis, req);
+        if (response?.success && response?.data) {
+            result.peakHours = response.data;
+        }
+    }
+
+    if (sections.includes('customerAnalytics')) {
+        const response = await runHandler(exports.getCustomerAnalytics, req);
+        if (response?.success && response?.data) {
+            result.customerAnalytics = response.data;
+        }
+    }
+
+    return result;
+}
+
 exports.getFullReport = async (req, res) => {
     try {
         const { startDate, endDate, sections: sectionsParam } = req.query;
@@ -530,84 +618,7 @@ exports.getFullReport = async (req, res) => {
             });
         }
 
-        const result = {};
-        const queryWithRange = { ...req.query, startDate, endDate };
-
-        if (sections.includes('overview')) {
-            const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
-            if (response?.success && response?.overview) {
-                result.overview = response.overview;
-            }
-        }
-
-        if (sections.includes('employees')) {
-            const response = await runHandler(tenantFinancialController.getEmployeeRevenue, req);
-            if (response?.success) {
-                result.employees = response.employees;
-                result.employeeTotals = response.totals;
-            }
-        }
-
-        if (sections.includes('services')) {
-            const response = await runHandler(tenantFinancialController.getServiceRevenue, req);
-            if (response?.success) {
-                result.services = response.services;
-                result.serviceTotals = response.totals;
-            }
-        }
-
-        if (sections.includes('products')) {
-            const response = await runHandler(tenantFinancialController.getProductRevenue, req);
-            if (response?.success) {
-                result.products = response.products;
-                result.productTotals = response.totals;
-            }
-        }
-
-        if (sections.includes('daily')) {
-            const response = await runHandler(tenantFinancialController.getDailyRevenue, req);
-            if (response?.success && response?.dailyRevenue) {
-                result.dailyRevenue = response.dailyRevenue;
-            }
-        }
-
-        if (sections.includes('bookingTrends')) {
-            const response = await runHandler(exports.getBookingTrends, {
-                ...req,
-                query: { ...queryWithRange, groupBy: 'day' }
-            });
-            if (response?.success && response?.data) {
-                result.bookingTrends = response.data;
-            }
-        }
-
-        if (sections.includes('servicePerformance')) {
-            const response = await runHandler(exports.getServicePerformance, req);
-            if (response?.success && response?.data) {
-                result.servicePerformance = response.data;
-            }
-        }
-
-        if (sections.includes('employeePerformance')) {
-            const response = await runHandler(exports.getEmployeePerformance, req);
-            if (response?.success && response?.data) {
-                result.employeePerformance = response.data;
-            }
-        }
-
-        if (sections.includes('peakHours')) {
-            const response = await runHandler(exports.getPeakHoursAnalysis, req);
-            if (response?.success && response?.data) {
-                result.peakHours = response.data;
-            }
-        }
-
-        if (sections.includes('customerAnalytics')) {
-            const response = await runHandler(exports.getCustomerAnalytics, req);
-            if (response?.success && response?.data) {
-                result.customerAnalytics = response.data;
-            }
-        }
+        const result = await buildFullReportData(req, sections, startDate, endDate);
 
         res.json({
             success: true,
@@ -618,6 +629,55 @@ exports.getFullReport = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate full report',
+            error: error.message
+        });
+    }
+};
+
+exports.downloadReportPdf = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { startDate, endDate, sections: sectionsParam, title } = req.query;
+        const sections = typeof sectionsParam === 'string'
+            ? sectionsParam.split(',').map((section) => section.trim()).filter(Boolean)
+            : [];
+
+        if (!startDate || !endDate || sections.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'startDate, endDate, and sections are required'
+            });
+        }
+
+        const tenant = await db.Tenant.findByPk(tenantId, {
+            attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
+        });
+
+        const data = await buildFullReportData(req, sections, startDate, endDate);
+        const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+        const tenantLogoPath = resolveUploadPath(tenant?.logo);
+        const generatedAt = new Date().toISOString();
+
+        const buffer = await generateReportPdfBuffer({
+            tenantName,
+            reportTitle: title ? `${title}` : 'Refah Report',
+            startDate,
+            endDate,
+            generatedAt,
+            tenantLogoPath,
+            data
+        });
+
+        const fileName = `report-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', buffer.length);
+        return res.send(buffer);
+    } catch (error) {
+        console.error('Download report PDF error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to generate report PDF',
             error: error.message
         });
     }
