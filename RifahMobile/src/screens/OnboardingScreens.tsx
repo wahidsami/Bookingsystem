@@ -149,21 +149,25 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
 
                         {/* 1. Image Container */}
                         <View style={styles.imageContainer}>
-                            <Image
-                                source={screen.image}
-                                style={styles.image}
-                                resizeMode="contain"
-                            />
+                            <View style={styles.imageFrame}>
+                                <Image
+                                    source={screen.image}
+                                    style={styles.image}
+                                    resizeMode="contain"
+                                />
+                            </View>
                         </View>
 
                         {/* 2. Text Block (Safely below image) */}
                         <View style={styles.textContainer}>
+                            <View style={styles.textCard}>
                             <Text style={styles.title}>
                                 {screen.title}
                             </Text>
-                            <Text style={styles.subtitle} numberOfLines={2}>
+                            <Text style={styles.subtitle} numberOfLines={3}>
                                 {screen.description}
                             </Text>
+                            </View>
                         </View>
 
                         {/* Ensure pagination space doesn't clash with subtitle */}
@@ -210,22 +214,42 @@ const styles = StyleSheet.create({
 
     // Image Layout mapping to the dashed box
     imageContainer: {
-        flex: 1,
+        flex: 0,
         width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: clamp(8, SCREEN_HEIGHT * 0.02, 16),
-        marginBottom: clamp(16, SCREEN_HEIGHT * 0.02, 24),
+        marginBottom: clamp(12, SCREEN_HEIGHT * 0.018, 20),
+        height: clamp(220, SCREEN_HEIGHT * 0.38, 320),
+    },
+    imageFrame: {
+        width: clamp(220, SCREEN_WIDTH * 0.72, 320),
+        height: clamp(220, SCREEN_WIDTH * 0.72, 320),
+        borderRadius: 999,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     image: {
         width: '100%',
         height: '100%',
-        transform: [{ scale: 1.3 }], // Safely enlarge image using visual transform strictly inside boundaries
     },
 
     textContainer: {
         width: '100%',
         alignItems: 'center',
+    },
+    textCard: {
+        width: '100%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        paddingHorizontal: clamp(14, SCREEN_WIDTH * 0.05, 22),
+        paddingVertical: clamp(12, SCREEN_HEIGHT * 0.016, 18),
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
+        elevation: 4,
     },
     title: {
         fontSize: clamp(20, SCREEN_HEIGHT * 0.024, 26),
