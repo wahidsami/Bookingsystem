@@ -77,9 +77,8 @@ export default function EditProductPage() {
     allowsDelivery: true,
     allowsPickup: true
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [existingImage, setExistingImage] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [activeSection, setActiveSection] = useState("product-basic");
   const formId = "edit-product-form";
 
@@ -135,8 +134,9 @@ export default function EditProductPage() {
         });
 
         if (prod.image) {
-          setExistingImage(getImageUrl(prod.image));
-          setImagePreview(getImageUrl(prod.image));
+          setImagePreviews([getImageUrl(prod.image)]);
+        } else {
+          setImagePreviews([]);
         }
       } else {
         setError(response.message || "Failed to load product");
@@ -162,15 +162,26 @@ export default function EditProductPage() {
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const availableSlots = Math.max(0, 5 - imagePreviews.length);
+    const acceptedFiles = files.slice(0, availableSlots);
+    if (acceptedFiles.length === 0) return;
+
+    setImageFiles((prev) => [...prev, ...acceptedFiles]);
+    acceptedFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        setImagePreviews((prev) => [...prev, reader.result as string]);
       };
       reader.readAsDataURL(file);
-    }
+    });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,10 +216,9 @@ export default function EditProductPage() {
       submitData.append("allowsDelivery", String(formData.allowsDelivery ?? true));
       submitData.append("allowsPickup", String(formData.allowsPickup ?? true));
 
-      // Append image only if a new one is selected (field name must be 'images' to match server multer)
-      if (imageFile) {
-        submitData.append("images", imageFile);
-      }
+      imageFiles.forEach((file) => {
+        submitData.append("images", file);
+      });
 
       const response = await tenantApi.updateProduct(id as string, submitData);
 
@@ -309,12 +319,10 @@ export default function EditProductPage() {
       formData.howToUse_en.trim() || formData.howToUse_ar.trim()
     ].filter(Boolean).length;
 
-    const mediaFilled = imagePreview ? 1 : 0;
+    const mediaFilled = imagePreviews.length > 0 ? 1 : 0;
     const pricingFilled = [
       formData.price.trim(),
-      formData.stock.trim(),
-      formData.isAvailable !== undefined,
-      formData.isFeatured !== undefined
+      formData.stock.trim()
     ].filter(Boolean).length;
 
     return [
@@ -339,11 +347,11 @@ export default function EditProductPage() {
       {
         id: "product-pricing",
         label: locale === "ar" ? "التسعير والمخزون" : "Pricing & inventory",
-        progressLabel: `${pricingFilled}/4`,
-        progressPercent: (pricingFilled / 4) * 100,
+        progressLabel: `${pricingFilled}/2`,
+        progressPercent: (pricingFilled / 2) * 100,
       },
     ] as ServiceEditorSection[];
-  }, [formData, imagePreview, locale]);
+  }, [formData, imagePreviews.length, locale]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -387,9 +395,8 @@ export default function EditProductPage() {
             {success}
           </div>
         ) : null}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 gap-6">
+          <div className="space-y-6">
             {/* Basic Information */}
             <div id="product-basic" className={`card ${isVisibleSection("product-basic") ? "block" : "hidden"}`}>
               <div className={`mb-4 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -530,9 +537,25 @@ export default function EditProductPage() {
 
             {/* Product Details */}
             <div id="product-content" className={`card ${isVisibleSection("product-content") ? "block" : "hidden"}`}>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
-              </h3>
+              <div className={`mb-4 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
+                </h3>
+                {hasAIFeature && (
+                  <button
+                    type="button"
+                    onClick={handleAIFill}
+                    disabled={isGeneratingAI || !formData.name_en}
+                    className="btn bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <SparklesIcon className="w-5 h-5" />
+                    {isGeneratingAI
+                      ? (locale === 'ar' ? 'جاري التوليد...' : 'Generating...')
+                      : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
+                    }
+                  </button>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -726,50 +749,61 @@ export default function EditProductPage() {
             </div>
           </div>
 
-          {/* Right Column - Image & Pricing */}
           <div className="space-y-6">
             {/* Image Upload */}
             <div id="product-media" className={`card ${isVisibleSection("product-media") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t("image")}
+                {locale === 'ar' ? 'صور المنتج' : 'Product Images'} <span className="text-red-500">*</span>
               </h3>
+              <p className="text-sm text-gray-500 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'حد أدنى: صورة واحدة، حد أقصى: 5 صور' : 'Minimum: 1 image, Maximum: 5 images'}
+              </p>
 
               <div className="space-y-4">
-                {imagePreview ? (
-                  <div className="relative">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreview(existingImage);
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="text-6xl">📦</span>
+                {imagePreviews.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-40 object-cover rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 text-sm"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                <label className="block">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                  <span className="btn btn-secondary w-full text-center cursor-pointer">
-                    {imagePreview && imagePreview !== existingImage ? t("changeImage") : t("uploadImage")}
-                  </span>
-                </label>
+                {imagePreviews.length < 5 && (
+                  <label className="block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageChange}
+                      className="hidden"
+                      disabled={imagePreviews.length >= 5}
+                    />
+                    <span className="btn btn-secondary w-full text-center cursor-pointer">
+                      {imagePreviews.length === 0
+                        ? `${t("uploadImage")} (${t("required")})`
+                        : `${locale === 'ar' ? 'إضافة صور أخرى' : 'Add more images'} (${imagePreviews.length}/5)`}
+                    </span>
+                  </label>
+                )}
+
+                {imagePreviews.length === 0 && (
+                  <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <span className="text-5xl">📦</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -815,68 +849,6 @@ export default function EditProductPage() {
               </div>
             </div>
 
-            {/* Status */}
-            <div className="card space-y-4">
-              <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <input
-                  type="checkbox"
-                  name="isAvailable"
-                  checked={formData.isAvailable}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-primary focus:ring-primary"
-                />
-                <label className="font-medium text-gray-700">{t("isAvailable")}</label>
-              </div>
-
-              <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <input
-                  type="checkbox"
-                  name="isFeatured"
-                  checked={formData.isFeatured}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-primary focus:ring-primary"
-                />
-                <label className="font-medium text-gray-700">{t("isFeatured")}</label>
-              </div>
-            </div>
-            <div className="border-t border-gray-200 pt-4 mt-4">
-              <p className="text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'خيارات التوصيل والاستلام' : 'Fulfillment options'}
-              </p>
-              <p className="text-xs text-gray-500 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'اختر واحدًا أو كليهما. يجب تفعيل خيار واحد على الأقل.' : 'Select one or both. At least one must be enabled.'}
-              </p>
-              <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="allowsDelivery"
-                    checked={formData.allowsDelivery ?? true}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormData(prev => ({ ...prev, allowsDelivery: checked }));
-                      if (!checked && !formData.allowsPickup) setFormData(prev => ({ ...prev, allowsPickup: true }));
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{locale === 'ar' ? 'التوصيل' : 'Delivery'}</label>
-                </div>
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="allowsPickup"
-                    checked={formData.allowsPickup ?? true}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormData(prev => ({ ...prev, allowsPickup: checked }));
-                      if (!checked && !formData.allowsDelivery) setFormData(prev => ({ ...prev, allowsDelivery: true }));
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{locale === 'ar' ? 'الاستلام من المركز' : 'Pick on visit'}</label>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

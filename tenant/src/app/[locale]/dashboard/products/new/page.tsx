@@ -327,9 +327,7 @@ export default function NewProductPage() {
     const mediaFilled = imagePreviews.length > 0 ? 1 : 0;
     const pricingFilled = [
       formData.rawPrice.trim(),
-      formData.stock.trim(),
-      formData.isAvailable !== undefined,
-      formData.isFeatured !== undefined
+      formData.stock.trim()
     ].filter(Boolean).length;
 
     return [
@@ -354,8 +352,8 @@ export default function NewProductPage() {
       {
         id: "product-pricing",
         label: locale === "ar" ? "التسعير والمخزون" : "Pricing & inventory",
-        progressLabel: `${pricingFilled}/4`,
-        progressPercent: (pricingFilled / 4) * 100,
+        progressLabel: `${pricingFilled}/2`,
+        progressPercent: (pricingFilled / 2) * 100,
       },
     ] as ServiceEditorSection[];
   }, [formData, imagePreviews.length, locale]);
@@ -551,9 +549,30 @@ export default function NewProductPage() {
 
             {/* Product Details */}
             <div id="product-content" className={`card ${isVisibleSection("product-content") ? "block" : "hidden"}`}>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
-              </h3>
+              <div className={`mb-4 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
+                </h3>
+                {hasAIFeature && (
+                  <button
+                    type="button"
+                    onClick={handleAIFill}
+                    disabled={isGeneratingAI || (!formData.name_en && !formData.name_ar)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${aiMode === 'enhance'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                      : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
+                      }`}
+                  >
+                    <SparklesIcon className="w-4 h-4" />
+                    {isGeneratingAI
+                      ? (locale === 'ar' ? 'جاري البحث...' : 'Searching...')
+                      : aiMode === 'enhance'
+                        ? (locale === 'ar' ? '✨ تحسين المحتوى' : '✨ Enhance Content')
+                        : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
+                    }
+                  </button>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -969,73 +988,6 @@ export default function NewProductPage() {
                   />
                 </div>
 
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'حالة المنتج' : 'Product status'}
-                  </p>
-                  <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <input
-                        type="checkbox"
-                        name="isAvailable"
-                        checked={formData.isAvailable}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-primary focus:ring-primary"
-                      />
-                      <label className="font-medium text-gray-700">{t("isAvailable")}</label>
-                    </div>
-
-                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <input
-                        type="checkbox"
-                        name="isFeatured"
-                        checked={formData.isFeatured}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-primary focus:ring-primary"
-                      />
-                      <label className="font-medium text-gray-700">{t("isFeatured")}</label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'خيارات التوصيل والاستلام' : 'Fulfillment options'}
-                  </p>
-                  <p className="text-xs text-gray-500 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'اختر واحدًا أو كليهما. يجب تفعيل خيار واحد على الأقل.' : 'Select one or both. At least one must be enabled.'}
-                  </p>
-                  <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <input
-                        type="checkbox"
-                        name="allowsDelivery"
-                        checked={formData.allowsDelivery}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setFormData(prev => ({ ...prev, allowsDelivery: checked }));
-                          if (!checked && !formData.allowsPickup) setFormData(prev => ({ ...prev, allowsPickup: true }));
-                        }}
-                        className="w-4 h-4 text-primary focus:ring-primary"
-                      />
-                      <label className="font-medium text-gray-700">{locale === 'ar' ? 'التوصيل' : 'Delivery'}</label>
-                    </div>
-                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <input
-                        type="checkbox"
-                        name="allowsPickup"
-                        checked={formData.allowsPickup}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setFormData(prev => ({ ...prev, allowsPickup: checked }));
-                          if (!checked && !formData.allowsDelivery) setFormData(prev => ({ ...prev, allowsDelivery: true }));
-                        }}
-                        className="w-4 h-4 text-primary focus:ring-primary"
-                      />
-                      <label className="font-medium text-gray-700">{locale === 'ar' ? 'الاستلام من المركز' : 'Pick on visit'}</label>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
