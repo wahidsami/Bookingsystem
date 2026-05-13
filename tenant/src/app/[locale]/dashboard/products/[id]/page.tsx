@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
-import Link from "next/link";
-import { ArrowLeftIcon, SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
+import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
+import { ServiceEditorFrame, type ServiceEditorSection } from "@/components/ServiceEditorFrame";
 
 const CATEGORIES = [
   "Hair Care",
@@ -80,6 +80,8 @@ export default function EditProductPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState("product-basic");
+  const formId = "edit-product-form";
 
   useEffect(() => {
     if (id) {
@@ -290,6 +292,65 @@ export default function EditProductPage() {
     }
   };
 
+  const productSections = useMemo(() => {
+    const basicFilled = [
+      formData.name_en.trim(),
+      formData.name_ar.trim(),
+      formData.category.trim(),
+      formData.brand.trim()
+    ].filter(Boolean).length;
+
+    const detailsFilled = [
+      formData.description_en.trim() || formData.description_ar.trim(),
+      formData.features_en.trim() || formData.features_ar.trim(),
+      formData.ingredients_en.trim() || formData.ingredients_ar.trim(),
+      formData.howToUse_en.trim() || formData.howToUse_ar.trim()
+    ].filter(Boolean).length;
+
+    const mediaFilled = imagePreview ? 1 : 0;
+    const pricingFilled = [
+      formData.price.trim(),
+      formData.stock.trim(),
+      formData.isAvailable !== undefined,
+      formData.isFeatured !== undefined
+    ].filter(Boolean).length;
+
+    return [
+      {
+        id: "product-basic",
+        label: locale === "ar" ? "المعلومات الأساسية" : "Basic information",
+        progressLabel: `${basicFilled}/4`,
+        progressPercent: (basicFilled / 4) * 100,
+      },
+      {
+        id: "product-content",
+        label: locale === "ar" ? "تفاصيل المنتج" : "Product details",
+        progressLabel: `${detailsFilled}/4`,
+        progressPercent: (detailsFilled / 4) * 100,
+      },
+      {
+        id: "product-media",
+        label: locale === "ar" ? "صور المنتج" : "Product images",
+        progressLabel: mediaFilled ? "1/1" : "0/1",
+        progressPercent: mediaFilled ? 100 : 0,
+      },
+      {
+        id: "product-pricing",
+        label: locale === "ar" ? "التسعير والمخزون" : "Pricing & inventory",
+        progressLabel: `${pricingFilled}/4`,
+        progressPercent: (pricingFilled / 4) * 100,
+      },
+    ] as ServiceEditorSection[];
+  }, [formData, imagePreview, locale]);
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const target = document.getElementById(sectionId);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   if (loading) {
     return (
       <TenantLayout>
@@ -303,67 +364,49 @@ export default function EditProductPage() {
 
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`mb-3 ${isRTL ? 'text-right' : 'text-left'}`}>
-          <Link
-            href={`/${locale}/dashboard/products`}
-            className={`inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-primary ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}
-          >
-            <ArrowLeftIcon className={`h-4 w-4 ${isRTL ? 'rotate-180' : ''}`} />
-            <span>{locale === 'ar' ? 'رجوع' : 'Back'}</span>
-          </Link>
-        </div>
-
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("edit")} {t("title")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {locale === 'ar' ? 'تعديل معلومات المنتج' : 'Edit product information'}
-            </p>
-          </div>
-          <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            {hasAIFeature && (
-              <button
-                type="button"
-                onClick={handleAIFill}
-                disabled={isGeneratingAI || !formData.name_en}
-                className="btn bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 disabled:opacity-50 flex items-center gap-2"
-                title={!formData.name_en ? (locale === 'ar' ? 'أدخل الاسم باللغة الإنجليزية أولاً' : 'Enter English name first') : ''}
-              >
-                <SparklesIcon className="w-5 h-5" />
-                {isGeneratingAI
-                  ? (locale === 'ar' ? 'جاري التوليد...' : 'Generating...')
-                  : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
-                }
-              </button>
-            )}
-            <Link href={`/${locale}/dashboard/products`} className="btn btn-secondary">
-              {t("cancel")}
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Form - Same structure as new page */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <ServiceEditorFrame
+        locale={locale}
+        isRTL={isRTL}
+        title={`${t("edit")} ${t("title")}`}
+        subtitle={locale === 'ar' ? 'تعديل معلومات المنتج' : 'Edit product information'}
+        backHref={`/${locale}/dashboard/products`}
+        cancelHref={`/${locale}/dashboard/products`}
+        saveLabel={t("save")}
+        loadingLabel={t("loading")}
+        cancelLabel={t("cancel")}
+        formId={formId}
+        loading={saving}
+        error={error}
+        sections={productSections}
+        activeSection={activeSection}
+        onSectionSelect={scrollToSection}
+      >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
-              </h3>
+            <div id="product-basic" className="card">
+              <div className={`mb-4 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
+                </h3>
+                {hasAIFeature && (
+                  <button
+                    type="button"
+                    onClick={handleAIFill}
+                    disabled={isGeneratingAI || !formData.name_en}
+                    className="btn bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                    title={!formData.name_en ? (locale === 'ar' ? 'أدخل الاسم باللغة الإنجليزية أولاً' : 'Enter English name first') : ''}
+                  >
+                    <SparklesIcon className="w-5 h-5" />
+                    {isGeneratingAI
+                      ? (locale === 'ar' ? 'جاري التوليد...' : 'Generating...')
+                      : (locale === 'ar' ? '✨ تعبئة ذكية' : '✨ AI Fill')
+                    }
+                  </button>
+                )}
+              </div>
 
               <div className="mt-4 space-y-4">
                 <div>
@@ -481,7 +524,7 @@ export default function EditProductPage() {
             </div>
 
             {/* Product Details */}
-            <div className="card">
+            <div id="product-content" className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
               </h3>
@@ -681,7 +724,7 @@ export default function EditProductPage() {
           {/* Right Column - Image & Pricing */}
           <div className="space-y-6">
             {/* Image Upload */}
-            <div className="card">
+            <div id="product-media" className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("image")}
               </h3>
@@ -726,7 +769,7 @@ export default function EditProductPage() {
             </div>
 
             {/* Pricing & Inventory */}
-            <div className="card">
+            <div id="product-pricing" className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
               </h3>
@@ -832,20 +875,8 @@ export default function EditProductPage() {
           </div>
         </div>
 
-        {/* Form Actions */}
-        <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <Link href={`/${locale}/dashboard/products`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn btn-primary flex-1"
-          >
-            {saving ? t("loading") : t("save")}
-          </button>
-        </div>
       </form>
+      </ServiceEditorFrame>
     </TenantLayout>
   );
 }
