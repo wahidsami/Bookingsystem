@@ -60,94 +60,124 @@ export default function GenerateReportPage() {
 
   return (
     <TenantLayout>
-      <div className="max-w-2xl mx-auto p-6" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-          {locale === 'ar' ? 'إنشاء تقرير' : 'Generate report'}
-        </h1>
-        <p className="text-gray-600 mb-6" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-          {locale === 'ar' ? 'اختر الأقسام والفترة ثم اعرض التقرير أو اطبعه.' : 'Choose sections and date range, then preview or print.'}
-        </p>
-
-        <div className="card mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {locale === 'ar' ? 'الفترة' : 'Date range'}
-          </h2>
-          <div className="flex flex-wrap gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ar' ? 'من تاريخ' : 'Start date'}</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ar' ? 'إلى تاريخ' : 'End date'}</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg w-full"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="card mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {locale === 'ar' ? 'أقسام التقرير' : 'Report sections'}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {SECTION_OPTIONS.map((opt) => (
-              <label key={opt.id} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sections.includes(opt.id)}
-                  onChange={() => toggleSection(opt.id)}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-gray-700">{locale === 'ar' ? t(opt.labelKey) : opt.labelEn}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="card mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {locale === 'ar' ? 'عنوان التقرير (اختياري)' : 'Report title (optional)'}
-          </h2>
-          <input
-            type="text"
-            value={reportTitle}
-            onChange={(e) => setReportTitle(e.target.value)}
-            placeholder={locale === 'ar' ? 'مثال: التقرير الشهري' : 'e.g. Monthly report'}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          />
-          <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">{locale === 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)'}</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div className="flex gap-4 no-print">
+      <div className="w-full max-w-7xl mx-auto p-6 space-y-6" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
+        <div className="flex items-center justify-between gap-4">
           <button
             type="button"
-            onClick={handlePreview}
-            disabled={sections.length === 0}
-            className="px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => router.push(`/${locale}/dashboard/reports`)}
+            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
-            {locale === 'ar' ? 'معاينة التقرير' : 'Preview report'}
+            <span>{isRTL ? '→' : '←'}</span>
+            <span>{locale === 'ar' ? 'العودة إلى التقارير' : 'Back to reports'}</span>
           </button>
-          <a
-            href={`/${locale}/dashboard/reports`}
-            className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300"
-          >
-            {locale === 'ar' ? 'إلغاء' : 'Cancel'}
-          </a>
+          <div className="text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-full px-3 py-1">
+            {sections.length} {locale === 'ar' ? 'أقسام محددة' : 'sections selected'}
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 md:p-8 shadow-sm">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            {locale === 'ar' ? 'إنشاء تقرير' : 'Generate report'}
+          </h1>
+          <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            {locale === 'ar'
+              ? 'اختر الأقسام والفترة الزمنية ثم انتقل إلى المعاينة أو التصدير.'
+              : 'Pick sections and date range, then continue to preview or export.'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 space-y-6">
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'أقسام التقرير' : 'Report sections'}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {SECTION_OPTIONS.map((opt) => (
+                  <label key={opt.id} className="flex items-center gap-3 cursor-pointer rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={sections.includes(opt.id)}
+                      onChange={() => toggleSection(opt.id)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-gray-700 font-medium">{locale === 'ar' ? t(opt.labelKey) : opt.labelEn}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'الفترة الزمنية' : 'Date range'}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ar' ? 'من تاريخ' : 'Start date'}</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ar' ? 'إلى تاريخ' : 'End date'}</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'بيانات التقرير' : 'Report metadata'}
+              </h2>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {locale === 'ar' ? 'عنوان التقرير (اختياري)' : 'Report title (optional)'}
+              </label>
+              <input
+                type="text"
+                value={reportTitle}
+                onChange={(e) => setReportTitle(e.target.value)}
+                placeholder={locale === 'ar' ? 'مثال: التقرير الشهري' : 'e.g. Monthly report'}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              />
+              <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">{locale === 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)'}</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-col gap-3 no-print">
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={sections.length === 0}
+                  className="w-full px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {locale === 'ar' ? 'معاينة التقرير' : 'Preview report'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/${locale}/dashboard/reports`)}
+                  className="w-full px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200"
+                >
+                  {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </TenantLayout>
