@@ -316,18 +316,18 @@ export default function NewProductPage() {
       formData.brand.trim(),
     ].filter(Boolean).length;
 
-    const pricingFilled = [formData.rawPrice.trim(), formData.stock.trim()].filter(Boolean).length;
-    const contentFilled = [
+    const detailsFilled = [
       formData.description_en.trim() || formData.description_ar.trim(),
       formData.features_en.trim() || formData.features_ar.trim(),
       formData.ingredients_en.trim() || formData.ingredients_ar.trim(),
       formData.howToUse_en.trim() || formData.howToUse_ar.trim()
     ].filter(Boolean).length;
     const mediaFilled = imagePreviews.length > 0 ? 1 : 0;
-    const settingsFilled = [
+    const pricingFilled = [
+      formData.rawPrice.trim(),
+      formData.stock.trim(),
       formData.isAvailable !== undefined,
-      formData.isFeatured !== undefined,
-      formData.allowsDelivery || formData.allowsPickup
+      formData.isFeatured !== undefined
     ].filter(Boolean).length;
 
     return [
@@ -338,28 +338,22 @@ export default function NewProductPage() {
         progressPercent: (basicFilled / 4) * 100,
       },
       {
-        id: "product-pricing",
-        label: locale === "ar" ? "التسعير والمخزون" : "Pricing & inventory",
-        progressLabel: `${pricingFilled}/2`,
-        progressPercent: (pricingFilled / 2) * 100,
-      },
-      {
         id: "product-content",
-        label: locale === "ar" ? "المحتوى" : "Content",
-        progressLabel: `${contentFilled}/4`,
-        progressPercent: (contentFilled / 4) * 100,
+        label: locale === "ar" ? "تفاصيل المنتج" : "Product details",
+        progressLabel: `${detailsFilled}/4`,
+        progressPercent: (detailsFilled / 4) * 100,
       },
       {
         id: "product-media",
-        label: locale === "ar" ? "الصور" : "Media",
+        label: locale === "ar" ? "صور المنتج" : "Product images",
         progressLabel: mediaFilled ? "1/1" : "0/1",
         progressPercent: mediaFilled ? 100 : 0,
       },
       {
-        id: "product-settings",
-        label: locale === "ar" ? "الإعدادات" : "Settings",
-        progressLabel: `${settingsFilled}/3`,
-        progressPercent: (settingsFilled / 3) * 100,
+        id: "product-pricing",
+        label: locale === "ar" ? "التسعير والمخزون" : "Pricing & inventory",
+        progressLabel: `${pricingFilled}/4`,
+        progressPercent: (pricingFilled / 4) * 100,
       },
     ] as ServiceEditorSection[];
   }, [formData, imagePreviews.length, locale]);
@@ -969,68 +963,73 @@ export default function NewProductPage() {
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Status */}
-            <div id="product-settings" className="card space-y-4">
-              <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <input
-                  type="checkbox"
-                  name="isAvailable"
-                  checked={formData.isAvailable}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-primary focus:ring-primary"
-                />
-                <label className="font-medium text-gray-700">{t("isAvailable")}</label>
-              </div>
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'حالة المنتج' : 'Product status'}
+                  </p>
+                  <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <input
+                        type="checkbox"
+                        name="isAvailable"
+                        checked={formData.isAvailable}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-primary focus:ring-primary"
+                      />
+                      <label className="font-medium text-gray-700">{t("isAvailable")}</label>
+                    </div>
 
-              <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <input
-                  type="checkbox"
-                  name="isFeatured"
-                  checked={formData.isFeatured}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-primary focus:ring-primary"
-                />
-                <label className="font-medium text-gray-700">{t("isFeatured")}</label>
-              </div>
-            </div>
-            <div className="border-t border-gray-200 pt-4 mt-4">
-              <p className="text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'خيارات التوصيل والاستلام' : 'Fulfillment options'}
-              </p>
-              <p className="text-xs text-gray-500 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === 'ar' ? 'اختر واحدًا أو كليهما. يجب تفعيل خيار واحد على الأقل.' : 'Select one or both. At least one must be enabled.'}
-              </p>
-              <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="allowsDelivery"
-                    checked={formData.allowsDelivery}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormData(prev => ({ ...prev, allowsDelivery: checked }));
-                      if (!checked && !formData.allowsPickup) setFormData(prev => ({ ...prev, allowsPickup: true }));
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{locale === 'ar' ? 'التوصيل' : 'Delivery'}</label>
+                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <input
+                        type="checkbox"
+                        name="isFeatured"
+                        checked={formData.isFeatured}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-primary focus:ring-primary"
+                      />
+                      <label className="font-medium text-gray-700">{t("isFeatured")}</label>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <input
-                    type="checkbox"
-                    name="allowsPickup"
-                    checked={formData.allowsPickup}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormData(prev => ({ ...prev, allowsPickup: checked }));
-                      if (!checked && !formData.allowsDelivery) setFormData(prev => ({ ...prev, allowsDelivery: true }));
-                    }}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <label className="font-medium text-gray-700">{locale === 'ar' ? 'الاستلام من المركز' : 'Pick on visit'}</label>
+
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'خيارات التوصيل والاستلام' : 'Fulfillment options'}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'اختر واحدًا أو كليهما. يجب تفعيل خيار واحد على الأقل.' : 'Select one or both. At least one must be enabled.'}
+                  </p>
+                  <div className="flex flex-wrap gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <input
+                        type="checkbox"
+                        name="allowsDelivery"
+                        checked={formData.allowsDelivery}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => ({ ...prev, allowsDelivery: checked }));
+                          if (!checked && !formData.allowsPickup) setFormData(prev => ({ ...prev, allowsPickup: true }));
+                        }}
+                        className="w-4 h-4 text-primary focus:ring-primary"
+                      />
+                      <label className="font-medium text-gray-700">{locale === 'ar' ? 'التوصيل' : 'Delivery'}</label>
+                    </div>
+                    <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <input
+                        type="checkbox"
+                        name="allowsPickup"
+                        checked={formData.allowsPickup}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => ({ ...prev, allowsPickup: checked }));
+                          if (!checked && !formData.allowsDelivery) setFormData(prev => ({ ...prev, allowsDelivery: true }));
+                        }}
+                        className="w-4 h-4 text-primary focus:ring-primary"
+                      />
+                      <label className="font-medium text-gray-700">{locale === 'ar' ? 'الاستلام من المركز' : 'Pick on visit'}</label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
