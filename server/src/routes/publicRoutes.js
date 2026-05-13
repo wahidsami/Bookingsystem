@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const publicTenantController = require('../controllers/publicTenantController');
 const publicBillPaymentController = require('../controllers/publicBillPaymentController');
+const reviewController = require('../controllers/reviewController');
 const { optionalAuth } = require('../middleware/authUser');
 
 // Get all active tenants (for browse/discovery)
@@ -31,6 +32,8 @@ router.get('/tenant/:tenantId/products/:id', publicTenantController.getPublicPro
 
 // Staff
 router.get('/tenant/:tenantId/staff', publicTenantController.getPublicStaff);
+router.get('/tenant/:tenantId/reviews', reviewController.getTenantPublicReviews);
+router.get('/staff/:staffId/reviews', reviewController.getStaffPublicReviews);
 
 // Bookings (public, no auth)
 router.post('/tenant/:tenantId/bookings', publicTenantController.createPublicBooking);

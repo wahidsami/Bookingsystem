@@ -32,6 +32,7 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
         try {
             setSubmitting(true);
             const payload = {
+                tenantId: appointment.tenantId,
                 staffId: appointment.staffId,
                 appointmentId: appointment.id,
                 rating,
@@ -39,7 +40,7 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                 customerName: (appointment as any).user?.firstName || (appointment as any).legacyCustomer?.firstName || 'Valued Customer'
             };
 
-            const res = await api.post<{ success: boolean; message?: string }>(`/tenant/${appointment.tenantId}/reviews`, payload);
+            const res = await api.post<{ success: boolean; message?: string }>(`/users/reviews`, payload);
             if (res.success) {
                 Alert.alert('Success', 'Thank you for your review!');
                 onSuccess();

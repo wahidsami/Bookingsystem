@@ -23,6 +23,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { bookingNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
+import { ReviewPromptModal } from '../components/ReviewPromptModal';
 
 interface BookingGroup {
     key: string;
@@ -46,6 +47,7 @@ export function BookingsScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
     const [selectedBookingGroup, setSelectedBookingGroup] = useState<BookingGroup | null>(null);
+    const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -494,6 +496,15 @@ export function BookingsScreen({ navigation }: any) {
                                                     <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
                                                 </TouchableOpacity>
                                             )}
+                                            {booking.status === 'completed' && activeTab === 'history' && (
+                                                <TouchableOpacity
+                                                    style={styles.reviewButton}
+                                                    onPress={() => setReviewBooking(booking)}
+                                                >
+                                                    <AppIcon name="star" size={16} color="#FFFFFF" />
+                                                    <Text style={styles.reviewButtonText}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     ))}
                                 </View>
@@ -502,6 +513,15 @@ export function BookingsScreen({ navigation }: any) {
                     </View>
                 </View>
             </Modal>
+            <ReviewPromptModal
+                visible={!!reviewBooking}
+                appointment={reviewBooking}
+                onClose={() => setReviewBooking(null)}
+                onSuccess={() => {
+                    setReviewBooking(null);
+                    loadBookings();
+                }}
+            />
         </View>
     );
 }
@@ -725,6 +745,22 @@ const styles = StyleSheet.create({
     },
     cancelButtonText: {
         color: '#EF4444',
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+    },
+    reviewButton: {
+        marginTop: spacing.sm,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: spacing.xs,
+    },
+    reviewButtonText: {
+        color: '#FFFFFF',
         fontSize: fontSize.sm,
         fontWeight: '600',
     },

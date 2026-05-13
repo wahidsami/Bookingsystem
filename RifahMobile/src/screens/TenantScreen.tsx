@@ -15,6 +15,19 @@ interface TenantDetailsProps {
     navigation: any;
 }
 
+type TenantReview = {
+    id: string;
+    rating: number;
+    comment?: string | null;
+    customerName?: string | null;
+    staffReply?: string | null;
+    createdAt: string;
+    staff?: {
+        id: string;
+        name?: string | null;
+    } | null;
+};
+
 const { width } = Dimensions.get('window');
 
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
@@ -33,6 +46,9 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showProductsTab, setShowProductsTab] = useState(false);
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
+    const [reviews, setReviews] = useState<TenantReview[]>([]);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[]; variants?: ServiceVariant[] }) | null>(null);
     const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
@@ -151,6 +167,34 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 if (staffRes.success) setStaff((staffRes.staff || []).map((member) => normalizeStaff(member)));
             } catch {
                 setStaff([]);
+            }
+
+            if (isReviewsEnabled) {
+                try {
+                    setReviewsLoading(true);
+                    const reviewsRes = await api.get<{ success: boolean; reviews: TenantReview[]; summary?: { total: number; avgRating: number | null } }>(
+                        `/public/tenant/${idToFetch}/reviews?limit=30`
+                    );
+                    if (reviewsRes.success) {
+                        const nextReviews = reviewsRes.reviews || [];
+                        setReviews(nextReviews);
+                        setReviewsSummary({
+                            total: reviewsRes.summary?.total || nextReviews.length,
+                            avgRating: reviewsRes.summary?.avgRating ?? null,
+                        });
+                    } else {
+                        setReviews([]);
+                        setReviewsSummary({ total: 0, avgRating: null });
+                    }
+                } catch {
+                    setReviews([]);
+                    setReviewsSummary({ total: 0, avgRating: null });
+                } finally {
+                    setReviewsLoading(false);
+                }
+            } else {
+                setReviews([]);
+                setReviewsSummary({ total: 0, avgRating: null });
             }
 
         } catch (error) {
@@ -566,8 +610,51 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const renderReviews = () => (
         <View style={styles.contentSection}>
-            <Text style={styles.sectionTitle}>Reviews</Text>
-            <Text style={styles.emptyText}>Reviews are not available in the mobile app yet.</Text>
+            <View style={styles.reviewSummaryCard}>
+                <View style={styles.reviewSummaryMetric}>
+                    <Text style={styles.reviewSummaryValue}>{reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : '-'}</Text>
+                    <Text style={styles.reviewSummaryLabel}>{isRTL ? 'المتوسط' : 'Average'}</Text>
+                </View>
+                <View style={styles.reviewSummaryDivider} />
+                <View style={styles.reviewSummaryMetric}>
+                    <Text style={styles.reviewSummaryValue}>{reviewsSummary.total}</Text>
+                    <Text style={styles.reviewSummaryLabel}>{isRTL ? 'عدد التقييمات' : 'Reviews'}</Text>
+                </View>
+            </View>
+
+            {reviewsLoading ? (
+                <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
+            ) : reviews.length === 0 ? (
+                <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
+            ) : (
+                reviews.map((review) => (
+                    <View key={review.id} style={styles.reviewCard}>
+                        <View style={styles.reviewHeader}>
+                            <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
+                            <View style={styles.reviewStarsRow}>
+                                {Array.from({ length: 5 }).map((_, index) => (
+                                    <Text key={`${review.id}-star-${index}`} style={[styles.reviewStar, index < Number(review.rating || 0) ? styles.reviewStarActive : null]}>
+                                        ★
+                                    </Text>
+                                ))}
+                            </View>
+                        </View>
+
+                        {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                        {review.staff?.name ? (
+                            <Text style={styles.reviewStaffName}>
+                                {isRTL ? `مقدم الخدمة: ${review.staff.name}` : `Provider: ${review.staff.name}`}
+                            </Text>
+                        ) : null}
+                        {review.staffReply ? (
+                            <View style={styles.reviewReplyBox}>
+                                <Text style={styles.reviewReplyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
+                                <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
+                            </View>
+                        ) : null}
+                    </View>
+                ))
+            )}
         </View>
     );
 
@@ -935,6 +1022,96 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: colors.text,
         marginBottom: spacing.md,
+    },
+    reviewSummaryCard: {
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    reviewSummaryMetric: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewSummaryDivider: {
+        width: 1,
+        height: 40,
+        backgroundColor: colors.border,
+    },
+    reviewSummaryValue: {
+        fontSize: fontSize.xl,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    reviewSummaryLabel: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+    },
+    reviewCard: {
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginBottom: spacing.sm,
+    },
+    reviewHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    reviewAuthor: {
+        fontSize: fontSize.md,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    reviewStarsRow: {
+        flexDirection: 'row',
+    },
+    reviewStar: {
+        fontSize: fontSize.md,
+        color: '#D1D5DB',
+    },
+    reviewStarActive: {
+        color: '#F59E0B',
+    },
+    reviewComment: {
+        marginTop: spacing.sm,
+        fontSize: fontSize.sm,
+        color: colors.text,
+        lineHeight: 20,
+    },
+    reviewStaffName: {
+        marginTop: spacing.sm,
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+    },
+    reviewReplyBox: {
+        marginTop: spacing.sm,
+        backgroundColor: '#F9FAFB',
+        borderRadius: borderRadius.md,
+        padding: spacing.sm,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    reviewReplyLabel: {
+        fontSize: fontSize.xs,
+        color: colors.primary,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    reviewReplyText: {
+        fontSize: fontSize.sm,
+        color: colors.text,
+        lineHeight: 18,
     },
     categorySection: {
         marginBottom: spacing.lg,

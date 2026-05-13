@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const paymentMethodController = require('../controllers/paymentMethodController');
+const reviewController = require('../controllers/reviewController');
 const { authenticateUser } = require('../middleware/authUser');
 
 // Get user profile
@@ -31,6 +32,7 @@ router.get('/bookings', authenticateUser, userController.getUserBookings);
 
 // Get services history
 router.get('/services-history', authenticateUser, userController.getServicesHistory);
+router.post('/reviews', authenticateUser, reviewController.createCustomerReview);
 
 // Payment Methods
 router.get('/payment-methods', authenticateUser, paymentMethodController.getPaymentMethods);
