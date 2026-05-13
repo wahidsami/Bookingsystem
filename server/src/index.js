@@ -560,6 +560,43 @@ const ensureAppointmentSchema = async () => {
     }
 };
 
+const ensurePlatformUserAuthSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'platform_users'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(24) NOT NULL DEFAULT 'local';
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NULL;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS google_email VARCHAR(255) NULL;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255) NULL;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP WITH TIME ZONE NULL;
+            END $$;
+        `);
+
+        console.log('Platform user auth schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure platform user auth schema:', error);
+        throw error;
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -592,6 +629,7 @@ const startServer = async () => {
         await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
 
         await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
+        await ensurePlatformUserAuthSchema();
         await db.PaymentMethod.sync({ force: false });
         await db.User.sync({ force: false });
         await db.Service.sync({ force: false });

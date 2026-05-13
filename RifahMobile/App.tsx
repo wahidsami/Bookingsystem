@@ -11,6 +11,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { GoogleOnboardingScreen } from './src/screens/GoogleOnboardingScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { LanguageProvider, useLanguage } from './src/contexts/LanguageContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { ServiceBookingCartProvider } from './src/contexts/ServiceBookingCartContext';
@@ -25,7 +26,7 @@ import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
 import { navigationRef, navigateToAppointmentInvite, navigateToNotifications } from './src/navigation/navigationService';
 
-type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'googleOnboarding' | 'forgotPassword' | 'home';
+type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'googleOnboarding' | 'forgotPassword' | 'resetPassword' | 'home';
 
 // Load Cairo fonts
 const loadFonts = async () => {
@@ -50,6 +51,7 @@ function AppContent() {
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+  const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
 
   const extractInviteToken = (url: string | null | undefined): string | null => {
     if (!url) return null;
@@ -57,6 +59,15 @@ function AppContent() {
     const deepLinkMatch = decoded.match(/appointment-invite\/([^/?#]+)/i);
     if (deepLinkMatch?.[1]) return deepLinkMatch[1];
     const queryMatch = decoded.match(/[?&]inviteToken=([^&#]+)/i) || decoded.match(/[?&]token=([^&#]+)/i);
+    return queryMatch?.[1] || null;
+  };
+
+  const extractPasswordResetToken = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    const decoded = decodeURIComponent(url);
+    const pathMatch = decoded.match(/reset-password\/([^/?#]+)/i);
+    if (pathMatch?.[1]) return pathMatch[1];
+    const queryMatch = decoded.match(/[?&]token=([^&#]+)/i);
     return queryMatch?.[1] || null;
   };
 
@@ -74,6 +85,13 @@ function AppContent() {
 
   useEffect(() => {
     const handleUrl = (url?: string | null) => {
+      const resetToken = extractPasswordResetToken(url);
+      if (resetToken) {
+        setPasswordResetToken(resetToken);
+        setCurrentScreen('resetPassword');
+        return;
+      }
+
       const token = extractInviteToken(url);
       if (!token) return;
       setPendingInviteToken(token);
@@ -286,6 +304,16 @@ function AppContent() {
           <ForgotPasswordScreen
             onBackToLogin={() => setCurrentScreen('login')}
             onBackToWelcome={() => setCurrentScreen('welcome')}
+          />
+          <StatusBar style="dark" />
+        </>
+      ) : null}
+
+      {currentScreen === 'resetPassword' ? (
+        <>
+          <ResetPasswordScreen
+            token={passwordResetToken || ''}
+            onBackToLogin={() => setCurrentScreen('login')}
           />
           <StatusBar style="dark" />
         </>

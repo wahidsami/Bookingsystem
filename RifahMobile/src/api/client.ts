@@ -1183,6 +1183,12 @@ class ApiClient {
         });
     }
 
+    async resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
+        return this.post<{ success: boolean; message: string }>(`/auth/user/reset-password/${encodeURIComponent(token)}`, {
+            password,
+        });
+    }
+
     async googleStart(idToken: string): Promise<GoogleStartResponse> {
         return this.post<GoogleStartResponse>('/auth/user/google/start', { idToken });
     }

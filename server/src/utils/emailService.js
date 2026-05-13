@@ -4,7 +4,8 @@ const path = require('path');
 const {
     getServerPublicUrl,
     getTenantDashboardLoginUrl,
-    getStaffAppLoginUrl
+    getStaffAppLoginUrl,
+    getCustomerAppResetUrl
 } = require('./url');
 
 /**
@@ -394,6 +395,20 @@ const sendStaffPasswordResetEmail = async ({ email, staffName, tenantName, tempo
     });
 };
 
+const sendCustomerPasswordResetEmail = async ({ email, firstName, resetUrl, expiresInMinutes = 60 }) => {
+    const passwordResetUrl = resetUrl || getCustomerAppResetUrl('');
+    return sendEmail({
+        to: email,
+        subject: 'Rifah customer app password reset',
+        template: 'customer_password_reset',
+        data: {
+            firstName: firstName || 'Customer',
+            resetUrl: passwordResetUrl,
+            expiresInMinutes: String(expiresInMinutes)
+        }
+    });
+};
+
 module.exports = {
     sendEmail,
     sendWelcomeEmail,
@@ -405,5 +420,6 @@ module.exports = {
     sendPaymentFailedEmail,
     sendStaffInviteEmail,
     sendDashboardAccountInviteEmail,
-    sendStaffPasswordResetEmail
+    sendStaffPasswordResetEmail,
+    sendCustomerPasswordResetEmail
 };

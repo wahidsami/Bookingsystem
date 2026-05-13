@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../models');
+const emailService = require('../utils/emailService');
+const { getCustomerAppResetUrl } = require('../utils/url');
 
 // Use environment variables, with validation to happen at startup
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -27,6 +29,7 @@ const TEST_OTP_ENABLED = `${process.env.ALLOW_TEST_OTP || ''}`.toLowerCase() ===
 const TEST_OTP_CODE = `${process.env.TEST_OTP_CODE || '1234'}`;
 const GOOGLE_OTP_TTL_MS = Math.max(60_000, Number.parseInt(process.env.GOOGLE_OTP_TTL_MS || '', 10) || (10 * 60 * 1000));
 const GOOGLE_OTP_MAX_ATTEMPTS = Math.max(1, Number.parseInt(process.env.GOOGLE_OTP_MAX_ATTEMPTS || '', 10) || 5);
+const PASSWORD_RESET_TTL_MS = Math.max(5 * 60 * 1000, Number.parseInt(process.env.PASSWORD_RESET_TTL_MS || '', 10) || (60 * 60 * 1000));
 
 /**
  * User Authentication Service
@@ -646,11 +649,20 @@ class UserAuthService {
 
         // Generate reset token
         const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
 
-        await user.update({ emailVerificationToken: resetToken });
+        await user.update({
+            passwordResetToken: resetToken,
+            passwordResetTokenExpiresAt: resetExpiresAt
+        });
 
-        // TODO: Send password reset email
-        // await emailService.sendPasswordResetEmail(user.email, resetToken);
+        const resetUrl = getCustomerAppResetUrl(resetToken);
+        await emailService.sendCustomerPasswordResetEmail({
+            email: user.email,
+            firstName: user.firstName,
+            resetUrl,
+            expiresInMinutes: Math.floor(PASSWORD_RESET_TTL_MS / 60000)
+        });
 
         return { message: 'If the email exists, a reset link has been sent' };
     }
@@ -660,16 +672,21 @@ class UserAuthService {
      */
     async resetPassword(token, newPassword) {
         const user = await db.PlatformUser.findOne({
-            where: { emailVerificationToken: token }
+            where: { passwordResetToken: token }
         });
 
         if (!user) {
             throw new Error('Invalid or expired reset token');
         }
 
+        if (!user.passwordResetTokenExpiresAt || new Date(user.passwordResetTokenExpiresAt).getTime() < Date.now()) {
+            throw new Error('Invalid or expired reset token');
+        }
+
         await user.update({
             password: newPassword, // Will be hashed by model hook
-            emailVerificationToken: null
+            passwordResetToken: null,
+            passwordResetTokenExpiresAt: null
         });
 
         return { message: 'Password reset successfully' };

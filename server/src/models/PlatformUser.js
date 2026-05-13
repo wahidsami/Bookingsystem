@@ -207,6 +207,16 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: true
         },
+        passwordResetToken: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            field: 'password_reset_token'
+        },
+        passwordResetTokenExpiresAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            field: 'password_reset_token_expires_at'
+        },
         phoneVerificationCode: {
             type: DataTypes.STRING,
             allowNull: true
