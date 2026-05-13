@@ -5,7 +5,6 @@
 
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
-const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
@@ -81,55 +80,29 @@ function getTenantAppointmentIncludes() {
  */
 exports.getDashboardSummary = async (req, res) => {
     try {
-        const tenantId = req.tenantId;
-        const { startDate, endDate } = req.query;
+        const financialResponse = await runHandler(tenantFinancialController.getFinancialOverview, req);
+        if (!financialResponse?.success || !financialResponse?.overview) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to generate dashboard summary'
+            });
+        }
 
-        // Get all appointments with services for this tenant
-        const appointments = await db.Appointment.findAll({
-            where: {
-                ...buildTenantAppointmentScope(tenantId),
-                ...buildDateRangeWhere('startTime', startDate, endDate)
-            },
-            include: getTenantAppointmentIncludes(),
-            attributes: ['id', 'status', 'price', 'paymentStatus', 'startTime', 'platformUserId', 'tenantId'],
-            subQuery: false
-        });
-
-        // Calculate metrics
-        const totalBookings = appointments.length;
-        const completedBookings = appointments.filter(a => a.status === 'completed').length;
-        const cancelledBookings = appointments.filter(a => a.status === 'cancelled').length;
-        const noShowBookings = appointments.filter(a => a.status === 'no_show').length;
-        
-        const completedAppointments = appointments.filter(a => a.status === 'completed');
-        const totalRevenue = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
-        const paidRevenue = completedAppointments.filter(a => isAppointmentFullyPaid(a.paymentStatus))
-            .reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
-        const pendingRevenue = completedAppointments.filter(a => a.paymentStatus === 'pending')
-            .reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
-
-        // Unique customers
-        const uniqueCustomers = [...new Set(appointments.map(a => a.platformUserId).filter(Boolean))].length;
-
-        // Completion rate
-        const completionRate = totalBookings > 0 ? ((completedBookings / totalBookings) * 100).toFixed(1) : 0;
-
-        // Average booking value
-        const avgBookingValue = completedBookings > 0 ? (totalRevenue / completedBookings).toFixed(2) : 0;
+        const overview = financialResponse.overview;
 
         res.json({
             success: true,
             data: {
-                totalBookings,
-                completedBookings,
-                cancelledBookings,
-                noShowBookings,
-                totalRevenue,
-                paidRevenue,
-                pendingRevenue,
-                uniqueCustomers,
-                completionRate,
-                avgBookingValue
+                totalBookings: Number(overview.totalBookings || 0),
+                completedBookings: Number(overview.completedBookings || 0),
+                cancelledBookings: Number(overview.cancelledBookings || 0),
+                noShowBookings: Number(overview.noShowBookings || 0),
+                totalRevenue: Number(overview.totalRevenue || 0),
+                paidRevenue: Number(overview.totalRevenue || 0),
+                pendingRevenue: Number(overview.pendingPayments || 0),
+                uniqueCustomers: Number(overview.uniqueCustomers || 0),
+                completionRate: Number(overview.completionRate || 0),
+                avgBookingValue: Number(overview.avgBookingValue || 0)
             }
         });
 

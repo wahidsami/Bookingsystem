@@ -49,6 +49,33 @@ function buildDateRangeWhere(field, startDate, endDate) {
     };
 }
 
+function buildTenantAppointmentScope(tenantId) {
+    return {
+        [Op.or]: [
+            { tenantId },
+            { '$service.tenantId$': tenantId },
+            { '$staff.tenantId$': tenantId }
+        ]
+    };
+}
+
+function getTenantAppointmentIncludes() {
+    return [
+        {
+            model: db.Service,
+            as: 'service',
+            attributes: ['id', 'tenantId'],
+            required: false
+        },
+        {
+            model: db.Staff,
+            as: 'staff',
+            attributes: ['id', 'tenantId'],
+            required: false
+        }
+    ];
+}
+
 /**
  * Get financial overview/summary
  * GET /api/v1/tenant/financial/overview
@@ -64,25 +91,30 @@ exports.getFinancialOverview = async (req, res) => {
         // Build date filter for orders
         const orderDateFilter = buildDateRangeWhere('createdAt', startDate, endDate);
 
-        // Get completed appointments with financials
+        // Get all appointments for KPI counters (status distribution, unique customers, completion rate)
+        const allAppointments = await db.Appointment.findAll({
+            where: {
+                ...buildTenantAppointmentScope(tenantId),
+                ...dateFilter
+            },
+            include: getTenantAppointmentIncludes(),
+            attributes: ['id', 'status', 'platformUserId', 'startTime', 'tenantId'],
+            subQuery: false
+        });
+
+        // Get monetized appointments with financials
         const appointments = await db.Appointment.findAll({
             where: {
+                ...buildTenantAppointmentScope(tenantId),
                 ...dateFilter,
                 status: { [Op.in]: ['completed', 'confirmed'] }
             },
-            include: [
-                {
-                    model: db.Service,
-                    as: 'service',
-                    where: { tenantId },
-                    attributes: ['id'],
-                    required: true
-                }
-            ],
+            include: getTenantAppointmentIncludes(),
             attributes: [
                 'id', 'price', 'rawPrice', 'taxAmount', 'platformFee', 
-                'tenantRevenue', 'employeeCommission', 'paymentStatus', 'status'
-            ]
+                'tenantRevenue', 'employeeCommission', 'paymentStatus', 'status', 'platformUserId', 'startTime', 'tenantId'
+            ],
+            subQuery: false
         });
 
         // Get product orders with financials
@@ -112,7 +144,7 @@ exports.getFinancialOverview = async (req, res) => {
             totalPlatformFees: 0,
             totalTenantRevenue: 0,
             totalEmployeeCommissions: 0,
-            totalBookings: appointments.length,
+            totalBookings: allAppointments.length,
             paidBookings: 0,
             pendingPayments: 0,
             completedBookings: 0
@@ -186,6 +218,15 @@ exports.getFinancialOverview = async (req, res) => {
             pendingPayments: appointmentTotals.pendingPayments + orderTotals.pendingPayments,
             completedBookings: appointmentTotals.completedBookings,
             completedOrders: orderTotals.completedOrders,
+            cancelledBookings: allAppointments.filter((appt) => appt.status === 'cancelled').length,
+            noShowBookings: allAppointments.filter((appt) => appt.status === 'no_show').length,
+            uniqueCustomers: [...new Set(allAppointments.map((appt) => appt.platformUserId).filter(Boolean))].length,
+            completionRate: allAppointments.length > 0
+                ? parseFloat(((allAppointments.filter((appt) => appt.status === 'completed').length / allAppointments.length) * 100).toFixed(1))
+                : 0,
+            avgBookingValue: allAppointments.filter((appt) => appt.status === 'completed').length > 0
+                ? parseFloat((appointmentTotals.totalRevenue / allAppointments.filter((appt) => appt.status === 'completed').length).toFixed(2))
+                : 0,
             // Separate breakdowns
             appointmentRevenue: appointmentTotals.totalRevenue,
             orderRevenue: orderTotals.totalRevenue,
@@ -198,7 +239,9 @@ exports.getFinancialOverview = async (req, res) => {
             if (typeof overview[key] === 'number' && 
                 key !== 'totalBookings' && key !== 'totalOrders' &&
                 key !== 'paidBookings' && key !== 'paidOrders' &&
-                key !== 'completedBookings' && key !== 'completedOrders') {
+                key !== 'completedBookings' && key !== 'completedOrders' &&
+                key !== 'cancelledBookings' && key !== 'noShowBookings' &&
+                key !== 'uniqueCustomers') {
                 overview[key] = parseFloat(overview[key].toFixed(2));
             }
         });
