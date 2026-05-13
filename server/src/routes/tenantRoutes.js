@@ -196,6 +196,7 @@ router.post('/notifications/send', checkTenantFeature('inAppMarketingNotificatio
 router.get('/notifications/history', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistory);
 router.get('/notifications/history/:id', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryDetail);
 router.get('/notifications/history/:id/recipients', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryRecipients);
+router.get('/notifications/delivery-logs', tenantNotificationController.getDeliveryLogs);
 
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);

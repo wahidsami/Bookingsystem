@@ -275,3 +275,113 @@ exports.getPushHistoryRecipients = async (req, res) => {
         return res.status(500).json({ success: false, message: error.message });
     }
 };
+
+exports.getDeliveryLogs = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        if (!tenantId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const { page, limit, offset } = parsePage(req.query);
+        const {
+            recipientType,
+            channel,
+            status,
+            eventType,
+            recipientId,
+            from,
+            to
+        } = req.query || {};
+
+        const where = { tenantId };
+
+        if (recipientType && ['customer', 'staff'].includes(String(recipientType))) {
+            where.recipientType = String(recipientType);
+        }
+        if (channel && ['push', 'inbox', 'staff_message'].includes(String(channel))) {
+            where.channel = String(channel);
+        }
+        if (status && ['queued', 'sent', 'failed', 'skipped'].includes(String(status))) {
+            where.status = String(status);
+        }
+        if (eventType && typeof eventType === 'string') {
+            where.eventType = { [Op.iLike]: `%${eventType.trim()}%` };
+        }
+        if (recipientId && typeof recipientId === 'string') {
+            where.recipientId = recipientId.trim();
+        }
+
+        if (from || to) {
+            where.createdAt = {};
+            if (from) {
+                const parsedFrom = new Date(from);
+                if (!Number.isNaN(parsedFrom.getTime())) {
+                    where.createdAt[Op.gte] = parsedFrom;
+                }
+            }
+            if (to) {
+                const parsedTo = new Date(to);
+                if (!Number.isNaN(parsedTo.getTime())) {
+                    where.createdAt[Op.lte] = parsedTo;
+                }
+            }
+        }
+
+        const { count, rows } = await db.NotificationDeliveryLog.findAndCountAll({
+            where,
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset
+        });
+
+        const logs = rows.map((row) => row.toJSON());
+
+        const statusGroups = await db.NotificationDeliveryLog.findAll({
+            where,
+            attributes: [
+                'status',
+                [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
+            ],
+            group: ['status'],
+            raw: true
+        });
+
+        const channelGroups = await db.NotificationDeliveryLog.findAll({
+            where,
+            attributes: [
+                'channel',
+                [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
+            ],
+            group: ['channel'],
+            raw: true
+        });
+
+        const summary = {
+            total: count,
+            byStatus: statusGroups.reduce((acc, item) => {
+                acc[item.status] = Number(item.count || 0);
+                return acc;
+            }, {}),
+            byChannel: channelGroups.reduce((acc, item) => {
+                acc[item.channel] = Number(item.count || 0);
+                return acc;
+            }, {})
+        };
+
+        return res.json({
+            success: true,
+            logs,
+            summary,
+            pagination: {
+                total: count,
+                page,
+                limit,
+                totalPages: Math.ceil(count / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Get notification delivery logs error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
