@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
+import { getProductStockTone, type ProductFilterMode } from "@/lib/productHelpers";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -38,19 +39,6 @@ interface Product {
   usedAsGiftCount: number;
   createdAt: string;
 }
-
-type ProductFilterMode =
-  | "all"
-  | "available"
-  | "unavailable"
-  | "featured"
-  | "in_stock"
-  | "low_stock"
-  | "out_of_stock"
-  | "az"
-  | "za"
-  | "newest"
-  | "oldest";
 
 export default function ProductsPage() {
   const dialog = useAppDialog();
@@ -462,7 +450,7 @@ export default function ProductsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">{t("stock")}</span>
-                  <span className={`font-semibold ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  <span className={`font-semibold ${getProductStockTone(Number(product.stock || 0))}`}>
                     {product.stock} {t("units")}
                   </span>
                 </div>

@@ -27,71 +27,71 @@ Bring `Products` pages to the same UX/architecture level as `Services` pages:
 ## Implementation Strategy
 
 ## Phase 1: Shared UX Baseline for Products Main Page
-- [ ] Introduce products filter mode model like services:
+- [x] Introduce products filter mode model like services:
   - `all`, `available`, `unavailable`, `featured`, `in_stock`, `low_stock`, `out_of_stock`, `az`, `za`, `newest`, `oldest`
-- [ ] Move filtering/sorting to client `useMemo` pipeline (like services) after loading product list.
-- [ ] Add category chip strip with counts (same interaction pattern as services categories).
-- [ ] Keep search local and instant (no API reload on each keystroke).
-- [ ] Preserve API query support but default to single load + local filtering for responsiveness.
+- [x] Move filtering/sorting to client `useMemo` pipeline (like services) after loading product list.
+- [x] Add category chip strip with counts (same interaction pattern as services categories).
+- [x] Keep search local and instant (no API reload on each keystroke).
+- [x] Preserve API query support but default to single load + local filtering for responsiveness.
 
 ## Phase 2: Products Main Page Action Parity
-- [ ] Add active toggle action with confirmation dialog (`isAvailable` toggle) matching service status toggle UX.
-- [ ] Standardize action buttons to icon style:
+- [x] Add active toggle action with confirmation dialog (`isAvailable` toggle) matching service status toggle UX.
+- [x] Standardize action buttons to icon style:
   - edit
   - availability toggle
   - delete
-- [ ] Replace browser `alert` with app dialogs (`useAppDialog`) for all product actions.
-- [ ] Add consistent success/failure dialog copy in EN/AR.
-- [ ] Ensure subscription limit presentation matches services visual pattern.
+- [x] Replace browser `alert` with app dialogs (`useAppDialog`) for all product actions.
+- [x] Add consistent success/failure dialog copy in EN/AR.
+- [x] Ensure subscription limit presentation matches services visual pattern.
 
 ## Phase 3: Products Main Page Visual Parity
-- [ ] Upgrade header/tooling section to match services hierarchy.
-- [ ] Align card structure with services density and metadata badges:
+- [x] Upgrade header/tooling section to match services hierarchy.
+- [x] Align card structure with services density and metadata badges:
   - availability badge
   - stock status badge
   - featured badge
   - category tag
-- [ ] Improve empty state and CTA consistency with services style.
-- [ ] Remove emoji-based labels and use icon components for consistency.
+- [x] Improve empty state and CTA consistency with services style.
+- [x] Remove emoji-based labels and use icon components for consistency.
 
 ## Phase 4: New Product Page Structural Refactor
-- [ ] Create product editor shell components mirroring service architecture:
+- [x] Create product editor shell components mirroring service architecture:
   - `ProductEditorFrame`
   - `ProductEditorSection`
-- [ ] Split form into sections:
+- [x] Split form into sections:
   - basic info
   - pricing and stock
   - merchandising (brand/size/color/category)
   - content (description/features/ingredients/how-to-use)
   - media
   - availability and fulfillment
-- [ ] Add section progress summary and click-to-scroll section navigation.
-- [ ] Keep AI helper block, but reposition into clear section with mode state and feedback.
+- [x] Add section progress summary and click-to-scroll section navigation.
+- [x] Keep AI helper block, but reposition into clear section with mode state and feedback.
 
 ## Phase 5: New Product Page Behavior Parity
-- [ ] Preserve current product-specific validations:
+- [x] Preserve current product-specific validations:
   - at least one image
   - max images (current max = 5)
   - stock and price constraints
-- [ ] Standardize submit error/success handling (dialog + inline message strategy as used in services).
-- [ ] Improve cancel/back behavior consistency with services pattern.
-- [ ] Ensure form field defaults and persistence behavior are predictable after failed submit.
+- [x] Standardize submit error/success handling (dialog + inline message strategy as used in services).
+- [x] Improve cancel/back behavior consistency with services pattern.
+- [x] Ensure form field defaults and persistence behavior are predictable after failed submit.
 
 ## Phase 6: Optional Reuse and Cleanup
-- [ ] Extract shared helper patterns for services/products:
+- [x] Extract shared helper patterns for services/products:
   - sort and filter option rendering
   - status badges
   - image fallback behavior
-- [ ] Normalize category source:
+- [x] Normalize category source:
   - short term: keep existing product categories list
   - future: move to backend-driven product categories (like services categories).
 
 ## Acceptance Criteria
-- [ ] Products main page feels functionally equivalent to services main page in filtering, sorting, actions, and visual quality.
-- [ ] New product page uses sectioned editor flow with progress/anchors similar to new service page.
-- [ ] No regression in product creation payload and image upload behavior.
-- [ ] EN/AR layout and copy quality preserved (RTL/LTR behavior intact).
-- [ ] Tenant build passes.
+- [x] Products main page feels functionally equivalent to services main page in filtering, sorting, actions, and visual quality.
+- [x] New product page uses sectioned editor flow with progress/anchors similar to new service page.
+- [x] No regression in product creation payload and image upload behavior.
+- [x] EN/AR layout and copy quality preserved (RTL/LTR behavior intact).
+- [x] Tenant build passes.
 
 ## Rollout Plan
 1. Refactor `products/page.tsx` first (safe, high-impact UX).
@@ -110,3 +110,4 @@ Bring `Products` pages to the same UX/architecture level as `Services` pages:
 ## Notes
 - Keep backend API contract unchanged in this phase.
 - This is a UI/UX and frontend architecture parity pass, not a pricing engine rewrite.
+- Product categories are now normalized through shared frontend helpers; backend-driven categories can be added later without blocking this release.

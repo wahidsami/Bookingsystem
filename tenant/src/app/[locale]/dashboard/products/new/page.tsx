@@ -7,17 +7,9 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
+import { DEFAULT_PRODUCT_CATEGORIES } from "@/lib/productHelpers";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
 import { ServiceEditorFrame, type ServiceEditorSection } from "@/components/ServiceEditorFrame";
-
-const CATEGORIES = [
-  "Hair Care",
-  "Skin Care",
-  "Makeup",
-  "Fragrance",
-  "Tools & Accessories",
-  "General"
-];
 
 export default function NewProductPage() {
   const t = useTranslations("Products");
@@ -577,7 +569,7 @@ export default function NewProductPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
-                    {CATEGORIES.map(cat => (
+                    {DEFAULT_PRODUCT_CATEGORIES.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
