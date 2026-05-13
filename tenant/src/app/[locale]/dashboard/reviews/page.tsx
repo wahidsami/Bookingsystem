@@ -22,6 +22,7 @@ interface ReviewRecord {
 }
 
 type FilterTab = "all" | "visible" | "hidden";
+type QuickFilter = "none" | "needs_reply" | "low_rated";
 
 export default function ReviewsPage() {
     const t = useTranslations("Reviews");
@@ -37,6 +38,12 @@ export default function ReviewsPage() {
     const [replyingToId, setReplyingToId] = useState<string | null>(null);
     const [replyDraft, setReplyDraft] = useState("");
     const [submittingReply, setSubmittingReply] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedStaffId, setSelectedStaffId] = useState<string>("all");
+    const [selectedRating, setSelectedRating] = useState<string>("all");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [quickFilter, setQuickFilter] = useState<QuickFilter>("none");
 
     useEffect(() => {
         loadReviews();
@@ -103,9 +110,46 @@ export default function ReviewsPage() {
         }
     };
 
-    const filteredReviews = reviews.filter(r => {
-        if (filter === "visible") return r.isVisible;
-        if (filter === "hidden") return !r.isVisible;
+    const staffOptions = Array.from(
+        new Map(
+            reviews
+                .filter((r) => r.staff?.id && r.staff?.name)
+                .map((r) => [r.staff!.id, r.staff!.name])
+        ).entries()
+    ).map(([id, name]) => ({ id, name }));
+
+    const filteredReviews = reviews.filter((r) => {
+        if (filter === "visible" && !r.isVisible) return false;
+        if (filter === "hidden" && r.isVisible) return false;
+
+        if (selectedStaffId !== "all" && r.staff?.id !== selectedStaffId) return false;
+        if (selectedRating !== "all" && String(r.rating) !== selectedRating) return false;
+
+        if (quickFilter === "needs_reply" && !!r.staffReply) return false;
+        if (quickFilter === "low_rated" && r.rating > 3) return false;
+
+        if (dateFrom) {
+            const from = new Date(`${dateFrom}T00:00:00`);
+            if (new Date(r.createdAt) < from) return false;
+        }
+        if (dateTo) {
+            const to = new Date(`${dateTo}T23:59:59`);
+            if (new Date(r.createdAt) > to) return false;
+        }
+
+        if (searchTerm.trim()) {
+            const needle = searchTerm.trim().toLowerCase();
+            const haystack = [
+                r.customerName || "",
+                r.comment || "",
+                r.staff?.name || "",
+                r.staffReply || "",
+            ]
+                .join(" ")
+                .toLowerCase();
+            if (!haystack.includes(needle)) return false;
+        }
+
         return true;
     });
 
@@ -120,6 +164,10 @@ export default function ReviewsPage() {
         { key: "visible", label: t("visible") || "Visible", count: reviews.filter(r => r.isVisible).length },
         { key: "hidden", label: t("hidden") || "Hidden", count: reviews.filter(r => !r.isVisible).length },
     ];
+
+    const repliedCount = reviews.filter((r) => !!r.staffReply).length;
+    const needsReplyCount = reviews.filter((r) => !r.staffReply).length;
+    const lowRatedCount = reviews.filter((r) => r.rating <= 3).length;
 
     return (
         <TenantLayout>
@@ -169,6 +217,92 @@ export default function ReviewsPage() {
                             {tab.label} ({tab.count})
                         </button>
                     ))}
+                </div>
+            </div>
+
+            {/* Advanced Filters */}
+            <div className="card mb-6 p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-6">
+                    <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder={locale === "ar" ? "بحث في الاسم أو التعليق..." : "Search name or comment..."}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 lg:col-span-2"
+                    />
+                    <select
+                        value={selectedStaffId}
+                        onChange={(e) => setSelectedStaffId(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                    >
+                        <option value="all">{locale === "ar" ? "كل الموظفين" : "All Staff"}</option>
+                        {staffOptions.map((staff) => (
+                            <option key={staff.id} value={staff.id}>{staff.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={selectedRating}
+                        onChange={(e) => setSelectedRating(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                    >
+                        <option value="all">{locale === "ar" ? "كل التقييمات" : "All Ratings"}</option>
+                        {[5, 4, 3, 2, 1].map((value) => (
+                            <option key={value} value={String(value)}>{value} ★</option>
+                        ))}
+                    </select>
+                    <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                    />
+                    <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                    />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setQuickFilter("none")}
+                        className={`rounded-full px-3 py-1 text-xs font-medium border ${quickFilter === "none" ? "bg-primary-100 text-primary-700 border-primary-200" : "bg-white text-gray-600 border-gray-200"}`}
+                    >
+                        {locale === "ar" ? "بدون فلتر سريع" : "No quick filter"}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setQuickFilter("needs_reply")}
+                        className={`rounded-full px-3 py-1 text-xs font-medium border ${quickFilter === "needs_reply" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-white text-gray-600 border-gray-200"}`}
+                    >
+                        {locale === "ar" ? `تحتاج رد (${needsReplyCount})` : `Needs reply (${needsReplyCount})`}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setQuickFilter("low_rated")}
+                        className={`rounded-full px-3 py-1 text-xs font-medium border ${quickFilter === "low_rated" ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-white text-gray-600 border-gray-200"}`}
+                    >
+                        {locale === "ar" ? `منخفضة (${lowRatedCount})` : `Low rated (${lowRatedCount})`}
+                    </button>
+                    <span className="text-xs text-gray-500 ml-auto">
+                        {locale === "ar"
+                            ? `تم الرد على ${repliedCount} من أصل ${reviews.length}`
+                            : `${repliedCount} / ${reviews.length} have replies`}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSearchTerm("");
+                            setSelectedStaffId("all");
+                            setSelectedRating("all");
+                            setDateFrom("");
+                            setDateTo("");
+                            setQuickFilter("none");
+                        }}
+                        className="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                        {locale === "ar" ? "تصفير الفلاتر" : "Reset filters"}
+                    </button>
                 </div>
             </div>
 

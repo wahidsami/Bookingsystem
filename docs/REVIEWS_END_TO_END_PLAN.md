@@ -40,8 +40,8 @@ Build a complete reviews system across:
 - [ ] Commit + push
 
 ### Phase 4: Tenant Dashboard Improvements
-- [ ] Advanced filters (rating/staff/date/visibility)
-- [ ] Reply/edit reply UX polish
+- [x] Advanced filters (rating/staff/date/visibility)
+- [x] Reply/edit reply UX polish
 - [ ] Dashboard alert on new review
 - [ ] Commit + push
 
