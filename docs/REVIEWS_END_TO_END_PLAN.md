@@ -33,9 +33,9 @@ Build a complete reviews system across:
 - [ ] Commit + push
 
 ### Phase 3: Customer Staff Profile + Review UX
-- [ ] Add customer-facing staff profile page
-- [ ] Show staff bio/skills/rating/reviews
-- [ ] Add "Write review" entry from eligible completed appointments
+- [x] Add customer-facing staff profile page
+- [x] Show staff bio/skills/rating/reviews
+- [x] Add "Write review" entry from eligible completed appointments
 - [ ] Add duplicate-review prevention UX
 - [ ] Commit + push
 

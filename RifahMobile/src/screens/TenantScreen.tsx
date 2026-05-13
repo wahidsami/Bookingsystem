@@ -28,6 +28,15 @@ type TenantReview = {
     } | null;
 };
 
+type StaffReview = {
+    id: string;
+    rating: number;
+    comment?: string | null;
+    customerName?: string | null;
+    staffReply?: string | null;
+    createdAt: string;
+};
+
 const { width } = Dimensions.get('window');
 
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
@@ -52,6 +61,10 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[]; variants?: ServiceVariant[] }) | null>(null);
     const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
+    const [selectedProvider, setSelectedProvider] = useState<Staff | null>(null);
+    const [providerReviews, setProviderReviews] = useState<StaffReview[]>([]);
+    const [providerReviewsLoading, setProviderReviewsLoading] = useState(false);
+    const [providerReviewsSummary, setProviderReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
     const { itemCount, addToCart, clearCart } = useCart();
     const { itemCount: serviceBookingItemCount } = useServiceBookingCart();
 
@@ -360,6 +373,30 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         }
 
         setSelectedServiceDetails(service);
+    };
+
+    const openProviderProfile = async (provider: Staff) => {
+        setSelectedProvider(provider);
+        setProviderReviews([]);
+        setProviderReviewsSummary({ total: 0, avgRating: null });
+        try {
+            setProviderReviewsLoading(true);
+            const response = await api.get<{ success: boolean; reviews: StaffReview[]; summary?: { total: number; avgRating: number | null } }>(
+                `/public/staff/${provider.id}/reviews?limit=20`
+            );
+            if (response.success) {
+                const reviews = response.reviews || [];
+                setProviderReviews(reviews);
+                setProviderReviewsSummary({
+                    total: response.summary?.total || reviews.length,
+                    avgRating: response.summary?.avgRating ?? null,
+                });
+            }
+        } catch (error) {
+            console.warn('Failed to load provider reviews:', error);
+        } finally {
+            setProviderReviewsLoading(false);
+        }
     };
 
     const handleBookService = (service: Service, staff?: Staff | null, variant?: ServiceVariant | null) => {
@@ -865,11 +902,18 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                                             {employee.skills.join(' • ')}
                                                         </Text>
                                                     ) : null}
-                                                    <TouchableOpacity style={styles.employeeBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService, employee)}>
-                                                        <Text style={styles.employeeBookButtonText}>
-                                                            {isRTL ? 'احجز مع هذا المتخصص' : 'Book with this Professional'}
-                                                        </Text>
-                                                    </TouchableOpacity>
+                                                    <View style={styles.employeeActionsRow}>
+                                                        <TouchableOpacity style={styles.employeeProfileButton} onPress={() => openProviderProfile(employee)}>
+                                                            <Text style={styles.employeeProfileButtonText}>
+                                                                {isRTL ? 'عرض الملف' : 'View Profile'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity style={styles.employeeBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService, employee)}>
+                                                            <Text style={styles.employeeBookButtonText}>
+                                                                {isRTL ? 'احجز مع هذا المتخصص' : 'Book with this Professional'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    </View>
                                                 </View>
                                             </View>
                                         );
@@ -883,6 +927,84 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         </View>
                         )
                     ) : null}
+                </View>
+            </Modal>
+
+            <Modal
+                visible={!!selectedProvider}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSelectedProvider(null)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setSelectedProvider(null)} />
+                    <View style={styles.providerModalCard}>
+                        {selectedProvider ? (
+                            <>
+                                <View style={styles.providerModalHeader}>
+                                    <Text style={styles.providerModalTitle}>{selectedProvider.name}</Text>
+                                    <TouchableOpacity onPress={() => setSelectedProvider(null)} style={styles.serviceModalClose}>
+                                        <AppIcon name="close" size={24} color={colors.text} />
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.providerSummaryRow}>
+                                    <View style={styles.providerSummaryBadge}>
+                                        <AppIcon name="star" size={14} color="#D97706" />
+                                        <Text style={styles.providerSummaryText}>
+                                            {providerReviewsSummary.avgRating ? providerReviewsSummary.avgRating.toFixed(1) : (selectedProvider.rating || 0).toFixed(1)}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.providerSummaryBadge}>
+                                        <AppIcon name="bookings" size={14} color={colors.primary} />
+                                        <Text style={styles.providerSummaryText}>
+                                            {providerReviewsSummary.total} {isRTL ? 'تقييم' : 'reviews'}
+                                        </Text>
+                                    </View>
+                                </View>
+                                {selectedProvider.experience ? (
+                                    <Text style={styles.providerExperienceText}>
+                                        {isRTL ? `الخبرة: ${selectedProvider.experience}` : `Experience: ${selectedProvider.experience}`}
+                                    </Text>
+                                ) : null}
+                                {selectedProvider.bio ? (
+                                    <Text style={styles.providerBioText}>{selectedProvider.bio}</Text>
+                                ) : null}
+                                {Array.isArray(selectedProvider.skills) && selectedProvider.skills.length > 0 ? (
+                                    <Text style={styles.providerSkillsText}>{selectedProvider.skills.join(' • ')}</Text>
+                                ) : null}
+                                <Text style={styles.providerReviewsHeading}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
+                                {providerReviewsLoading ? (
+                                    <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
+                                ) : providerReviews.length === 0 ? (
+                                    <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
+                                ) : (
+                                    <ScrollView style={styles.providerReviewsList} showsVerticalScrollIndicator={false}>
+                                        {providerReviews.map((review) => (
+                                            <View key={review.id} style={styles.providerReviewCard}>
+                                                <View style={styles.reviewHeader}>
+                                                    <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
+                                                    <View style={styles.reviewStarsRow}>
+                                                        {Array.from({ length: 5 }).map((_, index) => (
+                                                            <Text key={`${review.id}-provider-star-${index}`} style={[styles.reviewStar, index < Number(review.rating || 0) ? styles.reviewStarActive : null]}>
+                                                                ★
+                                                            </Text>
+                                                        ))}
+                                                    </View>
+                                                </View>
+                                                {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                                                {review.staffReply ? (
+                                                    <View style={styles.reviewReplyBox}>
+                                                        <Text style={styles.reviewReplyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
+                                                        <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+                                        ))}
+                                    </ScrollView>
+                                )}
+                            </>
+                        ) : null}
+                    </View>
                 </View>
             </Modal>
 
@@ -1414,18 +1536,109 @@ const styles = StyleSheet.create({
         fontSize: fontSize.xs,
         color: colors.textSecondary,
     },
+    employeeActionsRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        marginTop: 4,
+    },
+    employeeProfileButton: {
+        flex: 1,
+        alignSelf: 'flex-start',
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: colors.primary,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+    },
+    employeeProfileButtonText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.primary,
+    },
     employeeBookButton: {
+        flex: 1,
         alignSelf: 'flex-start',
         backgroundColor: colors.backgroundGray,
         borderRadius: borderRadius.full,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
-        marginTop: 2,
     },
     employeeBookButtonText: {
         fontSize: fontSize.sm,
         fontWeight: '700',
         color: colors.primary,
+    },
+    providerModalCard: {
+        width: '100%',
+        maxHeight: '85%',
+        marginTop: 'auto',
+        backgroundColor: 'white',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: spacing.lg,
+    },
+    providerModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    providerModalTitle: {
+        fontSize: fontSize.xl,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    providerSummaryRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    providerSummaryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 6,
+        borderRadius: borderRadius.md,
+        backgroundColor: '#F3F4F6',
+    },
+    providerSummaryText: {
+        fontSize: fontSize.sm,
+        color: colors.text,
+        fontWeight: '600',
+    },
+    providerExperienceText: {
+        fontSize: fontSize.sm,
+        color: colors.primaryDark,
+        marginBottom: spacing.xs,
+    },
+    providerBioText: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 20,
+        marginBottom: spacing.sm,
+    },
+    providerSkillsText: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        marginBottom: spacing.md,
+    },
+    providerReviewsHeading: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+        marginBottom: spacing.sm,
+    },
+    providerReviewsList: {
+        maxHeight: 320,
+    },
+    providerReviewCard: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.md,
+        padding: spacing.sm,
+        marginBottom: spacing.sm,
     },
     serviceModalDescription: {
         fontSize: fontSize.md,
