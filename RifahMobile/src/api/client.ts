@@ -446,6 +446,42 @@ const toOptionalString = (value: unknown): string | undefined => {
     return normalized ? normalized : undefined;
 };
 
+const normalizeServicePaymentOptionsValue = (value: unknown): Array<'at-center' | 'online-full' | 'booking-fee'> | undefined => {
+    const allowed = new Set(['at-center', 'online-full', 'booking-fee']);
+    const normalizeToken = (token: unknown) => `${token ?? ''}`.trim().toLowerCase();
+
+    let source: unknown[] = [];
+    if (Array.isArray(value)) {
+        source = value;
+    } else if (typeof value === 'string') {
+        const raw = value.trim();
+        if (!raw) {
+            source = [];
+        } else if (raw.startsWith('[') && raw.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(raw);
+                source = Array.isArray(parsed) ? parsed : [raw];
+            } catch {
+                source = raw.split(',');
+            }
+        } else {
+            source = raw.split(',');
+        }
+    } else if (value !== null && value !== undefined) {
+        source = [value];
+    }
+
+    const normalized = source
+        .map(normalizeToken)
+        .filter((token): token is 'at-center' | 'online-full' | 'booking-fee' => allowed.has(token));
+
+    if (normalized.length === 0) {
+        return undefined;
+    }
+
+    return Array.from(new Set(normalized));
+};
+
 const normalizeNotificationPreferences = (value: unknown): User['notificationPreferences'] => {
     if (!value || typeof value !== 'object') {
         return {
@@ -594,12 +630,7 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
     maxPrice: toNumber((service as Partial<Service> & { maxPrice?: number }).maxPrice),
     rawPrice: toNumber(service?.rawPrice),
     finalPrice: toNumber(service?.finalPrice),
-    paymentOptions: Array.isArray((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions)
-        ? ((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions as unknown[])
-            .map((option) => toStringValue(option).trim().toLowerCase())
-            .filter((option): option is 'at-center' | 'online-full' | 'booking-fee' =>
-                ['at-center', 'online-full', 'booking-fee'].includes(option))
-        : undefined,
+    paymentOptions: normalizeServicePaymentOptionsValue((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions),
     variants: Array.isArray((service as Partial<Service> & { variants?: unknown }).variants)
         ? ((service as Partial<Service> & { variants?: unknown }).variants as unknown[])
             .map((variant) => normalizeServiceVariant(variant))

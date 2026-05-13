@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Image } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -37,6 +37,8 @@ const DEFAULT_BOOKING_PAYMENT_SETTINGS = {
     serviceDepositFixedAmount: 50,
     serviceDepositPercentage: 50,
 };
+
+const MIN_SLOT_LEAD_MINUTES = 0;
 
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
@@ -197,7 +199,24 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     variantId: selectedVariant?.id || undefined,
                 }
             );
-            const available = (response.slots || []).filter(s => s.available);
+            const now = new Date();
+            const available = (response.slots || []).filter((slot) => {
+                if (!slot?.available) {
+                    return false;
+                }
+
+                if (!isSameDay(selectedDate, now)) {
+                    return true;
+                }
+
+                const slotStart = new Date(slot.startTime);
+                if (Number.isNaN(slotStart.getTime())) {
+                    return false;
+                }
+
+                const earliestAllowed = new Date(now.getTime() + (MIN_SLOT_LEAD_MINUTES * 60 * 1000));
+                return slotStart.getTime() >= earliestAllowed.getTime();
+            });
             setAvailableSlots(available);
         } catch (error: any) {
             console.error('Failed to load time slots:', error);
@@ -378,9 +397,16 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     style={[styles.staffCard, selectedStaff?.id === staff.id && styles.selectedCard]}
                     onPress={() => setSelectedStaff(staff)}
                 >
-                    <View style={styles.avatarPlaceholder}>
-                        <Text style={{ fontSize: 18 }}>{staff.name.charAt(0)}</Text>
-                    </View>
+                    {staff.avatar || staff.image ? (
+                        <Image
+                            source={{ uri: (staff.avatar || staff.image)! }}
+                            style={styles.staffAvatar}
+                        />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Text style={{ fontSize: 18 }}>{staff.name.charAt(0)}</Text>
+                        </View>
+                    )}
                     <View>
                         <Text style={styles.staffName}>{staff.name}</Text>
                         <Text style={styles.staffRole}>{staff.role || 'Specialist'}</Text>
@@ -661,6 +687,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    staffAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#F3F4F6',
     },
     staffName: {
         fontSize: fontSize.md,
