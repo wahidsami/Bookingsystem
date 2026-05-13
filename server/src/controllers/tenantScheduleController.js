@@ -33,6 +33,10 @@ function windowsOverlap(startA, endA, startB, endB) {
     return startA < endB && endA > startB;
 }
 
+function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(`${value || ''}`);
+}
+
 /**
  * Get all shifts for an employee
  * GET /api/v1/tenant/employees/:id/shifts
@@ -224,6 +228,15 @@ exports.deleteShift = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id: employeeId, shiftId } = req.params;
+
+        // Unsaved UI draft rows can have temporary ids like "draft-...".
+        // Treat as already deleted on server because no persisted row exists.
+        if (!isUuid(shiftId)) {
+            return res.json({
+                success: true,
+                message: 'Draft shift removed locally'
+            });
+        }
 
         // Verify employee belongs to tenant
         const employee = await db.Staff.findOne({
