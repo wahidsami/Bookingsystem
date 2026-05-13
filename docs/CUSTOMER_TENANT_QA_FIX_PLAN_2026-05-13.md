@@ -18,24 +18,24 @@ This plan covers the reported QA issues for tenant pages and booking flow in the
 - [x] Filter same-day slots to hide past times.
 - [x] Render specialist avatar image in booking specialist selection.
 - [x] Harden service payment option parsing (array/string/json) to ensure app matches tenant-selected options.
-- [ ] Commit + push
+- [x] Commit + push
 
 ### Phase B: Service Details UX Upgrade
 - [x] Replace service details drawer with a dedicated full page.
 - [x] Add back button to return to Services tab.
 - [x] Ensure full vertical scrolling for long content.
-- [ ] Commit + push
+- [x] Commit + push
 
 ### Phase C: Reviews Entry UX
-- [ ] Add "Write Review" CTA in tenant reviews tab (eligible completed bookings only).
-- [ ] Add "Write Review" CTA in staff profile view (eligible completed bookings only).
-- [ ] Reuse duplicate-review guard behavior.
+- [x] Add "Write Review" CTA in tenant reviews tab (eligible completed bookings only).
+- [x] Add "Write Review" CTA in staff profile view (eligible completed bookings only).
+- [x] Reuse duplicate-review guard behavior.
 - [ ] Commit + push
 
 ### Phase D: About Gallery Interaction
 - [x] Add full-screen image preview modal for gallery.
 - [x] Add close action and swipe-safe scrolling.
-- [ ] Commit + push
+- [x] Commit + push
 
 ### Phase E: QA Validation + Release Checklist
 - [ ] Validate all 7 scenarios on Android real devices.

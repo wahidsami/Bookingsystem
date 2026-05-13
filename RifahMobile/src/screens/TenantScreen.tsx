@@ -4,11 +4,12 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { api, Tenant, Service, ServiceVariant, Staff, Product, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
+import { api, Tenant, Service, ServiceVariant, Staff, Product, Booking, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppIcon } from '../components/AppIcon';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
+import { ReviewPromptModal } from '../components/ReviewPromptModal';
 
 interface TenantDetailsProps {
     route: any;
@@ -63,6 +64,9 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<Staff | null>(null);
     const [galleryPreviewImage, setGalleryPreviewImage] = useState<string | null>(null);
+    const [reviewTargetBooking, setReviewTargetBooking] = useState<Booking | null>(null);
+    const [reviewEligibleBookings, setReviewEligibleBookings] = useState<Booking[]>([]);
+    const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
     const [providerReviews, setProviderReviews] = useState<StaffReview[]>([]);
     const [providerReviewsLoading, setProviderReviewsLoading] = useState(false);
     const [providerReviewsSummary, setProviderReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
@@ -72,6 +76,10 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     useEffect(() => {
         loadTenantDetails();
     }, [tenantId, slug]);
+
+    useEffect(() => {
+        loadReviewEligibility();
+    }, []);
 
     useEffect(() => {
         if (!selectedServiceId || services.length === 0) {
@@ -336,6 +344,71 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 ]
             );
         }
+    };
+
+    const loadReviewEligibility = async () => {
+        try {
+            const user = await api.getUser();
+            if (!user) {
+                setReviewEligibleBookings([]);
+                setReviewedAppointmentIds(new Set());
+                return;
+            }
+
+            const [completedBookings, myReviews] = await Promise.all([
+                api.getBookings('completed'),
+                api.getMyReviews(200).catch(() => []),
+            ]);
+
+            const reviewedIds = new Set<string>(
+                (myReviews || [])
+                    .map((review: any) => review?.appointmentId)
+                    .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+            );
+
+            setReviewedAppointmentIds(reviewedIds);
+            setReviewEligibleBookings(completedBookings || []);
+        } catch (error) {
+            console.warn('Failed to load review eligibility:', error);
+            setReviewEligibleBookings([]);
+        }
+    };
+
+    const openTenantReviewPrompt = () => {
+        const tenantBooking = reviewEligibleBookings.find((booking) =>
+            booking.tenantId === tenant?.id
+            && booking.status === 'completed'
+            && !reviewedAppointmentIds.has(booking.id)
+        );
+
+        if (!tenantBooking) {
+            Alert.alert(
+                isRTL ? 'لا يوجد موعد مؤهل' : 'No eligible appointment',
+                isRTL ? 'أكمل موعدًا في هذا المركز أولًا لإضافة تقييم.' : 'Complete an appointment with this center first to add a review.'
+            );
+            return;
+        }
+
+        setReviewTargetBooking(tenantBooking);
+    };
+
+    const openProviderReviewPrompt = (providerId: string) => {
+        const providerBooking = reviewEligibleBookings.find((booking) =>
+            booking.tenantId === tenant?.id
+            && booking.staffId === providerId
+            && booking.status === 'completed'
+            && !reviewedAppointmentIds.has(booking.id)
+        );
+
+        if (!providerBooking) {
+            Alert.alert(
+                isRTL ? 'لا يوجد موعد مؤهل' : 'No eligible appointment',
+                isRTL ? 'أكمل موعدًا مع هذا المتخصص أولًا لإضافة تقييم.' : 'Complete an appointment with this specialist first to add a review.'
+            );
+            return;
+        }
+
+        setReviewTargetBooking(providerBooking);
     };
 
     const getServiceDescription = (service: Service) =>
@@ -678,6 +751,10 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const renderReviews = () => (
         <View style={styles.contentSection}>
+            <TouchableOpacity style={styles.writeReviewButton} onPress={openTenantReviewPrompt}>
+                <AppIcon name="star" size={16} color="#FFFFFF" />
+                <Text style={styles.writeReviewButtonText}>{isRTL ? 'أضف تقييمك' : 'Write a Review'}</Text>
+            </TouchableOpacity>
             <View style={styles.reviewSummaryCard}>
                 <View style={styles.reviewSummaryMetric}>
                     <Text style={styles.reviewSummaryValue}>{reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : '-'}</Text>
@@ -903,7 +980,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             <View style={styles.serviceModalCard}>
                                 <View style={styles.serviceModalHeader}>
                                     <TouchableOpacity onPress={closeServiceDetails} style={styles.serviceBackButton}>
-                                        <AppIcon name="back" size={20} color={colors.primary} />
+                                        <AppIcon name="arrow_back" size={20} color={colors.primary} />
                                         <Text style={styles.serviceBackText}>{isRTL ? 'العودة للخدمات' : 'Back to Services'}</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -1054,6 +1131,10 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <Text style={styles.providerSkillsText}>{selectedProvider.skills.join(' • ')}</Text>
                                 ) : null}
                                 <Text style={styles.providerReviewsHeading}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
+                                <TouchableOpacity style={styles.providerWriteReviewButton} onPress={() => openProviderReviewPrompt(selectedProvider.id)}>
+                                    <AppIcon name="star" size={14} color="#FFFFFF" />
+                                    <Text style={styles.providerWriteReviewButtonText}>{isRTL ? 'إضافة تقييم' : 'Write Review'}</Text>
+                                </TouchableOpacity>
                                 {providerReviewsLoading ? (
                                     <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
                                 ) : providerReviews.length === 0 ? (
@@ -1091,6 +1172,18 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
             {/* Bottom Action Bar (if needed, e.g. View Cart or Quick Book) */}
             {/* For now, individual service booking is sufficient */}
+            <ReviewPromptModal
+                visible={!!reviewTargetBooking}
+                appointment={reviewTargetBooking}
+                onClose={() => setReviewTargetBooking(null)}
+                onSuccess={() => {
+                    setReviewTargetBooking(null);
+                    loadReviewEligibility();
+                    if (showReviewsTab) {
+                        loadTenantDetails();
+                    }
+                }}
+            />
         </View>
     );
 }
@@ -1225,6 +1318,21 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: colors.text,
         marginBottom: spacing.md,
+    },
+    writeReviewButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.md,
+        paddingVertical: spacing.sm,
+        marginBottom: spacing.md,
+    },
+    writeReviewButtonText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.sm,
+        fontWeight: '700',
     },
     reviewSummaryCard: {
         backgroundColor: 'white',
@@ -1730,6 +1838,23 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: colors.text,
         marginBottom: spacing.sm,
+    },
+    providerWriteReviewButton: {
+        marginTop: spacing.xs,
+        marginBottom: spacing.sm,
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+    },
+    providerWriteReviewButtonText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.sm,
+        fontWeight: '700',
     },
     providerReviewsList: {
         maxHeight: 320,
