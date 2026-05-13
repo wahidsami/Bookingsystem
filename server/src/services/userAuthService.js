@@ -480,10 +480,14 @@ class UserAuthService {
                 throw new Error('Phone number already registered');
             }
 
+            // Some production databases still enforce NOT NULL on password.
+            // Provide a random placeholder so social-auth users can be created safely.
+            const generatedSocialPassword = `google_${crypto.randomBytes(24).toString('hex')}`;
+
             user = await db.PlatformUser.create({
                 email: normalizedEmail,
                 phone: normalizedPhone,
-                password: null,
+                password: generatedSocialPassword,
                 firstName: resolvedFirstName,
                 lastName: resolvedLastName,
                 authProvider: 'google',
