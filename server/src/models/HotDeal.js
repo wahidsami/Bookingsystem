@@ -100,6 +100,11 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: true
         },
+        image: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Uploaded hot deal image path (relative to uploads/)'
+        },
 
         // Pricing
         discountType: {

@@ -5,6 +5,8 @@
 
 const db = require('../models');
 const promotionService = require('../services/promotionService');
+const fs = require('fs');
+const path = require('path');
 
 const serializeHotDeal = (deal) => {
     if (!deal) return null;
@@ -230,6 +232,10 @@ const createHotDeal = async (req, res) => {
             maxRedemptions = -1
         } = req.body;
 
+        const imagePath = req.file?.path
+            ? req.file.path.replace(/\\/g, '/').split('uploads/')[1]
+            : null;
+
         // Check if tenant can create hot deals
         const canCreate = await promotionService.canCreateHotDeal(tenantId);
 
@@ -309,6 +315,7 @@ const createHotDeal = async (req, res) => {
             validFrom,
             validUntil,
             maxRedemptions,
+            image: imagePath,
             status,
             isActive: true
         });
@@ -344,6 +351,10 @@ const updateHotDeal = async (req, res) => {
         const { id } = req.params;
         const tenantId = req.tenantId;
         const updates = req.body;
+
+        const uploadedImagePath = req.file?.path
+            ? req.file.path.replace(/\\/g, '/').split('uploads/')[1]
+            : null;
 
         const deal = await db.HotDeal.findByPk(id);
         if (!deal) {
@@ -423,6 +434,14 @@ const updateHotDeal = async (req, res) => {
             });
         }
 
+        // Remove old image file only when we have a replacement.
+        if (uploadedImagePath && deal.image && deal.image !== uploadedImagePath) {
+            const oldImageAbsolutePath = path.join(__dirname, '../../uploads', deal.image);
+            if (fs.existsSync(oldImageAbsolutePath)) {
+                fs.unlinkSync(oldImageAbsolutePath);
+            }
+        }
+
         await deal.update({
             ...stripImmutableHotDealFields(updates),
             serviceId: nextServiceId,
@@ -431,7 +450,8 @@ const updateHotDeal = async (req, res) => {
             originalPrice,
             discountedPrice,
             validFrom: nextValidFrom,
-            validUntil: nextValidUntil
+            validUntil: nextValidUntil,
+            ...(uploadedImagePath ? { image: uploadedImagePath } : {})
         });
 
         const hydratedDeal = await db.HotDeal.findByPk(id, {
