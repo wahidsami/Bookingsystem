@@ -48,6 +48,15 @@ export function EmployeeEditorFrame({
   return (
     <div className="space-y-6">
       <div className="mb-2 animate-fade-in">
+        <div className={`mb-3 flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
+          <Link
+            href={cancelHref}
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            <span>{isRTL ? '→' : '←'}</span>
+            <span>{locale === 'ar' ? 'العودة إلى الفريق' : 'Back to Team'}</span>
+          </Link>
+        </div>
         <div className={`flex flex-col gap-4 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
           <div className="flex-1">
             <h2 className="mb-2 text-3xl font-bold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
