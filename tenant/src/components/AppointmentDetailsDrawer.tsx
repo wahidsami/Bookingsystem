@@ -192,7 +192,7 @@ function formatDateTime(value: string, locale: string) {
 function getStatusLabel(status: string, locale: string) {
   switch (status) {
     case "pending":
-      return locale === "ar" ? "قيد الانتظار" : "Pending";
+      return locale === "ar" ? "غير مؤكد" : "Unconfirmed";
     case "confirmed":
       return locale === "ar" ? "مؤكد" : "Confirmed";
     case "checked_in":
@@ -300,6 +300,7 @@ export function AppointmentDetailsDrawer({
   const [customerTransactionsSummary, setCustomerTransactionsSummary] = useState<CustomerTransactionsSummary | null>(null);
   const [customerTransactionsLoading, setCustomerTransactionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
@@ -497,6 +498,21 @@ export function AppointmentDetailsDrawer({
   const handleRebook = () => {
     if (!appointment) return;
     onRebook(appointment);
+  };
+
+  const handleQuickStatusUpdate = async (nextStatus: "confirmed" | "checked_in" | "in_service" | "completed" | "no_show") => {
+    if (!appointment || statusUpdating) return;
+    try {
+      setStatusUpdating(true);
+      const response = await tenantApi.updateAppointmentStatus(appointment.id, nextStatus);
+      if (response?.success && response?.appointment) {
+        setAppointment((prev) => prev ? { ...prev, status: response.appointment.status } : prev);
+      }
+    } catch (err) {
+      console.error("Failed to update appointment status from drawer:", err);
+    } finally {
+      setStatusUpdating(false);
+    }
   };
 
   if (!open) {
@@ -1081,6 +1097,64 @@ export function AppointmentDetailsDrawer({
                       >
                         {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
                       </button>
+                    </div>
+
+                    <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "تحديث الحالة" : "Update status"}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {appointment.status === "pending" && (
+                          <button
+                            type="button"
+                            disabled={statusUpdating}
+                            onClick={() => handleQuickStatusUpdate("confirmed")}
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            {locale === "ar" ? "تأكيد" : "Confirm"}
+                          </button>
+                        )}
+                        {(appointment.status === "pending" || appointment.status === "confirmed") && (
+                          <button
+                            type="button"
+                            disabled={statusUpdating}
+                            onClick={() => handleQuickStatusUpdate("checked_in")}
+                            className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-50"
+                          >
+                            {locale === "ar" ? "تم الوصول" : "Arrived"}
+                          </button>
+                        )}
+                        {appointment.status === "checked_in" && (
+                          <button
+                            type="button"
+                            disabled={statusUpdating}
+                            onClick={() => handleQuickStatusUpdate("in_service")}
+                            className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50"
+                          >
+                            {locale === "ar" ? "بدء الخدمة" : "Start service"}
+                          </button>
+                        )}
+                        {appointment.status === "in_service" && (
+                          <button
+                            type="button"
+                            disabled={statusUpdating}
+                            onClick={() => handleQuickStatusUpdate("completed")}
+                            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+                          >
+                            {locale === "ar" ? "إكمال" : "Complete"}
+                          </button>
+                        )}
+                        {(appointment.status === "pending" || appointment.status === "confirmed" || appointment.status === "checked_in") && (
+                          <button
+                            type="button"
+                            disabled={statusUpdating}
+                            onClick={() => handleQuickStatusUpdate("no_show")}
+                            className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                          >
+                            {locale === "ar" ? "عدم حضور" : "No-show"}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">

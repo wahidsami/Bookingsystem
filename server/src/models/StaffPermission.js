@@ -49,7 +49,9 @@ module.exports = (sequelize, DataTypes) => {
                 view_reviews: true,
                 reply_reviews: false,
                 view_clients: false,
-                view_booking_notes: false
+                view_booking_notes: false,
+                can_start_service: true,
+                can_mark_no_show: true
             }
         }
     }, {

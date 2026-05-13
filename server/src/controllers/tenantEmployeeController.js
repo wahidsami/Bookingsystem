@@ -19,7 +19,9 @@ const DEFAULT_STAFF_PERMISSIONS = {
     view_reviews: true,
     reply_reviews: false,
     view_clients: false,
-    view_booking_notes: false
+    view_booking_notes: false,
+    can_start_service: true,
+    can_mark_no_show: true
 };
 const VALID_SCHEDULE_VISIBILITY_WEEKS = [1, 2, 3, 4];
 const DEFAULT_EMPLOYEE_LIMIT = 12;

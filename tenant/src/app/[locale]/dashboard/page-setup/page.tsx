@@ -211,6 +211,11 @@ export default function PageSetupPage() {
         snapchatUrl: businessInfo.snapchatUrl,
       });
 
+      const refreshedPageData = await tenantApi.getPublicPageData();
+      const nextFacilities = Array.isArray(refreshedPageData?.data?.aboutUs?.facilitiesImages)
+        ? refreshedPageData.data.aboutUs.facilitiesImages
+        : [];
+      setExistingGallery(nextFacilities);
       setNewGalleryFiles([]);
       setMessage(locale === 'ar' ? 'تم حفظ إعدادات الصفحة بنجاح' : 'Page setup saved successfully');
     } catch (err: any) {

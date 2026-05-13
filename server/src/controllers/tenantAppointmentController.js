@@ -593,6 +593,11 @@ exports.getAppointmentsBoard = async (req, res) => {
 
         if (status) {
             appointmentWhere.status = status;
+        } else {
+            // Keep the board focused on active flow; cancelled appointments remain available in list/history views.
+            appointmentWhere.status = {
+                [Op.ne]: 'cancelled'
+            };
         }
 
         if (paymentStatus) {
@@ -850,7 +855,59 @@ exports.updateAppointmentStatus = async (req, res) => {
         await transaction.commit();
 
         try {
-            if (normalizedStatus === 'in_service') {
+            if (normalizedStatus === 'checked_in') {
+                const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+                const appointmentDate = new Date(appointment.startTime).toLocaleString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+                let customerName = 'A customer';
+                try {
+                    if (appointment.platformUserId) {
+                        const customer = await db.PlatformUser.findByPk(appointment.platformUserId, {
+                            attributes: ['firstName', 'lastName']
+                        });
+                        if (customer) {
+                            customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customerName;
+                        }
+                    }
+                } catch (_lookupError) {
+                    // Keep generic fallback name if lookup fails.
+                }
+
+                await pushNotificationService.sendToStaff(appointment.staffId, {
+                    title: 'Customer arrived',
+                    body: `${customerName} arrived for ${serviceName}.`,
+                    data: {
+                        type: 'staff_appointment_arrived',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        status: normalizedStatus
+                    }
+                });
+
+                await createStaffAppointmentMessage({
+                    tenantId,
+                    staffId: appointment.staffId,
+                    customerName,
+                    serviceName,
+                    appointmentDate,
+                    action: 'checked_in'
+                });
+
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: 'Your appointment is now marked as arrived.',
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+            } else if (normalizedStatus === 'in_service') {
                 await appointmentLifecycleService.notifyServiceStarted(appointment);
             } else if (normalizedStatus === 'completed') {
                 await appointmentLifecycleService.notifyServiceCompleted(appointment);
@@ -946,6 +1003,9 @@ exports.updatePaymentStatus = async (req, res) => {
             appointment.remainderAmount = 0;
             appointment.remainderPaid = true;
             appointment.totalPaid = appointment.price;
+            if (appointment.status === 'pending') {
+                appointment.status = 'confirmed';
+            }
         } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
             appointment.depositPaid = true;
             appointment.remainderPaid = false;
@@ -956,6 +1016,9 @@ exports.updatePaymentStatus = async (req, res) => {
                 appointment.totalPaid = splitPayment.depositAmount;
             }
             appointment.paidAt = appointment.paidAt || new Date();
+            if (appointment.status === 'pending') {
+                appointment.status = 'confirmed';
+            }
         } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
             appointment.paidAt = null;
             appointment.depositPaid = false;

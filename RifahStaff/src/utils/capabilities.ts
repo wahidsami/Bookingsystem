@@ -4,6 +4,8 @@ type StaffPermissions = {
     reply_reviews?: boolean;
     view_clients?: boolean;
     view_booking_notes?: boolean;
+    can_start_service?: boolean;
+    can_mark_no_show?: boolean;
 } | null | undefined;
 
 type StaffFeatures = {
@@ -43,3 +45,9 @@ export const canViewMessages = (user: StaffLike): boolean =>
 
 export const canRequestTimeOff = (user: StaffLike): boolean =>
     Boolean(user?.features?.timeOff);
+
+export const canStartService = (user: StaffLike): boolean =>
+    user?.permissions?.can_start_service !== false;
+
+export const canMarkNoShow = (user: StaffLike): boolean =>
+    user?.permissions?.can_mark_no_show !== false;

@@ -167,7 +167,9 @@ export default function EditEmployeePage() {
     view_reviews: true,
     reply_reviews: false,
     view_clients: false,
-    view_booking_notes: false
+    view_booking_notes: false,
+    can_start_service: true,
+    can_mark_no_show: true
   });
   const [permissionsLoading, setPermissionsLoading] = useState(false);
 
@@ -388,7 +390,9 @@ export default function EditEmployeePage() {
               view_reviews: permRes.permissions.view_reviews !== undefined ? permRes.permissions.view_reviews : true,
               reply_reviews: permRes.permissions.reply_reviews || false,
               view_clients: permRes.permissions.view_clients || false,
-              view_booking_notes: permRes.permissions.view_booking_notes || false
+              view_booking_notes: permRes.permissions.view_booking_notes || false,
+              can_start_service: permRes.permissions.can_start_service !== undefined ? permRes.permissions.can_start_service : true,
+              can_mark_no_show: permRes.permissions.can_mark_no_show !== undefined ? permRes.permissions.can_mark_no_show : true
             });
           }
         } catch (permErr) {
@@ -553,7 +557,9 @@ export default function EditEmployeePage() {
     { key: 'view_reviews', label: locale === 'ar' ? 'عرض التقييمات' : 'View reviews' },
     { key: 'reply_reviews', label: locale === 'ar' ? 'الرد على التقييمات' : 'Reply to reviews' },
     { key: 'view_clients', label: locale === 'ar' ? 'عرض العملاء' : 'View clients' },
-    { key: 'view_booking_notes', label: locale === 'ar' ? 'عرض ملاحظات الحجز' : 'View booking notes' }
+    { key: 'view_booking_notes', label: locale === 'ar' ? 'عرض ملاحظات الحجز' : 'View booking notes' },
+    { key: 'can_start_service', label: locale === 'ar' ? 'إظهار زر بدء الخدمة' : 'Show Start button' },
+    { key: 'can_mark_no_show', label: locale === 'ar' ? 'إظهار زر عدم الحضور' : 'Show No-show button' }
   ] as const;
 
   const resolveDashboardAccountId = async () => {

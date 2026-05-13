@@ -236,6 +236,9 @@ class BookingService {
             }
 
             // ========== CREATE APPOINTMENT ==========
+            const requiresArrivalPayment = ['at-center', 'at_center', 'pay_on_visit', 'cash_on_delivery', 'cash']
+                .includes(`${normalizedPaymentMethod}`.trim().toLowerCase());
+            const initialAppointmentStatus = requiresArrivalPayment ? 'pending' : 'confirmed';
             const appointment = await db.Appointment.create({
                 serviceId,
                 staffId: finalStaffId,
@@ -261,7 +264,7 @@ class BookingService {
                 bookingSessionId: bookingSessionId || null,
                 bookingReference: bookingReference || null,
                 bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex : 0,
-                status: 'confirmed',
+                status: initialAppointmentStatus,
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING,
                 paymentMethod: normalizedPaymentMethod,
                 depositAmount: initialDepositAmount,

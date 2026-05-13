@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { differenceInCalendarDays } from 'date-fns';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { canRequestTimeOff, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
+import { canMarkNoShow, canRequestTimeOff, canStartService, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '../../src/services/appointments';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
 import { getImageUrl } from '../../src/services/api';
@@ -81,6 +81,29 @@ const formatClock = (timeString: string) => {
 
 const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)}h`;
 
+const getAppointmentStatusLabel = (status?: string) => {
+    const normalized = `${status || ''}`.trim().toLowerCase();
+    switch (normalized) {
+        case 'pending':
+            return 'Unconfirmed';
+        case 'confirmed':
+            return 'Confirmed';
+        case 'checked_in':
+            return 'Arrived';
+        case 'in_service':
+        case 'started':
+            return 'In Service';
+        case 'completed':
+            return 'Completed';
+        case 'cancelled':
+            return 'Cancelled';
+        case 'no_show':
+            return 'No Show';
+        default:
+            return String(status || 'Pending').replace(/_/g, ' ');
+    }
+};
+
 const getDateSpanDays = (startDate: string, endDate: string) => {
     const start = parseRiyadhDateKey(startDate);
     const end = parseRiyadhDateKey(endDate);
@@ -123,6 +146,8 @@ export default function ScheduleScreen() {
     const timeOffEnabled = canRequestTimeOff(user);
     const canSeeBookingNotes = canViewBookingNotes(user);
     const canViewClientContext = canViewClients(user);
+    const canShowStartAction = canStartService(user);
+    const canShowNoShowAction = canMarkNoShow(user);
     const scheduleVisibilityWeeks = Math.min(Math.max(Number(user?.scheduleVisibilityWeeks || 1), 1), 4);
     const weekColumnGap = 10;
     const weekColumnWidth = useMemo(
@@ -667,7 +692,7 @@ export default function ScheduleScreen() {
                                                                                 {customerLabel}
                                                                             </Text>
                                                                             <Text style={[styles.gridAppointmentMeta, compactGridCards && styles.gridAppointmentMetaCompact]} numberOfLines={1}>
-                                                                                {appointment.status.toUpperCase().replace('_', ' ')}{appointment.paymentStatus ? ` • ${appointment.paymentStatus.replace(/_/g, ' ')}` : ''}
+                                                                                {getAppointmentStatusLabel(appointment.status)}{appointment.paymentStatus ? ` • ${appointment.paymentStatus.replace(/_/g, ' ')}` : ''}
                                                                             </Text>
                                                                         </View>
                                                                     </View>
@@ -870,7 +895,7 @@ export default function ScheduleScreen() {
                                             </View>
                                             <View style={styles.statusBadge}>
                                                 <Text style={[styles.appointmentStatusText, appointment.status === 'started' && { color: '#fbbf24' }, appointment.status === 'completed' && { color: '#10b981' }, appointment.status === 'cancelled' && { color: '#ef4444' }]}>
-                                                    {appointment.status.toUpperCase().replace('_', ' ')}
+                                                    {getAppointmentStatusLabel(appointment.status)}
                                                 </Text>
                                             </View>
                                         </View>
@@ -939,7 +964,7 @@ export default function ScheduleScreen() {
 
                                     {!isCompleted && appointment.status !== 'cancelled' ? (
                                         <View style={styles.appointmentActions}>
-                                            {!isStarted ? (
+                                            {!isStarted && canShowStartAction ? (
                                                 <TouchableOpacity
                                                     style={[styles.actionBtn, styles.startBtn, updatingId === appointment.id && { opacity: 0.6 }]}
                                                     onPress={() => handleAppointmentStatusUpdate(appointment.id, 'started')}
@@ -950,7 +975,7 @@ export default function ScheduleScreen() {
                                                         : <Ionicons name="play" size={16} color="#ffffff" style={styles.btnIcon} />}
                                                     <Text style={styles.btnTextWhite}>Start</Text>
                                                 </TouchableOpacity>
-                                            ) : (
+                                            ) : isStarted ? (
                                                 <TouchableOpacity
                                                     style={[styles.actionBtn, styles.completeBtn, updatingId === appointment.id && { opacity: 0.6 }]}
                                                     onPress={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
@@ -961,15 +986,17 @@ export default function ScheduleScreen() {
                                                         : <Ionicons name="checkmark-done" size={16} color="#ffffff" style={styles.btnIcon} />}
                                                     <Text style={styles.btnTextWhite}>Complete</Text>
                                                 </TouchableOpacity>
-                                            )}
+                                            ) : null}
 
-                                            <TouchableOpacity
-                                                style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
-                                                onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
-                                                disabled={!!updatingId}
-                                            >
-                                                <Text style={styles.btnTextGray}>No Show</Text>
-                                            </TouchableOpacity>
+                                            {canShowNoShowAction ? (
+                                                <TouchableOpacity
+                                                    style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
+                                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
+                                                    disabled={!!updatingId}
+                                                >
+                                                    <Text style={styles.btnTextGray}>No Show</Text>
+                                                </TouchableOpacity>
+                                            ) : null}
                                         </View>
                                     ) : null}
                                 </View>
@@ -1106,7 +1133,7 @@ export default function ScheduleScreen() {
 
                         {!isCompleted && appointment.status !== 'cancelled' ? (
                             <View style={styles.appointmentActions}>
-                                {!isStarted ? (
+                                {!isStarted && canShowStartAction ? (
                                     <TouchableOpacity
                                         style={[styles.actionBtn, styles.startBtn, updatingId === appointment.id && { opacity: 0.6 }]}
                                         onPress={() => handleAppointmentStatusUpdate(appointment.id, 'started')}
@@ -1117,7 +1144,7 @@ export default function ScheduleScreen() {
                                             : <Ionicons name="play" size={16} color="#ffffff" style={styles.btnIcon} />}
                                         <Text style={styles.btnTextWhite}>Start</Text>
                                     </TouchableOpacity>
-                                ) : (
+                                ) : isStarted ? (
                                     <TouchableOpacity
                                         style={[styles.actionBtn, styles.completeBtn, updatingId === appointment.id && { opacity: 0.6 }]}
                                         onPress={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
@@ -1128,15 +1155,17 @@ export default function ScheduleScreen() {
                                             : <Ionicons name="checkmark-done" size={16} color="#ffffff" style={styles.btnIcon} />}
                                         <Text style={styles.btnTextWhite}>Complete</Text>
                                     </TouchableOpacity>
-                                )}
+                                ) : null}
 
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
-                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
-                                    disabled={!!updatingId}
-                                >
-                                    <Text style={styles.btnTextGray}>No Show</Text>
-                                </TouchableOpacity>
+                                {canShowNoShowAction ? (
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
+                                        onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
+                                        disabled={!!updatingId}
+                                    >
+                                        <Text style={styles.btnTextGray}>No Show</Text>
+                                    </TouchableOpacity>
+                                ) : null}
                             </View>
                         ) : null}
                     </Pressable>

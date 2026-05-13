@@ -21,7 +21,9 @@ const DEFAULT_STAFF_PERMISSIONS = {
     view_reviews: true,
     reply_reviews: false,
     view_clients: false,
-    view_booking_notes: false
+    view_booking_notes: false,
+    can_start_service: true,
+    can_mark_no_show: true
 };
 const STAFF_BLOCKING_SESSION_STATUSES = Object.freeze(['pending', 'confirmed', 'checked_in', 'in_service']);
 

@@ -420,7 +420,7 @@ const ensureStaffPermissionSchema = async () => {
 
                 ALTER TABLE public.staff_permissions
                     ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT
-                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb;
+                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb;
 
                 ALTER TABLE public.staff_permissions
                     ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
@@ -440,14 +440,14 @@ const ensureStaffPermissionSchema = async () => {
                         ALTER COLUMN permissions TYPE JSONB
                         USING CASE
                             WHEN permissions IS NULL OR permissions::text = '' THEN
-                                '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb
+                                '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb
                             ELSE permissions::jsonb
                         END;
                 END IF;
 
                 ALTER TABLE public.staff_permissions
                     ALTER COLUMN permissions SET DEFAULT
-                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb;
+                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb;
 
                 UPDATE public.staff_permissions sp
                 SET "tenantId" = s."tenantId"
@@ -456,12 +456,20 @@ const ensureStaffPermissionSchema = async () => {
                   AND sp."tenantId" IS NULL;
 
                 UPDATE public.staff_permissions
-                SET permissions = '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false}'::jsonb
+                SET permissions = '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb
                 WHERE permissions IS NULL;
 
                 UPDATE public.staff_permissions
                 SET permissions = permissions || '{"view_booking_notes": false}'::jsonb
                 WHERE NOT (permissions ? 'view_booking_notes');
+
+                UPDATE public.staff_permissions
+                SET permissions = permissions || '{"can_start_service": true}'::jsonb
+                WHERE NOT (permissions ? 'can_start_service');
+
+                UPDATE public.staff_permissions
+                SET permissions = permissions || '{"can_mark_no_show": true}'::jsonb
+                WHERE NOT (permissions ? 'can_mark_no_show');
             END $$;
         `);
 

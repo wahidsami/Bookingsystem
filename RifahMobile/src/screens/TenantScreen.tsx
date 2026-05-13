@@ -290,6 +290,9 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     );
     const missions = normalizeList(pageData?.aboutUs?.missions);
     const visions = normalizeList(pageData?.aboutUs?.visions);
+    const facilitiesImages = Array.isArray(pageData?.aboutUs?.facilitiesImages)
+        ? pageData.aboutUs.facilitiesImages.map((image: string) => getImageUrl(image))
+        : [];
     const pageSetup = pageData?.generalSettings?.pageSetup || {};
     const socialLinks = [
         { key: 'instagram', url: pageSetup?.instagramUrl || tenant?.instagramUrl, icon: 'instagram' as const, color: '#E1306C' },
@@ -307,6 +310,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         tenant?.city,
         tenant?.country,
     ].filter(Boolean).join(', ') || tenant?.address || null;
+    const mapUrl = pageSetup?.googleMapLink || tenant?.googleMapLink || null;
 
     const handleAddProduct = (product: Product) => {
         const result = addToCart(product);
@@ -398,6 +402,32 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             setProviderReviewsLoading(false);
         }
     };
+
+    const extractMapCoordinates = (mapUrl?: string | null): { lat: number; lng: number } | null => {
+        if (!mapUrl) return null;
+        const decodedUrl = decodeURIComponent(mapUrl);
+        const atMatch = decodedUrl.match(/@(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
+        if (atMatch) {
+            return { lat: Number(atMatch[1]), lng: Number(atMatch[3]) };
+        }
+        const qMatch = decodedUrl.match(/[?&]q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/i);
+        if (qMatch) {
+            return { lat: Number(qMatch[1]), lng: Number(qMatch[3]) };
+        }
+        const llMatch = decodedUrl.match(/[?&]ll=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/i);
+        if (llMatch) {
+            return { lat: Number(llMatch[1]), lng: Number(llMatch[3]) };
+        }
+        return null;
+    };
+
+    const buildMapPreviewImage = (mapUrl?: string | null): string | null => {
+        const coords = extractMapCoordinates(mapUrl);
+        if (!coords) return null;
+        const center = `${coords.lat},${coords.lng}`;
+        return `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(center)}&zoom=15&size=800x360&markers=${encodeURIComponent(center + ',red-pushpin')}`;
+    };
+    const mapPreviewImage = buildMapPreviewImage(mapUrl);
 
     const handleBookService = (service: Service, staff?: Staff | null, variant?: ServiceVariant | null) => {
         closeServiceDetails();
@@ -722,14 +752,38 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 </View>
             ) : null}
 
-            {locationLine || pageSetup?.googleMapLink || tenant?.googleMapLink ? (
+            {facilitiesImages.length > 0 ? (
+                <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionTitle}>{isRTL ? 'صور المركز' : 'Center Gallery'}</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+                        {facilitiesImages.map((imageUri: string, index: number) => (
+                            <Image
+                                key={`gallery-${index}`}
+                                source={{ uri: imageUri }}
+                                style={styles.galleryImage}
+                            />
+                        ))}
+                    </ScrollView>
+                </View>
+            ) : null}
+
+            {locationLine || mapUrl ? (
                 <View style={styles.sectionBlock}>
                     <Text style={styles.sectionTitle}>{t('location')}</Text>
                     {locationLine ? <Text style={styles.addressText}>{locationLine}</Text> : null}
-                    {pageSetup?.googleMapLink || tenant?.googleMapLink ? (
-                        <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(pageSetup?.googleMapLink || tenant?.googleMapLink)}>
-                            <AppIcon name="location" size={32} color={colors.textSecondary} />
-                            <Text style={styles.mapText}>{t('viewOnMap')}</Text>
+                    {mapUrl ? (
+                        <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(mapUrl)}>
+                            {mapPreviewImage ? (
+                                <Image source={{ uri: mapPreviewImage }} style={styles.mapPreviewImage} />
+                            ) : (
+                                <View style={styles.mapFallback}>
+                                    <AppIcon name="location" size={32} color={colors.textSecondary} />
+                                    <Text style={styles.mapText}>{t('viewOnMap')}</Text>
+                                </View>
+                            )}
+                            <View style={styles.mapOverlayPill}>
+                                <Text style={styles.mapOverlayPillText}>{t('viewOnMap')}</Text>
+                            </View>
                         </TouchableOpacity>
                     ) : null}
                 </View>
@@ -1696,13 +1750,47 @@ const styles = StyleSheet.create({
         height: 150,
         backgroundColor: '#F3F4F6',
         borderRadius: borderRadius.lg,
+        overflow: 'hidden',
+        marginTop: spacing.sm,
+    },
+    mapPreviewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    mapFallback: {
+        width: '100%',
+        height: '100%',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: spacing.sm,
+    },
+    mapOverlayPill: {
+        position: 'absolute',
+        bottom: spacing.sm,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(17, 24, 39, 0.82)',
+        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 6,
+    },
+    mapOverlayPillText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.xs,
+        fontWeight: '700',
     },
     mapText: {
         color: colors.textSecondary,
         marginTop: spacing.sm,
+    },
+    galleryRow: {
+        gap: spacing.sm,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xs,
+    },
+    galleryImage: {
+        width: 180,
+        height: 120,
+        borderRadius: borderRadius.lg,
+        backgroundColor: '#F3F4F6',
     },
     hoursRow: {
         flexDirection: 'row',

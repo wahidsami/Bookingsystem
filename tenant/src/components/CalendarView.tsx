@@ -333,7 +333,7 @@ export function CalendarView({
   const getStatusLabel = (status: Appointment['status']) => {
     switch (status) {
       case 'pending':
-        return t("pending");
+        return locale === 'ar' ? 'غير مؤكد' : 'Unconfirmed';
       case 'confirmed':
         return t("confirmed");
       case 'checked_in':

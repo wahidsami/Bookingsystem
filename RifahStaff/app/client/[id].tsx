@@ -170,7 +170,11 @@ export default function ClientProfileScreen() {
                                     ) : null}
                                 </View>
                                 <View style={styles.statusPill}>
-                                    <Text style={styles.statusPillText}>{String(appointment.status || 'pending').replace(/_/g, ' ')}</Text>
+                                    <Text style={styles.statusPillText}>
+                                        {`${appointment.status || 'pending'}`.toLowerCase() === 'pending'
+                                            ? 'Unconfirmed'
+                                            : String(appointment.status || 'pending').replace(/_/g, ' ')}
+                                    </Text>
                                 </View>
                             </View>
                         ))

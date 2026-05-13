@@ -24,6 +24,8 @@ interface User {
         reply_reviews: boolean;
         view_clients: boolean;
         view_booking_notes: boolean;
+        can_start_service: boolean;
+        can_mark_no_show: boolean;
     };
     features?: {
         today: boolean;
@@ -82,6 +84,8 @@ const normalizeUserPayload = (userData: any): User => ({
         reply_reviews: Boolean(userData?.permissions?.reply_reviews),
         view_clients: Boolean(userData?.permissions?.view_clients),
         view_booking_notes: Boolean(userData?.permissions?.view_booking_notes),
+        can_start_service: userData?.permissions?.can_start_service !== false,
+        can_mark_no_show: userData?.permissions?.can_mark_no_show !== false,
     },
     features: {
         today: userData?.features?.today !== false,

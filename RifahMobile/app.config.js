@@ -33,7 +33,7 @@ module.exports = {
       },
       package: 'com.refah.mobile',
       versionCode: 1,
-      edgeToEdgeEnabled: true,
+      edgeToEdgeEnabled: false,
       predictiveBackGestureEnabled: false,
     },
     web: {

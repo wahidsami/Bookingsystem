@@ -541,7 +541,7 @@ const getStatusColor = (status: string) => {
 const getStatusText = (status: string, _t: any, language?: string) => {
     if (language === 'ar') {
         switch (status) {
-            case 'pending': return 'قيد الانتظار';
+            case 'pending': return 'غير مؤكد';
             case 'confirmed': return 'مؤكد';
             case 'checked_in': return 'تم الوصول';
             case 'in_service': return 'الخدمة جارية';
@@ -553,7 +553,7 @@ const getStatusText = (status: string, _t: any, language?: string) => {
     }
 
     switch (status) {
-        case 'pending': return 'Pending';
+        case 'pending': return 'Unconfirmed';
         case 'confirmed': return 'Confirmed';
         case 'checked_in': return 'Checked In';
         case 'in_service': return 'In Service';

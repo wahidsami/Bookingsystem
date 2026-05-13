@@ -7,6 +7,12 @@ const buildStaffAppointmentMessage = ({ customerName, serviceName, appointmentDa
             body: `${customerName} was reassigned to ${serviceName} for ${appointmentDate}.`
         };
     }
+    if (action === 'checked_in') {
+        return {
+            subject: 'Customer arrived',
+            body: `${customerName} arrived for ${serviceName} (${appointmentDate}).`
+        };
+    }
 
     return {
         subject: 'New appointment assigned',
