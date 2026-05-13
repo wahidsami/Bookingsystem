@@ -56,6 +56,8 @@ type IconName =
   | 'profile'
   | 'bell'
   | 'search'
+  | 'cart'
+  | 'user'
   | 'settings'
   | 'location'
   | 'message'
@@ -107,6 +109,8 @@ const iconMap = {
   profile: ProfileIcon,
   bell: BellIcon,
   search: SearchIcon,
+  cart: CartIcon,
+  user: UserIcon,
   settings: SettingsIcon,
   location: LocationIcon,
   message: MessageIcon,

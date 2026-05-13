@@ -45,7 +45,6 @@ interface NewCustomerForm {
   lastName: string;
   email: string;
   phone: string;
-  password: string;
   gender: string;
   dateOfBirth: string;
 }
@@ -180,7 +179,6 @@ export function AppointmentActionDrawer({
     lastName: "",
     email: "",
     phone: "",
-    password: "",
     gender: "",
     dateOfBirth: ""
   });
@@ -225,7 +223,6 @@ export function AppointmentActionDrawer({
         lastName: "",
         email: "",
         phone: "",
-        password: "",
         gender: "",
         dateOfBirth: ""
       });
@@ -376,8 +373,7 @@ export function AppointmentActionDrawer({
         newCustomer.firstName.trim(),
         newCustomer.lastName.trim(),
         newCustomer.email.trim(),
-        newCustomer.phone.trim(),
-        newCustomer.password.trim()
+        newCustomer.phone.trim()
       ];
 
       if (requiredFields.some((value) => !value)) {
@@ -717,14 +713,6 @@ export function AppointmentActionDrawer({
                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                         style={{ textAlign: isRTL ? 'right' : 'left' }}
                       />
-                      <input
-                        type="password"
-                        value={newCustomer.password}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, password: e.target.value }))}
-                        placeholder={locale === "ar" ? "كلمة المرور" : "Password"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
                       <select
                         value={newCustomer.gender}
                         onChange={(e) => setNewCustomer((prev) => ({ ...prev, gender: e.target.value }))}
@@ -740,6 +728,8 @@ export function AppointmentActionDrawer({
                         type="date"
                         value={newCustomer.dateOfBirth}
                         onChange={(e) => setNewCustomer((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
+                        aria-label={locale === "ar" ? "تاريخ الميلاد" : "Date of birth"}
+                        title={locale === "ar" ? "تاريخ الميلاد (اختياري)" : "Date of birth (optional)"}
                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                       />
                     </div>

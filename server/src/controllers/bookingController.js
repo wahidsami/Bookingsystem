@@ -628,6 +628,41 @@ const respondToInvite = async (req, res) => {
         }
         await appointment.save();
 
+        const appointmentWithContext = await db.Appointment.findByPk(appointment.id, {
+            include: [
+                { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar'], required: false },
+                { model: db.PlatformUser, as: 'user', attributes: ['id', 'firstName', 'lastName'], required: false }
+            ]
+        });
+
+        const customerName = `${appointmentWithContext?.user?.firstName || ''} ${appointmentWithContext?.user?.lastName || ''}`.trim() || 'Customer';
+        const serviceName = appointmentWithContext?.service?.name_en || appointmentWithContext?.service?.name_ar || 'service';
+        const when = new Date(appointment.startTime).toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+
+        try {
+            await db.StaffMessage.create({
+                tenantId: appointment.tenantId,
+                senderType: 'admin',
+                senderId: appointment.tenantId,
+                recipientType: null,
+                recipientId: null,
+                subject: response === 'confirm' ? 'Customer confirmed appointment' : 'Customer declined appointment',
+                body: response === 'confirm'
+                    ? `${customerName} confirmed ${serviceName} on ${when}.`
+                    : `${customerName} declined ${serviceName} on ${when}.`,
+                isPinned: false,
+                readBy: []
+            });
+        } catch (messageError) {
+            console.warn('Failed to create tenant dashboard message for invite response:', messageError.message);
+        }
+
         return res.json({
             success: true,
             message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment declined',

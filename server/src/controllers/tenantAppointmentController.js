@@ -26,6 +26,7 @@ const {
     normalizeAppointmentStatus
 } = require('../utils/appointmentStatus');
 const { getServerPublicUrl } = require('../utils/url');
+const { sendEmail } = require('../utils/emailService');
 
 const INVITE_EXPIRY_HOURS = 72;
 
@@ -120,7 +121,7 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     const phone = `${normalizedCustomer.phone || ''}`.trim();
     const password = `${normalizedCustomer.password || ''}`;
 
-    if (!firstName || !lastName || !email || !phone || !password) {
+    if (!firstName || !lastName || !email || !phone) {
         throw new Error('Customer details are required when no existing customer is selected');
     }
 
@@ -146,10 +147,12 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         return existingUser;
     }
 
+    const generatedPassword = password || crypto.randomBytes(24).toString('hex');
+
     return await db.PlatformUser.create({
         email,
         phone,
-        password,
+        password: generatedPassword,
         firstName,
         lastName,
         gender: normalizedCustomer.gender || null,
@@ -158,6 +161,33 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         phoneVerified: false,
         isActive: true
     }, { transaction });
+}
+
+async function sendAppointmentInviteEmail({ to, customerName, tenantName, inviteLink, startTime, serviceName, locale = 'en' }) {
+    if (!to) {
+        return;
+    }
+
+    const appointmentDate = new Date(startTime).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+
+    await sendEmail({
+        to,
+        subject: locale === 'ar' ? 'دعوة لتأكيد موعدك في رفاه' : 'Confirm your Refah appointment',
+        template: 'customer_appointment_invite',
+        data: {
+            customerName: customerName || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer'),
+            tenantName: tenantName || 'Refah',
+            serviceName: serviceName || (locale === 'ar' ? 'الخدمة' : 'Service'),
+            appointmentDate,
+            inviteLink
+        }
+    });
 }
 
 /**
@@ -236,12 +266,19 @@ exports.createAppointment = async (req, res) => {
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'gender', ['profileImage', 'photo']],
                     required: false
+                },
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_ar', 'name_en'],
+                    required: false
                 }
             ],
             transaction
         });
 
         await transaction.commit();
+        const inviteLink = buildAppointmentInviteLink(inviteToken);
 
         try {
             const serviceName = fullAppointment?.service?.name_en || fullAppointment?.service?.name_ar || 'service';
@@ -301,6 +338,15 @@ exports.createAppointment = async (req, res) => {
                 appointmentDate,
                 action: 'assigned'
             });
+
+            await sendAppointmentInviteEmail({
+                to: customerUser.email,
+                customerName,
+                tenantName: fullAppointment?.tenant?.name || 'Refah',
+                inviteLink,
+                startTime: appointment.startTime,
+                serviceName
+            });
         } catch (notificationError) {
             console.warn('Tenant appointment notification warning:', notificationError.message);
         }
@@ -312,7 +358,7 @@ exports.createAppointment = async (req, res) => {
             appointmentInvite: {
                 token: inviteToken,
                 expiresAt: inviteExpiresAt.toISOString(),
-                link: buildAppointmentInviteLink(inviteToken)
+                link: inviteLink
             }
         });
     } catch (error) {

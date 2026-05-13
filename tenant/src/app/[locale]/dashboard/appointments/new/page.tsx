@@ -48,7 +48,6 @@ interface NewCustomerForm {
   lastName: string;
   email: string;
   phone: string;
-  password: string;
   gender: string;
   dateOfBirth: string;
 }
@@ -109,7 +108,6 @@ export default function NewAppointmentPage() {
     lastName: "",
     email: "",
     phone: "",
-    password: "",
     gender: "",
     dateOfBirth: ""
   });
@@ -237,8 +235,7 @@ export default function NewAppointmentPage() {
         newCustomer.firstName.trim(),
         newCustomer.lastName.trim(),
         newCustomer.email.trim(),
-        newCustomer.phone.trim(),
-        newCustomer.password.trim()
+        newCustomer.phone.trim()
       ];
 
       if (requiredFields.some((value) => !value)) {
@@ -553,18 +550,6 @@ export default function NewAppointmentPage() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'كلمة المرور' : 'Password'} *
-                  </label>
-                  <input
-                    type="password"
-                    value={newCustomer.password}
-                    onChange={(e) => setNewCustomer((prev) => ({ ...prev, password: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'الجنس' : 'Gender'}
                   </label>
                   <select
@@ -583,6 +568,9 @@ export default function NewAppointmentPage() {
                   <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'تاريخ الميلاد' : 'Date of birth'}
                   </label>
+                  <p className="mb-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'اختياري - بصيغة يوم/شهر/سنة' : 'Optional - day/month/year format'}
+                  </p>
                   <input
                     type="date"
                     value={newCustomer.dateOfBirth}
