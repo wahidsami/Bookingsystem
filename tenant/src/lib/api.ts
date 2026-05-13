@@ -1070,7 +1070,7 @@ class TenantApiClient {
       lastName: string;
       email: string;
       phone: string;
-      password: string;
+      password?: string;
       gender?: string | null;
       dateOfBirth?: string | null;
     } | null;
