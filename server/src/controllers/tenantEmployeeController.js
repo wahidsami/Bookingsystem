@@ -1605,11 +1605,7 @@ exports.updateEmployee = async (req, res) => {
 
         // Parse skills if provided
         if (skills !== undefined) {
-            if (typeof skills === 'string') {
-                employee.skills = skills.split(',').map(s => s.trim()).filter(s => s);
-            } else if (Array.isArray(skills)) {
-                employee.skills = skills;
-            }
+            employee.skills = parseStringArrayField(skills, employee.skills || []);
         }
 
         if (spokenLanguages !== undefined) {
