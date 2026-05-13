@@ -150,6 +150,12 @@ export default function NewProductPage() {
     setSuccess("");
 
     try {
+      if (!formData.allowsDelivery && !formData.allowsPickup) {
+        setError(locale === 'ar' ? 'يرجى تفعيل خيار واحد على الأقل من خيارات الاستلام.' : 'Please enable at least one fulfillment option.');
+        setLoading(false);
+        return;
+      }
+
       const submitData = new FormData();
 
       // Append all form fields
@@ -988,9 +994,65 @@ export default function NewProductPage() {
                   />
                 </div>
 
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                  <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      name="isAvailable"
+                      checked={formData.isAvailable}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-primary border-gray-300 rounded"
+                    />
+                    {locale === 'ar' ? 'متاح' : 'Available'}
+                  </label>
+                  <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      name="isFeatured"
+                      checked={formData.isFeatured}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-primary border-gray-300 rounded"
+                    />
+                    {locale === 'ar' ? 'مميز' : 'Featured'}
+                  </label>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'خيارات الاستلام' : 'Fulfillment options'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar'
+                      ? 'يمكنك تفعيل خيار أو خيارين، ويجب تفعيل خيار واحد على الأقل.'
+                      : 'Select one or both. At least one option must be enabled.'}
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        name="allowsDelivery"
+                        checked={formData.allowsDelivery}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary border-gray-300 rounded"
+                      />
+                      {locale === 'ar' ? 'توصيل' : 'Delivery'}
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        name="allowsPickup"
+                        checked={formData.allowsPickup}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary border-gray-300 rounded"
+                      />
+                      {locale === 'ar' ? 'استلام عند الزيارة' : 'Pick on visit'}
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
         </div>
 
       </form>
