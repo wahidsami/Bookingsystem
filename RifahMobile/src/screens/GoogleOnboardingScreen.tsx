@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -92,6 +92,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
     const [otpHint, setOtpHint] = useState('');
+    const [googlePromptInFlight, setGooglePromptInFlight] = useState(false);
 
     const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
         webClientId: googleClientId || undefined,
@@ -120,29 +121,52 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
         try {
             setLoading(true);
+            setGooglePromptInFlight(true);
             const result = await promptAsync();
             if (result.type !== 'success') {
+                setGooglePromptInFlight(false);
                 setLoading(false);
-                return;
             }
-
-            const idToken = extractIdToken(result as any, response as any);
-            if (!idToken) {
-                throw new Error(t('googleTokenMissing'));
-            }
-
-            const startResult = await api.googleStart(idToken);
-            setOnboardingToken(startResult.onboardingToken);
-            setEmail(startResult.profile?.email || '');
-            setFirstName(startResult.profile?.firstName || '');
-            setLastName(startResult.profile?.lastName || '');
-            setStep('phone');
         } catch (err: any) {
+            setGooglePromptInFlight(false);
             setError(err?.message || t('googleSignInFailed'));
-        } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const completeGoogleStart = async () => {
+            if (!googlePromptInFlight) {
+                return;
+            }
+
+            const idToken = extractIdToken(response as any, response as any);
+            if (!idToken) {
+                return;
+            }
+
+            try {
+                const startResult = await api.googleStart(idToken);
+                setOnboardingToken(startResult.onboardingToken);
+                setEmail(startResult.profile?.email || '');
+                setFirstName(startResult.profile?.firstName || '');
+                setLastName(startResult.profile?.lastName || '');
+                setStep('phone');
+                setError('');
+            } catch (err: any) {
+                setError(err?.message || t('googleSignInFailed'));
+            } finally {
+                setGooglePromptInFlight(false);
+                setLoading(false);
+            }
+        };
+
+        completeGoogleStart().catch(() => {
+            setGooglePromptInFlight(false);
+            setLoading(false);
+            setError(t('googleSignInFailed'));
+        });
+    }, [googlePromptInFlight, response, t]);
 
     const sendOtp = async () => {
         setError('');
