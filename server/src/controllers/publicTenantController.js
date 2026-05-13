@@ -1041,15 +1041,23 @@ exports.createPublicBooking = async (req, res) => {
             const totalPrice = parseFloat(appointment.price || 0);
             const splitPayment = calculateServiceDeposit(totalPrice, tenantPaymentSettings);
             const safeBookingFee = splitPayment.depositAmount;
+            const normalizedTotalPrice = Number.isFinite(totalPrice) ? totalPrice : 0;
+            const isFullyCoveredByDeposit = safeBookingFee >= normalizedTotalPrice && normalizedTotalPrice > 0;
+            const nextPaymentStatus = isFullyCoveredByDeposit
+                ? APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                : APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
+            const safeRemainderAmount = isFullyCoveredByDeposit
+                ? 0
+                : splitPayment.remainderAmount;
 
             await appointment.update({
-                paymentStatus: APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
+                paymentStatus: nextPaymentStatus,
                 paymentMethod: 'mock_booking_fee',
                 paidAt: new Date(),
                 depositAmount: safeBookingFee,
                 depositPaid: safeBookingFee > 0,
-                remainderAmount: splitPayment.remainderAmount,
-                remainderPaid: false,
+                remainderAmount: safeRemainderAmount,
+                remainderPaid: isFullyCoveredByDeposit,
                 totalPaid: safeBookingFee
             });
 

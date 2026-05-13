@@ -171,9 +171,22 @@ export function BookingsScreen({ navigation }: any) {
     const getStaffName = (booking: Booking) =>
         booking.Staff?.name || booking.staff?.name || '-';
 
-    const getPaymentStatusText = (paymentStatus?: string | null) => {
+    const getPaymentStatusText = (booking: Booking) => {
+        const paymentStatus = booking.paymentStatus;
+        const outstandingAmount = getBookingOutstandingAmount(booking);
+        const normalizedPaymentStatus = (() => {
+            const raw = `${paymentStatus || ''}`.trim().toLowerCase();
+            if ((raw === 'fully_paid' || raw === 'paid') && outstandingAmount > 0.009) {
+                return 'deposit_paid';
+            }
+            if (raw === 'deposit_paid' && outstandingAmount <= 0.009) {
+                return 'fully_paid';
+            }
+            return raw || 'pending';
+        })();
+
         if (language === 'ar') {
-            switch (paymentStatus) {
+            switch (normalizedPaymentStatus) {
                 case 'pending': return 'بانتظار الدفع';
                 case 'deposit_paid': return 'عربون مدفوع';
                 case 'fully_paid':
@@ -184,7 +197,7 @@ export function BookingsScreen({ navigation }: any) {
             }
         }
 
-        switch (paymentStatus) {
+        switch (normalizedPaymentStatus) {
             case 'pending': return 'Pending';
             case 'deposit_paid': return 'Deposit Paid';
             case 'fully_paid':
@@ -465,7 +478,7 @@ export function BookingsScreen({ navigation }: any) {
                                             </View>
                                             <View style={styles.detailRow}>
                                                 <Text style={styles.detailLabel}>{language === 'ar' ? 'حالة الدفع' : 'Payment Status'}</Text>
-                                                <Text style={styles.detailValue}>{getPaymentStatusText(booking.paymentStatus)}</Text>
+                                                <Text style={styles.detailValue}>{getPaymentStatusText(booking)}</Text>
                                             </View>
                                             <View style={styles.detailRow}>
                                                 <Text style={styles.detailLabel}>{language === 'ar' ? 'السعر' : 'Amount'}</Text>

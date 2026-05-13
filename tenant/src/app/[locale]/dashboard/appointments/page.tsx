@@ -60,6 +60,8 @@ interface Appointment {
   platformFee?: number;
   tenantRevenue?: number;
   employeeCommission?: number;
+  totalPaid?: number;
+  outstandingAmount?: number;
   remainderAmount?: number;
   notes?: string;
   paymentMethod?: string | null;
@@ -426,6 +428,32 @@ export default function AppointmentsPage() {
       case 'partially_refunded': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const resolveEffectivePaymentStatus = (appointment: {
+    paymentStatus?: string | null;
+    price?: number | null;
+    totalPaid?: number | null;
+    outstandingAmount?: number | null;
+    remainderAmount?: number | null;
+  }) => {
+    const rawStatus = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
+    const price = Number(appointment.price || 0);
+    const totalPaid = Number(appointment.totalPaid || 0);
+    const explicitOutstanding = Number(appointment.outstandingAmount);
+    const outstanding = Number.isFinite(explicitOutstanding)
+      ? explicitOutstanding
+      : Math.max(0, price - totalPaid);
+    const remainderAmount = Number(appointment.remainderAmount || 0);
+
+    if ((rawStatus === 'fully_paid' || rawStatus === 'paid') && outstanding > 0.009) {
+      return 'deposit_paid';
+    }
+    if (rawStatus === 'deposit_paid' && outstanding <= 0.009 && remainderAmount <= 0.009) {
+      return 'fully_paid';
+    }
+
+    return rawStatus || 'pending';
   };
 
   const getStatusLabel = (status: string) => {
@@ -1069,10 +1097,15 @@ export default function AppointmentsPage() {
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(appointment.status)}`}>
                         {getStatusLabel(appointment.status)}
                       </span>
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getPaymentStatusColor(appointment.paymentStatus)}`}>
-                        {getPaymentStatusLabel(appointment.paymentStatus)}
-                      </span>
-                      {appointment.paymentStatus === 'deposit_paid' && (
+                      {(() => {
+                        const effectivePaymentStatus = resolveEffectivePaymentStatus(appointment);
+                        return (
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${getPaymentStatusColor(effectivePaymentStatus)}`}>
+                            {getPaymentStatusLabel(effectivePaymentStatus)}
+                          </span>
+                        );
+                      })()}
+                      {resolveEffectivePaymentStatus(appointment) === 'deposit_paid' && (
                         <span className="px-2 py-1 rounded text-xs font-semibold bg-amber-200 text-amber-900">
                           {t("remainderDue") || "Remainder due"}
                         </span>

@@ -1067,6 +1067,14 @@ exports.updatePaymentStatus = async (req, res) => {
                 appointment.remainderAmount = splitPayment.remainderAmount;
                 appointment.totalPaid = splitPayment.depositAmount;
             }
+            const totalPrice = parseFloat(appointment.price || 0);
+            const totalPaid = parseFloat(appointment.totalPaid || 0);
+            const fullyCovered = Number.isFinite(totalPrice) && Number.isFinite(totalPaid) && totalPrice > 0 && totalPaid >= totalPrice;
+            if (fullyCovered) {
+                appointment.paymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
+                appointment.remainderAmount = 0;
+                appointment.remainderPaid = true;
+            }
             appointment.paidAt = appointment.paidAt || new Date();
             if (appointment.status === 'pending') {
                 appointment.status = 'confirmed';

@@ -210,6 +210,33 @@ function getStatusLabel(status: string, locale: string) {
   }
 }
 
+function resolveEffectivePaymentStatus(item: {
+  paymentStatus?: string | null;
+  price?: number | null;
+  totalPaid?: number | null;
+  outstandingAmount?: number | null;
+  remainderAmount?: number | null;
+}) {
+  const rawStatus = `${item.paymentStatus || ''}`.trim().toLowerCase();
+  const price = Number(item.price || 0);
+  const totalPaid = Number(item.totalPaid || 0);
+  const explicitOutstanding = Number(item.outstandingAmount);
+  const computedOutstanding = Number.isFinite(explicitOutstanding)
+    ? explicitOutstanding
+    : Math.max(0, price - totalPaid);
+  const remainderAmount = Number(item.remainderAmount || 0);
+
+  if ((rawStatus === 'fully_paid' || rawStatus === 'paid') && computedOutstanding > 0.009) {
+    return 'deposit_paid';
+  }
+
+  if (rawStatus === 'deposit_paid' && computedOutstanding <= 0.009 && remainderAmount <= 0.009) {
+    return 'fully_paid';
+  }
+
+  return rawStatus || 'pending';
+}
+
 function getPaymentStatusLabel(status: string, locale: string) {
   switch (status) {
     case "pending":
@@ -617,7 +644,7 @@ export function AppointmentDetailsDrawer({
                   {getStatusLabel(item.status, locale)}
                 </span>
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                  {getPaymentStatusLabel(item.paymentStatus, locale)}
+                  {getPaymentStatusLabel(resolveEffectivePaymentStatus(item), locale)}
                 </span>
               </div>
               <h5 className="text-base font-bold text-gray-900">
@@ -729,7 +756,7 @@ export function AppointmentDetailsDrawer({
                     <p className="mt-1 text-xs text-gray-500">{formatDateTime(item.date, locale)}</p>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                        {getPaymentStatusLabel(item.paymentStatus, locale)}
+                        {getPaymentStatusLabel(resolveEffectivePaymentStatus(item), locale)}
                       </span>
                       <Currency amount={Number(item.outstandingAmount || item.price || 0)} className="text-sm font-bold text-gray-900" />
                     </div>
@@ -999,7 +1026,7 @@ export function AppointmentDetailsDrawer({
                           {getStatusLabel(appointment.status, locale)}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                          {getPaymentStatusLabel(appointment.paymentStatus, locale)}
+                          {getPaymentStatusLabel(resolveEffectivePaymentStatus(appointment), locale)}
                         </span>
                       </div>
 
