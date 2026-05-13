@@ -575,11 +575,15 @@ exports.getAppointmentsBoard = async (req, res) => {
         const dateKey = date;
         const dayStart = new Date(`${dateKey}T00:00:00`);
         const dayEnd = new Date(`${dateKey}T23:59:59.999`);
+        // Add tolerance window to reduce timezone-edge misses between
+        // booking source timezone and dashboard viewer timezone.
+        const boardWindowStart = new Date(dayStart.getTime() - (12 * 60 * 60 * 1000));
+        const boardWindowEnd = new Date(dayEnd.getTime() + (12 * 60 * 60 * 1000));
         const dayOfWeek = selectedDate.getDay();
 
         const appointmentWhere = {
             startTime: {
-                [Op.between]: [dayStart, dayEnd]
+                [Op.between]: [boardWindowStart, boardWindowEnd]
             }
         };
 

@@ -260,9 +260,20 @@ export function CalendarView({
     const appointmentStartMinutes = (startHour * 60) + startMinute;
     const appointmentEndMinutes = (endHour * 60) + endMinute;
 
-    // If appointment is fully outside the board range, don't render it.
-    if (appointmentEndMinutes <= boardStartMinutes || appointmentStartMinutes >= boardEndMinutes) {
-      return { display: 'none' };
+    // If appointment is fully outside the board range, pin it to the closest edge
+    // instead of hiding it, so operators can still see and investigate it.
+    if (appointmentEndMinutes <= boardStartMinutes) {
+      return {
+        top: '2px',
+        height: `${Math.max(18, MIN_APPOINTMENT_HEIGHT * 0.35)}px`
+      };
+    }
+
+    if (appointmentStartMinutes >= boardEndMinutes) {
+      return {
+        top: `${Math.max(0, totalHeight - Math.max(18, MIN_APPOINTMENT_HEIGHT * 0.35) - 2)}px`,
+        height: `${Math.max(18, MIN_APPOINTMENT_HEIGHT * 0.35)}px`
+      };
     }
 
     const clampedStartMinutes = Math.max(appointmentStartMinutes, boardStartMinutes);
