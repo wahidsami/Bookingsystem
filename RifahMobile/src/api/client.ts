@@ -909,10 +909,7 @@ class ApiClient {
     }
 
     async hasActiveSession(): Promise<boolean> {
-        const token = await this.getToken();
-        if (!token) {
-            return false;
-        }
+        let token = await this.getToken();
 
         const expired = await this.isSessionExpired();
         if (expired) {
@@ -920,12 +917,21 @@ class ApiClient {
             return false;
         }
 
+        // If access token is missing but refresh token exists, recover session silently.
+        if (!token) {
+            const refreshedToken = await this.refreshAccessToken();
+            if (!refreshedToken) {
+                return false;
+            }
+            token = refreshedToken;
+        }
+
         const lastActive = await this.getLastSessionActivity();
         if (!lastActive) {
             await this.touchSession();
         }
 
-        return true;
+        return Boolean(token);
     }
 
     /**
@@ -997,8 +1003,8 @@ class ApiClient {
             headers,
         }, timeoutMs);
 
-        // If 401, try to refresh token and retry once
-        if (response.status === 401 && token) {
+        // If 401, try to refresh token and retry once (even if access token was missing)
+        if (response.status === 401) {
             const newToken = await this.refreshAccessToken();
             if (newToken) {
                 // Retry with new token
