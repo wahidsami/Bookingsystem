@@ -39,6 +39,31 @@ const prettifySlug = (value) => value
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
+const normalizeGeneralSettings = (generalSettings = {}) => {
+    const sections = generalSettings?.sections || {};
+    const aboutFallback = sections.about !== undefined ? sections.about : (sections.callToAction !== false);
+
+    return {
+        ...generalSettings,
+        template: generalSettings?.template || 'template1',
+        theme: {
+            primaryColor: generalSettings?.theme?.primaryColor || '#3B82F6',
+            secondaryColor: generalSettings?.theme?.secondaryColor || '#8B5CF6',
+            helperColor: generalSettings?.theme?.helperColor || '#10B981'
+        },
+        sections: {
+            heroSlider: sections.heroSlider !== false,
+            services: sections.services !== false,
+            products: sections.products !== false,
+            about: aboutFallback !== false,
+            reviews: sections.reviews === true,
+            // keep legacy key for backward compatibility
+            callToAction: sections.callToAction !== false
+        },
+        logo: generalSettings?.logo || null
+    };
+};
+
 /**
  * Get all active tenants (public listing)
  */
@@ -383,6 +408,8 @@ exports.getPublicPageData = async (req, res) => {
                         heroSlider: true,
                         services: true,
                         products: true,
+                        about: true,
+                        reviews: false,
                         callToAction: true
                     }
                 }
@@ -418,23 +445,7 @@ exports.getPublicPageData = async (req, res) => {
                     about: pageData.pageBanner_about || null,
                     contact: pageData.pageBanner_contact || null
                 },
-                generalSettings: {
-                    ...(pageData.generalSettings || {
-                        template: 'template1',
-                        theme: {
-                            primaryColor: '#3B82F6',
-                            secondaryColor: '#8B5CF6',
-                            helperColor: '#10B981'
-                        },
-                        sections: {
-                            heroSlider: true,
-                            services: true,
-                            products: true,
-                            callToAction: true
-                        }
-                    }),
-                    logo: pageData.generalSettings?.logo || null
-                }
+                generalSettings: normalizeGeneralSettings(pageData.generalSettings || {})
             }
         });
     } catch (error) {

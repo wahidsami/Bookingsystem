@@ -99,7 +99,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 const sections = pageDataRes.data.generalSettings.sections;
                 isProductsEnabled = sections.products !== false;
                 isServicesEnabled = sections.services !== false;
-                isAboutEnabled = sections.about !== false;
+                isAboutEnabled = sections.about !== false && sections.callToAction !== false;
+                isReviewsEnabled = sections.reviews === true;
 
                 setShowProductsTab(isProductsEnabled);
                 setShowServicesTab(isServicesEnabled);
@@ -109,6 +110,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 setShowProductsTab(true); // Fallback to true if no settings found
                 isProductsEnabled = true;
                 setShowReviewsTab(false);
+                setShowAboutTab(true);
             }
 
             // Fallback for activeTab if the default 'services' is hidden
@@ -231,15 +233,17 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     );
     const missions = normalizeList(pageData?.aboutUs?.missions);
     const visions = normalizeList(pageData?.aboutUs?.visions);
+    const pageSetup = pageData?.generalSettings?.pageSetup || {};
     const socialLinks = [
-        { key: 'instagram', url: tenant?.instagramUrl, icon: 'instagram' as const, color: '#E1306C' },
-        { key: 'twitter', url: tenant?.twitterUrl, icon: 'twitter' as const, color: '#1DA1F2' },
+        { key: 'instagram', url: pageSetup?.instagramUrl || tenant?.instagramUrl, icon: 'instagram' as const, color: '#E1306C' },
+        { key: 'twitter', url: pageSetup?.twitterUrl || tenant?.twitterUrl, icon: 'twitter' as const, color: '#1DA1F2' },
         { key: 'facebook', url: tenant?.facebookUrl, icon: 'link' as const, color: '#1877F2' },
-        { key: 'linkedin', url: tenant?.linkedinUrl, icon: 'linkedin' as const, color: '#0A66C2' },
-        { key: 'youtube', url: tenant?.youtubeUrl, icon: 'youtube' as const, color: '#FF0000' },
-        { key: 'tiktok', url: tenant?.tiktokUrl, icon: 'tiktok' as const, color: '#111111' },
+        { key: 'linkedin', url: pageSetup?.linkedinUrl || tenant?.linkedinUrl, icon: 'linkedin' as const, color: '#0A66C2' },
+        { key: 'youtube', url: pageSetup?.youtubeUrl || tenant?.youtubeUrl, icon: 'youtube' as const, color: '#FF0000' },
+        { key: 'tiktok', url: pageSetup?.tiktokUrl || tenant?.tiktokUrl, icon: 'tiktok' as const, color: '#111111' },
+        { key: 'snapchat', url: pageSetup?.snapchatUrl || tenant?.snapchatUrl, icon: 'snapchat' as const, color: '#FACC15' },
     ].filter((item) => item.url);
-    const locationLine = [
+    const locationLine = pageSetup?.addressText || [
         tenant?.buildingNumber,
         tenant?.street,
         tenant?.district,
@@ -594,12 +598,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 </View>
             ) : null}
 
-            {locationLine || tenant?.googleMapLink ? (
+            {locationLine || pageSetup?.googleMapLink || tenant?.googleMapLink ? (
                 <View style={styles.sectionBlock}>
                     <Text style={styles.sectionTitle}>{t('location')}</Text>
                     {locationLine ? <Text style={styles.addressText}>{locationLine}</Text> : null}
-                    {tenant?.googleMapLink ? (
-                        <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(tenant.googleMapLink)}>
+                    {pageSetup?.googleMapLink || tenant?.googleMapLink ? (
+                        <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(pageSetup?.googleMapLink || tenant?.googleMapLink)}>
                             <AppIcon name="location" size={32} color={colors.textSecondary} />
                             <Text style={styles.mapText}>{t('viewOnMap')}</Text>
                         </TouchableOpacity>
@@ -623,25 +627,25 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 </View>
             ) : null}
 
-            {tenant?.phone || tenant?.mobile || tenant?.email || tenant?.website ? (
+            {pageSetup?.phone || tenant?.phone || tenant?.mobile || pageSetup?.email || tenant?.email || pageSetup?.website || tenant?.website ? (
                 <View style={styles.sectionBlock}>
                     <Text style={styles.sectionTitle}>{t('contact')}</Text>
-                    {tenant?.phone || tenant?.mobile ? (
+                    {pageSetup?.phone || tenant?.phone || tenant?.mobile ? (
                         <View style={styles.contactRow}>
                             <AppIcon name="phone" size={20} color={colors.primary} />
-                            <Text style={styles.contactText}>{tenant?.phone || tenant?.mobile}</Text>
+                            <Text style={styles.contactText}>{pageSetup?.phone || tenant?.phone || tenant?.mobile}</Text>
                         </View>
                     ) : null}
-                    {tenant?.email ? (
+                    {pageSetup?.email || tenant?.email ? (
                         <View style={styles.contactRow}>
                             <AppIcon name="mail" size={20} color={colors.primary} />
-                            <Text style={styles.contactText}>{tenant.email}</Text>
+                            <Text style={styles.contactText}>{pageSetup?.email || tenant?.email}</Text>
                         </View>
                     ) : null}
-                    {tenant?.website ? (
-                        <TouchableOpacity style={styles.contactRow} onPress={() => openExternalUrl(tenant.website)}>
+                    {pageSetup?.website || tenant?.website ? (
+                        <TouchableOpacity style={styles.contactRow} onPress={() => openExternalUrl(pageSetup?.website || tenant?.website)}>
                             <AppIcon name="globe" size={20} color={colors.primary} />
-                            <Text style={styles.contactText}>{tenant.website}</Text>
+                            <Text style={styles.contactText}>{pageSetup?.website || tenant?.website}</Text>
                         </TouchableOpacity>
                     ) : null}
                 </View>

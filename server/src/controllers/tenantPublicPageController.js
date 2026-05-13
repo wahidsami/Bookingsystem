@@ -68,6 +68,31 @@ const upload = multer({
 // Using upload.any() to accept dynamic field names for mission/vision/value images
 exports.uploadMiddleware = upload.any();
 
+const normalizeGeneralSettings = (generalSettings = {}) => {
+    const sections = generalSettings?.sections || {};
+    const aboutFallback = sections.about !== undefined ? sections.about : (sections.callToAction !== false);
+
+    return {
+        ...generalSettings,
+        template: generalSettings?.template || 'template1',
+        theme: {
+            primaryColor: generalSettings?.theme?.primaryColor || '#3B82F6',
+            secondaryColor: generalSettings?.theme?.secondaryColor || '#8B5CF6',
+            helperColor: generalSettings?.theme?.helperColor || '#10B981'
+        },
+        sections: {
+            heroSlider: sections.heroSlider !== false,
+            services: sections.services !== false,
+            products: sections.products !== false,
+            about: aboutFallback !== false,
+            reviews: sections.reviews === true,
+            // keep legacy key for compatibility
+            callToAction: sections.callToAction !== false
+        },
+        logo: generalSettings?.logo || null
+    };
+};
+
 /**
  * Get public page data for tenant
  */
@@ -127,7 +152,7 @@ exports.getPublicPageData = async (req, res) => {
                 },
                 homePage: pageData.homePage_data || {},
                 contactUs: pageData.contactUs_data || {},
-                generalSettings: pageData.generalSettings || {}
+                generalSettings: normalizeGeneralSettings(pageData.generalSettings || {})
             }
         });
     } catch (error) {
@@ -277,12 +302,12 @@ exports.updatePublicPageData = async (req, res) => {
             
             // Merge with existing generalSettings to preserve logo if it exists
             const currentSettings = pageData.generalSettings || {};
-            pageData.generalSettings = {
+            pageData.generalSettings = normalizeGeneralSettings({
                 ...currentSettings,
                 ...generalSettingsData,
                 // Preserve logo if it exists and wasn't explicitly removed
                 logo: generalSettingsData.logo !== undefined ? generalSettingsData.logo : currentSettings.logo
-            };
+            });
         }
 
         // Handle page banners - using dedicated columns (following aboutUs_heroImage pattern)
