@@ -153,7 +153,10 @@ export function PurchasesScreen({ navigation }: any) {
 
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
-                    <Text style={styles.price}>{Number(item.totalAmount || 0).toFixed(2)} SAR</Text>
+                    <View style={styles.priceBlock}>
+                        <Text style={styles.price}>{Number(item.totalAmount || 0).toFixed(2)} SAR</Text>
+                        <Text style={styles.totalHint}>{language === 'ar' ? 'إجمالي الطلب' : 'Order total'}</Text>
+                    </View>
                     <View style={styles.actions}>
                         {orderNeedsPayment(item) && (
                             <TouchableOpacity
@@ -385,11 +388,16 @@ const styles = StyleSheet.create({
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         marginTop: spacing.sm,
         paddingTop: spacing.sm,
         borderTopWidth: 1,
         borderTopColor: colors.border + '40',
+        gap: spacing.sm,
+    },
+    priceBlock: {
+        flex: 1,
+        gap: 2,
     },
     price: {
         fontSize: fontSize.lg,
@@ -399,12 +407,18 @@ const styles = StyleSheet.create({
     actions: {
         flexDirection: 'row',
         gap: spacing.sm,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-end',
     },
     payButton: {
+        minWidth: 96,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
+        paddingVertical: spacing.sm,
         backgroundColor: colors.primary,
         borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     payButtonText: {
         color: '#FFFFFF',
@@ -412,15 +426,23 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     cancelButton: {
+        minWidth: 96,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
+        paddingVertical: spacing.sm,
         borderWidth: 1,
         borderColor: '#EF4444',
         borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     cancelButtonText: {
         color: '#EF4444',
         fontSize: fontSize.sm,
+        fontWeight: '600',
+    },
+    totalHint: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
         fontWeight: '600',
     },
     emptyContainer: {

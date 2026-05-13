@@ -281,12 +281,14 @@ export function BookingsScreen({ navigation }: any) {
 
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
-                    <Text style={styles.price}>{item.totalPrice.toFixed(2)} SAR</Text>
-                    <Text style={styles.variantLabel}>
-                        {language === 'ar'
-                            ? `يدفع الآن: ${item.payableNowTotal.toFixed(2)} SAR`
-                            : `Due now: ${item.payableNowTotal.toFixed(2)} SAR`}
-                    </Text>
+                    <View style={styles.priceBlock}>
+                        <Text style={styles.price}>{item.totalPrice.toFixed(2)} SAR</Text>
+                        <Text style={styles.dueNowText}>
+                            {language === 'ar'
+                                ? `يدفع الآن: ${item.payableNowTotal.toFixed(2)} SAR`
+                                : `Due now: ${item.payableNowTotal.toFixed(2)} SAR`}
+                        </Text>
+                    </View>
                     <View style={styles.actions}>
                         <TouchableOpacity
                             style={styles.payButton}
@@ -732,8 +734,13 @@ const styles = StyleSheet.create({
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         marginTop: spacing.sm,
+        gap: spacing.sm,
+    },
+    priceBlock: {
+        flex: 1,
+        gap: 2,
     },
     price: {
         fontSize: fontSize.lg,
@@ -743,16 +750,25 @@ const styles = StyleSheet.create({
     actions: {
         flexDirection: 'row',
         gap: spacing.sm,
+        alignItems: 'center',
     },
     payButton: {
+        minWidth: 120,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
+        paddingVertical: spacing.sm,
         backgroundColor: colors.primary,
         borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     payButtonText: {
         color: '#FFFFFF',
         fontSize: fontSize.sm,
+        fontWeight: '600',
+    },
+    dueNowText: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
         fontWeight: '600',
     },
     cancelButton: {

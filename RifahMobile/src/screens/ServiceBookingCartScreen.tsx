@@ -125,8 +125,8 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                         ? 'أضف خدمة من صفحة الخدمة ثم عد هنا لإكمال الحجز.'
                         : 'Add a service from the tenant page and come back here to complete the booking.'}
                 </Text>
-                <TouchableOpacity style={styles.primaryButton} onPress={openTenant}>
-                    <Text style={styles.primaryButtonText}>
+                <TouchableOpacity style={styles.emptyCtaButton} onPress={openTenant}>
+                    <Text style={styles.emptyCtaButtonText}>
                         {language === 'ar' ? 'تصفح الخدمات' : 'Browse Services'}
                     </Text>
                 </TouchableOpacity>
@@ -302,6 +302,23 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: spacing.sm,
         marginBottom: spacing.xl,
+    },
+    emptyCtaButton: {
+        minWidth: 180,
+        maxWidth: 260,
+        width: '72%',
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+    },
+    emptyCtaButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: fontSize.md,
+        textAlign: 'center',
     },
     header: {
         flexDirection: 'row',
