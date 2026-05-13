@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { ThemedText as Text } from '../components/ThemedText';
@@ -118,7 +118,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
     if (items.length === 0) {
         return (
             <View style={[styles.container, styles.emptyState]}>
-                <Ionicons name="calendar-outline" size={72} color={colors.textSecondary} />
+                <AppIcon name="bookings" size={72} color={colors.textSecondary} />
                 <Text style={styles.emptyTitle}>{language === 'ar' ? 'لا توجد خدمات محفوظة' : 'Your booking cart is empty'}</Text>
                 <Text style={styles.emptySubtitle}>
                     {language === 'ar'
@@ -142,7 +142,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
         >
             <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text} />
+                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.headerTitle}>
@@ -153,7 +153,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                     </Text>
                 </View>
                 <TouchableOpacity style={styles.headerAction} onPress={openTenant}>
-                    <Ionicons name="add" size={20} color={colors.primary} />
+                    <AppIcon name="plus" size={20} color={colors.primary} />
                 </TouchableOpacity>
             </View>
 
@@ -216,7 +216,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                                     <Text style={styles.itemMeta}>{staffLabel}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.removeButton}>
-                                    <Ionicons name="trash-outline" size={18} color={colors.error} />
+                                    <AppIcon name="delete" size={18} color={colors.error} />
                                 </TouchableOpacity>
                             </View>
 

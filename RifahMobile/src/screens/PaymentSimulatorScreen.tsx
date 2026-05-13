@@ -5,7 +5,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -64,7 +64,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
         return (
             <SafeAreaView style={[styles.container, styles.centerAll]} edges={['top', 'bottom']}>
                 <View style={styles.successCircle}>
-                    <Ionicons name="checkmark" size={60} color="white" />
+                    <AppIcon name="star" size={60} color="white" />
                 </View>
                 <Text style={styles.successTitle}>Payment Successful!</Text>
                 <Text style={styles.successSubtitle}>Your order has been placed.</Text>
@@ -81,7 +81,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
             >
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} disabled={isProcessing}>
-                        <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={colors.text} />
+                        <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>RefahPay Checkout</Text>
                     <View style={{ width: 40 }} />
@@ -162,7 +162,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
                         )}
                     </TouchableOpacity>
                     <View style={styles.secureBadge}>
-                        <Ionicons name="lock-closed" size={12} color={colors.textSecondary} />
+                        <AppIcon name="lock" size={12} color={colors.textSecondary} />
                         <Text style={styles.secureText}>Secure Payment via RefahPay Simulator</Text>
                     </View>
                 </View>

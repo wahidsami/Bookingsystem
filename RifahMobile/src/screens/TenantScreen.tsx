@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { api, Tenant, Service, ServiceVariant, Staff, Product, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 
@@ -232,12 +232,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const missions = normalizeList(pageData?.aboutUs?.missions);
     const visions = normalizeList(pageData?.aboutUs?.visions);
     const socialLinks = [
-        { key: 'instagram', url: tenant?.instagramUrl, icon: 'logo-instagram' as const, color: '#E1306C' },
-        { key: 'twitter', url: tenant?.twitterUrl, icon: 'logo-twitter' as const, color: '#1DA1F2' },
-        { key: 'facebook', url: tenant?.facebookUrl, icon: 'logo-facebook' as const, color: '#1877F2' },
-        { key: 'linkedin', url: tenant?.linkedinUrl, icon: 'logo-linkedin' as const, color: '#0A66C2' },
-        { key: 'youtube', url: tenant?.youtubeUrl, icon: 'logo-youtube' as const, color: '#FF0000' },
-        { key: 'tiktok', url: tenant?.tiktokUrl, icon: 'logo-tiktok' as const, color: '#111111' },
+        { key: 'instagram', url: tenant?.instagramUrl, icon: 'instagram' as const, color: '#E1306C' },
+        { key: 'twitter', url: tenant?.twitterUrl, icon: 'twitter' as const, color: '#1DA1F2' },
+        { key: 'facebook', url: tenant?.facebookUrl, icon: 'link' as const, color: '#1877F2' },
+        { key: 'linkedin', url: tenant?.linkedinUrl, icon: 'linkedin' as const, color: '#0A66C2' },
+        { key: 'youtube', url: tenant?.youtubeUrl, icon: 'youtube' as const, color: '#FF0000' },
+        { key: 'tiktok', url: tenant?.tiktokUrl, icon: 'tiktok' as const, color: '#111111' },
     ].filter((item) => item.url);
     const locationLine = [
         tenant?.buildingNumber,
@@ -384,17 +384,17 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         <View style={styles.heroContent}>
                             <View style={[styles.heroHeader, { marginTop: topInset }]}>
                                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                                    <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="white" />
+                                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color="white" />
                                 </TouchableOpacity>
                                 <View style={styles.heroActions}>
                                     <TouchableOpacity style={styles.iconButton} onPress={handleShareTenant}>
-                                        <Ionicons name="share-outline" size={24} color="white" />
+                                        <AppIcon name="share" size={24} color="white" />
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={styles.iconButton}
                                         onPress={() => navigation.navigate('ServiceBookingCart')}
                                     >
-                                        <Ionicons name="calendar-outline" size={24} color="white" />
+                                        <AppIcon name="bookings" size={24} color="white" />
                                         {serviceBookingItemCount > 0 && (
                                             <View style={styles.badgeContainer}>
                                                 <Text style={styles.badgeText}>{serviceBookingItemCount}</Text>
@@ -402,7 +402,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         )}
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Cart', { tenant })}>
-                                        <Ionicons name="cart-outline" size={24} color="white" />
+                                        <AppIcon name="cart" size={24} color="white" />
                                         {itemCount > 0 && (
                                             <View style={styles.badgeContainer}>
                                                 <Text style={styles.badgeText}>{itemCount}</Text>
@@ -468,7 +468,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     <View style={styles.serviceBookingBanner}>
                         <View style={styles.serviceBookingBannerLeft}>
                             <View style={styles.serviceBookingBannerIcon}>
-                                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                                <AppIcon name="bookings" size={18} color={colors.primary} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.serviceBookingBannerTitle}>
@@ -512,7 +512,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     </View>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.addButton} onPress={() => handleBookService(service)}>
-                                        <Ionicons name="add" size={24} color={colors.primary} />
+                                        <AppIcon name="plus" size={24} color={colors.primary} />
                                     </TouchableOpacity>
                                 </View>
                             ))}
@@ -549,7 +549,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     </View>
                                     <TouchableOpacity style={styles.addToCartButton} onPress={() => handleAddProduct(product)}>
                                         <Text style={styles.addToCartText}>{t('addToCart' as any) || 'Add'}</Text>
-                                        <Ionicons name="cart-outline" size={18} color="white" />
+                                        <AppIcon name="cart" size={18} color="white" />
                                     </TouchableOpacity>
                                 </View>
                             );
@@ -600,7 +600,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     {locationLine ? <Text style={styles.addressText}>{locationLine}</Text> : null}
                     {tenant?.googleMapLink ? (
                         <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(tenant.googleMapLink)}>
-                            <Ionicons name="map" size={32} color={colors.textSecondary} />
+                            <AppIcon name="location" size={32} color={colors.textSecondary} />
                             <Text style={styles.mapText}>{t('viewOnMap')}</Text>
                         </TouchableOpacity>
                     ) : null}
@@ -628,19 +628,19 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     <Text style={styles.sectionTitle}>{t('contact')}</Text>
                     {tenant?.phone || tenant?.mobile ? (
                         <View style={styles.contactRow}>
-                            <Ionicons name="call-outline" size={20} color={colors.primary} />
+                            <AppIcon name="phone" size={20} color={colors.primary} />
                             <Text style={styles.contactText}>{tenant?.phone || tenant?.mobile}</Text>
                         </View>
                     ) : null}
                     {tenant?.email ? (
                         <View style={styles.contactRow}>
-                            <Ionicons name="mail-outline" size={20} color={colors.primary} />
+                            <AppIcon name="mail" size={20} color={colors.primary} />
                             <Text style={styles.contactText}>{tenant.email}</Text>
                         </View>
                     ) : null}
                     {tenant?.website ? (
                         <TouchableOpacity style={styles.contactRow} onPress={() => openExternalUrl(tenant.website)}>
-                            <Ionicons name="globe-outline" size={20} color={colors.primary} />
+                            <AppIcon name="globe" size={20} color={colors.primary} />
                             <Text style={styles.contactText}>{tenant.website}</Text>
                         </TouchableOpacity>
                     ) : null}
@@ -653,7 +653,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     <View style={styles.socialRow}>
                         {socialLinks.map((item) => (
                             <TouchableOpacity key={item.key} style={styles.socialIcon} onPress={() => openExternalUrl(item.url)}>
-                                <Ionicons name={item.icon} size={24} color={item.color} />
+                                <AppIcon name={item.icon as any} size={24} color={item.color} />
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -705,22 +705,22 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <Text style={styles.serviceModalTitle}>{isRTL ? (selectedServiceDetails?.name_ar || selectedService.name_ar) : (selectedServiceDetails?.name_en || selectedService.name_en)}</Text>
                                 </View>
                                 <TouchableOpacity onPress={closeServiceDetails} style={styles.serviceModalClose}>
-                                    <Ionicons name="close" size={24} color={colors.text} />
+                                    <AppIcon name="close" size={24} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
 
                             <View style={styles.serviceMetaRow}>
                                 <View style={styles.serviceMetaBadge}>
-                                    <Ionicons name="time-outline" size={16} color={colors.primary} />
+                                    <AppIcon name="clock" size={16} color={colors.primary} />
                                     <Text style={styles.serviceMetaText}>{(selectedServiceDetails?.duration || selectedService.duration)} mins</Text>
                                 </View>
                                 <View style={styles.serviceMetaBadge}>
-                                    <Ionicons name="cash-outline" size={16} color={colors.primary} />
+                                    <AppIcon name="cash" size={16} color={colors.primary} />
                                     <Text style={styles.serviceMetaText}>{getServicePrice(selectedServiceDetails || selectedService).toFixed(2)} SAR</Text>
                                 </View>
                                 {(selectedServiceDetails?.employees || []).length > 0 ? (
                                     <View style={styles.serviceMetaBadge}>
-                                        <Ionicons name="star" size={16} color={colors.primary} />
+                                        <AppIcon name="star" size={16} color={colors.primary} />
                                         <Text style={styles.serviceMetaText}>
                                             {(selectedServiceDetails!.employees!.reduce((sum, member) => sum + (member.rating || 0), 0) / selectedServiceDetails!.employees!.length).toFixed(1)} ⭐
                                         </Text>
@@ -759,7 +759,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                                     <View style={styles.employeeHeaderRow}>
                                                         <Text style={styles.employeeName}>{employee.name}</Text>
                                                         <View style={styles.employeeRatingBadge}>
-                                                            <Ionicons name="star" size={12} color="#D97706" />
+                                                            <AppIcon name="star" size={12} color="#D97706" />
                                                             <Text style={styles.employeeRatingText}>{(employee.rating || 0).toFixed(1)}</Text>
                                                         </View>
                                                     </View>

@@ -4,7 +4,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, Service, Staff, SlotItem, getServicePrice, normalizeStaff } from '../api/client';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { useAppSession } from '../contexts/AppSessionContext';
@@ -154,7 +154,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 ? 'احجز الآن وادفع في المركز عند حضور الموعد.'
                 : 'Book now and settle the amount at the center when you arrive.',
             amountLabel: language === 'ar' ? 'يدفع لاحقاً' : 'Pay later',
-            icon: 'storefront-outline' as const,
+            icon: 'browse' as const,
         } : null,
         paymentSettings.allowServiceFullOnline && allowedServicePaymentMethods.has('online-full') ? {
             id: 'online-full' as ServicePaymentChoice,
@@ -163,7 +163,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 ? 'ادفع كامل قيمة الخدمة الآن لتأكيد الحجز.'
                 : 'Pay the full service amount now to lock in your booking.',
             amountLabel: `${servicePrice.toFixed(2)} SAR`,
-            icon: 'card-outline' as const,
+            icon: 'card' as const,
         } : null,
         paymentSettings.allowServiceDeposit && allowedServicePaymentMethods.has('booking-fee') ? {
             id: 'booking-fee' as ServicePaymentChoice,
@@ -172,14 +172,14 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 ? 'ادفع جزءاً من المبلغ الآن وأكمل الباقي عند المركز.'
                 : 'Pay a deposit now and settle the rest at the center.',
             amountLabel: `${bookingFeeAmount.toFixed(2)} SAR`,
-            icon: 'cash-outline' as const,
+            icon: 'cash' as const,
         } : null,
     ].filter(Boolean) as Array<{
         id: ServicePaymentChoice;
         title: string;
         subtitle: string;
         amountLabel: string;
-        icon: keyof typeof Ionicons.glyphMap;
+        icon: 'browse' | 'card' | 'cash';
     }>;
 
     const loadTimeSlots = async () => {
@@ -363,13 +363,13 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 onPress={() => setSelectedStaff(null)}
             >
                 <View style={styles.avatarPlaceholder}>
-                    <Ionicons name="people" size={24} color={colors.primary} />
+                    <AppIcon name="user" size={24} color={colors.primary} />
                 </View>
                 <View>
                     <Text style={styles.staffName}>Any Professional</Text>
                     <Text style={styles.staffRole}>Maximum Availability</Text>
                 </View>
-                {selectedStaff === null && <Ionicons name="checkmark-circle" size={24} color={colors.primary} />}
+                {selectedStaff === null && <AppIcon name="star" size={24} color={colors.primary} />}
             </TouchableOpacity>
 
             {staffList.map(staff => (
@@ -385,7 +385,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                         <Text style={styles.staffName}>{staff.name}</Text>
                         <Text style={styles.staffRole}>{staff.role || 'Specialist'}</Text>
                     </View>
-                    {selectedStaff?.id === staff.id && <Ionicons name="checkmark-circle" size={24} color={colors.primary} />}
+                    {selectedStaff?.id === staff.id && <AppIcon name="star" size={24} color={colors.primary} />}
                 </TouchableOpacity>
             ))}
         </View>
@@ -531,7 +531,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                             activeOpacity={0.9}
                         >
                             <View style={styles.paymentOptionIcon}>
-                                <Ionicons name={option.icon} size={20} color={colors.primary} />
+                                <AppIcon name={option.icon} size={20} color={colors.primary} />
                             </View>
                             <View style={styles.paymentOptionContent}>
                                 <View style={styles.paymentOptionHeader}>
@@ -540,11 +540,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                                 </View>
                                 <Text style={styles.paymentOptionSubtitle}>{option.subtitle}</Text>
                             </View>
-                            <Ionicons
-                                name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                                size={22}
-                                color={isSelected ? colors.primary : colors.textSecondary}
-                            />
+                            <AppIcon name={isSelected ? 'star' : 'clock'} size={20} color={isSelected ? colors.primary : colors.textSecondary} />
                         </TouchableOpacity>
                     );
                 })}
@@ -557,7 +553,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             {/* Header */}
             <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                    <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={colors.text} />
+                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Booking</Text>
                 <View style={{ width: 40 }} />

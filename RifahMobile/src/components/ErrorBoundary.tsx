@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Text } from 'react-native';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+import { AppIcon } from './AppIcon';
 
 interface Props {
     children: ReactNode;
@@ -34,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
             return (
                 <View style={styles.container}>
                     <ScrollView contentContainerStyle={styles.content}>
-                        <Text style={styles.icon}>⚠️</Text>
+                        <AppIcon name="warning" size={64} color={colors.primary} />
                         <Text style={styles.title}>Oops! Something went wrong.</Text>
                         <Text style={styles.subtitle}>
                             عذراً، حدث خطأ غير متوقع.
@@ -73,10 +74,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.xl,
-    },
-    icon: {
-        fontSize: 64,
-        marginBottom: spacing.lg,
     },
     title: {
         fontSize: fontSize.xxl,

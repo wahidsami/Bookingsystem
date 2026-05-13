@@ -4,7 +4,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { api, getImageUrl, Tenant } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -161,7 +161,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     if (cartItems.length === 0) {
         return (
             <View style={[styles.container, styles.centerAll]}>
-                <Ionicons name="cart-outline" size={80} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+                <AppIcon name="cart" size={80} color={colors.textSecondary} />
                 <Text style={styles.emptyTitle}>Your cart is empty</Text>
                 <Text style={styles.emptySubtitle}>Looks like you haven't added any products yet.</Text>
                 <TouchableOpacity style={styles.continueButton} onPress={() => navigation.goBack()}>
@@ -179,7 +179,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
         >
             <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={colors.text} />
+                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Shopping Cart</Text>
                 <View style={{ width: 40 }} />
@@ -199,16 +199,16 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                                 <Text style={styles.itemPrice}>{item.product.price} SAR</Text>
                                 <View style={styles.qtyControls}>
                                     <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.product.id, item.quantity - 1)}>
-                                        <Ionicons name="remove" size={18} color={colors.text} />
+                                        <AppIcon name="minus" size={18} color={colors.text} />
                                     </TouchableOpacity>
                                     <Text style={styles.qtyText}>{item.quantity}</Text>
                                     <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.product.id, item.quantity + 1)}>
-                                        <Ionicons name="add" size={18} color={colors.text} />
+                                        <AppIcon name="plus" size={18} color={colors.text} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
                             <TouchableOpacity onPress={() => removeFromCart(item.product.id)} style={styles.removeBtn}>
-                                <Ionicons name="trash-outline" size={20} color={colors.error} />
+                                <AppIcon name="delete" size={20} color={colors.error} />
                             </TouchableOpacity>
                         </View>
                     ))}
@@ -256,7 +256,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             style={[styles.methodOption, deliveryMethod === 'standard' && styles.methodOptionActive]}
                             onPress={() => setDeliveryMethod('standard')}
                         >
-                            <Ionicons name="bicycle-outline" size={24} color={deliveryMethod === 'standard' ? colors.primary : colors.textSecondary} />
+                            <AppIcon name="bicycle" size={24} color={deliveryMethod === 'standard' ? colors.primary : colors.textSecondary} />
                             <Text style={[styles.methodLabel, deliveryMethod === 'standard' && styles.methodLabelActive]}>Standard</Text>
                             <Text style={styles.methodDesc}>(2-3 days)</Text>
                         </TouchableOpacity>
@@ -264,7 +264,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             style={[styles.methodOption, deliveryMethod === 'express' && styles.methodOptionActive]}
                             onPress={() => setDeliveryMethod('express')}
                         >
-                            <Ionicons name="rocket-outline" size={24} color={deliveryMethod === 'express' ? colors.primary : colors.textSecondary} />
+                            <AppIcon name="rocket" size={24} color={deliveryMethod === 'express' ? colors.primary : colors.textSecondary} />
                             <Text style={[styles.methodLabel, deliveryMethod === 'express' && styles.methodLabelActive]}>Express</Text>
                             <Text style={styles.methodDesc}>(Same day)</Text>
                         </TouchableOpacity>
@@ -278,14 +278,14 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             style={[styles.methodOption, paymentMethod === 'online' && styles.methodOptionActive]}
                             onPress={() => setPaymentMethod('online')}
                         >
-                            <Ionicons name="card-outline" size={24} color={paymentMethod === 'online' ? colors.primary : colors.textSecondary} />
+                            <AppIcon name="card" size={24} color={paymentMethod === 'online' ? colors.primary : colors.textSecondary} />
                             <Text style={[styles.methodLabel, paymentMethod === 'online' && styles.methodLabelActive]}>Credit Card</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.methodOption, paymentMethod === 'cash-on-delivery' && styles.methodOptionActive]}
                             onPress={() => setPaymentMethod('cash-on-delivery')}
                         >
-                            <Ionicons name="cash-outline" size={24} color={paymentMethod === 'cash-on-delivery' ? colors.primary : colors.textSecondary} />
+                            <AppIcon name="cash" size={24} color={paymentMethod === 'cash-on-delivery' ? colors.primary : colors.textSecondary} />
                             <Text style={[styles.methodLabel, paymentMethod === 'cash-on-delivery' && styles.methodLabelActive]}>Cash on Delivery</Text>
                         </TouchableOpacity>
                     </View>

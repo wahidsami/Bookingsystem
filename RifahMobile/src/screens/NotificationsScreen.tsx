@@ -7,7 +7,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { CustomerNotification, api, getImageUrl } from '../api/client';
@@ -91,7 +91,7 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
                 <Text style={styles.cardBody} numberOfLines={3}>{item.body}</Text>
                 <View style={styles.cardFooter}>
                     <View style={styles.linkBadge}>
-                        <Ionicons name="notifications-outline" size={14} color={colors.primary} />
+                        <AppIcon name="bell" size={14} color={colors.primary} />
                         <Text style={styles.linkBadgeText}>
                             {item.linkType === 'service'
                                 ? (language === 'ar' ? 'خدمة' : 'Service')
@@ -102,7 +102,7 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
                     </View>
                     {imageUrl ? (
                         <View style={styles.imageBadge}>
-                            <Ionicons name="image-outline" size={14} color="#6b7280" />
+                            <AppIcon name="image" size={14} color="#6b7280" />
                             <Text style={styles.imageBadgeText}>{language === 'ar' ? 'صورة' : 'Image'}</Text>
                         </View>
                     ) : null}
@@ -115,7 +115,7 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
         <View style={styles.container}>
             <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <Ionicons name={language === 'ar' ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text} />
+                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <View style={styles.headerContent}>
                     <Text style={styles.headerTitle}>{language === 'ar' ? 'الإشعارات' : 'Notifications'}</Text>
@@ -141,7 +141,7 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
                     renderItem={renderItem}
                     ListEmptyComponent={(
                         <View style={styles.emptyWrap}>
-                            <Ionicons name="notifications-off-outline" size={40} color={colors.textTertiary} />
+                            <AppIcon name="notifications_off" size={40} color={colors.textTertiary} />
                             <Text style={styles.emptyTitle}>{language === 'ar' ? 'لا توجد إشعارات بعد' : 'No notifications yet'}</Text>
                             <Text style={styles.emptyBody}>
                                 {language === 'ar'

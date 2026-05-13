@@ -15,6 +15,7 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { AppIcon } from '../components/AppIcon';
 
 export function PaymentScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
@@ -102,7 +103,10 @@ export function PaymentScreen({ route, navigation }: any) {
 
                 {/* Virtual Card Tip */}
                 <TouchableOpacity style={styles.testCardButton} onPress={fillTestCard}>
-                    <Text style={styles.testCardText}>✨ {t('useTestCard')}</Text>
+                    <View style={styles.testCardRow}>
+                        <AppIcon name="sparkles" size={16} color={colors.primary} />
+                        <Text style={styles.testCardText}>{t('useTestCard')}</Text>
+                    </View>
                 </TouchableOpacity>
 
                 <View style={styles.form}>
@@ -229,6 +233,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.primary,
         borderStyle: 'dashed',
+    },
+    testCardRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
     },
     testCardText: {
         color: colors.primary,

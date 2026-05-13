@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { ThemedText as Text } from './ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { AppIcon } from './AppIcon';
 
 interface GuestViewProps {
     type: 'orders' | 'bookings';
@@ -12,12 +13,12 @@ interface GuestViewProps {
 export function GuestView({ type, onLoginPress }: GuestViewProps) {
     const { t } = useLanguage();
 
-    const icon = type === 'orders' ? '🛍️' : '📅';
+    const iconName = type === 'orders' ? 'purchases' : 'bookings';
     const message = type === 'orders' ? t('loginToOrderOrders') : t('loginToOrderBookings');
 
     return (
         <View style={styles.container}>
-            <Text style={styles.icon}>{icon}</Text>
+            <AppIcon name={iconName} size={72} color={colors.primary} />
             <Text style={styles.title}>{t('guestTitle')}</Text>
             <Text style={styles.message}>{message}</Text>
 
@@ -35,10 +36,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: spacing.xl,
         backgroundColor: colors.background,
-    },
-    icon: {
-        fontSize: 72,
-        marginBottom: spacing.lg,
     },
     title: {
         fontSize: fontSize.xl,

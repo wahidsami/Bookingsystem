@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { api, User, Booking, bookingNeedsPayment, getImageUrl } from '../api/client';
 import { useNavigation } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { AppIcon } from '../components/AppIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -96,12 +97,12 @@ export function DashboardScreen() {
                     <View style={styles.statCard}>
                         <Text style={styles.statLabel}>{t('upcomingBookings')}</Text>
                         <Text style={styles.statValue}>{stats.upcomingCount}</Text>
-                        <Text style={styles.statIcon}>📅</Text>
+                        <AppIcon name="bookings" size={40} color="rgba(255,255,255,0.35)" />
                     </View>
                     <View style={[styles.statCard, styles.statCardSecondary]}>
                         <Text style={styles.statLabel}>{t('payments')}</Text>
                         <Text style={styles.statValue}>{stats.pendingPayment}</Text>
-                        <Text style={styles.statIcon}>💳</Text>
+                        <AppIcon name="card" size={40} color="rgba(255,255,255,0.35)" />
                     </View>
                 </View>
 
@@ -113,7 +114,7 @@ export function DashboardScreen() {
                         onPress={() => navigation.navigate('Browse')}
                     >
                         <View style={styles.actionIconContainer}>
-                            <Text style={styles.actionIcon}>🔍</Text>
+                            <AppIcon name="search" size={24} color={colors.primary} />
                         </View>
                         <Text style={styles.actionText}>{t('findSalon')}</Text>
                     </TouchableOpacity>
@@ -123,7 +124,7 @@ export function DashboardScreen() {
                         onPress={() => navigation.navigate('Bookings')}
                     >
                         <View style={[styles.actionIconContainer, { backgroundColor: '#E0F2FE' }]}>
-                            <Text style={styles.actionIcon}>📅</Text>
+                            <AppIcon name="bookings" size={24} color={colors.primary} />
                         </View>
                         <Text style={styles.actionText}>{t('bookings')}</Text>
                     </TouchableOpacity>
@@ -133,7 +134,7 @@ export function DashboardScreen() {
                         onPress={() => navigation.navigate('MyPurchases')}
                     >
                         <View style={[styles.actionIconContainer, { backgroundColor: '#FCE7F3' }]}>
-                            <Text style={styles.actionIcon}>🛍️</Text>
+                            <AppIcon name="purchases" size={24} color={colors.primary} />
                         </View>
                         <Text style={styles.actionText}>{t('myPurchases')}</Text>
                     </TouchableOpacity>

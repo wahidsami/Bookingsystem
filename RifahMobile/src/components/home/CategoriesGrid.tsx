@@ -5,6 +5,7 @@ import { colors, spacing, fontSize, borderRadius } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api, ServiceCategory } from '../../api/client';
 import { SkeletonCard } from './SkeletonCard';
+import { AppIcon } from '../AppIcon';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - spacing.lg * 2 - spacing.md * 2) / 3;
@@ -77,7 +78,7 @@ export function CategoriesGrid({ navigation }: CategoriesGridProps) {
                     }
                 >
                     <View style={styles.circle}>
-                        <Text style={styles.icon}>{category.icon || '📂'}</Text>
+                        <AppIcon name="folder" size={28} color={colors.primary} />
                     </View>
                     <Text style={styles.label} numberOfLines={1}>
                         {isRTL ? category.name_ar : category.name_en}
@@ -108,9 +109,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.xs,
-    },
-    icon: {
-        fontSize: 28,
     },
     label: {
         fontSize: fontSize.xs,

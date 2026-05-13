@@ -5,7 +5,7 @@ import { colors, spacing, fontSize, borderRadius } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api, Staff, getImageUrl } from '../../api/client';
 import { SkeletonCard } from './SkeletonCard';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../AppIcon';
 
 export function TopProvidersSection() {
     const { t } = useLanguage();
@@ -94,13 +94,13 @@ export function TopProvidersSection() {
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>{selectedProvider.name}</Text>
                                 <TouchableOpacity onPress={() => setSelectedProvider(null)} style={styles.modalClose}>
-                                    <Ionicons name="close" size={22} color={colors.text} />
+                                    <AppIcon name="close" size={22} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
 
                             <View style={styles.modalRatingRow}>
                                 <View style={styles.modalRatingBadge}>
-                                    <Ionicons name="star" size={16} color="#D97706" />
+                                    <AppIcon name="star" size={16} color="#D97706" />
                                     <Text style={styles.modalRatingText}>{(selectedProvider.rating || 0).toFixed(1)}</Text>
                                 </View>
                                 {selectedProvider.experience ? (

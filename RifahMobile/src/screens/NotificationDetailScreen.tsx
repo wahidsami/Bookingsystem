@@ -8,7 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { ThemedText as Text } from '../components/ThemedText';
 import { CustomerNotification, api, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
@@ -89,7 +89,7 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
         <View style={styles.container}>
             <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <Ionicons name={language === 'ar' ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text} />
+                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{language === 'ar' ? 'تفاصيل الإشعار' : 'Notification Detail'}</Text>
                 <View style={styles.headerButtonSpacer} />
@@ -101,7 +101,7 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
                 </View>
             ) : !notification ? (
                 <View style={styles.emptyWrap}>
-                    <Ionicons name="alert-circle-outline" size={40} color={colors.textTertiary} />
+                    <AppIcon name="warning" size={40} color={colors.textTertiary} />
                     <Text style={styles.emptyTitle}>{language === 'ar' ? 'تعذر تحميل الإشعار' : 'Could not load notification'}</Text>
                 </View>
             ) : (

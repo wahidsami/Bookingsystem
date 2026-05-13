@@ -3,7 +3,7 @@ import { View, StyleSheet, Modal, TouchableOpacity, TextInput, ActivityIndicator
 import { ThemedText as Text } from './ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from './AppIcon';
 import { api, Booking } from '../api/client';
 
 const { width } = Dimensions.get('window');
@@ -69,7 +69,7 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                     <View style={styles.header}>
                         <Text style={styles.title}>How was your experience?</Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color={colors.textSecondary} />
+                            <AppIcon name="close" size={24} color={colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
 
@@ -80,11 +80,10 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                     <View style={styles.starsContainer}>
                         {[1, 2, 3, 4, 5].map((star) => (
                             <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                                <Ionicons
-                                    name={star <= rating ? 'star' : 'star-outline'}
+                                <AppIcon
+                                    name="star"
                                     size={40}
                                     color={star <= rating ? '#F59E0B' : '#D1D5DB'}
-                                    style={styles.starIcon}
                                 />
                             </TouchableOpacity>
                         ))}

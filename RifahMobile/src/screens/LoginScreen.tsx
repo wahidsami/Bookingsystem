@@ -8,7 +8,6 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    Alert,
     Image,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
@@ -16,6 +15,10 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
+import AppleIcon from '../../assets/icons/icon_apple_brand.svg';
+import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
+import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 
 interface LoginScreenProps {
     onLoginSuccess: () => void;
@@ -33,8 +36,6 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
-    const [connectionMessage, setConnectionMessage] = useState('');
-    const [testingConnection, setTestingConnection] = useState(false);
 
     const validateEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -43,7 +44,6 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
 
     const handleLogin = async () => {
         setError('');
-        setConnectionMessage('');
 
         // Validation
         if (!email.trim()) {
@@ -86,52 +86,9 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
             }
         } catch (err: any) {
             console.error('Login error:', err);
-            const message = err?.message || 'Login failed. Please try again.';
-            const normalizedMessage = `${message}`.toLowerCase();
-
-            if (normalizedMessage.includes('aborted') || normalizedMessage.includes('timed out')) {
-                const probe = await api.testConnection();
-                if (probe.ok) {
-                    setConnectionMessage(`${t('loginTimedOutHint')} ${probe.url}`);
-                } else {
-                    setConnectionMessage(`API check failed at ${probe.url}${probe.status ? ` (HTTP ${probe.status})` : ''}${probe.message ? ` - ${probe.message}` : ''}`);
-                }
-
-                setError(`${t('loginTimedOut')}. ${t('loginTimedOutMessage')}`);
-                return;
-            }
-
-            if (/network request failed/i.test(message)) {
-                const probe = await api.testConnection();
-
-                if (probe.ok) {
-                    setConnectionMessage(`API GET succeeded at ${probe.url}. This build can reach the server, but the login POST still failed.`);
-                    setError('Network request failed during login. Please install the latest APK and try again.');
-                } else {
-                    setConnectionMessage(`API check failed at ${probe.url}${probe.status ? ` (HTTP ${probe.status})` : ''}${probe.message ? ` - ${probe.message}` : ''}`);
-                    setError(message);
-                }
-            } else {
-                setError(message);
-            }
+            setError(err?.message || 'Login failed. Please try again.');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleTestConnection = async () => {
-        setTestingConnection(true);
-        setConnectionMessage('');
-
-        try {
-            const probe = await api.testConnection();
-            if (probe.ok) {
-                setConnectionMessage(`API connection OK: ${probe.url} (HTTP ${probe.status})`);
-            } else {
-                setConnectionMessage(`API connection failed: ${probe.url}${probe.status ? ` (HTTP ${probe.status})` : ''}${probe.message ? ` - ${probe.message}` : ''}`);
-            }
-        } finally {
-            setTestingConnection(false);
         }
     };
 
@@ -150,15 +107,6 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                 ]}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Back Button */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={onBackToWelcome}
-                    accessibilityLabel="Back to welcome"
-                >
-                    <Text style={styles.backButtonText}>← {t('welcomeTitle')}</Text>
-                </TouchableOpacity>
-
                 {/* Header with Logo */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
@@ -169,10 +117,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                         />
                     </View>
                     <Text style={[styles.title, isRTL && styles.rtlText]}>
-                        {t('welcomeBack')}
-                    </Text>
-                    <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
-                        {t('loginSubtitle')}
+                        Sign in to your Account
                     </Text>
                 </View>
 
@@ -180,12 +125,6 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                 {error ? (
                     <View style={styles.errorContainer}>
                         <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                ) : null}
-
-                {connectionMessage ? (
-                    <View style={styles.connectionContainer}>
-                        <Text style={styles.connectionText}>{connectionMessage}</Text>
                     </View>
                 ) : null}
 
@@ -226,7 +165,11 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                                 style={styles.eyeButton}
                                 onPress={() => setShowPassword(!showPassword)}
                             >
-                                <Text style={styles.eyeText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                                {showPassword ? (
+                                    <EyeOpenIcon width={20} height={20} color="#6B7280" />
+                                ) : (
+                                    <EyeClosedIcon width={20} height={20} color="#6B7280" />
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -235,18 +178,6 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     <TouchableOpacity style={styles.forgotPasswordButton} onPress={onForgotPassword}>
                         <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.connectionButton}
-                        onPress={handleTestConnection}
-                        disabled={testingConnection || loading}
-                    >
-                        <Text style={styles.connectionButtonText}>
-                            {testingConnection ? 'Testing connection...' : 'Test API connection'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <Text style={styles.apiUrlText}>{api.getBaseUrl()}</Text>
 
                     {/* Login Button */}
                     <TouchableOpacity
@@ -267,7 +198,13 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                         onPress={onGoogleSignIn}
                         disabled={loading}
                     >
+                        <GoogleIcon width={20} height={20} style={styles.leadingIcon} />
                         <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.appleButton} disabled={true}>
+                        <AppleIcon width={20} height={20} style={styles.leadingIcon} />
+                        <Text style={styles.appleButtonText}>Continue with Apple</Text>
                     </TouchableOpacity>
 
                     {/* Register Link */}
@@ -292,37 +229,24 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
     },
-    backButton: {
-        paddingVertical: spacing.sm,
-        marginBottom: spacing.md,
-    },
-    backButtonText: {
-        fontSize: fontSize.md,
-        color: colors.primary,
-        fontWeight: '600',
-    },
     header: {
-        marginBottom: spacing.xl,
+        marginBottom: spacing.lg,
         alignItems: 'center',
+        marginTop: spacing.lg,
     },
     logoContainer: {
         marginBottom: spacing.lg,
         alignItems: 'center',
     },
     logo: {
-        width: 140,
-        height: 140,
+        width: 110,
+        height: 110,
     },
     title: {
-        fontSize: fontSize.xxxl,
+        fontSize: 40,
         fontWeight: '700',
         color: colors.text,
         marginBottom: spacing.xs,
-        textAlign: 'center',
-    },
-    subtitle: {
-        fontSize: fontSize.lg,
-        color: colors.textSecondary,
         textAlign: 'center',
     },
     rtlText: {
@@ -339,19 +263,6 @@ const styles = StyleSheet.create({
     errorText: {
         color: '#DC2626',
         fontSize: fontSize.sm,
-    },
-    connectionContainer: {
-        backgroundColor: '#EEF6FF',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-        borderRadius: borderRadius.md,
-        padding: spacing.md,
-        marginBottom: spacing.lg,
-    },
-    connectionText: {
-        color: colors.text,
-        fontSize: fontSize.sm,
-        textAlign: 'center',
     },
     form: {
         flex: 1,
@@ -391,9 +302,6 @@ const styles = StyleSheet.create({
         top: spacing.md,
         padding: spacing.xs,
     },
-    eyeText: {
-        fontSize: 20,
-    },
     forgotPasswordButton: {
         alignSelf: 'flex-end',
         marginBottom: spacing.lg,
@@ -402,21 +310,6 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontSize: fontSize.sm,
         fontWeight: '600',
-    },
-    connectionButton: {
-        alignSelf: 'center',
-        marginBottom: spacing.sm,
-    },
-    connectionButtonText: {
-        color: colors.primary,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-    },
-    apiUrlText: {
-        color: colors.textSecondary,
-        fontSize: fontSize.xs,
-        textAlign: 'center',
-        marginBottom: spacing.lg,
     },
     loginButton: {
         backgroundColor: colors.primary,
@@ -441,10 +334,33 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
         marginTop: spacing.sm,
         minHeight: 48,
     },
+    leadingIcon: {
+        marginRight: spacing.sm,
+    },
     googleButtonText: {
+        color: '#111827',
+        fontSize: fontSize.lg,
+        fontWeight: '700',
+    },
+    appleButton: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#ffffff',
+        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.md + 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        marginTop: spacing.sm,
+        minHeight: 48,
+        opacity: 0.7,
+    },
+    appleButtonText: {
         color: '#111827',
         fontSize: fontSize.lg,
         fontWeight: '700',

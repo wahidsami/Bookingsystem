@@ -6,6 +6,7 @@ import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { HomeScreen } from '../screens/HomeScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
+import { AppIcon } from '../components/AppIcon';
 
 const Drawer = createDrawerNavigator();
 
@@ -15,15 +16,15 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
     const isRTL = language === 'ar';
 
     const menuItems = [
-        { name: 'Dashboard', icon: '📊', label: t('dashboard'), active: true },
-        { name: 'Profile', icon: '👤', label: t('profile') },
-        { name: 'Bookings', icon: '📅', label: t('bookings') },
-        { name: 'MyPurchases', icon: '🛍️', label: t('myPurchases') },
-        { name: 'Payments', icon: '💳', label: t('payments') },
-        { name: 'PaymentMethods', icon: '💳', label: t('paymentMethods') },
-        { name: 'Wallet', icon: '🔥', label: t('walletLoyalty') },
-        { name: 'Settings', icon: '⚙️', label: t('settings') },
-        { name: 'Home', icon: '🏢', label: t('browseSalons') },
+        { name: 'Dashboard', icon: 'dashboard', label: t('dashboard'), active: true },
+        { name: 'Profile', icon: 'profile', label: t('profile') },
+        { name: 'Bookings', icon: 'bookings', label: t('bookings') },
+        { name: 'MyPurchases', icon: 'purchases', label: t('myPurchases') },
+        { name: 'Payments', icon: 'card', label: t('payments') },
+        { name: 'PaymentMethods', icon: 'card', label: t('paymentMethods') },
+        { name: 'Wallet', icon: 'sparkles', label: t('walletLoyalty') },
+        { name: 'Settings', icon: 'settings', label: t('settings') },
+        { name: 'Home', icon: 'browse', label: t('browseSalons') },
     ];
 
     const handleLogout = () => {
@@ -42,7 +43,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                 </View>
 
                 <View style={styles.logoContainer}>
-                    <Text style={styles.logoIcon}>💜</Text>
+                    <AppIcon name="sparkles" size={24} color={colors.primary} />
                     <Text style={styles.logoText}>Rifah</Text>
                 </View>
 
@@ -72,7 +73,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                         ]}
                         onPress={() => props.navigation.navigate(item.name)}
                     >
-                        <Text style={styles.menuIcon}>{item.icon}</Text>
+                        <AppIcon name={item.icon as any} size={20} color={item.active ? '#FFFFFF' : colors.primary} />
                         <Text style={[
                             styles.menuLabel,
                             item.active && styles.menuLabelActive
@@ -84,7 +85,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
                 {/* Logout */}
                 <TouchableOpacity style={styles.logoutItem} onPress={handleLogout}>
-                    <Text style={styles.menuIcon}>🚪</Text>
+                    <AppIcon name="logout" size={20} color="#EF4444" />
                     <Text style={styles.logoutLabel}>{t('logout')}</Text>
                 </TouchableOpacity>
             </View>
@@ -95,7 +96,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                     <Text style={styles.statLabel}>{t('totalBookings')}</Text>
                     <View style={styles.statValueContainer}>
                         <Text style={styles.statValue}>5</Text>
-                        <Text style={styles.statIcon}>📅</Text>
+                        <AppIcon name="bookings" size={20} color={colors.primary} />
                     </View>
                 </View>
 
@@ -103,7 +104,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                     <Text style={styles.statLabel}>{t('upcomingBookings')}</Text>
                     <View style={styles.statValueContainer}>
                         <Text style={styles.statValue}>2</Text>
-                        <Text style={styles.statIcon}>✏️</Text>
+                        <AppIcon name="dashboard" size={20} color={colors.primary} />
                     </View>
                 </View>
             </View>
@@ -155,9 +156,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: spacing.xs,
         marginBottom: spacing.sm,
-    },
-    logoIcon: {
-        fontSize: 24,
     },
     logoText: {
         fontSize: fontSize.lg,
@@ -222,9 +220,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginHorizontal: spacing.sm,
     },
-    menuIcon: {
-        fontSize: 20,
-    },
     menuLabel: {
         fontSize: fontSize.md,
         color: colors.text,
@@ -273,8 +268,5 @@ const styles = StyleSheet.create({
         fontSize: fontSize.xxl,
         fontWeight: '700',
         color: colors.text,
-    },
-    statIcon: {
-        fontSize: 24,
     },
 });

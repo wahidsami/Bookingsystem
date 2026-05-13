@@ -44,7 +44,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 }
             >
                 {/* Section 1: Hot Deals */}
-                <SectionHeader title={`🔥 ${t('hotDeals')}`} />
+                <SectionHeader title={t('hotDeals')} />
                 <HotDealsCarousel navigation={navigation} />
 
                 {/* Section 2: New to Refah */}

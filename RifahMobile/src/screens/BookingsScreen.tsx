@@ -22,6 +22,7 @@ import { useAppSession } from '../contexts/AppSessionContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { AppIcon } from '../components/AppIcon';
 
 interface BookingGroup {
     key: string;
@@ -247,13 +248,13 @@ export function BookingsScreen({ navigation }: any) {
                         </Text>
                     )}
                     <View style={styles.dateTimeRow}>
-                        <Text style={styles.dateIcon}>📅</Text>
+                        <AppIcon name="bookings" size={16} color={colors.primary} />
                         <Text style={styles.dateTimeText}>
                             {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
                         </Text>
                     </View>
                     <View style={styles.dateTimeRow}>
-                        <Text style={styles.dateIcon}>⏰</Text>
+                        <AppIcon name="clock" size={16} color={colors.primary} />
                         <Text style={styles.dateTimeText}>
                             {format(dateDate, 'h:mm a', { locale: isArabic ? ar : enUS })}
                         </Text>
@@ -342,7 +343,7 @@ export function BookingsScreen({ navigation }: any) {
                 />
             ) : (
                 <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyIcon}>📅</Text>
+                    <AppIcon name="bookings" size={64} color={colors.textSecondary} />
                     <Text style={styles.emptyText}>
                         {activeTab === 'upcoming' ? t('noUpcomingBookings') : t('noBookingHistory')}
                     </Text>

@@ -9,6 +9,7 @@ import { api, PublicAppContent, User } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { CustomerPushDebugState, getCustomerPushDebugState, registerCustomerPushNotifications } from '../lib/notifications';
+import { AppIcon } from '../components/AppIcon';
 
 interface MoreScreenProps {
     navigation?: any;
@@ -62,13 +63,13 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     );
 
     const menuItems = [
-        { id: 'profile', icon: '👤', label: t('profile'), action: () => navigation?.navigate('Profile') },
-        { id: 'myAppointments', icon: '📅', label: t('myAppointments'), action: () => navigation?.navigate('Appointments') },
-        { id: 'browse', icon: '🔍', label: t('browseSalons'), action: () => navigation?.navigate('Browse') },
-        { id: 'myPurchases', icon: '🛍️', label: t('myPurchases'), action: () => navigation?.navigate('Purchases') },
+        { id: 'profile', icon: 'profile', label: t('profile'), action: () => navigation?.navigate('Profile') },
+        { id: 'myAppointments', icon: 'bookings', label: t('myAppointments'), action: () => navigation?.navigate('Appointments') },
+        { id: 'browse', icon: 'search', label: t('browseSalons'), action: () => navigation?.navigate('Browse') },
+        { id: 'myPurchases', icon: 'purchases', label: t('myPurchases'), action: () => navigation?.navigate('Purchases') },
         {
             id: 'notifications',
-            icon: '🔔',
+            icon: 'bell',
             label: notificationUnreadCount > 0
                 ? `${t('notifications')} (${notificationUnreadCount})`
                 : t('notifications'),
@@ -77,10 +78,10 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     ];
 
     const settingsItems = [
-        { id: 'settings', icon: '⚙️', label: t('settings'), action: () => navigation?.navigate('Settings') },
+        { id: 'settings', icon: 'settings', label: t('settings'), action: () => navigation?.navigate('Settings') },
         {
             id: 'savedAddresses',
-            icon: '📍',
+            icon: 'location',
             label: t('savedAddresses'),
             action: () => navigation?.navigate('EditProfile'),
         },
@@ -89,7 +90,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     const supportItems = [
         {
             id: 'helpSupport',
-            icon: '💬',
+            icon: 'message',
             label: appContent?.support?.help_support?.[
                 language === 'ar' ? 'titleAr' : 'titleEn'
             ] || t('helpSupport'),
@@ -97,7 +98,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
         },
         {
             id: 'aboutRefah',
-            icon: '✨',
+            icon: 'sparkles',
             label: appContent?.legal?.about_refah?.[
                 language === 'ar' ? 'titleAr' : 'titleEn'
             ] || t('aboutRefah'),
@@ -105,7 +106,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
         },
         {
             id: 'privacyTerms',
-            icon: '📄',
+            icon: 'file',
             label: appContent?.legal?.privacy_terms?.[
                 language === 'ar' ? 'titleAr' : 'titleEn'
             ] || t('privacyTerms'),
@@ -116,15 +117,17 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     const socialLinks = (appContent?.social || []).filter((item) => item.url);
 
     const getSocialIcon = (iconKey: string) => {
-        const socialIconMap: Record<string, string> = {
-            instagram: '📸',
-            x_twitter: '𝕏',
-            snapchat: '👻',
-            tiktok: '♪',
-            youtube: '▶️',
-            website: '🌐',
+        const socialIconMap: Record<string, React.ComponentProps<typeof AppIcon>['name']> = {
+            instagram: 'instagram',
+            x_twitter: 'twitter',
+            twitter: 'twitter',
+            snapchat: 'snapchat',
+            tiktok: 'tiktok',
+            youtube: 'youtube',
+            linkedin: 'linkedin',
+            website: 'website',
         };
-        return socialIconMap[iconKey] || '🔗';
+        return socialIconMap[iconKey] || 'link';
     };
 
     const handleAuthAction = async () => {
@@ -209,7 +212,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             }}
                         >
                             <View style={styles.menuItemLeft}>
-                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
                                 <Text style={styles.menuLabel}>{item.label}</Text>
                             </View>
                             <Text style={styles.menuArrow}>›</Text>
@@ -231,7 +234,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                                         style={styles.socialIconButton}
                                         onPress={() => Linking.openURL(item.url)}
                                     >
-                                        <Text style={styles.socialIconText}>{getSocialIcon(item.iconKey)}</Text>
+                                        <AppIcon name={getSocialIcon(item.iconKey)} size={24} color={colors.primary} />
                                     </TouchableOpacity>
                                 ))}
                             </View>
@@ -258,7 +261,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             }}
                         >
                             <View style={styles.menuItemLeft}>
-                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
                                 <Text style={styles.menuLabel}>{item.label}</Text>
                             </View>
                             <Text style={styles.menuArrow}>›</Text>
@@ -316,7 +319,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             onPress={item.action}
                         >
                             <View style={styles.menuItemLeft}>
-                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
                                 <Text style={styles.menuLabel}>{item.label}</Text>
                             </View>
                             <Text style={styles.menuArrow}>›</Text>
@@ -326,7 +329,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
 
                 {/* Logout Button */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleAuthAction}>
-                    <Text style={styles.logoutIcon}>{isAuthenticated ? '🚪' : '🔐'}</Text>
+                    <AppIcon name={isAuthenticated ? 'logout' : 'lock'} size={20} color="#DC2626" />
                     <Text style={styles.logoutText}>{isAuthenticated ? t('logout') : t('loginNow')}</Text>
                 </TouchableOpacity>
 
@@ -389,9 +392,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: spacing.md,
     },
-    menuIcon: {
-        fontSize: 24,
-    },
     menuLabel: {
         fontSize: fontSize.md,
         color: colors.text,
@@ -435,9 +435,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: colors.border,
-    },
-    socialIconText: {
-        fontSize: 24,
     },
     pushCard: {
         backgroundColor: '#FFFFFF',
@@ -500,9 +497,6 @@ const styles = StyleSheet.create({
         marginTop: spacing.xl,
         padding: spacing.lg,
         borderRadius: 12,
-    },
-    logoutIcon: {
-        fontSize: 20,
     },
     logoutText: {
         fontSize: fontSize.md,

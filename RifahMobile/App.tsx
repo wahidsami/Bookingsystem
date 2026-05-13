@@ -116,7 +116,7 @@ function AppContent() {
         const hasActiveSession = await api.hasActiveSession();
         if (!hasActiveSession) {
           setIsAuthenticated(false);
-          setCurrentScreen('welcome');
+          setCurrentScreen('login');
           return;
         }
 
@@ -167,7 +167,7 @@ function AppContent() {
     } else {
       const authenticated = await api.hasActiveSession();
       setIsAuthenticated(authenticated);
-      setCurrentScreen(authenticated ? 'home' : 'welcome');
+      setCurrentScreen(authenticated ? 'home' : 'login');
     }
   };
 
@@ -178,7 +178,7 @@ function AppContent() {
 
   const handleOnboardingComplete = async () => {
     await markOnboardingComplete();
-    setCurrentScreen('welcome');
+    setCurrentScreen('login');
   };
 
   const handleLoginSuccess = () => {
@@ -197,7 +197,7 @@ function AppContent() {
     await unregisterCustomerPushNotifications();
     await api.clearTokens();
     setIsAuthenticated(false);
-    setCurrentScreen('welcome');
+    setCurrentScreen('login');
   };
 
   // Show nothing while fonts are loading

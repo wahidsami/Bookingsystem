@@ -93,6 +93,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     const [otp, setOtp] = useState('');
     const [otpHint, setOtpHint] = useState('');
     const [googlePromptInFlight, setGooglePromptInFlight] = useState(false);
+    const [googlePromptStarted, setGooglePromptStarted] = useState(false);
 
     const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
         webClientId: googleClientId || undefined,
@@ -135,6 +136,14 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     };
 
     useEffect(() => {
+        if (step !== 'google' || googlePromptStarted || !request || !canStartGoogle) {
+            return;
+        }
+        setGooglePromptStarted(true);
+        beginGoogleFlow().catch(() => undefined);
+    }, [step, googlePromptStarted, request, canStartGoogle]);
+
+    useEffect(() => {
         const completeGoogleStart = async () => {
             if (!googlePromptInFlight) {
                 return;
@@ -155,6 +164,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 setError('');
             } catch (err: any) {
                 setError(err?.message || t('googleSignInFailed'));
+                setGooglePromptStarted(false);
             } finally {
                 setGooglePromptInFlight(false);
                 setLoading(false);
@@ -165,6 +175,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
             setGooglePromptInFlight(false);
             setLoading(false);
             setError(t('googleSignInFailed'));
+            setGooglePromptStarted(false);
         });
     }, [googlePromptInFlight, response, t]);
 
@@ -246,13 +257,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 {step === 'google' ? (
                     <View style={styles.card}>
                         <Text style={styles.infoText}>{t('signInWithGoogleFirst')}</Text>
-                        <TouchableOpacity
-                            style={[styles.primaryButton, (!canStartGoogle || loading || !request) && styles.disabledButton]}
-                            disabled={!canStartGoogle || loading || !request}
-                            onPress={beginGoogleFlow}
-                        >
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{t('continueWithGoogle')}</Text>}
-                        </TouchableOpacity>
+                        {loading ? <ActivityIndicator color={colors.primary} /> : null}
                     </View>
                 ) : null}
 

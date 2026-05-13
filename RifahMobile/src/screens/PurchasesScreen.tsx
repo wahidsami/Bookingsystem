@@ -20,6 +20,7 @@ import { useAppSession } from '../contexts/AppSessionContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { orderNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { AppIcon } from '../components/AppIcon';
 
 export function PurchasesScreen({ navigation }: any) {
     const { t, language } = useLanguage();
@@ -129,7 +130,7 @@ export function PurchasesScreen({ navigation }: any) {
                 <View style={styles.cardBody}>
                     <Text style={styles.orderId}>#{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}</Text>
                     <View style={styles.dateTimeRow}>
-                        <Text style={styles.dateIcon}>📅</Text>
+                        <AppIcon name="bookings" size={16} color={colors.primary} />
                         <Text style={styles.dateTimeText}>
                             {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
                         </Text>
@@ -226,7 +227,7 @@ export function PurchasesScreen({ navigation }: any) {
                 />
             ) : (
                 <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyIcon}>🛍️</Text>
+                    <AppIcon name="purchases" size={64} color={colors.textSecondary} />
                     <Text style={styles.emptyText}>{t('noOrders')}</Text>
                     <TouchableOpacity
                         style={styles.bookButton}

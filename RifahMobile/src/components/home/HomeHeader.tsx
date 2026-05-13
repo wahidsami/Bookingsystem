@@ -9,6 +9,7 @@ import { api, User } from '../../api/client';
 import { useAppSession } from '../../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../../utils/safeArea';
 import { UserAvatar } from '../UserAvatar';
+import { AppIcon } from '../AppIcon';
 
 interface HomeHeaderProps {
     navigation: any;
@@ -87,7 +88,7 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
                     style={styles.iconButton}
                     onPress={() => (isAuthenticated ? navigation.navigate('Notifications') : showLogin())}
                 >
-                    <Text style={styles.icon}>🔔</Text>
+                    <AppIcon name="bell" size={20} color={colors.primary} />
                     {unreadCount > 0 ? (
                         <View style={styles.badge}>
                             <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -95,7 +96,7 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
                     ) : null}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Browse')}>
-                    <Text style={styles.icon}>🔍</Text>
+                    <AppIcon name="search" size={20} color={colors.primary} />
                 </TouchableOpacity>
             </View>
         </View>
@@ -137,9 +138,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
-    },
-    icon: {
-        fontSize: 20,
     },
     badge: {
         position: 'absolute',

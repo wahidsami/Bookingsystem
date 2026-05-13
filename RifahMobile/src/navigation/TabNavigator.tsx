@@ -1,5 +1,4 @@
 import React from 'react';
-import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -8,6 +7,7 @@ import { PurchasesScreen } from '../screens/PurchasesScreen';
 import { MoreScreen } from '../screens/MoreScreen';
 import { colors } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { AppIcon } from '../components/AppIcon';
 
 const Tab = createBottomTabNavigator();
 
@@ -42,7 +42,7 @@ export function TabNavigator() {
                 options={{
                     tabBarLabel: language === 'ar' ? 'الرئيسية' : 'Home',
                     tabBarIcon: ({ color, size }) => (
-                        <Text style={{ fontSize: size, color }}>🏠</Text>
+                        <AppIcon name="home" size={size} color={color} />
                     ),
                 }}
             />
@@ -52,7 +52,7 @@ export function TabNavigator() {
                 options={{
                     tabBarLabel: t('appointments'),
                     tabBarIcon: ({ color, size }) => (
-                        <Text style={{ fontSize: size, color }}>📅</Text>
+                        <AppIcon name="bookings" size={size} color={color} />
                     ),
                 }}
             />
@@ -62,7 +62,7 @@ export function TabNavigator() {
                 options={{
                     tabBarLabel: t('purchases'),
                     tabBarIcon: ({ color, size }) => (
-                        <Text style={{ fontSize: size, color }}>🛍️</Text>
+                        <AppIcon name="purchases" size={size} color={color} />
                     ),
                 }}
             />
@@ -72,7 +72,7 @@ export function TabNavigator() {
                 options={{
                     tabBarLabel: t('me'),
                     tabBarIcon: ({ color, size }) => (
-                        <Text style={{ fontSize: size, color }}>👤</Text>
+                        <AppIcon name="profile" size={size} color={color} />
                     ),
                 }}
             />

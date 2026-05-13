@@ -11,7 +11,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { HotDeal, getImageUrl } from '../api/client';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -53,7 +53,7 @@ export function HotDealDetailScreen() {
             {/* Header */}
             <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.text} />
+                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('hotDeals')}</Text>
                 <View style={{ width: 40 }} />
@@ -113,19 +113,19 @@ export function HotDealDetailScreen() {
                 <View style={styles.detailsCard}>
                     {validUntil && (
                         <View style={styles.detailRow}>
-                            <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+                            <AppIcon name="bookings" size={20} color={colors.textSecondary} />
                             <Text style={styles.detailText}>{t('validUntilLabel')} {validUntil}</Text>
                         </View>
                     )}
                     {spotsLeft !== null && (
                         <View style={styles.detailRow}>
-                            <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
+                            <AppIcon name="user" size={20} color={colors.textSecondary} />
                             <Text style={styles.detailText}>{spotsLeft} {t('spotsRemainingLabel')}</Text>
                         </View>
                     )}
                     {deal.service?.duration && (
                         <View style={styles.detailRow}>
-                            <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+                            <AppIcon name="clock" size={20} color={colors.textSecondary} />
                             <Text style={styles.detailText}>{deal.service.duration} {t('minSessionLabel')}</Text>
                         </View>
                     )}
@@ -154,7 +154,7 @@ export function HotDealDetailScreen() {
                         }
                     >
                         <Text style={styles.ctaText}>{t('bookAtLabel')} {tenantName}</Text>
-                        <Ionicons name={isRTL ? 'arrow-back' : 'arrow-forward'} size={20} color="#fff" />
+                        <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={20} color="#fff" />
                     </TouchableOpacity>
                 )}
 

@@ -9,14 +9,15 @@ import {
     Platform,
     ActivityIndicator,
     Image,
-    Alert,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
+import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
+import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 
 interface RegisterScreenProps {
     onRegisterSuccess: () => void;
@@ -42,34 +43,8 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
         gender: '' as 'male' | 'female' | 'other' | '',
     });
 
-    const [avatar, setAvatar] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-    const pickImage = async () => {
-        try {
-            // Request permission first
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-            if (!permissionResult.granted) {
-                Alert.alert(t('permissionRequiredTitle'), t('photoLibraryPermissionRequired'));
-                return;
-            }
-
-            const result = await ImagePicker.launchImageLibraryAsync({
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.5,
-            });
-
-            if (!result.canceled) {
-                setAvatar(result.assets[0].uri);
-            }
-        } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert(t('error'), t('failedToPickImage'));
-        }
-    };
 
     const validateEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -166,22 +141,6 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     }
                 }
 
-                if (avatar) {
-                    try {
-                        const uriParts = avatar.split('.');
-                        const fileType = uriParts.length > 1 ? uriParts[uriParts.length - 1] : 'jpg';
-                        const fileName = `avatar.${fileType}`;
-                        const contentType = fileType === 'jpg' ? 'image/jpeg' : `image/${fileType}`;
-                        const uploadResponse = await api.uploadProfilePhoto(avatar, fileName, contentType);
-                        user = {
-                            ...user,
-                            profileImage: uploadResponse.profileImage,
-                        };
-                    } catch (uploadError) {
-                        console.error('Registration avatar upload error:', uploadError);
-                    }
-                }
-
                 await api.setUser(user);
                 onRegisterSuccess();
             } else {
@@ -210,15 +169,6 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                 ]}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Back Button */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={onBackToWelcome}
-                    accessibilityLabel="Back to welcome"
-                >
-                    <Text style={styles.backButtonText}>← {t('welcomeTitle')}</Text>
-                </TouchableOpacity>
-
                 {/* Header with Logo */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
@@ -231,9 +181,6 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     <Text style={[styles.title, isRTL && styles.rtlText]}>
                         {t('createAccount')}
                     </Text>
-                    <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
-                        {t('registerSubtitle')}
-                    </Text>
                 </View>
 
                 {/* Error Message */}
@@ -242,25 +189,6 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                         <Text style={styles.errorText}>{error}</Text>
                     </View>
                 ) : null}
-
-                {/* Avatar Picker */}
-                <View style={styles.avatarSection}>
-                    <TouchableOpacity
-                        style={styles.avatarPicker}
-                        onPress={pickImage}
-                        disabled={loading}
-                    >
-                        {avatar ? (
-                            <Image source={{ uri: avatar }} style={styles.avatarPreview} />
-                        ) : (
-                            <View style={styles.avatarPlaceholder}>
-                                <Text style={styles.avatarIcon}>📷</Text>
-                                <Text style={styles.avatarText}>{t('addPhoto')}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                    <Text style={styles.avatarHint}>{t('optional')}</Text>
-                </View>
 
                 {/* Form */}
                 <View style={styles.form}>
@@ -334,7 +262,11 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                                 style={styles.eyeButton}
                                 onPress={() => setShowPassword(!showPassword)}
                             >
-                                <Text style={styles.eyeText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                                {showPassword ? (
+                                    <EyeOpenIcon width={20} height={20} color="#6B7280" />
+                                ) : (
+                                    <EyeClosedIcon width={20} height={20} color="#6B7280" />
+                                )}
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.hint}>Min 8 chars, 1 uppercase, 1 lowercase, 1 number</Text>
@@ -357,45 +289,12 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                                 style={styles.eyeButton}
                                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                             >
-                                <Text style={styles.eyeText}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                                {showConfirmPassword ? (
+                                    <EyeOpenIcon width={20} height={20} color="#6B7280" />
+                                ) : (
+                                    <EyeClosedIcon width={20} height={20} color="#6B7280" />
+                                )}
                             </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Optional Fields */}
-                    <View style={styles.row}>
-                        <View style={[styles.inputGroup, styles.halfWidth]}>
-                            <Text style={styles.label}>{t('dateOfBirth')}</Text>
-                            <TextInput
-                                style={[styles.input, isRTL && styles.rtlInput]}
-                                value={formData.dateOfBirth}
-                                onChangeText={(text) => setFormData({ ...formData, dateOfBirth: text })}
-                                placeholder="YYYY-MM-DD"
-                                editable={!loading}
-                            />
-                        </View>
-                        <View style={[styles.inputGroup, styles.halfWidth]}>
-                            <Text style={styles.label}>{t('gender')}</Text>
-                            <View style={styles.genderButtons}>
-                                <TouchableOpacity
-                                    style={[styles.genderButton, formData.gender === 'male' && styles.genderButtonSelected]}
-                                    onPress={() => setFormData({ ...formData, gender: 'male' })}
-                                    disabled={loading}
-                                >
-                                    <Text style={[styles.genderButtonText, formData.gender === 'male' && styles.genderButtonTextSelected]}>
-                                        {t('male')}
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.genderButton, formData.gender === 'female' && styles.genderButtonSelected]}
-                                    onPress={() => setFormData({ ...formData, gender: 'female' })}
-                                    disabled={loading}
-                                >
-                                    <Text style={[styles.genderButtonText, formData.gender === 'female' && styles.genderButtonTextSelected]}>
-                                        {t('female')}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
                         </View>
                     </View>
 
@@ -417,6 +316,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                         onPress={onGoogleSignIn}
                         disabled={loading}
                     >
+                        <GoogleIcon width={20} height={20} style={styles.leadingIcon} />
                         <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
                     </TouchableOpacity>
 
@@ -442,37 +342,24 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
     },
-    backButton: {
-        paddingVertical: spacing.sm,
-        marginBottom: spacing.md,
-    },
-    backButtonText: {
-        fontSize: fontSize.md,
-        color: colors.primary,
-        fontWeight: '600',
-    },
     header: {
-        marginBottom: spacing.lg,
+        marginBottom: spacing.xl,
         alignItems: 'center',
+        marginTop: spacing.lg,
     },
     logoContainer: {
         marginBottom: spacing.lg,
         alignItems: 'center',
     },
     logo: {
-        width: 140,
-        height: 140,
+        width: 110,
+        height: 110,
     },
     title: {
         fontSize: fontSize.xxxl,
         fontWeight: '700',
         color: colors.text,
         marginBottom: spacing.xs,
-        textAlign: 'center',
-    },
-    subtitle: {
-        fontSize: fontSize.lg,
-        color: colors.textSecondary,
         textAlign: 'center',
     },
     rtlText: {
@@ -540,32 +427,6 @@ const styles = StyleSheet.create({
         top: spacing.md,
         padding: spacing.xs,
     },
-    eyeText: {
-        fontSize: 20,
-    },
-    genderButtons: {
-        flexDirection: 'row',
-        gap: spacing.xs,
-    },
-    genderButton: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
-        paddingVertical: spacing.sm,
-        alignItems: 'center',
-    },
-    genderButtonSelected: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
-    },
-    genderButtonText: {
-        fontSize: fontSize.sm,
-        color: colors.text,
-    },
-    genderButtonTextSelected: {
-        color: colors.textInverse,
-    },
     registerButton: {
         backgroundColor: colors.primary,
         borderRadius: borderRadius.lg,
@@ -589,8 +450,13 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
         marginTop: spacing.sm,
         minHeight: 48,
+    },
+    leadingIcon: {
+        marginRight: spacing.sm,
     },
     googleButtonText: {
         color: '#111827',
@@ -610,40 +476,5 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontSize: fontSize.md,
         fontWeight: '700',
-    },
-    avatarSection: {
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-    },
-    avatarPicker: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        overflow: 'hidden',
-        marginBottom: spacing.sm,
-    },
-    avatarPreview: {
-        width: '100%',
-        height: '100%',
-    },
-    avatarPlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: colors.primary + '20',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarIcon: {
-        fontSize: 40,
-        marginBottom: spacing.xs,
-    },
-    avatarText: {
-        fontSize: fontSize.sm,
-        color: colors.primary,
-        fontWeight: '600',
-    },
-    avatarHint: {
-        fontSize: fontSize.xs,
-        color: colors.textTertiary,
     },
 });
