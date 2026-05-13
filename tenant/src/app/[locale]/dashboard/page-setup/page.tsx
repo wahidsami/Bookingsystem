@@ -18,6 +18,7 @@ export default function PageSetupPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +34,7 @@ export default function PageSetupPage() {
   const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
 
   const [businessInfo, setBusinessInfo] = useState({
+    coverImage: '',
     addressText: '',
     googleMapLink: '',
     phone: '',
@@ -98,6 +100,7 @@ export default function PageSetupPage() {
           .join(', ');
 
         setBusinessInfo({
+          coverImage: business?.coverImage || '',
           addressText: pageSetup?.addressText || fallbackAddressText,
           googleMapLink: pageSetup?.googleMapLink || business?.googleMapLink || '',
           phone: pageSetup?.phone || business?.phone || business?.mobile || '',
@@ -217,6 +220,28 @@ export default function PageSetupPage() {
     }
   };
 
+  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setCoverUploading(true);
+      setMessage(null);
+      setError(null);
+      const response = await tenantApi.uploadCoverImage(file);
+      const nextCover = response?.data?.coverImage || '';
+      if (nextCover) {
+        setBusinessInfo((prev) => ({ ...prev, coverImage: nextCover }));
+      }
+      setMessage(locale === 'ar' ? 'تم تحديث صورة الغلاف بنجاح' : 'Cover image updated successfully');
+    } catch (err: any) {
+      setError(err?.message || (locale === 'ar' ? 'فشل تحديث صورة الغلاف' : 'Failed to update cover image'));
+    } finally {
+      setCoverUploading(false);
+      event.target.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <TenantLayout>
@@ -241,6 +266,36 @@ export default function PageSetupPage() {
 
         {message ? <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-700">{message}</div> : null}
         {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</div> : null}
+
+        <section className="rounded-xl border border-gray-200 bg-white p-5">
+          <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'صورة الغلاف' : 'Tenant Cover Image'}</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {locale === 'ar'
+              ? 'تظهر هذه الصورة في أعلى صفحة المركز داخل تطبيق العميل.'
+              : 'This image appears at the top of your center page in the customer app.'}
+          </p>
+
+          <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+            {businessInfo.coverImage ? (
+              <img
+                src={businessInfo.coverImage.startsWith('http') ? businessInfo.coverImage : getImageUrl(businessInfo.coverImage)}
+                className="h-52 w-full object-cover"
+                alt={locale === 'ar' ? 'صورة الغلاف' : 'Cover image'}
+              />
+            ) : (
+              <div className="flex h-52 items-center justify-center text-sm text-gray-500">
+                {locale === 'ar' ? 'لا توجد صورة غلاف حالياً' : 'No cover image uploaded yet'}
+              </div>
+            )}
+          </div>
+
+          <label className="mt-4 inline-flex cursor-pointer items-center rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary/90">
+            {coverUploading
+              ? (locale === 'ar' ? 'جارٍ الرفع...' : 'Uploading...')
+              : (locale === 'ar' ? 'رفع / استبدال الغلاف' : 'Upload / Replace Cover')}
+            <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} disabled={coverUploading} />
+          </label>
+        </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'إظهار التبويبات' : 'Tab Visibility'}</h2>
