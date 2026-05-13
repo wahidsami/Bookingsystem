@@ -33,6 +33,7 @@ router.get('/bookings', authenticateUser, userController.getUserBookings);
 // Get services history
 router.get('/services-history', authenticateUser, userController.getServicesHistory);
 router.post('/reviews', authenticateUser, reviewController.createCustomerReview);
+router.get('/reviews', authenticateUser, reviewController.getCustomerReviews);
 
 // Payment Methods
 router.get('/payment-methods', authenticateUser, paymentMethodController.getPaymentMethods);

@@ -26,9 +26,9 @@ Build a complete reviews system across:
 - [ ] Commit + push
 
 ### Phase 2: Staff Reviews Read Model
-- [ ] Add backend endpoint to list public staff reviews
-- [ ] Add backend endpoint to list "my reviews" for customer (optional helper)
-- [ ] Staff app: verify/adjust reviews screen mapping and reply behavior
+- [x] Add backend endpoint to list public staff reviews
+- [x] Add backend endpoint to list "my reviews" for customer (optional helper)
+- [x] Staff app: verify/adjust reviews screen mapping and reply behavior
 - [ ] Push notifications on new staff review
 - [ ] Commit + push
 

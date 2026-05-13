@@ -133,6 +133,51 @@ exports.createCustomerReview = async (req, res) => {
     }
 };
 
+exports.getCustomerReviews = async (req, res) => {
+    try {
+        const platformUserId = req.userId;
+        const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 100);
+
+        const reviews = await db.Review.findAll({
+            where: { platformUserId },
+            include: [
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'slug', 'logo'],
+                    required: false
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'name', 'photo'],
+                    required: false
+                },
+                {
+                    model: db.Appointment,
+                    as: 'appointment',
+                    attributes: ['id', 'status', 'startTime', 'serviceName', 'serviceVariantName'],
+                    required: false
+                }
+            ],
+            order: [['createdAt', 'DESC']],
+            limit
+        });
+
+        return res.json({
+            success: true,
+            reviews
+        });
+    } catch (error) {
+        console.error('Get customer reviews error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch customer reviews',
+            error: error.message
+        });
+    }
+};
+
 exports.getTenantPublicReviews = async (req, res) => {
     try {
         const { tenantId } = req.params;

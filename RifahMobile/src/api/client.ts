@@ -1276,6 +1276,11 @@ class ApiClient {
         return this.post(`/users/notifications/${id}/read`, {});
     }
 
+    async getMyReviews(limit: number = 50): Promise<CustomerReviewRecord[]> {
+        const response = await this.get<{ success: boolean; reviews: CustomerReviewRecord[] }>(`/users/reviews?limit=${limit}`);
+        return response.reviews || [];
+    }
+
     /**
      * Upload profile photo (authenticated).
      * POST /users/profile/photo with FormData key 'photo'.
@@ -1496,6 +1501,33 @@ export interface ServiceCategory {
     icon?: string;
     sortOrder: number;
     isActive: boolean;
+}
+
+export interface CustomerReviewRecord {
+    id: string;
+    tenantId: string;
+    staffId?: string | null;
+    appointmentId?: string | null;
+    rating: number;
+    comment?: string | null;
+    customerName?: string | null;
+    staffReply?: string | null;
+    staffRepliedAt?: string | null;
+    isVisible: boolean;
+    createdAt: string;
+    tenant?: {
+        id: string;
+        name?: string;
+        name_en?: string;
+        name_ar?: string;
+        slug?: string;
+        logo?: string | null;
+    } | null;
+    staff?: {
+        id: string;
+        name?: string;
+        photo?: string | null;
+    } | null;
 }
 
 export const getServicePrice = (
