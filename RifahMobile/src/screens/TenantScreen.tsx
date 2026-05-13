@@ -62,6 +62,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[]; variants?: ServiceVariant[] }) | null>(null);
     const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<Staff | null>(null);
+    const [galleryPreviewImage, setGalleryPreviewImage] = useState<string | null>(null);
     const [providerReviews, setProviderReviews] = useState<StaffReview[]>([]);
     const [providerReviewsLoading, setProviderReviewsLoading] = useState(false);
     const [providerReviewsSummary, setProviderReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
@@ -757,11 +758,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     <Text style={styles.sectionTitle}>{isRTL ? 'صور المركز' : 'Center Gallery'}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
                         {facilitiesImages.map((imageUri: string, index: number) => (
-                            <Image
-                                key={`gallery-${index}`}
-                                source={{ uri: imageUri }}
-                                style={styles.galleryImage}
-                            />
+                            <TouchableOpacity key={`gallery-${index}`} activeOpacity={0.9} onPress={() => setGalleryPreviewImage(imageUri)}>
+                                <Image
+                                    source={{ uri: imageUri }}
+                                    style={styles.galleryImage}
+                                />
+                            </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
@@ -867,118 +869,143 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             </ScrollView>
 
             <Modal
+                visible={!!galleryPreviewImage}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setGalleryPreviewImage(null)}
+            >
+                <View style={styles.galleryPreviewBackdrop}>
+                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setGalleryPreviewImage(null)} />
+                    {galleryPreviewImage ? (
+                        <View style={styles.galleryPreviewCard}>
+                            <Image source={{ uri: galleryPreviewImage }} style={styles.galleryPreviewImage} resizeMode="contain" />
+                            <TouchableOpacity style={styles.galleryPreviewCloseButton} onPress={() => setGalleryPreviewImage(null)}>
+                                <AppIcon name="close" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
+                </View>
+            </Modal>
+
+            <Modal
                 visible={!!selectedService}
                 transparent
                 animationType="slide"
                 onRequestClose={closeServiceDetails}
             >
                 <View style={styles.modalBackdrop}>
-                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={closeServiceDetails} />
                     {selectedService ? (
                         selectedServiceLoading ? (
                             <View style={styles.serviceModalCard}>
                                 <ActivityIndicator color={colors.primary} />
                             </View>
                         ) : (
-                        <View style={styles.serviceModalCard}>
-                            <View style={styles.serviceModalHeader}>
-                                <View style={styles.serviceModalTitleWrap}>
-                                    <Text style={styles.serviceModalCategory}>{selectedServiceDetails?.category || selectedService.category}</Text>
-                                    <Text style={styles.serviceModalTitle}>{isRTL ? (selectedServiceDetails?.name_ar || selectedService.name_ar) : (selectedServiceDetails?.name_en || selectedService.name_en)}</Text>
+                            <View style={styles.serviceModalCard}>
+                                <View style={styles.serviceModalHeader}>
+                                    <TouchableOpacity onPress={closeServiceDetails} style={styles.serviceBackButton}>
+                                        <AppIcon name="back" size={20} color={colors.primary} />
+                                        <Text style={styles.serviceBackText}>{isRTL ? 'العودة للخدمات' : 'Back to Services'}</Text>
+                                    </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity onPress={closeServiceDetails} style={styles.serviceModalClose}>
-                                    <AppIcon name="close" size={24} color={colors.text} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.serviceMetaRow}>
-                                <View style={styles.serviceMetaBadge}>
-                                    <AppIcon name="clock" size={16} color={colors.primary} />
-                                    <Text style={styles.serviceMetaText}>{(selectedServiceDetails?.duration || selectedService.duration)} mins</Text>
-                                </View>
-                                <View style={styles.serviceMetaBadge}>
-                                    <AppIcon name="cash" size={16} color={colors.primary} />
-                                    <Text style={styles.serviceMetaText}>{getServicePrice(selectedServiceDetails || selectedService).toFixed(2)} SAR</Text>
-                                </View>
-                                {(selectedServiceDetails?.employees || []).length > 0 ? (
-                                    <View style={styles.serviceMetaBadge}>
-                                        <AppIcon name="star" size={16} color={colors.primary} />
-                                        <Text style={styles.serviceMetaText}>
-                                            {(selectedServiceDetails!.employees!.reduce((sum, member) => sum + (member.rating || 0), 0) / selectedServiceDetails!.employees!.length).toFixed(1)} ⭐
-                                        </Text>
+                                <ScrollView
+                                    style={styles.serviceDetailScroll}
+                                    contentContainerStyle={styles.serviceDetailScrollContent}
+                                    showsVerticalScrollIndicator={true}
+                                >
+                                    <View style={styles.serviceModalTitleWrap}>
+                                        <Text style={styles.serviceModalCategory}>{selectedServiceDetails?.category || selectedService.category}</Text>
+                                        <Text style={styles.serviceModalTitle}>{isRTL ? (selectedServiceDetails?.name_ar || selectedService.name_ar) : (selectedServiceDetails?.name_en || selectedService.name_en)}</Text>
                                     </View>
-                                ) : null}
-                            </View>
 
-                            <Text style={styles.serviceModalDescription}>
-                                {getServiceDescription(selectedServiceDetails || selectedService) || 'Service details will appear here soon.'}
-                            </Text>
+                                    <View style={styles.serviceMetaRow}>
+                                        <View style={styles.serviceMetaBadge}>
+                                            <AppIcon name="clock" size={16} color={colors.primary} />
+                                            <Text style={styles.serviceMetaText}>{(selectedServiceDetails?.duration || selectedService.duration)} mins</Text>
+                                        </View>
+                                        <View style={styles.serviceMetaBadge}>
+                                            <AppIcon name="cash" size={16} color={colors.primary} />
+                                            <Text style={styles.serviceMetaText}>{getServicePrice(selectedServiceDetails || selectedService).toFixed(2)} SAR</Text>
+                                        </View>
+                                        {(selectedServiceDetails?.employees || []).length > 0 ? (
+                                            <View style={styles.serviceMetaBadge}>
+                                                <AppIcon name="star" size={16} color={colors.primary} />
+                                                <Text style={styles.serviceMetaText}>
+                                                    {(selectedServiceDetails!.employees!.reduce((sum, member) => sum + (member.rating || 0), 0) / selectedServiceDetails!.employees!.length).toFixed(1)} ⭐
+                                                </Text>
+                                            </View>
+                                        ) : null}
+                                    </View>
 
-                            {renderServiceVariants(selectedServiceDetails || selectedService)}
-
-                            {(selectedServiceDetails?.employees || []).length > 0 ? (
-                                <View style={styles.employeeSection}>
-                                    <Text style={styles.employeeSectionTitle}>
-                                        {isRTL ? 'المتخصصون المتاحون' : 'Available Professionals'}
+                                    <Text style={styles.serviceModalDescription}>
+                                        {getServiceDescription(selectedServiceDetails || selectedService) || 'Service details will appear here soon.'}
                                     </Text>
-                                    {(selectedServiceDetails?.employees || []).map((employee) => {
-                                        const avatarUrl = getImageUrl(employee.avatar || employee.image);
-                                        const initials = employee.name?.charAt(0)?.toUpperCase() || '?';
-                                        const experienceLabel = employee.experience
-                                            ? (isRTL ? `الخبرة: ${employee.experience}` : `Experience: ${employee.experience}`)
-                                            : (isRTL ? 'الخبرة غير متاحة' : 'Experience not listed');
 
-                                        return (
-                                            <View key={employee.id} style={styles.employeeCard}>
-                                                {avatarUrl ? (
-                                                    <Image source={{ uri: avatarUrl }} style={styles.employeeAvatar} />
-                                                ) : (
-                                                    <View style={styles.employeeAvatarPlaceholder}>
-                                                        <Text style={styles.employeeAvatarText}>{initials}</Text>
-                                                    </View>
-                                                )}
-                                                <View style={styles.employeeContent}>
-                                                    <View style={styles.employeeHeaderRow}>
-                                                        <Text style={styles.employeeName}>{employee.name}</Text>
-                                                        <View style={styles.employeeRatingBadge}>
-                                                            <AppIcon name="star" size={12} color="#D97706" />
-                                                            <Text style={styles.employeeRatingText}>{(employee.rating || 0).toFixed(1)}</Text>
+                                    {renderServiceVariants(selectedServiceDetails || selectedService)}
+
+                                    {(selectedServiceDetails?.employees || []).length > 0 ? (
+                                        <View style={styles.employeeSection}>
+                                            <Text style={styles.employeeSectionTitle}>
+                                                {isRTL ? 'المتخصصون المتاحون' : 'Available Professionals'}
+                                            </Text>
+                                            {(selectedServiceDetails?.employees || []).map((employee) => {
+                                                const avatarUrl = getImageUrl(employee.avatar || employee.image);
+                                                const initials = employee.name?.charAt(0)?.toUpperCase() || '?';
+                                                const experienceLabel = employee.experience
+                                                    ? (isRTL ? `الخبرة: ${employee.experience}` : `Experience: ${employee.experience}`)
+                                                    : (isRTL ? 'الخبرة غير متاحة' : 'Experience not listed');
+
+                                                return (
+                                                    <View key={employee.id} style={styles.employeeCard}>
+                                                        {avatarUrl ? (
+                                                            <Image source={{ uri: avatarUrl }} style={styles.employeeAvatar} />
+                                                        ) : (
+                                                            <View style={styles.employeeAvatarPlaceholder}>
+                                                                <Text style={styles.employeeAvatarText}>{initials}</Text>
+                                                            </View>
+                                                        )}
+                                                        <View style={styles.employeeContent}>
+                                                            <View style={styles.employeeHeaderRow}>
+                                                                <Text style={styles.employeeName}>{employee.name}</Text>
+                                                                <View style={styles.employeeRatingBadge}>
+                                                                    <AppIcon name="star" size={12} color="#D97706" />
+                                                                    <Text style={styles.employeeRatingText}>{(employee.rating || 0).toFixed(1)}</Text>
+                                                                </View>
+                                                            </View>
+                                                            <Text style={styles.employeeExperience}>{experienceLabel}</Text>
+                                                            {employee.bio ? (
+                                                                <Text style={styles.employeeBio} numberOfLines={3}>
+                                                                    {employee.bio}
+                                                                </Text>
+                                                            ) : null}
+                                                            {Array.isArray(employee.skills) && employee.skills.length > 0 ? (
+                                                                <Text style={styles.employeeSkills} numberOfLines={1}>
+                                                                    {employee.skills.join(' • ')}
+                                                                </Text>
+                                                            ) : null}
+                                                            <View style={styles.employeeActionsRow}>
+                                                                <TouchableOpacity style={styles.employeeProfileButton} onPress={() => openProviderProfile(employee)}>
+                                                                    <Text style={styles.employeeProfileButtonText}>
+                                                                        {isRTL ? 'عرض الملف' : 'View Profile'}
+                                                                    </Text>
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity style={styles.employeeBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService, employee)}>
+                                                                    <Text style={styles.employeeBookButtonText}>
+                                                                        {isRTL ? 'احجز مع هذا المتخصص' : 'Book with this Professional'}
+                                                                    </Text>
+                                                                </TouchableOpacity>
+                                                            </View>
                                                         </View>
                                                     </View>
-                                                    <Text style={styles.employeeExperience}>{experienceLabel}</Text>
-                                                    {employee.bio ? (
-                                                        <Text style={styles.employeeBio} numberOfLines={3}>
-                                                            {employee.bio}
-                                                        </Text>
-                                                    ) : null}
-                                                    {Array.isArray(employee.skills) && employee.skills.length > 0 ? (
-                                                        <Text style={styles.employeeSkills} numberOfLines={1}>
-                                                            {employee.skills.join(' • ')}
-                                                        </Text>
-                                                    ) : null}
-                                                    <View style={styles.employeeActionsRow}>
-                                                        <TouchableOpacity style={styles.employeeProfileButton} onPress={() => openProviderProfile(employee)}>
-                                                            <Text style={styles.employeeProfileButtonText}>
-                                                                {isRTL ? 'عرض الملف' : 'View Profile'}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity style={styles.employeeBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService, employee)}>
-                                                            <Text style={styles.employeeBookButtonText}>
-                                                                {isRTL ? 'احجز مع هذا المتخصص' : 'Book with this Professional'}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        );
-                                    })}
-                                </View>
-                            ) : null}
+                                                );
+                                            })}
+                                        </View>
+                                    ) : null}
 
-                            <TouchableOpacity style={styles.serviceBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService)}>
-                                <Text style={styles.serviceBookButtonText}>{isRTL ? 'احجز هذه الخدمة' : 'Book This Service'}</Text>
-                            </TouchableOpacity>
-                        </View>
+                                    <TouchableOpacity style={styles.serviceBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService)}>
+                                        <Text style={styles.serviceBookButtonText}>{isRTL ? 'احجز هذه الخدمة' : 'Book This Service'}</Text>
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            </View>
                         )
                     ) : null}
                 </View>
@@ -1403,21 +1430,42 @@ const styles = StyleSheet.create({
     modalBackdrop: {
         flex: 1,
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
-        justifyContent: 'flex-end',
+        justifyContent: 'flex-start',
     },
     serviceModalCard: {
         backgroundColor: colors.background,
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
+        borderBottomLeftRadius: borderRadius.xl,
+        borderBottomRightRadius: borderRadius.xl,
         padding: spacing.lg,
         gap: spacing.md,
-        maxHeight: '75%',
+        height: '94%',
     },
     serviceModalHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
         gap: spacing.md,
+    },
+    serviceBackButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+        backgroundColor: '#EFE8FF',
+    },
+    serviceBackText: {
+        color: colors.primary,
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+    },
+    serviceDetailScroll: {
+        flex: 1,
+    },
+    serviceDetailScrollContent: {
+        gap: spacing.md,
+        paddingBottom: spacing.xl,
     },
     serviceModalTitleWrap: {
         flex: 1,
@@ -1791,6 +1839,34 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: borderRadius.lg,
         backgroundColor: '#F3F4F6',
+    },
+    galleryPreviewBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.88)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: spacing.lg,
+    },
+    galleryPreviewCard: {
+        width: '100%',
+        height: '78%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    galleryPreviewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    galleryPreviewCloseButton: {
+        position: 'absolute',
+        top: spacing.md,
+        right: spacing.md,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(15,23,42,0.65)',
     },
     hoursRow: {
         flexDirection: 'row',

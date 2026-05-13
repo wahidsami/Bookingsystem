@@ -21,9 +21,9 @@ This plan covers the reported QA issues for tenant pages and booking flow in the
 - [ ] Commit + push
 
 ### Phase B: Service Details UX Upgrade
-- [ ] Replace service details drawer with a dedicated full page.
-- [ ] Add back button to return to Services tab.
-- [ ] Ensure full vertical scrolling for long content.
+- [x] Replace service details drawer with a dedicated full page.
+- [x] Add back button to return to Services tab.
+- [x] Ensure full vertical scrolling for long content.
 - [ ] Commit + push
 
 ### Phase C: Reviews Entry UX
@@ -33,8 +33,8 @@ This plan covers the reported QA issues for tenant pages and booking flow in the
 - [ ] Commit + push
 
 ### Phase D: About Gallery Interaction
-- [ ] Add full-screen image preview modal for gallery.
-- [ ] Add close action and swipe-safe scrolling.
+- [x] Add full-screen image preview modal for gallery.
+- [x] Add close action and swipe-safe scrolling.
 - [ ] Commit + push
 
 ### Phase E: QA Validation + Release Checklist
