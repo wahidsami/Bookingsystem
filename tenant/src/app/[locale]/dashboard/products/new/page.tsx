@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { API_BASE_URL, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
-import Link from "next/link";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
+import { ServiceEditorFrame, type ServiceEditorSection } from "@/components/ServiceEditorFrame";
 
 const CATEGORIES = [
   "Hair Care",
@@ -62,6 +62,8 @@ export default function NewProductPage() {
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const formId = "new-product-form";
+  const [activeSection, setActiveSection] = useState("product-basic");
 
   useEffect(() => {
     loadGlobalSettings();
@@ -314,26 +316,88 @@ export default function NewProductPage() {
     }
   };
 
+  const productSections = useMemo(() => {
+    const basicFilled = [
+      formData.name_en.trim(),
+      formData.name_ar.trim(),
+      formData.category.trim(),
+      formData.brand.trim(),
+    ].filter(Boolean).length;
+
+    const pricingFilled = [formData.rawPrice.trim(), formData.stock.trim()].filter(Boolean).length;
+    const contentFilled = [
+      formData.description_en.trim() || formData.description_ar.trim(),
+      formData.features_en.trim() || formData.features_ar.trim(),
+      formData.ingredients_en.trim() || formData.ingredients_ar.trim(),
+      formData.howToUse_en.trim() || formData.howToUse_ar.trim()
+    ].filter(Boolean).length;
+    const mediaFilled = imagePreviews.length > 0 ? 1 : 0;
+    const settingsFilled = [
+      formData.isAvailable !== undefined,
+      formData.isFeatured !== undefined,
+      formData.allowsDelivery || formData.allowsPickup
+    ].filter(Boolean).length;
+
+    return [
+      {
+        id: "product-basic",
+        label: locale === "ar" ? "المعلومات الأساسية" : "Basic information",
+        progressLabel: `${basicFilled}/4`,
+        progressPercent: (basicFilled / 4) * 100,
+      },
+      {
+        id: "product-pricing",
+        label: locale === "ar" ? "التسعير والمخزون" : "Pricing & inventory",
+        progressLabel: `${pricingFilled}/2`,
+        progressPercent: (pricingFilled / 2) * 100,
+      },
+      {
+        id: "product-content",
+        label: locale === "ar" ? "المحتوى" : "Content",
+        progressLabel: `${contentFilled}/4`,
+        progressPercent: (contentFilled / 4) * 100,
+      },
+      {
+        id: "product-media",
+        label: locale === "ar" ? "الصور" : "Media",
+        progressLabel: mediaFilled ? "1/1" : "0/1",
+        progressPercent: mediaFilled ? 100 : 0,
+      },
+      {
+        id: "product-settings",
+        label: locale === "ar" ? "الإعدادات" : "Settings",
+        progressLabel: `${settingsFilled}/3`,
+        progressPercent: (settingsFilled / 3) * 100,
+      },
+    ] as ServiceEditorSection[];
+  }, [formData, imagePreviews.length, locale]);
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const target = document.getElementById(sectionId);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("addProduct")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج' : 'Add a new product to your catalog'}
-            </p>
-          </div>
-          <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <Link href={`/${locale}/dashboard/products`} className="btn btn-secondary">
-              {t("cancel")}
-            </Link>
-          </div>
-        </div>
-      </div>
+      <ServiceEditorFrame
+        locale={locale}
+        isRTL={isRTL}
+        title={t("addProduct")}
+        subtitle={locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج' : 'Add a new product to your catalog'}
+        cancelHref={`/${locale}/dashboard/products`}
+        saveLabel={t("save")}
+        loadingLabel={t("loading")}
+        cancelLabel={t("cancel")}
+        formId={formId}
+        loading={loading}
+        error={error}
+        sections={productSections}
+        activeSection={activeSection}
+        onSectionSelect={scrollToSection}
+      >
 
       {/* Not Found Popup */}
       {showNotFoundPopup && (
@@ -374,20 +438,13 @@ export default function NewProductPage() {
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
-            <div className="card">
+            <div id="product-basic" className="card">
               <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
@@ -502,7 +559,7 @@ export default function NewProductPage() {
             </div>
 
             {/* Product Details */}
-            <div className="card">
+            <div id="product-content" className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
               </h3>
@@ -760,7 +817,7 @@ export default function NewProductPage() {
           {/* Right Column - Image & Pricing */}
           <div className="space-y-6">
             {/* Image Upload */}
-            <div className="card">
+            <div id="product-media" className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("images")} <span className="text-red-500">*</span>
               </h3>
@@ -820,7 +877,7 @@ export default function NewProductPage() {
             </div>
 
             {/* Pricing & Inventory */}
-            <div className="card">
+            <div id="product-pricing" className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
               </h3>
@@ -925,7 +982,7 @@ export default function NewProductPage() {
             </div>
 
             {/* Status */}
-            <div className="card space-y-4">
+            <div id="product-settings" className="card space-y-4">
               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <input
                   type="checkbox"
@@ -989,20 +1046,8 @@ export default function NewProductPage() {
           </div>
         </div>
 
-        {/* Form Actions */}
-        <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <Link href={`/${locale}/dashboard/products`} className="btn btn-secondary">
-            {t("cancel")}
-          </Link>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary flex-1"
-          >
-            {loading ? t("loading") : t("save")}
-          </button>
-        </div>
       </form>
+      </ServiceEditorFrame>
     </TenantLayout>
   );
 }
