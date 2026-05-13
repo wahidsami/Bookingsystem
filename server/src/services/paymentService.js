@@ -14,7 +14,7 @@ const {
 } = require('../utils/paymentErrorHandler');
 const logger = require('../utils/productionLogger');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
-const pushNotificationService = require('./pushNotificationService');
+const notificationOrchestrator = require('./notificationOrchestratorService');
 const { createAppointmentTransaction } = require('./paymentTransactionLedgerService');
 
 class PaymentService {
@@ -321,7 +321,10 @@ class PaymentService {
 
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'booking';
-            await pushNotificationService.sendToUser(platformUserId, {
+            await notificationOrchestrator.notifyCustomer({
+                tenantId,
+                platformUserId,
+                eventType: 'booking_payment_received',
                 title: nextPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID ? 'Booking deposit confirmed' : 'Booking payment confirmed',
                 body: nextPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
                     ? `Your booking fee for ${serviceName} was received successfully.`
@@ -498,7 +501,10 @@ class PaymentService {
         }
 
         try {
-            await pushNotificationService.sendToUser(platformUserId, {
+            await notificationOrchestrator.notifyCustomer({
+                tenantId,
+                platformUserId,
+                eventType: 'order_payment_received',
                 title: 'Order payment confirmed',
                 body: `Payment for order ${order.orderNumber} was received successfully.`,
                 data: {

@@ -5,7 +5,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
-const pushNotificationService = require('./pushNotificationService');
+const notificationOrchestrator = require('./notificationOrchestratorService');
 const {
     createOrderTransaction,
     resolveLedgerPaymentMethod
@@ -195,7 +195,10 @@ class OrderService {
 
             try {
                 const tenantName = fullOrder?.tenant?.name_ar || fullOrder?.tenant?.name_en || fullOrder?.tenant?.name || 'the store';
-                await pushNotificationService.sendToUser(platformUserId, {
+                await notificationOrchestrator.notifyCustomer({
+                    tenantId,
+                    platformUserId,
+                    eventType: 'order_created',
                     title: 'Order created',
                     body: `Your order ${fullOrder?.orderNumber || order.orderNumber} has been placed with ${tenantName}.`,
                     data: {
@@ -326,7 +329,10 @@ class OrderService {
             }
 
             try {
-                await pushNotificationService.sendToUser(order.platformUserId, {
+                await notificationOrchestrator.notifyCustomer({
+                    tenantId: order.tenantId,
+                    platformUserId: order.platformUserId,
+                    eventType: 'order_payment_updated',
                     title: paymentStatus === 'paid' ? 'Order payment confirmed' : 'Order payment updated',
                     body: paymentStatus === 'paid'
                         ? `Payment for order ${order.orderNumber} was confirmed successfully.`
@@ -387,7 +393,10 @@ class OrderService {
         await order.update(updateData, options);
 
         try {
-            await pushNotificationService.sendToUser(order.platformUserId, {
+            await notificationOrchestrator.notifyCustomer({
+                tenantId: order.tenantId,
+                platformUserId: order.platformUserId,
+                eventType: 'order_status_updated',
                 title: 'Order status updated',
                 body: `Order ${order.orderNumber} is now ${status.replace(/_/g, ' ')}.`,
                 data: {
@@ -478,7 +487,10 @@ class OrderService {
             }
 
             try {
-                await pushNotificationService.sendToUser(order.platformUserId, {
+                await notificationOrchestrator.notifyCustomer({
+                    tenantId: order.tenantId,
+                    platformUserId: order.platformUserId,
+                    eventType: 'order_cancelled',
                     title: 'Order cancelled',
                     body: `Order ${order.orderNumber} has been cancelled.`,
                     data: {

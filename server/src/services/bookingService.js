@@ -1,8 +1,7 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const userService = require('./userService');
-const pushNotificationService = require('./pushNotificationService');
-const { createStaffAppointmentMessage } = require('./staffNotificationService');
+const notificationOrchestrator = require('./notificationOrchestratorService');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const {
     getTenantPaymentSettings,
@@ -318,7 +317,10 @@ class BookingService {
                     const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
                     const appointmentDate = formatNotificationDate(start);
 
-                    await pushNotificationService.sendToUser(platformUserId, {
+                    await notificationOrchestrator.notifyCustomer({
+                        tenantId,
+                        platformUserId,
+                        eventType: 'booking_created',
                         title: 'Booking confirmed',
                         body: `Your ${serviceName} booking for ${appointmentDate} is confirmed.`,
                         data: {
@@ -329,7 +331,10 @@ class BookingService {
                         }
                     });
 
-                    await pushNotificationService.sendToStaff(finalStaffId, {
+                    await notificationOrchestrator.notifyStaff({
+                        tenantId,
+                        staffId: finalStaffId,
+                        eventType: 'staff_appointment_assigned',
                         title: 'New appointment assigned',
                         body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
                         data: {
@@ -338,15 +343,6 @@ class BookingService {
                             tenantId,
                             platformUserId
                         }
-                    });
-
-                    await createStaffAppointmentMessage({
-                        tenantId,
-                        staffId: finalStaffId,
-                        customerName,
-                        serviceName,
-                        appointmentDate,
-                        action: 'assigned'
                     });
                 } catch (notificationError) {
                     console.warn('Booking notification warning:', notificationError.message);
@@ -493,7 +489,10 @@ class BookingService {
                     const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
                     const serviceCount = appointments.length;
                     const serviceLabel = serviceCount === 1 ? 'service' : 'services';
-                    await pushNotificationService.sendToUser(platformUserId, {
+                    await notificationOrchestrator.notifyCustomer({
+                        tenantId,
+                        platformUserId,
+                        eventType: 'booking_session_created',
                         title: 'Booking confirmed',
                         body: `Your booking for ${serviceCount} ${serviceLabel} has been confirmed.`,
                         data: {
@@ -511,7 +510,10 @@ class BookingService {
                         const appointmentDate = formatNotificationDate(appointment.startTime);
                         const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
                         if (appointment.staffId) {
-                            await pushNotificationService.sendToStaff(appointment.staffId, {
+                            await notificationOrchestrator.notifyStaff({
+                                tenantId,
+                                staffId: appointment.staffId,
+                                eventType: 'staff_appointment_assigned',
                                 title: 'New appointment assigned',
                                 body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
                                 data: {
@@ -522,15 +524,6 @@ class BookingService {
                                 }
                             });
                         }
-
-                        await createStaffAppointmentMessage({
-                            tenantId,
-                            staffId: appointment.staffId,
-                            customerName,
-                            serviceName,
-                            appointmentDate,
-                            action: 'assigned'
-                        });
                     }
                 } catch (notificationError) {
                     console.warn('Booking session notification warning:', notificationError.message);
@@ -996,7 +989,10 @@ class BookingService {
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
             const customerName = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || 'A customer';
-            await pushNotificationService.sendToStaff(appointment.staffId, {
+            await notificationOrchestrator.notifyStaff({
+                tenantId: appointment.tenantId,
+                staffId: appointment.staffId,
+                eventType: 'staff_appointment_cancelled',
                 title: 'Appointment cancelled',
                 body: `${customerName} cancelled the ${serviceName} booking.`,
                 data: {

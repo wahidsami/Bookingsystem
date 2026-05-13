@@ -635,6 +635,7 @@ const startServer = async () => {
         await db.TenantFeatureUsage.sync({ force: false }); // Monthly feature quota usage such as AI
         await db.TenantPushCampaign.sync({ force: false }); // Marketing push campaign history
         await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
+        await db.NotificationDeliveryLog.sync({ force: false }); // Unified delivery logging (push + inbox/staff)
 
         await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
         await ensurePlatformUserAuthSchema();

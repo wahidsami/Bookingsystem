@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const db = require('../models');
 const pushNotificationService = require('../services/pushNotificationService');
+const notificationOrchestrator = require('../services/notificationOrchestratorService');
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const appointmentLifecycleService = require('../services/appointmentLifecycleService');
 const { normalizePackageEntitlements, isFeatureEnabled } = require('../utils/packageEntitlements');
@@ -1120,7 +1121,10 @@ const updateAppointmentStatus = async (req, res) => {
             } else if (normalizedStatus === 'completed') {
                 await appointmentLifecycleService.notifyServiceCompleted(appointment);
             } else {
-                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                await notificationOrchestrator.notifyCustomer({
+                    tenantId: appointment.tenantId,
+                    platformUserId: appointment.platformUserId,
+                    eventType: 'booking_status_updated',
                     title: 'Booking updated',
                     body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
                     data: {

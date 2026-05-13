@@ -1,8 +1,7 @@
 'use strict';
 
 const db = require('../models');
-const pushNotificationService = require('./pushNotificationService');
-const customerNotificationService = require('./customerNotificationService');
+const notificationOrchestrator = require('./notificationOrchestratorService');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 
 const formatAppointmentDate = (appointment) => {
@@ -61,15 +60,14 @@ const sendCustomerUpdate = async (appointment, title, body, data = {}) => {
         ...data
     };
 
-    await customerNotificationService.sendCustomerInboxNotification(
-        appointment.tenantId,
-        appointment.platformUserId,
+    return notificationOrchestrator.notifyCustomer({
+        tenantId: appointment.tenantId,
+        platformUserId: appointment.platformUserId,
+        eventType: payload.type || 'booking_update',
         title,
         body,
-        payload
-    );
-
-    return { success: true };
+        data: payload
+    });
 };
 
 const sendStaffUpdate = async (appointment, title, body, data = {}) => {
@@ -77,7 +75,10 @@ const sendStaffUpdate = async (appointment, title, body, data = {}) => {
         return { success: false, skipped: true, reason: 'missing_staff' };
     }
 
-    await pushNotificationService.sendToStaff(appointment.staffId, {
+    return notificationOrchestrator.notifyStaff({
+        tenantId: appointment.tenantId,
+        staffId: appointment.staffId,
+        eventType: data.type || 'staff_update',
         title,
         body,
         data: {
@@ -89,20 +90,6 @@ const sendStaffUpdate = async (appointment, title, body, data = {}) => {
             ...data
         }
     });
-
-    await db.StaffMessage.create({
-        tenantId: appointment.tenantId,
-        senderType: 'admin',
-        senderId: appointment.tenantId,
-        recipientType: 'staff',
-        recipientId: appointment.staffId,
-        subject: title,
-        body,
-        isPinned: false,
-        readBy: []
-    });
-
-    return { success: true };
 };
 
 const notifyServiceStarted = async (appointment) => {

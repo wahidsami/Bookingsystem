@@ -1,5 +1,5 @@
 const db = require('../models');
-const pushNotificationService = require('../services/pushNotificationService');
+const notificationOrchestrator = require('../services/notificationOrchestratorService');
 
 const toNumber = (value) => {
     const parsed = Number(value);
@@ -120,7 +120,10 @@ exports.createCustomerReview = async (req, res) => {
         await recalculateStaffRating(resolvedStaffId);
         if (resolvedStaffId) {
             try {
-                await pushNotificationService.sendToStaff(resolvedStaffId, {
+                await notificationOrchestrator.notifyStaff({
+                    tenantId,
+                    staffId: resolvedStaffId,
+                    eventType: 'staff_new_review',
                     title: 'New customer review',
                     body: `You received a ${Math.round(parsedRating)}/5 review.`,
                     data: {
