@@ -121,7 +121,7 @@ export function PurchasesScreen({ navigation }: any) {
                             styles.statusText,
                             { color: getStatusColor(item.status) }
                         ]}>
-                            {getStatusText(item.status, t)}
+                            {getStatusText(item.status, language)}
                         </Text>
                     </View>
                 </View>
@@ -261,8 +261,35 @@ const getStatusColor = (status: string) => {
     }
 };
 
-const getStatusText = (status: string, t: any) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+const getStatusText = (status: string, language: 'ar' | 'en') => {
+    const normalized = `${status || ''}`.trim().toLowerCase();
+    if (language === 'ar') {
+        switch (normalized) {
+            case 'pending': return 'قيد الانتظار';
+            case 'confirmed': return 'مؤكد';
+            case 'processing': return 'قيد المعالجة';
+            case 'ready_for_pickup': return 'جاهز للاستلام';
+            case 'shipped': return 'تم الشحن';
+            case 'delivered': return 'تم التوصيل';
+            case 'completed': return 'مكتمل';
+            case 'cancelled': return 'ملغي';
+            case 'refunded': return 'مسترد';
+            default: return status;
+        }
+    }
+
+    switch (normalized) {
+        case 'pending': return 'Pending';
+        case 'confirmed': return 'Confirmed';
+        case 'processing': return 'Processing';
+        case 'ready_for_pickup': return 'Ready for Pickup';
+        case 'shipped': return 'Shipped';
+        case 'delivered': return 'Delivered';
+        case 'completed': return 'Completed';
+        case 'cancelled': return 'Cancelled';
+        case 'refunded': return 'Refunded';
+        default: return status;
+    }
 };
 
 const styles = StyleSheet.create({

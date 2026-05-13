@@ -230,12 +230,14 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 }
             );
             const now = new Date();
+            const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
+            const todayKey = format(now, 'yyyy-MM-dd');
             const available = (response.slots || []).filter((slot) => {
                 if (!slot?.available) {
                     return false;
                 }
 
-                if (!isSameDay(selectedDate, now)) {
+                if (selectedDateKey !== todayKey) {
                     return true;
                 }
 

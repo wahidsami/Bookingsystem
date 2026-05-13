@@ -1365,7 +1365,7 @@ class ApiClient {
         }
 
         if (status === 'completed') {
-            return normalized.filter((appointment) => ['completed', 'cancelled'].includes(appointment.status));
+            return normalized.filter((appointment) => ['completed', 'cancelled', 'no_show'].includes(appointment.status));
         }
 
         return normalized.filter((appointment) => appointment.status === status);

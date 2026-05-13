@@ -18,6 +18,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 import { useLanguage } from '../contexts/LanguageContext';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -27,6 +28,16 @@ interface GoogleOnboardingScreenProps {
 }
 
 type Step = 'google' | 'phone' | 'otp' | 'name';
+const GOOGLE_ONBOARDING_STATE_KEY = 'refah_google_onboarding_state_v1';
+
+type PersistedGoogleOnboardingState = {
+    onboardingToken: string;
+    phone: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    step: Exclude<Step, 'google'>;
+};
 
 const extractIdToken = (authResult: any, responseState: any): string => {
     const directToken =
@@ -95,6 +106,27 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     const [googlePromptInFlight, setGooglePromptInFlight] = useState(false);
     const [googlePromptStarted, setGooglePromptStarted] = useState(false);
 
+    const persistOnboardingState = async (patch: Partial<PersistedGoogleOnboardingState> = {}) => {
+        const nextState: PersistedGoogleOnboardingState = {
+            onboardingToken: patch.onboardingToken ?? onboardingToken,
+            phone: patch.phone ?? phone,
+            email: patch.email ?? email,
+            firstName: patch.firstName ?? firstName,
+            lastName: patch.lastName ?? lastName,
+            step: patch.step ?? (step === 'google' ? 'phone' : step),
+        };
+
+        if (!nextState.onboardingToken || !nextState.step) {
+            return;
+        }
+
+        await AsyncStorage.setItem(GOOGLE_ONBOARDING_STATE_KEY, JSON.stringify(nextState));
+    };
+
+    const clearPersistedOnboardingState = async () => {
+        await AsyncStorage.removeItem(GOOGLE_ONBOARDING_STATE_KEY);
+    };
+
     const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
         webClientId: googleClientId || undefined,
         androidClientId: googleAndroidClientId || undefined,
@@ -136,6 +168,27 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     };
 
     useEffect(() => {
+        const hydrateState = async () => {
+            try {
+                const raw = await AsyncStorage.getItem(GOOGLE_ONBOARDING_STATE_KEY);
+                if (!raw) return;
+                const saved = JSON.parse(raw) as PersistedGoogleOnboardingState;
+                if (!saved?.onboardingToken || !saved?.step) return;
+                setOnboardingToken(saved.onboardingToken);
+                setPhone(saved.phone || '');
+                setEmail(saved.email || '');
+                setFirstName(saved.firstName || '');
+                setLastName(saved.lastName || '');
+                setStep(saved.step);
+            } catch {
+                // Ignore hydration errors and continue with fresh flow
+            }
+        };
+
+        hydrateState().catch(() => undefined);
+    }, []);
+
+    useEffect(() => {
         if (step !== 'google' || googlePromptStarted || !request || !canStartGoogle) {
             return;
         }
@@ -172,6 +225,13 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 setFirstName(startResult.profile?.firstName || '');
                 setLastName(startResult.profile?.lastName || '');
                 setStep('phone');
+                await persistOnboardingState({
+                    onboardingToken: startResult.onboardingToken,
+                    email: startResult.profile?.email || '',
+                    firstName: startResult.profile?.firstName || '',
+                    lastName: startResult.profile?.lastName || '',
+                    step: 'phone',
+                });
                 setError('');
             } catch (err: any) {
                 setError(err?.message || t('googleSignInFailed'));
@@ -211,6 +271,11 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
             setPhone(sendResult.phone || normalizedPhone);
             setOtpHint(sendResult.testCodeEnabled ? t('devOtpHint') : t('otpSentToPhone'));
             setStep('otp');
+            await persistOnboardingState({
+                onboardingToken: token,
+                phone: sendResult.phone || normalizedPhone,
+                step: 'otp',
+            });
         } catch (err: any) {
             setError(err?.message || t('otpSendFailed'));
         } finally {
@@ -236,6 +301,11 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
         if (forceNameStep || !firstName.trim() || !lastName.trim()) {
             setStep('name');
+            await persistOnboardingState({
+                onboardingToken: token,
+                phone: normalizedPhone,
+                step: 'name',
+            });
             return;
         }
 
@@ -251,6 +321,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
             await api.setTokens(completeResult.accessToken, completeResult.refreshToken);
             await api.setUser(completeResult.user);
+            await clearPersistedOnboardingState();
             onSuccess();
         } catch (err: any) {
             setError(err?.message || t('completeRegistrationFailed'));
