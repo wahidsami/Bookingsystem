@@ -232,16 +232,19 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
     }
 
     const sent = sentToIds.length;
-    const billableRecipients = uniqueUserIds.length;
+    const billableRecipients = sent;
     const skippedRecipients = recipientResults.filter((item) => item.skipped).length;
     const failedRecipients = recipientResults.filter((item) => !item.success && !item.skipped).length;
 
+    let usageAfterSend = null;
     if (limit !== -1 && billableRecipients > 0) {
         const [usage] = await db.TenantPushUsage.findOrCreate({
             where: { tenantId, month: monthKey },
             defaults: { tenantId, month: monthKey, count: 0 }
         });
         await usage.increment('count', { by: billableRecipients });
+        await usage.reload();
+        usageAfterSend = usage.count || 0;
     }
 
     if (campaign) {
@@ -273,7 +276,9 @@ async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, d
             skippedRecipients,
             failedRecipients,
             skippedReasons,
+            billableRecipients,
             usageLimit: limit,
+            usageAfterSend,
             recipientResults
         }
     };

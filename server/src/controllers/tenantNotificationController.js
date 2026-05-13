@@ -69,6 +69,33 @@ exports.sendMarketingPush = async (req, res) => {
         }
 
         let userIds = Array.isArray(platformUserIds) ? platformUserIds : [];
+        if (userIds.length > 0) {
+            const normalizedInputIds = [...new Set(userIds.map((id) => `${id || ''}`.trim()).filter(Boolean))];
+
+            const existingPlatformUsers = await db.PlatformUser.findAll({
+                where: { id: { [Op.in]: normalizedInputIds } },
+                attributes: ['id'],
+                raw: true
+            });
+
+            const platformUserIdSet = new Set(existingPlatformUsers.map((row) => row.id).filter(Boolean));
+            const unresolvedIds = normalizedInputIds.filter((id) => !platformUserIdSet.has(id));
+
+            if (unresolvedIds.length > 0) {
+                const matchedCustomers = await db.Customer.findAll({
+                    where: { id: { [Op.in]: unresolvedIds } },
+                    attributes: ['id', 'platformUserId'],
+                    raw: true
+                });
+
+                matchedCustomers
+                    .map((row) => row.platformUserId)
+                    .filter(Boolean)
+                    .forEach((id) => platformUserIdSet.add(id));
+            }
+
+            userIds = [...platformUserIdSet];
+        }
         if (userIds.length === 0 && audience === 'all_booked') {
             const appointmentUserIds = await db.Appointment.findAll({
                 where: { tenantId, platformUserId: { [Op.ne]: null } },
