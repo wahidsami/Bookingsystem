@@ -11,11 +11,10 @@ import Link from "next/link";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import {
   ArrowPathIcon,
-  FunnelIcon,
   PencilSquareIcon,
+  PlusIcon,
   PhotoIcon,
   PowerIcon,
-  TagIcon,
   TrashIcon
 } from "@heroicons/react/24/outline";
 
@@ -186,6 +185,10 @@ export default function ProductsPage() {
     });
   }, [locale, productsAfterGlobalFilters, selectedCategory]);
 
+  const currentCategoryLabel = useMemo(() => {
+    return categories.find((category) => category.key === selectedCategory)?.name || t("allCategories");
+  }, [categories, selectedCategory, t]);
+
   const handleDelete = async (id: string, name: string) => {
     const productName = locale === 'ar' ? name : name;
     if (!(await dialog.confirm(locale === 'ar'
@@ -267,118 +270,76 @@ export default function ProductsPage() {
 
   return (
     <TenantLayout>
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("title")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("subtitle")}
-            </p>
-            <div className={`mt-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-              <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                UI v2
-              </span>
+      <div className="mb-6 animate-fade-in space-y-4">
+        <div className={`flex items-start justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className="space-y-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            <h2 className="text-3xl font-bold text-gray-900">{t("title")}</h2>
+            <p className="text-sm text-gray-600">{t("subtitle")}</p>
+          </div>
+          {limits && (
+            <div className={`rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm ${isRTL ? 'text-right' : 'text-left'}`}>
+              <div className="text-gray-500">{locale === 'ar' ? 'الحد المسموح' : 'Limit'}</div>
+              <div className={`font-semibold ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
+                {limits.current} / {limits.limit}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className={`card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between ${isRTL ? 'lg:flex-row-reverse' : ''}`}>
+          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder={t("searchPlaceholder")}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                style={{ textAlign: isRTL ? 'right' : 'left' }}
+              />
+            </div>
+            <div className="w-full lg:w-72">
+              <select
+                value={filterMode}
+                onChange={(e) => setFilterMode(e.target.value as ProductFilterMode)}
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                style={{ textAlign: isRTL ? 'right' : 'left' }}
+              >
+                {filterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            {limits && (
-              <div className="text-sm px-3 py-1 bg-gray-100 rounded-lg whitespace-nowrap">
-                <span className="text-gray-500">{isRTL ? 'الحد المسموح:' : 'Limit:'} </span>
-                <span className={`font-medium ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
-                  {limits.current} / {limits.limit}
-                </span>
-              </div>
-            )}
-            <Link
-              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/products/new`}
-              className={`btn btn-primary ${limits && !limits.allowed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-              onClick={(e) => {
-                if (limits && !limits.allowed) {
-                  e.preventDefault();
-                  void dialog.alert({
-                    title: locale === 'ar' ? 'تم الوصول للحد الأقصى' : 'Limit reached',
-                    message: isRTL ? 'تم الوصول للحد الأقصى لباقتك' : 'You have reached your subscription limit',
-                    tone: "default"
-                  });
-                }
-              }}
-            >
-              <span className="mr-2">{isRTL ? '➕' : ''}</span>
-              {t("addProduct")}
-              <span className="ml-2">{!isRTL ? '➕' : ''}</span>
-            </Link>
-          </div>
+
+          <Link
+            href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/products/new`}
+            className={`btn btn-primary inline-flex items-center gap-2 whitespace-nowrap ${limits && !limits.allowed ? 'pointer-events-none opacity-50' : ''}`}
+            onClick={(e) => {
+              if (limits && !limits.allowed) {
+                e.preventDefault();
+                dialog.alert({
+                  title: locale === 'ar' ? 'الحد وصل' : 'Limit reached',
+                  message: locale === 'ar' ? 'تم الوصول للحد الأقصى في الباقة الحالية.' : 'You have reached your current package limit.',
+                  tone: 'danger'
+                });
+              }
+            }}
+          >
+            <PlusIcon className="h-5 w-5" />
+            <span>{t("addProduct")}</span>
+          </Link>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className={`card mb-6 ${isRTL ? 'text-right' : ''}`}>
-        <div className={`flex flex-col md:flex-row gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
-          {/* Search */}
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder={t("searchPlaceholder")}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            />
-          </div>
-
-          {/* Global Filter */}
-          <div className="w-full md:w-56">
-            <select
-              value={filterMode}
-              onChange={(e) => setFilterMode(e.target.value as ProductFilterMode)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              style={{ textAlign: isRTL ? 'right' : 'left' }}
-            >
-              {filterOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <FunnelIcon className="h-4 w-4" />
-            <span>{visibleProducts.length} / {products.length}</span>
-          </div>
-        </div>
-
-        <div className={`mt-4 flex flex-wrap gap-2 ${isRTL ? 'justify-end' : 'justify-start'}`}>
-          {categories.map((category) => {
-            const selected = selectedCategory === category.key;
-            return (
-              <button
-                key={category.key}
-                type="button"
-                onClick={() => setSelectedCategory(category.key)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  selected
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:text-primary'
-                }`}
-              >
-                {category.name} ({category.count})
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Loading State */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
@@ -386,137 +347,182 @@ export default function ProductsPage() {
             <p className="text-sm text-gray-600">{t("loading")}</p>
           </div>
         </div>
-      ) : visibleProducts.length === 0 ? (
+      ) : products.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-16 text-center">
           <PhotoIcon className="mb-4 h-14 w-14 text-gray-300" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noProducts")}</h3>
-          <p className="text-gray-600 mb-6">{t("noProductsDesc")}</p>
-          <Link href={`/${locale}/dashboard/products/new`} className="btn btn-primary">
-            {t("addFirstProduct")}
+          <h3 className="text-xl font-semibold text-gray-900">{t("noProducts")}</h3>
+          <p className="mt-2 max-w-md text-sm text-gray-600">{t("noProductsDesc")}</p>
+          <Link href={`/${locale}/dashboard/products/new`} className="btn btn-primary mt-6 inline-flex items-center gap-2">
+            <PlusIcon className="h-5 w-5" />
+            <span>{t("addFirstProduct")}</span>
           </Link>
         </div>
       ) : (
-        /* Products Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {visibleProducts.map((product) => (
-            <div key={product.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm transition hover:shadow-md">
-              {/* Product Image */}
-              <div className="relative mb-4">
-                <div className="w-full h-44 bg-white rounded-2xl overflow-hidden flex items-center justify-center ring-1 ring-gray-200">
-                  {product.image ? (
-                    <img
-                      src={getImageUrl(product.image)}
-                      alt={locale === 'ar' ? product.name_ar : product.name_en}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <PhotoIcon className="h-10 w-10 text-gray-300" />
-                  )}
-                </div>
-                {product.isFeatured && (
-                  <div className={`absolute top-2 ${isRTL ? 'left-2' : 'right-2'} px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full`}>
-                    {t("featured")}
-                  </div>
-                )}
-                <div
-                  className={`absolute top-2 ${isRTL ? 'right-2' : 'left-2'} w-3 h-3 rounded-full border-2 border-white ${product.isAvailable ? 'bg-emerald-500' : 'bg-gray-400'
-                    }`}
-                  title={product.isAvailable ? t("available") : t("unavailable")}
-                ></div>
-              </div>
-
-              {/* Product Info */}
-              <div className="mb-3">
-                <h3 className="text-lg font-bold text-gray-900 truncate mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {locale === 'ar' ? product.name_ar : product.name_en}
-                </h3>
-                <div className="flex flex-wrap gap-2" style={{ justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
-                  {product.category && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200">
-                      <TagIcon className="h-3.5 w-3.5" />
-                      {product.category}
-                    </span>
-                  )}
-                  {product.brand && (
-                    <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200">
-                      {product.brand}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Price and Stock */}
-              <div className="mb-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{t("price")}</span>
-                  <span className="font-bold text-primary">
-                    <Currency amount={product.price} />
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{t("stock")}</span>
-                  <span className={`font-semibold ${getProductStockTone(Number(product.stock || 0))}`}>
-                    {product.stock} {t("units")}
-                  </span>
-                </div>
-                {product.sku && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{t("sku")}</span>
-                    <span className="text-sm font-mono text-gray-700">{product.sku}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Stats */}
-              {(product.soldCount > 0 || product.usedAsGiftCount > 0) && (
-                <div className="mb-3 p-3 bg-white rounded-2xl ring-1 ring-gray-200">
-                  {product.soldCount > 0 && (
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-600">{t("sold")}</span>
-                      <span className="text-xs font-semibold text-gray-900">{product.soldCount}</span>
-                    </div>
-                  )}
-                  {product.usedAsGiftCount > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600">{t("usedAsGift")}</span>
-                      <span className="text-xs font-semibold text-gray-900">{product.usedAsGiftCount}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className={`flex items-center justify-end gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <Link
-                  href={`/${locale}/dashboard/products/${product.id}`}
-                  title={t("edit")}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
-                >
-                  <PencilSquareIcon className="h-5 w-5" />
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleToggleAvailability(product)}
-                  title={product.isAvailable ? (locale === 'ar' ? 'إيقاف' : 'Deactivate') : (locale === 'ar' ? 'تفعيل' : 'Activate')}
-                  className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition ${
-                    product.isAvailable
-                      ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  }`}
-                >
-                  <PowerIcon className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(product.id, locale === 'ar' ? product.name_ar : product.name_en)}
-                  title={t("delete")}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
-                >
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
+        <div className={`grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] ${isRTL ? 'lg:[direction:rtl]' : ''}`}>
+          <aside className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              <h3 className="text-lg font-bold text-gray-900">{locale === 'ar' ? 'الفئات' : 'Categories'}</h3>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {categories.length - 1}
+              </span>
             </div>
-          ))}
+            <div className="space-y-2">
+              {categories.map((category) => {
+                const active = selectedCategory === category.key;
+                return (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => setSelectedCategory(category.key)}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                      active
+                        ? 'border-primary bg-primary/5 text-primary shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                  >
+                    <span className="font-medium">{category.name}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
+                      {category.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <h3 className="text-xl font-bold text-gray-900">{currentCategoryLabel}</h3>
+                <p className="text-sm text-gray-600">
+                  {visibleProducts.length} {locale === 'ar' ? 'منتج' : 'products'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadProducts()}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <ArrowPathIcon className="h-4 w-4" />
+                <span>{locale === 'ar' ? 'تحديث' : 'Refresh'}</span>
+              </button>
+            </div>
+
+            {visibleProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-gray-200 py-16 text-center">
+                <PhotoIcon className="h-14 w-14 text-gray-300" />
+                <h4 className="mt-4 text-lg font-semibold text-gray-900">{t("noProducts")}</h4>
+                <p className="mt-2 text-sm text-gray-600">{t("noProductsDesc")}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleProducts.map((product) => {
+                  const stock = Number(product.stock || 0);
+                  const stockLabel = stock <= 0
+                    ? (locale === 'ar' ? 'نفد المخزون' : 'Out of stock')
+                    : stock <= 10
+                      ? (locale === 'ar' ? 'مخزون منخفض' : 'Low stock')
+                      : (locale === 'ar' ? 'متوفر' : 'In stock');
+
+                  return (
+                    <div
+                      key={product.id}
+                      className="rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm transition hover:shadow-md"
+                    >
+                      <div className={`flex flex-col gap-4 xl:flex-row xl:items-center ${isRTL ? 'xl:flex-row-reverse' : ''}`}>
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
+                            {product.image ? (
+                              <img
+                                src={getImageUrl(product.image)}
+                                alt={locale === 'ar' ? product.name_ar : product.name_en}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center">
+                                <PhotoIcon className="h-8 w-8 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                            <div className="min-w-0">
+                              <h4 className="truncate text-lg font-bold text-gray-900">
+                                {locale === 'ar' ? product.name_ar : product.name_en}
+                              </h4>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                                  {locale === 'ar' ? 'المخزون' : 'Stock'}: {product.stock} {t("units")}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                                  {locale === 'ar' ? 'الفئة' : 'Category'}: {(product.category || "").trim() || (locale === "ar" ? "غير مصنف" : "Uncategorized")}
+                                </span>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${product.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                                  {product.isAvailable ? t("available") : t("unavailable")}
+                                </span>
+                                {product.isFeatured && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
+                                    {t("featured")}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                                {product.brand && <span>{locale === 'ar' ? 'العلامة' : 'Brand'}: {product.brand}</span>}
+                                {product.sku && <span>• SKU: {product.sku}</span>}
+                                <span>• {stockLabel}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center justify-between gap-4 xl:flex-col xl:items-end">
+                          <div className="text-right">
+                            <div className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                              {t("price")}
+                            </div>
+                            <div className={`text-2xl font-bold ${getProductStockTone(stock)}`}>
+                              <Currency amount={product.price} />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/${locale}/dashboard/products/${product.id}`}
+                              title={t("edit")}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
+                            >
+                              <PencilSquareIcon className="h-5 w-5" />
+                            </Link>
+                            <button
+                              type="button"
+                              title={product.isAvailable ? (locale === 'ar' ? 'إيقاف' : 'Deactivate') : (locale === 'ar' ? 'تفعيل' : 'Activate')}
+                              onClick={() => handleToggleAvailability(product)}
+                              className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
+                                product.isAvailable
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary hover:text-primary'
+                              }`}
+                            >
+                              <PowerIcon className="h-5 w-5" />
+                            </button>
+                            <button
+                              type="button"
+                              title={t("delete")}
+                              onClick={() => handleDelete(product.id, locale === 'ar' ? product.name_ar : product.name_en)}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
       )}
     </TenantLayout>
