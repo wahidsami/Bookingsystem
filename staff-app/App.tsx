@@ -4,11 +4,13 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  Switch,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { getApiUrl } from './src/config/env';
 import {
@@ -34,6 +36,7 @@ import {
 } from './src/lib/notifications';
 
 type TabKey = 'overview' | 'appointments' | 'schedule' | 'profile';
+const STAFF_PUSH_ENABLED_KEY = 'rifah_staff_push_enabled';
 
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 
@@ -100,6 +103,8 @@ export default function App() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [pushUpdating, setPushUpdating] = useState(false);
 
   useEffect(() => {
     const cleanup = initializeStaffNotificationHandling();
@@ -107,14 +112,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    AsyncStorage.getItem(STAFF_PUSH_ENABLED_KEY)
+      .then((raw) => {
+        if (raw === 'true') setPushEnabled(true);
+        if (raw === 'false') setPushEnabled(false);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     if (!session) {
+      return;
+    }
+
+    if (!pushEnabled) {
+      unregisterStaffPushNotifications(session).catch((error) => {
+        console.warn('Staff push unregister warning:', error?.message || error);
+      });
       return;
     }
 
     registerStaffPushNotifications(session).catch((error) => {
       console.warn('Staff push registration warning:', error?.message || error);
     });
-  }, [session?.accessToken, session?.staff.id]);
+  }, [session?.accessToken, session?.staff.id, pushEnabled]);
 
   const loadDashboard = async (activeSession: StaffSession, showSpinner = true) => {
     if (showSpinner) {
@@ -223,6 +244,25 @@ export default function App() {
     setActionMessage(null);
     setCurrentPassword('');
     setNewPassword('');
+  };
+
+  const handleTogglePush = async (value: boolean) => {
+    if (!session || pushUpdating) return;
+    const previous = pushEnabled;
+    setPushEnabled(value);
+    setPushUpdating(true);
+    try {
+      if (value) {
+        await registerStaffPushNotifications(session);
+      } else {
+        await unregisterStaffPushNotifications(session);
+      }
+      await AsyncStorage.setItem(STAFF_PUSH_ENABLED_KEY, value ? 'true' : 'false');
+    } catch (error) {
+      setPushEnabled(previous);
+    } finally {
+      setPushUpdating(false);
+    }
   };
 
   const handleAppointmentAction = async (
@@ -621,6 +661,23 @@ export default function App() {
             <Text style={styles.profileLine}>Commission: {session.staff.commissionRate ?? 0}%</Text>
             <Text style={styles.profileLine}>Rating: {session.staff.rating ?? 'N/A'}</Text>
 
+            <View style={styles.notificationCard}>
+              <Text style={styles.passwordTitle}>Push notifications</Text>
+              <Text style={styles.profileLine}>
+                {pushEnabled ? 'Enabled: notifications appear in device tray.' : 'Disabled: notifications are muted on this device.'}
+              </Text>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>{pushEnabled ? 'On' : 'Off'}</Text>
+                <Switch
+                  value={pushEnabled}
+                  onValueChange={handleTogglePush}
+                  disabled={pushUpdating}
+                  trackColor={{ false: '#d1d5db', true: '#99f6e4' }}
+                  thumbColor={pushEnabled ? '#0f766e' : '#94a3b8'}
+                />
+              </View>
+            </View>
+
             <View style={styles.passwordPanel}>
               <Text style={styles.passwordTitle}>Change password</Text>
               <TextInput
@@ -945,6 +1002,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#334155',
     marginBottom: 10,
+  },
+  notificationCard: {
+    marginTop: 6,
+    marginBottom: 6,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  toggleRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   logoutButton: {
     marginTop: 20,
