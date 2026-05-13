@@ -26,6 +26,7 @@ interface Product {
   description_en?: string;
   description_ar?: string;
   image?: string;
+  images?: string[];
   price: number;
   category: string;
   stock: number;
@@ -77,8 +78,9 @@ export default function EditProductPage() {
     allowsDelivery: true,
     allowsPickup: true
   });
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [activeSection, setActiveSection] = useState("product-basic");
   const formId = "edit-product-form";
 
@@ -133,11 +135,12 @@ export default function EditProductPage() {
           allowsPickup: prod.allowsPickup !== undefined ? prod.allowsPickup : true
         });
 
-        if (prod.image) {
-          setImagePreviews([getImageUrl(prod.image)]);
-        } else {
-          setImagePreviews([]);
-        }
+        const loadedImages = Array.isArray(prod.images) && prod.images.length > 0
+          ? prod.images
+          : (prod.image ? [prod.image] : []);
+        setExistingImages(loadedImages);
+        setNewImageFiles([]);
+        setNewImagePreviews([]);
       } else {
         setError(response.message || "Failed to load product");
       }
@@ -165,23 +168,28 @@ export default function EditProductPage() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const availableSlots = Math.max(0, 5 - imagePreviews.length);
+    const availableSlots = Math.max(0, 5 - (existingImages.length + newImageFiles.length));
     const acceptedFiles = files.slice(0, availableSlots);
     if (acceptedFiles.length === 0) return;
 
-    setImageFiles((prev) => [...prev, ...acceptedFiles]);
+    setNewImageFiles((prev) => [...prev, ...acceptedFiles]);
     acceptedFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreviews((prev) => [...prev, reader.result as string]);
+        setNewImagePreviews((prev) => [...prev, reader.result as string]);
       };
       reader.readAsDataURL(file);
     });
   };
 
   const handleRemoveImage = (index: number) => {
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    if (index < existingImages.length) {
+      setExistingImages((prev) => prev.filter((_, i) => i !== index));
+      return;
+    }
+    const newIndex = index - existingImages.length;
+    setNewImagePreviews((prev) => prev.filter((_, i) => i !== newIndex));
+    setNewImageFiles((prev) => prev.filter((_, i) => i !== newIndex));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -198,7 +206,7 @@ export default function EditProductPage() {
       submitData.append("name_ar", formData.name_ar);
       if (formData.description_en) submitData.append("description_en", formData.description_en);
       if (formData.description_ar) submitData.append("description_ar", formData.description_ar);
-      submitData.append("price", formData.price);
+      submitData.append("rawPrice", formData.price);
       submitData.append("category", formData.category);
       submitData.append("stock", formData.stock);
       if (formData.sku) submitData.append("sku", formData.sku);
@@ -216,7 +224,8 @@ export default function EditProductPage() {
       submitData.append("allowsDelivery", String(formData.allowsDelivery ?? true));
       submitData.append("allowsPickup", String(formData.allowsPickup ?? true));
 
-      imageFiles.forEach((file) => {
+      submitData.append("retainedImages", JSON.stringify(existingImages));
+      newImageFiles.forEach((file) => {
         submitData.append("images", file);
       });
 
@@ -224,6 +233,7 @@ export default function EditProductPage() {
 
       if (response.success) {
         setSuccess(locale === 'ar' ? 'تم حفظ التعديلات بنجاح.' : 'Changes saved successfully.');
+        await loadProduct();
       } else {
         setError(response.message || t("updateError"));
       }
@@ -319,7 +329,7 @@ export default function EditProductPage() {
       formData.howToUse_en.trim() || formData.howToUse_ar.trim()
     ].filter(Boolean).length;
 
-    const mediaFilled = imagePreviews.length > 0 ? 1 : 0;
+    const mediaFilled = (existingImages.length + newImagePreviews.length) > 0 ? 1 : 0;
     const pricingFilled = [
       formData.price.trim(),
       formData.stock.trim()
@@ -351,7 +361,7 @@ export default function EditProductPage() {
         progressPercent: (pricingFilled / 2) * 100,
       },
     ] as ServiceEditorSection[];
-  }, [formData, imagePreviews.length, locale]);
+  }, [formData, existingImages.length, newImagePreviews.length, locale]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -760,9 +770,9 @@ export default function EditProductPage() {
               </p>
 
               <div className="space-y-4">
-                {imagePreviews.length > 0 && (
+                {[...existingImages.map((img) => getImageUrl(img) || ""), ...newImagePreviews].length > 0 && (
                   <div className="grid grid-cols-2 gap-4">
-                    {imagePreviews.map((preview, index) => (
+                    {[...existingImages.map((img) => getImageUrl(img) || ""), ...newImagePreviews].map((preview, index) => (
                       <div key={index} className="relative">
                         <img
                           src={preview}
@@ -781,7 +791,7 @@ export default function EditProductPage() {
                   </div>
                 )}
 
-                {imagePreviews.length < 5 && (
+                {(existingImages.length + newImagePreviews.length) < 5 && (
                   <label className="block">
                     <input
                       type="file"
@@ -789,17 +799,17 @@ export default function EditProductPage() {
                       multiple
                       onChange={handleImageChange}
                       className="hidden"
-                      disabled={imagePreviews.length >= 5}
+                      disabled={(existingImages.length + newImagePreviews.length) >= 5}
                     />
                     <span className="btn btn-secondary w-full text-center cursor-pointer">
-                      {imagePreviews.length === 0
+                      {(existingImages.length + newImagePreviews.length) === 0
                         ? `${t("uploadImage")} (${t("required")})`
-                        : `${locale === 'ar' ? 'إضافة صور أخرى' : 'Add more images'} (${imagePreviews.length}/5)`}
+                        : `${locale === 'ar' ? 'إضافة صور أخرى' : 'Add more images'} (${existingImages.length + newImagePreviews.length}/5)`}
                     </span>
                   </label>
                 )}
 
-                {imagePreviews.length === 0 && (
+                {(existingImages.length + newImagePreviews.length) === 0 && (
                   <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center">
                     <span className="text-5xl">📦</span>
                   </div>

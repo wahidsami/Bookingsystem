@@ -44,6 +44,26 @@ function calculateProductPrice(rawPrice, taxRate, commissionRate) {
     return parseFloat((raw + tax + commission).toFixed(2));
 }
 
+function parseArrayField(value) {
+    if (Array.isArray(value)) {
+        return value.filter(Boolean).map((item) => `${item}`.trim()).filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter(Boolean).map((item) => `${item}`.trim()).filter(Boolean);
+                }
+            } catch (_) {}
+        }
+        return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    return [];
+}
+
 // Configure multer for product image uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -423,8 +443,31 @@ exports.updateProduct = async (req, res) => {
             }
         }
 
-        // Handle multiple images if uploaded
-        let imagePaths = product.images || (product.image ? [product.image] : []);
+        // Handle retained/existing images (when UI deletes some images before save)
+        const currentImages = Array.isArray(product.images) && product.images.length > 0
+            ? product.images
+            : (product.image ? [product.image] : []);
+        const retainedImagesRaw = req.body.retainedImages ?? req.body.imagesExisting ?? req.body.existingImages;
+        const retainedImages = parseArrayField(retainedImagesRaw);
+
+        let imagePaths = retainedImagesRaw !== undefined
+            ? retainedImages.filter((img) => currentImages.includes(img))
+            : [...currentImages];
+
+        // Clean up files removed by tenant from product gallery
+        const removedImages = currentImages.filter((img) => !imagePaths.includes(img));
+        for (const relativePath of removedImages) {
+            const absolutePath = path.join(__dirname, '../../uploads', relativePath);
+            if (fs.existsSync(absolutePath)) {
+                try {
+                    fs.unlinkSync(absolutePath);
+                } catch (unlinkError) {
+                    console.warn('Failed to delete removed product image:', absolutePath, unlinkError?.message);
+                }
+            }
+        }
+
+        // Append newly uploaded files
         if (req.files && req.files.length > 0) {
             const newImagePaths = req.files.map(file => file.path.replace(/\\/g, '/').split('uploads/')[1]);
             
