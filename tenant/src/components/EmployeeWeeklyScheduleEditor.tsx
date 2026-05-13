@@ -64,12 +64,19 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 });
 
 function normalizeShift(shift: Partial<ShiftRecord>): ShiftRecord {
+  const normalizeTimeValue = (value: string | null | undefined, fallback: string) => {
+    const raw = `${value || ""}`.trim();
+    if (!raw) return fallback;
+    const match = raw.match(/^(\d{2}:\d{2})/);
+    return match?.[1] || fallback;
+  };
+
   return {
     id: `${shift.id || crypto.randomUUID()}`,
     dayOfWeek: shift.dayOfWeek ?? null,
     specificDate: shift.specificDate ?? null,
-    startTime: shift.startTime || DEFAULT_START,
-    endTime: shift.endTime || DEFAULT_END,
+    startTime: normalizeTimeValue(shift.startTime, DEFAULT_START),
+    endTime: normalizeTimeValue(shift.endTime, DEFAULT_END),
     isRecurring: shift.isRecurring !== false,
     startDate: shift.startDate ?? null,
     endDate: shift.endDate ?? null,
