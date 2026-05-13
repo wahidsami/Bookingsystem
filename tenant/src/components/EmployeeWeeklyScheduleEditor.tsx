@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { tenantApi } from "@/lib/api";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { CalendarIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -35,6 +35,10 @@ interface EmployeeWeeklyScheduleEditorProps {
     recurringShifts: number;
     oneTimeShifts: number;
   }) => void;
+}
+
+export interface EmployeeWeeklyScheduleEditorHandle {
+  flushDraftShifts: () => Promise<boolean>;
 }
 
 type ScheduleMode = "recurring" | "one-time";
@@ -89,7 +93,7 @@ function buildShiftPayload(shift: ShiftRecord, sharedStartDate: string | null, s
   };
 }
 
-export function EmployeeWeeklyScheduleEditor({
+export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklyScheduleEditorHandle, EmployeeWeeklyScheduleEditorProps>(function EmployeeWeeklyScheduleEditor({
   employeeId,
   employeeName,
   locale,
@@ -101,7 +105,7 @@ export function EmployeeWeeklyScheduleEditor({
   sharedEndDate = null,
   onSharedRangeChange,
   onSummaryChange
-}: EmployeeWeeklyScheduleEditorProps) {
+}: EmployeeWeeklyScheduleEditorProps, ref) {
   const dialog = useAppDialog();
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -540,6 +544,64 @@ export function EmployeeWeeklyScheduleEditor({
     await persistShift(shift.id);
   };
 
+  useImperativeHandle(ref, () => ({
+    flushDraftShifts: async () => {
+      if (isDraftMode || !employeeId) {
+        return true;
+      }
+
+      const draftShifts = shifts.filter((shift) => shift.isDraft);
+      if (draftShifts.length === 0) {
+        return true;
+      }
+
+      setSavingKey("flush-drafts");
+      try {
+        const results = await Promise.all(
+          draftShifts.map(async (shift) => {
+            const isRecurringShift = shift.isRecurring !== false;
+            const specificDate = !isRecurringShift
+              ? (shift.specificDate || sharedStartDate || new Date().toISOString().slice(0, 10))
+              : null;
+
+            const response = await tenantApi.createEmployeeShift(employeeId, {
+              dayOfWeek: isRecurringShift ? shift.dayOfWeek : null,
+              specificDate,
+              startTime: shift.startTime,
+              endTime: shift.endTime,
+              isRecurring: isRecurringShift,
+              startDate: isRecurringShift ? (sharedStartDate || null) : null,
+              endDate: isRecurringShift ? (sharedEndDate || null) : null,
+              label: shift.label?.trim() || undefined
+            });
+
+            const createdShift = normalizeShift(response?.shift || response?.data?.shift || { ...shift, isDraft: false });
+            return { oldId: shift.id, createdShift };
+          })
+        );
+
+        setShiftsAndMirror((current) =>
+          current.map((item) => {
+            const match = results.find((result) => result.oldId === item.id);
+            return match ? { ...match.createdShift, isDraft: false } : item;
+          })
+        );
+
+        return true;
+      } catch (err: any) {
+        console.error("Failed to flush draft shifts:", err);
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر حفظ الورديات" : "Failed to save shifts",
+          message: err?.message || (locale === "ar" ? "تعذر حفظ بعض الورديات الجديدة." : "Some new shifts could not be saved."),
+          tone: "danger"
+        });
+        return false;
+      } finally {
+        setSavingKey(null);
+      }
+    }
+  }), [dialog, employeeId, isDraftMode, locale, sharedEndDate, sharedStartDate, shifts]);
+
   const oneTimeShiftCount = shifts.filter((shift) => shift.isRecurring === false || shift.specificDate).length;
 
   useEffect(() => {
@@ -838,4 +900,4 @@ export function EmployeeWeeklyScheduleEditor({
       ) : null}
     </div>
   );
-}
+});

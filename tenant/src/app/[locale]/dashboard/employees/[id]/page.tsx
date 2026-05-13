@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { EmployeeEditorFrame, type EmployeeEditorSection } from "@/components/EmployeeEditorFrame";
-import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklyScheduleEditor";
+import { EmployeeWeeklyScheduleEditor, type EmployeeWeeklyScheduleEditorHandle } from "@/components/EmployeeWeeklyScheduleEditor";
 import { EMPLOYEE_GENDERS, EMPLOYEE_POSITIONS, getDashboardRoleKeyForEmployeePosition } from "@/lib/employeePositions";
 import { EMPLOYEE_LANGUAGE_OPTIONS } from "@/lib/employeeProfile";
 import {
@@ -58,7 +58,6 @@ export default function EditEmployeePage() {
     const dialog = useAppDialog();
   const t = useTranslations("Employees");
   const params = useParams();
-  const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
   const { id } = params;
@@ -107,6 +106,7 @@ export default function EditEmployeePage() {
     recurringShifts: 0,
     oneTimeShifts: 0
   });
+  const scheduleEditorRef = useRef<EmployeeWeeklyScheduleEditorHandle | null>(null);
   const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
   const dashboardRoleLabel = ROLE_OPTIONS.find((role) => role.value === dashboardRoleKey)
     ? (locale === 'ar'
@@ -714,6 +714,11 @@ export default function EditEmployeePage() {
     setError("");
 
     try {
+      const flushResult = await scheduleEditorRef.current?.flushDraftShifts();
+      if (flushResult === false) {
+        return;
+      }
+
       const submitData = new FormData();
 
       // Append all form fields
@@ -749,7 +754,11 @@ export default function EditEmployeePage() {
 
       if (response.success) {
         setSavedEmail(formData.email.trim());
-        router.push(`/${locale}/dashboard/employees`);
+        await dialog.alert({
+          title: locale === 'ar' ? 'تم الحفظ' : 'Saved',
+          message: locale === 'ar' ? 'تم حفظ بيانات عضو الفريق بنجاح.' : 'Team member changes were saved successfully.',
+          tone: 'success'
+        });
       } else {
         const message = response.message || t("updateError");
         setError(message);
@@ -1195,6 +1204,7 @@ export default function EditEmployeePage() {
                 </div>
 
                 <EmployeeWeeklyScheduleEditor
+                  ref={scheduleEditorRef}
                   employeeId={id as string}
                   employeeName={formData.name || undefined}
                   locale={locale}
