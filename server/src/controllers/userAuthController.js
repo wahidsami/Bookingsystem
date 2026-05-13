@@ -342,9 +342,13 @@ const googleStart = async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Google account verified',
+            message: result.requiresOnboarding === false ? 'Login successful' : 'Google account verified',
+            requiresOnboarding: result.requiresOnboarding !== false,
             onboardingToken: result.onboardingToken,
-            profile: result.profile
+            profile: result.profile,
+            accessToken: result.tokens?.accessToken || null,
+            refreshToken: result.tokens?.refreshToken || null,
+            user: result.user || null,
         });
     } catch (error) {
         res.status(400).json({

@@ -40,7 +40,7 @@ const KEYS = {
     SESSION_LAST_ACTIVE: 'refah_session_last_active',
 };
 
-const SESSION_MAX_INACTIVE_DAYS = 30;
+const SESSION_MAX_INACTIVE_DAYS = 90;
 const SESSION_MAX_INACTIVE_MS = SESSION_MAX_INACTIVE_DAYS * 24 * 60 * 60 * 1000;
 
 export interface ApiResponse<T> {
@@ -141,7 +141,11 @@ export interface Tenant {
 export interface GoogleStartResponse {
     success: boolean;
     message: string;
-    onboardingToken: string;
+    requiresOnboarding?: boolean;
+    onboardingToken?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    user?: User;
     profile: {
         email: string;
         firstName: string | null;
@@ -888,6 +892,7 @@ class ApiClient {
         try {
             await SecureStore.setItemAsync(KEYS.ACCESS_TOKEN, accessToken);
             await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, refreshToken);
+            await this.touchSession();
         } catch (error) {
             console.error('Error storing tokens:', error);
         }
@@ -983,20 +988,29 @@ class ApiClient {
             });
 
             if (!response.ok) {
-                await this.clearTokens();
+                if (response.status === 401 || response.status === 403) {
+                    await this.clearTokens();
+                }
                 return null;
             }
 
             const data = await response.json();
             if (data.success && data.accessToken) {
-                await this.setTokens(data.accessToken, refreshToken);
+                const nextRefreshToken = data.refreshToken || refreshToken;
+                await this.setTokens(data.accessToken, nextRefreshToken);
+                await this.touchSession();
                 return data.accessToken;
+            }
+
+            if (data?.message && `${data.message}`.toLowerCase().includes('expired')) {
+                await this.clearTokens();
             }
 
             return null;
         } catch (error) {
             console.error('Token refresh failed:', error);
-            await this.clearTokens();
+            // Keep session data on transient network/runtime failures.
+            // We'll only clear tokens when backend explicitly rejects token validity.
             return null;
         }
     }

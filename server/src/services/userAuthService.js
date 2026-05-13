@@ -356,6 +356,50 @@ class UserAuthService {
         const firstName = `${payload.given_name || payload.name || ''}`.trim();
         const lastName = `${payload.family_name || ''}`.trim();
 
+        const existingUserBySub = await db.PlatformUser.findOne({ where: { googleSub: payload.sub } });
+        const existingUserByEmail = existingUserBySub
+            ? null
+            : await db.PlatformUser.findOne({ where: { email } });
+        const existingUser = existingUserBySub || existingUserByEmail;
+
+        if (existingUser) {
+            if (existingUser.isBanned) {
+                throw new Error(`Account is banned. Reason: ${existingUser.banReason || 'Violation of terms'}`);
+            }
+
+            if (!existingUser.isActive) {
+                throw new Error('Account is inactive. Please contact support.');
+            }
+
+            // Returning Google users with verified phone can login directly without OTP/onboarding.
+            if (existingUser.phoneVerified && existingUser.phone && existingUser.authProvider === 'google') {
+                if (!existingUser.googleSub) {
+                    existingUser.googleSub = payload.sub;
+                }
+                existingUser.googleEmail = email;
+                existingUser.emailVerified = true;
+                if (!existingUser.profileImage && payload.picture) {
+                    existingUser.profileImage = payload.picture;
+                }
+                await existingUser.save();
+
+                const tokens = this.generateTokens(existingUser);
+                this.persistLoginMetadata(existingUser, tokens.refreshToken);
+
+                return {
+                    requiresOnboarding: false,
+                    tokens,
+                    user: this.buildSafeUserPayload(existingUser),
+                    profile: {
+                        email,
+                        firstName: firstName || null,
+                        lastName: lastName || null,
+                        picture: payload.picture || null,
+                    }
+                };
+            }
+        }
+
         const onboardingToken = jwt.sign({
             type: 'google_onboarding',
             sub: payload.sub,
@@ -369,6 +413,7 @@ class UserAuthService {
         });
 
         return {
+            requiresOnboarding: true,
             onboardingToken,
             profile: {
                 email,

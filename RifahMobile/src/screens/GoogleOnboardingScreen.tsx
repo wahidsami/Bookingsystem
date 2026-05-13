@@ -156,6 +156,17 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
             try {
                 const startResult = await api.googleStart(idToken);
+                if (startResult.requiresOnboarding === false && startResult.accessToken && startResult.refreshToken && startResult.user) {
+                    await api.setTokens(startResult.accessToken, startResult.refreshToken);
+                    await api.setUser(startResult.user);
+                    setError('');
+                    onSuccess();
+                    return;
+                }
+
+                if (!startResult.onboardingToken) {
+                    throw new Error(t('googleSignInFailed'));
+                }
                 setOnboardingToken(startResult.onboardingToken);
                 setEmail(startResult.profile?.email || '');
                 setFirstName(startResult.profile?.firstName || '');

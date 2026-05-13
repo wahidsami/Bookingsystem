@@ -11,6 +11,10 @@ This plan covers the reported QA issues for tenant pages and booking flow in the
 5. About tab gallery images cannot be enlarged.
 6. Specialist buttons in booking flow do not show employee avatars.
 7. Service payment option mismatch: customer app shows all 3 options even when tenant chose one.
+8. Booking to cart must be blocked if selected time is less than one hour away.
+9. Cart lacks edit/modify path for booked service items.
+10. Login/session appears to expire too quickly after idle.
+11. Returning Google users are forced through phone/OTP/name steps again.
 
 ## Phased Execution
 
@@ -41,6 +45,13 @@ This plan covers the reported QA issues for tenant pages and booking flow in the
 - [ ] Validate all 7 scenarios on Android real devices.
 - [ ] Validate Arabic + English labels/flows.
 - [ ] Regression check bookings, payment, and reviews.
+- [ ] Commit + push
+
+### Phase F: Final Sign-off Additions
+- [x] Enforce one-hour minimum lead time before adding service booking to cart.
+- [x] Add edit path for service booking cart items.
+- [x] Improve session resilience for idle periods (token/session handling).
+- [x] Add Google returning-user fast login path (skip OTP/name when already linked and verified).
 - [ ] Commit + push
 
 ## Notes

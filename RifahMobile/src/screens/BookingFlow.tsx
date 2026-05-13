@@ -39,13 +39,14 @@ const DEFAULT_BOOKING_PAYMENT_SETTINGS = {
 };
 
 const MIN_SLOT_LEAD_MINUTES = 0;
+const MIN_CART_LEAD_MINUTES = 60;
 
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
     const { t, isRTL, language } = useLanguage();
     const { showLogin } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
-    const { addItem } = useServiceBookingCart();
+    const { addItem, updateItem } = useServiceBookingCart();
     const [step, setStep] = useState<BookingStep>('staff');
     const [loading, setLoading] = useState(false);
 
@@ -61,6 +62,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [bookingNote, setBookingNote] = useState('');
     const [paymentSettings, setPaymentSettings] = useState(tenant?.paymentSettings || DEFAULT_BOOKING_PAYMENT_SETTINGS);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServicePaymentChoice>('at-center');
+    const editingCartItemId: string | null = route.params?.cartItemId || null;
     const allowedServicePaymentMethods = new Set(normalizeServicePaymentOptions(service?.paymentOptions));
 
     useEffect(() => {
@@ -76,6 +78,34 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             loadTimeSlots();
         }
     }, [selectedDate, step]);
+
+    useEffect(() => {
+        const prefillStartTime = route.params?.startTime;
+        if (!prefillStartTime) {
+            return;
+        }
+
+        const parsed = new Date(prefillStartTime);
+        if (!Number.isNaN(parsed.getTime())) {
+            setSelectedDate(new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+            setSelectedTime({
+                startTime: parsed.toISOString(),
+                endTime: route.params?.endTime || parsed.toISOString(),
+                available: true,
+                staffId: route.params?.selectedStaff?.id || route.params?.staffId || undefined,
+                staffName: route.params?.selectedStaff?.name || undefined,
+            });
+        }
+
+        const prefillPayment = route.params?.paymentMethod as ServicePaymentChoice | undefined;
+        if (prefillPayment && SERVICE_PAYMENT_CHOICES.includes(prefillPayment)) {
+            setSelectedPaymentMethod(prefillPayment);
+        }
+
+        if (route.params?.notes) {
+            setBookingNote(String(route.params.notes));
+        }
+    }, []);
 
     const loadStaff = async () => {
         try {
@@ -321,6 +351,18 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             return;
         }
 
+        const slotStart = new Date(selectedTime.startTime);
+        const minutesUntilSlot = (slotStart.getTime() - Date.now()) / (1000 * 60);
+        if (!Number.isFinite(minutesUntilSlot) || minutesUntilSlot < MIN_CART_LEAD_MINUTES) {
+            Alert.alert(
+                language === 'ar' ? 'الوقت غير متاح' : 'Time not allowed',
+                language === 'ar'
+                    ? 'يجب أن يكون موعد الخدمة بعد ساعة واحدة على الأقل قبل إضافته إلى السلة.'
+                    : 'Service time must be at least one hour from now before adding to cart.'
+            );
+            return;
+        }
+
         const bookingCartItem: ServiceBookingCartItem = {
             id: `${service.id}-${selectedTime.startTime}-${Date.now()}`,
             tenantId: tenant.id,
@@ -344,22 +386,26 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             payableNowAmount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : selectedPaymentMethod === 'online-full' ? servicePrice : 0,
         };
 
-        const result = addItem(bookingCartItem);
-        if (!result.success) {
-            Alert.alert(
-                language === 'ar' ? 'تنبيه' : 'Notice',
-                language === 'ar'
-                    ? 'السلة الحالية تخص مركزاً آخر. أفرغ السلة أو أكمل الحجز الحالي أولاً.'
-                    : 'Your current booking cart belongs to another tenant. Please clear it or finish that booking first.'
-            );
-            return;
+        if (editingCartItemId) {
+            updateItem(editingCartItemId, bookingCartItem);
+        } else {
+            const result = addItem(bookingCartItem);
+            if (!result.success) {
+                Alert.alert(
+                    language === 'ar' ? 'تنبيه' : 'Notice',
+                    language === 'ar'
+                        ? 'السلة الحالية تخص مركزاً آخر. أفرغ السلة أو أكمل الحجز الحالي أولاً.'
+                        : 'Your current booking cart belongs to another tenant. Please clear it or finish that booking first.'
+                );
+                return;
+            }
         }
 
         Alert.alert(
             language === 'ar' ? 'تمت الإضافة' : 'Added to cart',
             language === 'ar'
-                ? 'تم حفظ الخدمة في سلة الحجز.'
-                : 'This service was saved to your booking cart.',
+                ? (editingCartItemId ? 'تم تحديث الخدمة في سلة الحجز.' : 'تم حفظ الخدمة في سلة الحجز.')
+                : (editingCartItemId ? 'This service was updated in your booking cart.' : 'This service was saved to your booking cart.'),
             [
                 {
                     text: language === 'ar' ? 'عرض السلة' : 'View Cart',

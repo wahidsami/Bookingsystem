@@ -39,6 +39,7 @@ interface ServiceBookingCartContextType {
         payableNowTotal: number;
     }>;
     addItem: (item: ServiceBookingCartItem) => CartAddResult;
+    updateItem: (id: string, updates: Partial<ServiceBookingCartItem>) => void;
     removeItem: (id: string) => void;
     clearCart: () => void;
 }
@@ -87,6 +88,16 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
     const removeItem = (id: string) => {
         setItems((prev) => {
             const nextItems = prev.filter((item) => item.id !== id);
+            void saveCart(nextItems);
+            return nextItems;
+        });
+    };
+
+    const updateItem = (id: string, updates: Partial<ServiceBookingCartItem>) => {
+        setItems((prev) => {
+            const nextItems = prev.map((item) => (
+                item.id === id ? { ...item, ...updates, id: item.id } : item
+            ));
             void saveCart(nextItems);
             return nextItems;
         });
@@ -141,6 +152,7 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
                 payableNowTotal,
                 paymentGroups,
                 addItem,
+                updateItem,
                 removeItem,
                 clearCart,
             }}

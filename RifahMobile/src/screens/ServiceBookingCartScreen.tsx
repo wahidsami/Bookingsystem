@@ -220,6 +220,26 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                                 </TouchableOpacity>
                             </View>
 
+                            <View style={styles.itemActionRow}>
+                                <TouchableOpacity
+                                    style={styles.editButton}
+                                    onPress={() => navigation.navigate('Booking', {
+                                        service: item.service,
+                                        tenant: cartTenant,
+                                        selectedStaff: item.staff || undefined,
+                                        selectedVariant: item.variant || undefined,
+                                        startTime: item.startTime,
+                                        endTime: item.startTime,
+                                        notes: item.notes || '',
+                                        paymentMethod: item.paymentMethod,
+                                        cartItemId: item.id,
+                                    })}
+                                >
+                                    <AppIcon name="settings" size={14} color={colors.primary} />
+                                    <Text style={styles.editButtonText}>{language === 'ar' ? 'تعديل' : 'Edit'}</Text>
+                                </TouchableOpacity>
+                            </View>
+
                             <View style={styles.itemDetails}>
                                 <View style={styles.detailRow}>
                                     <Text style={styles.detailLabel}>{language === 'ar' ? 'الموعد' : 'Time'}</Text>
@@ -409,6 +429,27 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         gap: spacing.md,
+    },
+    itemActionRow: {
+        marginTop: spacing.sm,
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    editButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 6,
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: '#D9C8FF',
+        backgroundColor: '#F7F2FF',
+    },
+    editButtonText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.primary,
     },
     detailLabel: {
         fontSize: fontSize.sm,
