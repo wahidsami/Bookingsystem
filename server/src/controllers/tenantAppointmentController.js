@@ -855,29 +855,29 @@ exports.updateAppointmentStatus = async (req, res) => {
         await transaction.commit();
 
         try {
-            if (normalizedStatus === 'checked_in') {
-                const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
-                const appointmentDate = new Date(appointment.startTime).toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                });
-                let customerName = 'A customer';
-                try {
-                    if (appointment.platformUserId) {
-                        const customer = await db.PlatformUser.findByPk(appointment.platformUserId, {
-                            attributes: ['firstName', 'lastName']
-                        });
-                        if (customer) {
-                            customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customerName;
-                        }
+            const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+            const appointmentDate = new Date(appointment.startTime).toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+            let customerName = 'A customer';
+            try {
+                if (appointment.platformUserId) {
+                    const customer = await db.PlatformUser.findByPk(appointment.platformUserId, {
+                        attributes: ['firstName', 'lastName']
+                    });
+                    if (customer) {
+                        customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customerName;
                     }
-                } catch (_lookupError) {
-                    // Keep generic fallback name if lookup fails.
                 }
+            } catch (_lookupError) {
+                // Keep generic fallback name if lookup fails.
+            }
 
+            if (normalizedStatus === 'checked_in') {
                 await pushNotificationService.sendToStaff(appointment.staffId, {
                     title: 'Customer arrived',
                     body: `${customerName} arrived for ${serviceName}.`,
@@ -911,6 +911,54 @@ exports.updateAppointmentStatus = async (req, res) => {
                 await appointmentLifecycleService.notifyServiceStarted(appointment);
             } else if (normalizedStatus === 'completed') {
                 await appointmentLifecycleService.notifyServiceCompleted(appointment);
+            } else if (normalizedStatus === 'cancelled' || normalizedStatus === 'no_show') {
+                await pushNotificationService.sendToStaff(appointment.staffId, {
+                    title: normalizedStatus === 'cancelled' ? 'Appointment cancelled' : 'Marked as no-show',
+                    body: normalizedStatus === 'cancelled'
+                        ? `${customerName} appointment for ${serviceName} was cancelled.`
+                        : `${customerName} was marked as no-show for ${serviceName}.`,
+                    data: {
+                        type: normalizedStatus === 'cancelled' ? 'staff_appointment_cancelled' : 'staff_appointment_no_show',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        status: normalizedStatus
+                    }
+                });
+
+                await createStaffAppointmentMessage({
+                    tenantId,
+                    staffId: appointment.staffId,
+                    customerName,
+                    serviceName,
+                    appointmentDate,
+                    action: normalizedStatus === 'cancelled' ? 'cancelled' : 'no_show'
+                });
+
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: normalizedStatus === 'cancelled'
+                        ? 'Your appointment has been cancelled.'
+                        : 'Your appointment was marked as no-show.',
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+
+                await customerNotificationService.sendCustomerInboxNotification(
+                    tenantId,
+                    appointment.platformUserId,
+                    normalizedStatus === 'cancelled' ? 'Appointment cancelled' : 'Appointment marked as no-show',
+                    normalizedStatus === 'cancelled'
+                        ? `Your ${serviceName} appointment was cancelled.`
+                        : `Your ${serviceName} appointment was marked as no-show.`,
+                    {
+                        type: normalizedStatus === 'cancelled' ? 'appointment_cancelled' : 'appointment_no_show',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                );
             } else {
                 await pushNotificationService.sendToUser(appointment.platformUserId, {
                     title: 'Booking updated',

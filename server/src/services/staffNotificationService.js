@@ -13,6 +13,18 @@ const buildStaffAppointmentMessage = ({ customerName, serviceName, appointmentDa
             body: `${customerName} arrived for ${serviceName} (${appointmentDate}).`
         };
     }
+    if (action === 'cancelled') {
+        return {
+            subject: 'Appointment cancelled',
+            body: `${customerName} cancelled ${serviceName} (${appointmentDate}).`
+        };
+    }
+    if (action === 'no_show') {
+        return {
+            subject: 'Customer marked as no-show',
+            body: `${customerName} was marked as no-show for ${serviceName} (${appointmentDate}).`
+        };
+    }
 
     return {
         subject: 'New appointment assigned',

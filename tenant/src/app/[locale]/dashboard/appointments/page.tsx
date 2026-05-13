@@ -68,6 +68,7 @@ interface Appointment {
   service: Service;
   staff: Employee;
   user?: User;
+  updatedAt?: string;
 }
 
 interface EmployeeBreak {
@@ -125,7 +126,7 @@ export default function AppointmentsPage() {
   const [filterServiceId, setFilterServiceId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'cancelled'>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showFilters, setShowFilters] = useState(false);
   const [showQuickDrawer, setShowQuickDrawer] = useState(false);
@@ -273,7 +274,11 @@ export default function AppointmentsPage() {
       };
       if (filterStaffId) params.staffId = filterStaffId;
       if (filterServiceId) params.serviceId = filterServiceId;
-      if (filterStatus) params.status = filterStatus;
+      if (viewMode === 'cancelled') {
+        params.status = 'cancelled';
+      } else if (filterStatus) {
+        params.status = filterStatus;
+      }
       if (filterPaymentStatus) params.paymentStatus = filterPaymentStatus;
 
       const response = await tenantApi.getAppointments(params);
@@ -658,7 +663,7 @@ export default function AppointmentsPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -678,6 +683,16 @@ export default function AppointmentsPage() {
                   className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                 >
                   {t("listView")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('cancelled');
+                    setShowFilters(false);
+                  }}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'cancelled' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >
+                  {locale === 'ar' ? 'الملغاة' : 'Cancelled'}
                 </button>
               </div>
 
@@ -986,7 +1001,7 @@ export default function AppointmentsPage() {
         </div>
       )}
 
-      {viewMode === 'list' && (
+      {(viewMode === 'list' || viewMode === 'cancelled') && (
         <div className="mb-4 flex justify-end">
           <button
             type="button"
@@ -1005,7 +1020,7 @@ export default function AppointmentsPage() {
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="mt-4 text-gray-600">{t("loading")}</p>
         </div>
-      ) : viewMode === 'list' && appointments.length === 0 ? (
+      ) : (viewMode === 'list' || viewMode === 'cancelled') && appointments.length === 0 ? (
         <div className="card text-center py-12">
           <div className="text-6xl mb-4">📅</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noAppointments")}</h3>
@@ -1014,7 +1029,7 @@ export default function AppointmentsPage() {
             {locale === 'ar' ? 'القائمة معروضة حسب تاريخ البداية والنهاية أعلاه. غيّر النطاق لرؤية حجوزات أخرى.' : 'List is filtered by the start/end dates above. Try a wider date range to see more appointments.'}
           </p>
         </div>
-      ) : viewMode === 'list' ? (
+      ) : (viewMode === 'list' || viewMode === 'cancelled') ? (
         /* List View */
         <div className="space-y-4">
           {appointments.map((appointment) => {
@@ -1068,6 +1083,11 @@ export default function AppointmentsPage() {
                       <p>{t("customer")}: {userName}</p>
                       {appointment.user?.phone && (
                         <p>{t("phone")}: {appointment.user.phone}</p>
+                      )}
+                      {viewMode === 'cancelled' && appointment.updatedAt && (
+                        <p>
+                          {locale === 'ar' ? 'وقت الإلغاء' : 'Cancelled at'}: {formatDateTime(appointment.updatedAt).date} {formatDateTime(appointment.updatedAt).time}
+                        </p>
                       )}
                     </div>
                   </div>

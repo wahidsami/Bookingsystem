@@ -14,8 +14,9 @@ export const getImageUrl = (path: string | null | undefined): string => {
   if (!path) return '/placeholder.png';
   if (path.startsWith('http')) return path;
   const normalized = path.replace(/\\/g, '/');
-  const prefix = normalized.startsWith('uploads/') ? '' : 'uploads/';
-  return `${API_ORIGIN}/${prefix}${normalized}`;
+  const stripped = normalized.replace(/^\/+/, '');
+  const prefixed = stripped.startsWith('uploads/') ? stripped : `uploads/${stripped}`;
+  return `${API_ORIGIN}/${prefixed}`;
 };
 
 const API_URL = API_BASE_URL;
