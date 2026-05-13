@@ -571,10 +571,9 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       },
       { kind: "link", name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.payroll },
       { kind: "link", name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reports },
-      { kind: "link", name: t("myPage"), href: `/${locale}/dashboard/mypage`, icon: GlobeAltIcon, visible: hasPublicPageCustomization, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.mypage },
       { kind: "link", name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.settings },
     ];
-  }, [billingChildren, canAccessPermission, catalogChildren, hasHotDeals, hasInternalMessaging, hasPayroll, hasPublicPageCustomization, hasPushNotifications, hasReports, locale, marketingChildren, posDueCount, t]);
+  }, [billingChildren, canAccessPermission, catalogChildren, hasHotDeals, hasInternalMessaging, hasPayroll, hasPushNotifications, hasReports, locale, marketingChildren, posDueCount, t]);
   const navigation = navigationItems.filter((item) => item.visible !== false && (item.kind === "group" || canAccessPermission(item.permissionKey)));
   const mobileNavigation = useMemo(() => {
     return navigation.flatMap((item) => {
@@ -596,7 +595,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       { href: `/${locale}/dashboard/notifications`, allowed: hasPushNotifications && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.notifications), feature: "pushNotifications" },
       { href: `/${locale}/dashboard/payroll`, allowed: hasPayroll && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.payroll), feature: "payroll" },
       { href: `/${locale}/dashboard/reports`, allowed: hasReports && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.reports), feature: "reports" },
-      { href: `/${locale}/dashboard/mypage`, allowed: hasPublicPageCustomization && canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.mypage), feature: "publicPageCustomization" },
+      { href: `/${locale}/dashboard/mypage`, allowed: false, feature: "publicPageCustomization" },
       { href: `/${locale}/dashboard/page-setup`, allowed: canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.mypage), feature: "publicPageCustomization" },
       { href: `/${locale}/dashboard/settings`, allowed: canAccessPermission(DASHBOARD_SECTION_PERMISSION_MAP.settings), feature: "settings" }
     ];
