@@ -277,6 +277,11 @@ export default function ProductsPage() {
             <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {t("subtitle")}
             </p>
+            <div className={`mt-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+              <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                UI v2
+              </span>
+            </div>
           </div>
           <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
             {limits && (

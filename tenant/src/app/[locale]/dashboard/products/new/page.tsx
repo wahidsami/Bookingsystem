@@ -378,7 +378,7 @@ export default function NewProductPage() {
         locale={locale}
         isRTL={isRTL}
         title={t("addProduct")}
-        subtitle={locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج' : 'Add a new product to your catalog'}
+        subtitle={locale === 'ar' ? 'أضف منتجاً جديداً إلى الكتالوج (UI v2)' : 'Add a new product to your catalog (UI v2)'}
         cancelHref={`/${locale}/dashboard/products`}
         saveLabel={t("save")}
         loadingLabel={t("loading")}
