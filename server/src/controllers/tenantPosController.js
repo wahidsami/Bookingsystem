@@ -13,6 +13,7 @@ const {
 const POS_QUEUE_LIMIT = 100;
 const POS_TRANSACTION_LIMIT = 100;
 const POS_ALERT_LIMIT = 10;
+const REVIEW_ALERT_LOOKBACK_DAYS = 14;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
@@ -329,6 +330,69 @@ const mapPosAlertFromQueueItem = (item) => {
         paymentIntent: item.paymentIntent,
         scheduledAt: item.scheduledAt,
         detailPath: item.detailPath
+    };
+};
+
+const fetchReviewAttentionAlerts = async (tenantId, limit) => {
+    const lookbackDate = new Date();
+    lookbackDate.setDate(lookbackDate.getDate() - REVIEW_ALERT_LOOKBACK_DAYS);
+
+    const reviews = await db.Review.findAll({
+        where: {
+            tenantId,
+            createdAt: { [Op.gte]: lookbackDate }
+        },
+        include: [
+            {
+                model: db.Staff,
+                as: 'staff',
+                attributes: ['id', 'name'],
+                required: false
+            }
+        ],
+        order: [['createdAt', 'DESC']],
+        limit
+    });
+
+    const alerts = reviews.map((review) => {
+        const customerName = review.customerName || 'Customer';
+        const reviewText = review.comment ? `${review.comment}`.trim() : '';
+        const shortComment = reviewText.length > 90 ? `${reviewText.slice(0, 87)}...` : reviewText;
+        const hasReply = Boolean(review.staffReply);
+
+        return {
+            id: `review-${review.id}`,
+            kind: 'review',
+            entityType: 'review',
+            entityId: review.id,
+            reference: review.id,
+            severity: review.rating <= 3 ? 'high' : 'medium',
+            title: hasReply
+                ? `Review updated by ${customerName}`
+                : `New review from ${customerName}`,
+            title_ar: hasReply
+                ? `تم تحديث تقييم من ${customerName}`
+                : `تقييم جديد من ${customerName}`,
+            message: hasReply
+                ? `Rating ${review.rating}/5${review.staff?.name ? ` for ${review.staff.name}` : ''}.`
+                : `Rating ${review.rating}/5${review.staff?.name ? ` for ${review.staff.name}` : ''}${shortComment ? `: "${shortComment}"` : ''}`,
+            message_ar: hasReply
+                ? `بتقييم ${review.rating}/5${review.staff?.name ? ` لمقدم الخدمة ${review.staff.name}` : ''}.`
+                : `بتقييم ${review.rating}/5${review.staff?.name ? ` لمقدم الخدمة ${review.staff.name}` : ''}${shortComment ? `: "${shortComment}"` : ''}`,
+            amountDue: null,
+            paymentIntent: null,
+            scheduledAt: review.createdAt,
+            detailPath: '/dashboard/reviews'
+        };
+    });
+
+    return {
+        alerts,
+        summary: {
+            reviewAlertCount: alerts.length,
+            lowRatedReviewCount: alerts.filter((alert) => alert.severity === 'high').length,
+            pendingReviewReplyCount: reviews.filter((review) => !review.staffReply).length
+        }
     };
 };
 
@@ -953,9 +1017,10 @@ exports.getOperationalAlerts = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const limit = Math.min(parseInt(req.query.limit || POS_ALERT_LIMIT, 10), POS_ALERT_LIMIT);
-        const [queueResult, appointmentResult] = await Promise.all([
+        const [queueResult, appointmentResult, reviewResult] = await Promise.all([
             fetchQueueData(tenantId, '', POS_QUEUE_LIMIT),
-            fetchAppointmentAttentionAlerts(tenantId, limit)
+            fetchAppointmentAttentionAlerts(tenantId, limit),
+            fetchReviewAttentionAlerts(tenantId, limit)
         ]);
         const completedDueResult = await fetchCompletedPaymentDueAlerts(tenantId, limit);
         const alerts = [
@@ -964,6 +1029,7 @@ exports.getOperationalAlerts = async (req, res) => {
                 kind: 'pos'
             })),
             ...appointmentResult.alerts,
+            ...reviewResult.alerts,
             ...completedDueResult.alerts
         ]
             .sort((left, right) => new Date(right.scheduledAt).getTime() - new Date(left.scheduledAt).getTime())
@@ -972,6 +1038,7 @@ exports.getOperationalAlerts = async (req, res) => {
         const summary = {
             ...queueResult.summary,
             ...appointmentResult.summary,
+            ...reviewResult.summary,
             ...completedDueResult.summary
         };
 

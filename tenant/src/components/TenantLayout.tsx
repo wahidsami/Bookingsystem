@@ -187,7 +187,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     return [
       ...posAlerts.map((alert) => ({
         key: `pos-${alert.id}`,
-        kind: (alert.kind || 'pos') as 'pos' | 'appointment',
+        kind: (alert.kind || 'pos') as 'pos' | 'appointment' | 'review',
         originalId: alert.id,
         title: locale === 'ar' ? (alert.title_ar || alert.title) : alert.title,
         message: locale === 'ar' ? (alert.message_ar || alert.message) : alert.message,
@@ -206,13 +206,13 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         severity: alert.priority === 'high' || alert.priority === 'critical' ? 'high' : 'medium'
       }))
     ]
-      .filter((item) => (item.kind !== 'pos' && item.kind !== 'appointment') || item.timestamp > notificationSeenAt)
+      .filter((item) => (item.kind !== 'pos' && item.kind !== 'appointment' && item.kind !== 'review') || item.timestamp > notificationSeenAt)
       .sort((left, right) => right.timestamp - left.timestamp)
       .slice(0, 6);
   }, [locale, posAlerts, usageAlerts, notificationSeenAt]);
   const notificationBadgeCount = notificationCount;
-  const handleDismissNotification = (item: { kind: 'pos' | 'appointment' | 'usage'; originalId: string }) => {
-    if (item.kind === 'pos' || item.kind === 'appointment') {
+  const handleDismissNotification = (item: { kind: 'pos' | 'appointment' | 'review' | 'usage'; originalId: string }) => {
+    if (item.kind === 'pos' || item.kind === 'appointment' || item.kind === 'review') {
       dismissPosAlert(item.originalId);
     } else {
       dismissAlert(item.originalId);
@@ -407,12 +407,16 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                         ? 'bg-sky-100 text-sky-700'
                         : item.kind === 'appointment'
                           ? 'bg-amber-100 text-amber-700'
+                          : item.kind === 'review'
+                            ? 'bg-violet-100 text-violet-700'
                           : 'bg-amber-100 text-amber-700'
                     }`}>
                       {item.kind === 'pos'
                         ? (locale === 'ar' ? 'تحصيل' : 'POS')
                         : item.kind === 'appointment'
                           ? (locale === 'ar' ? 'موعد' : 'Appointment')
+                          : item.kind === 'review'
+                            ? (locale === 'ar' ? 'تقييم' : 'Review')
                           : (locale === 'ar' ? 'اشتراك' : 'Subscription')}
                     </span>
                     <button

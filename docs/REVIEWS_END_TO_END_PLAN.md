@@ -42,7 +42,7 @@ Build a complete reviews system across:
 ### Phase 4: Tenant Dashboard Improvements
 - [x] Advanced filters (rating/staff/date/visibility)
 - [x] Reply/edit reply UX polish
-- [ ] Dashboard alert on new review
+- [x] Dashboard alert on new review
 - [ ] Commit + push
 
 ### Phase 5: QA + Release Hardening
