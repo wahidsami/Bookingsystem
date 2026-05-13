@@ -946,6 +946,7 @@ class ApiClient {
 
     async hasActiveSession(): Promise<boolean> {
         let token = await this.getToken();
+        const refreshToken = await this.getRefreshToken();
 
         const expired = await this.isSessionExpired();
         if (expired) {
@@ -957,7 +958,9 @@ class ApiClient {
         if (!token) {
             const refreshedToken = await this.refreshAccessToken();
             if (!refreshedToken) {
-                return false;
+                // Keep the user signed in when refresh token still exists.
+                // This prevents silent logout during transient network outages.
+                return Boolean(refreshToken);
             }
             token = refreshedToken;
         }

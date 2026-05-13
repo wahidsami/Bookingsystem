@@ -429,7 +429,7 @@ export default function NotificationsPage() {
       });
 
       if (res.success) {
-        const recipientCount = res.debug?.requestedRecipients ?? res.data?.sent ?? 0;
+        const recipientCount = res.debug?.sentRecipients ?? res.data?.sent ?? 0;
         setMessage({ type: 'success', text: copy.sentTo(recipientCount) });
         setTitle('');
         setBody('');

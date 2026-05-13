@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Linking, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { UserAvatar } from '../components/UserAvatar';
@@ -8,7 +8,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { api, PublicAppContent, User } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
-import { CustomerPushDebugState, getCustomerPushDebugState, registerCustomerPushNotifications } from '../lib/notifications';
 import { AppIcon } from '../components/AppIcon';
 
 interface MoreScreenProps {
@@ -21,19 +20,11 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
     const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
-    const [pushDebugState, setPushDebugState] = useState<CustomerPushDebugState | null>(null);
-    const [pushRefreshing, setPushRefreshing] = useState(false);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
 
     useEffect(() => {
         api.getUser().then(setUser).catch(() => setUser(null));
     }, [isAuthenticated]);
-
-    const loadPushDebugState = React.useCallback(() => {
-        getCustomerPushDebugState()
-            .then(setPushDebugState)
-            .catch(() => setPushDebugState(null));
-    }, []);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -58,8 +49,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                 setNotificationUnreadCount(0);
             }
 
-            loadPushDebugState();
-        }, [loadPushDebugState])
+        }, [isAuthenticated])
     );
 
     const menuItems = [
@@ -137,37 +127,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
         }
 
         showLogin();
-    };
-
-    const getPushStatusLabel = () => {
-        if (!pushDebugState) {
-            return language === 'ar' ? 'لم يتم تسجيل هذا الجهاز للإشعارات بعد.' : 'This device has not registered for push notifications yet.';
-        }
-
-        const labels: Record<CustomerPushDebugState['status'], { ar: string; en: string }> = {
-            idle: { ar: 'في وضع الانتظار.', en: 'Idle.' },
-            started: { ar: 'جاري بدء تسجيل الإشعارات.', en: 'Push registration is starting.' },
-            permission_denied: { ar: 'تم رفض إذن الإشعارات على هذا الجهاز.', en: 'Notification permission was denied on this device.' },
-            token_received: { ar: 'تم إنشاء رمز Expo على الجهاز وهو بانتظار الحفظ في الخادم.', en: 'Expo token was generated on the device and is waiting to be saved.' },
-            registered: { ar: 'تم تسجيل الجهاز للإشعارات بنجاح.', en: 'This device is registered for push notifications.' },
-            register_failed: { ar: 'فشل حفظ رمز الإشعارات في الخادم.', en: 'The backend failed to save the push token.' },
-            unregistered: { ar: 'تم إلغاء تسجيل الإشعارات لهذا الجهاز.', en: 'Push notifications were removed from this device.' },
-            auth_missing: { ar: 'يجب تسجيل الدخول أولاً لتسجيل هذا الجهاز.', en: 'Sign in first so this device can register.' },
-        };
-
-        return labels[pushDebugState.status]?.[language] || pushDebugState.message;
-    };
-
-    const handleRetryPushRegistration = async () => {
-        setPushRefreshing(true);
-        try {
-            await registerCustomerPushNotifications();
-        } catch (error) {
-            console.warn('Manual push registration retry failed:', error);
-        } finally {
-            await loadPushDebugState();
-            setPushRefreshing(false);
-        }
     };
 
     return (
@@ -268,44 +227,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                         </TouchableOpacity>
                     ))}
                 </View>
-
-                {isAuthenticated && (
-                    <>
-                        <View style={styles.sectionHeaderWrap}>
-                            <Text style={styles.sectionHeaderText}>{t('pushNotifications')}</Text>
-                        </View>
-
-                        <View style={styles.pushCard}>
-                            <Text style={styles.pushTitle}>{t('pushNotifications')}</Text>
-                            <Text style={styles.pushDescription}>{t('pushNotificationsDescription')}</Text>
-                            <Text style={styles.pushStatus}>{getPushStatusLabel()}</Text>
-                            {pushDebugState?.tokenPreview ? (
-                                <Text style={styles.pushMeta}>
-                                    {language === 'ar' ? 'معاينة الرمز:' : 'Token preview:'} {pushDebugState.tokenPreview}
-                                </Text>
-                            ) : null}
-                            {pushDebugState?.lastAttemptAt ? (
-                                <Text style={styles.pushMeta}>
-                                    {language === 'ar' ? 'آخر محاولة:' : 'Last attempt:'} {new Date(pushDebugState.lastAttemptAt).toLocaleString()}
-                                </Text>
-                            ) : null}
-                            {pushDebugState?.error ? (
-                                <Text style={styles.pushError}>{pushDebugState.error}</Text>
-                            ) : null}
-                            <TouchableOpacity
-                                style={[styles.pushRetryButton, pushRefreshing && styles.pushRetryButtonDisabled]}
-                                onPress={handleRetryPushRegistration}
-                                disabled={pushRefreshing}
-                            >
-                                {pushRefreshing ? (
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                ) : (
-                                    <Text style={styles.pushRetryText}>{t('retry')}</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                )}
 
                 <View style={styles.sectionHeaderWrap}>
                     <Text style={styles.sectionHeaderText}>{t('supportAndLegal')}</Text>
@@ -435,57 +356,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: colors.border,
-    },
-    pushCard: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: spacing.lg,
-        marginTop: spacing.sm,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: colors.border,
-        padding: spacing.lg,
-        gap: spacing.sm,
-    },
-    pushTitle: {
-        fontSize: fontSize.md,
-        color: colors.text,
-        fontWeight: '700',
-    },
-    pushDescription: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
-        lineHeight: 22,
-    },
-    pushStatus: {
-        fontSize: fontSize.sm,
-        color: colors.text,
-        fontWeight: '600',
-        lineHeight: 22,
-    },
-    pushMeta: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
-    },
-    pushError: {
-        fontSize: fontSize.xs,
-        color: '#DC2626',
-    },
-    pushRetryButton: {
-        marginTop: spacing.sm,
-        backgroundColor: colors.primary,
-        borderRadius: 12,
-        paddingVertical: spacing.sm,
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 44,
-    },
-    pushRetryButtonDisabled: {
-        opacity: 0.7,
-    },
-    pushRetryText: {
-        fontSize: fontSize.md,
-        color: '#FFFFFF',
-        fontWeight: '700',
     },
     logoutButton: {
         flexDirection: 'row',

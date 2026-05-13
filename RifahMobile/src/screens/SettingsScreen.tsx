@@ -1,9 +1,11 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { api } from '../api/client';
+import { registerCustomerPushNotifications, unregisterCustomerPushNotifications } from '../lib/notifications';
 
 interface SettingsScreenProps {
     navigation: any;
@@ -12,11 +14,64 @@ interface SettingsScreenProps {
 export function SettingsScreen({ navigation }: SettingsScreenProps) {
     const { t, language, setLanguage } = useLanguage();
     const { topInset } = useScreenSafeArea();
+    const [profile, setProfile] = React.useState<any>(null);
+    const [pushEnabled, setPushEnabled] = React.useState(true);
+    const [pushLoading, setPushLoading] = React.useState(false);
 
     const nextLanguage = language === 'ar' ? 'en' : 'ar';
 
+    React.useEffect(() => {
+        let active = true;
+        api.getProfile()
+            .then((profile) => {
+                if (!active) return;
+                setProfile(profile);
+                setPushEnabled(profile.notificationPreferences?.push !== false);
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, []);
+
     const handleLanguageToggle = async () => {
         await setLanguage(nextLanguage);
+    };
+
+    const handlePushToggle = async (value: boolean) => {
+        if (pushLoading) return;
+        const previous = pushEnabled;
+        setPushEnabled(value);
+        setPushLoading(true);
+
+        try {
+            await api.updateProfile({
+                notificationPreferences: {
+                    email: profile?.notificationPreferences?.email !== false,
+                    sms: profile?.notificationPreferences?.sms !== false,
+                    push: value,
+                    whatsapp: profile?.notificationPreferences?.whatsapp === true,
+                },
+            });
+
+            setProfile((current: any) => ({
+                ...(current || {}),
+                notificationPreferences: {
+                    ...(current?.notificationPreferences || {}),
+                    push: value,
+                },
+            }));
+
+            if (value) {
+                await registerCustomerPushNotifications();
+            } else {
+                await unregisterCustomerPushNotifications();
+            }
+        } catch (error) {
+            setPushEnabled(previous);
+        } finally {
+            setPushLoading(false);
+        }
     };
 
     return (
@@ -38,6 +93,26 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                     </Text>
                 </TouchableOpacity>
                 <Text style={styles.hint}>{t('languageRestartHint')}</Text>
+            </View>
+
+            <View style={styles.card}>
+                <Text style={styles.cardTitle}>{t('pushNotifications')}</Text>
+                <Text style={styles.cardDescription}>{t('pushNotificationsDescription')}</Text>
+                <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>
+                        {pushEnabled ? t('yes') : t('no')}
+                    </Text>
+                    {pushLoading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                        <Switch
+                            value={pushEnabled}
+                            onValueChange={handlePushToggle}
+                            trackColor={{ false: '#D1D5DB', true: '#C4B5FD' }}
+                            thumbColor={pushEnabled ? colors.primary : '#9CA3AF'}
+                        />
+                    )}
+                </View>
             </View>
         </View>
     );
@@ -104,5 +179,16 @@ const styles = StyleSheet.create({
     hint: {
         fontSize: fontSize.xs,
         color: colors.textSecondary,
+    },
+    toggleRow: {
+        marginTop: spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    toggleLabel: {
+        fontSize: fontSize.md,
+        color: colors.text,
+        fontWeight: '600',
     },
 });
