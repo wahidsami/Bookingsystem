@@ -16,6 +16,18 @@ const parseLimit = (value, fallback) => {
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: parseLimit(process.env.RATE_LIMIT_GENERAL_MAX, 300),
+    skip: (req) => {
+        const path = `${req.originalUrl || req.url || ''}`;
+        const hasAuthHeader = typeof req.headers?.authorization === 'string' && req.headers.authorization.startsWith('Bearer ');
+
+        // Tenant dashboard and subscription widgets can burst many small requests.
+        // We handle those with tenant-scoped middleware after authentication.
+        if (hasAuthHeader && (path.startsWith('/api/v1/tenant/') || path.startsWith('/api/v1/subscription/'))) {
+            return true;
+        }
+
+        return false;
+    },
     message: {
         success: false,
         message: 'Too many requests from this IP, please try again later.'

@@ -54,6 +54,40 @@ type ScheduleSummary = {
   oneTimeShifts: number;
 };
 
+const normalizeStringArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => `${item ?? ''}`.trim()).filter(Boolean);
+  }
+
+  let current: unknown = value;
+  let depth = 0;
+  while (typeof current === "string" && depth < 8) {
+    const trimmed = current.trim();
+    if (!trimmed) {
+      return [];
+    }
+    if (!(trimmed.startsWith("[") || trimmed.startsWith("\"["))) {
+      return [trimmed];
+    }
+    try {
+      current = JSON.parse(trimmed);
+      depth += 1;
+    } catch {
+      break;
+    }
+  }
+
+  if (Array.isArray(current)) {
+    return current.map((item) => `${item ?? ''}`.replace(/^"+|"+$/g, '').trim()).filter(Boolean);
+  }
+
+  if (typeof current === "string") {
+    return [`${current}`.replace(/^"+|"+$/g, '').trim()].filter(Boolean);
+  }
+
+  return [];
+};
+
 export default function EditEmployeePage() {
     const dialog = useAppDialog();
   const t = useTranslations("Employees");
@@ -300,8 +334,8 @@ export default function EditEmployeePage() {
           position: emp.position || "",
           bio: emp.bio || "",
           experience: emp.experience || "",
-          skills: emp.skills || [],
-          spokenLanguages: Array.isArray(emp.spokenLanguages) ? emp.spokenLanguages : [],
+          skills: normalizeStringArray(emp.skills),
+          spokenLanguages: normalizeStringArray(emp.spokenLanguages),
           salary: emp.salary?.toString() || "",
           commissionRate: emp.commissionRate?.toString() || "",
           serviceCommissionEnabled: emp.serviceCommissionEnabled ?? false,

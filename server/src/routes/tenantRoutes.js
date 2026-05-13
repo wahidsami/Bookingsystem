@@ -26,7 +26,7 @@ const tenantPayrollController = require('../controllers/tenantPayrollController'
 const tenantNotificationController = require('../controllers/tenantNotificationController');
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const aiController = require('../controllers/tenant/aiController');
-const { authenticateTenant, checkTenantFeature } = require('../middleware/authTenant');
+const { authenticateTenant, checkTenantFeature, rateLimitTenant } = require('../middleware/authTenant');
 const {
     requireActiveSubscription,
     checkResourceLimit
@@ -64,6 +64,7 @@ const notificationImageUpload = multer({ storage: notificationImageStorage });
 
 // All routes require authentication
 router.use(authenticateTenant);
+router.use(rateLimitTenant(900, 60 * 1000));
 
 // Onboarding: resubmit after more_info_required
 router.put('/resubmit-request', tenantRegistrationController.resubmitRequest);

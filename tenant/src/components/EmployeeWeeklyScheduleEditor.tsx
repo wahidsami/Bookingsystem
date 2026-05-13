@@ -550,14 +550,12 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
         return true;
       }
 
-      const draftShifts = shifts.filter((shift) => shift.isDraft);
-      if (draftShifts.length === 0) {
-        return true;
-      }
-
       setSavingKey("flush-drafts");
       try {
-        const results = await Promise.all(
+        const draftShifts = shifts.filter((shift) => shift.isDraft);
+        const persistedShifts = shifts.filter((shift) => !shift.isDraft);
+
+        const createdDraftResults = await Promise.all(
           draftShifts.map(async (shift) => {
             const isRecurringShift = shift.isRecurring !== false;
             const specificDate = !isRecurringShift
@@ -580,9 +578,21 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
           })
         );
 
+        // Persist all current non-draft shifts too, so parent "Save Team Member"
+        // captures time changes even when a field was changed but never blurred.
+        await Promise.all(
+          persistedShifts.map(async (shift) => {
+            await tenantApi.updateEmployeeShift(
+              employeeId,
+              shift.id,
+              buildShiftPayload(shift, sharedStartDate, sharedEndDate)
+            );
+          })
+        );
+
         setShiftsAndMirror((current) =>
           current.map((item) => {
-            const match = results.find((result) => result.oldId === item.id);
+            const match = createdDraftResults.find((result) => result.oldId === item.id);
             return match ? { ...match.createdShift, isDraft: false } : item;
           })
         );

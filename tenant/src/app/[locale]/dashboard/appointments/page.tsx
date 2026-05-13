@@ -986,6 +986,19 @@ export default function AppointmentsPage() {
         </div>
       )}
 
+      {viewMode === 'list' && (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowFilters(true)}
+            className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            <FunnelIcon className="h-5 w-5" />
+            <span>{locale === 'ar' ? 'أدوات المواعيد' : 'Appointment Tools'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Loading State */}
       {loading ? (
         <div className="text-center py-12">
