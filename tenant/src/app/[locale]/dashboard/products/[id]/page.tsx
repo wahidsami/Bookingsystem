@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import { SparklesIcon, LanguageIcon } from "@heroicons/react/24/outline";
@@ -43,7 +43,6 @@ interface Product {
 export default function EditProductPage() {
   const t = useTranslations("Products");
   const params = useParams();
-  const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
   const { id } = params;
@@ -54,6 +53,7 @@ export default function EditProductPage() {
   const [translatingField, setTranslatingField] = useState<string | null>(null);
   const [hasAIFeature, setHasAIFeature] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
     name_en: "",
     name_ar: "",
@@ -150,6 +150,7 @@ export default function EditProductPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    if (success) setSuccess("");
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
@@ -176,6 +177,7 @@ export default function EditProductPage() {
     e.preventDefault();
     setSaving(true);
     setError("");
+    setSuccess("");
 
     try {
       const submitData = new FormData();
@@ -211,7 +213,7 @@ export default function EditProductPage() {
       const response = await tenantApi.updateProduct(id as string, submitData);
 
       if (response.success) {
-        router.push(`/${locale}/dashboard/products`);
+        setSuccess(locale === 'ar' ? 'تم حفظ التعديلات بنجاح.' : 'Changes saved successfully.');
       } else {
         setError(response.message || t("updateError"));
       }
@@ -345,11 +347,9 @@ export default function EditProductPage() {
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
-    const target = document.getElementById(sectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   };
+
+  const isVisibleSection = (sectionId: string) => activeSection === sectionId;
 
   if (loading) {
     return (
@@ -382,11 +382,16 @@ export default function EditProductPage() {
         onSectionSelect={scrollToSection}
       >
       <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+        {success ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+            {success}
+          </div>
+        ) : null}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
-            <div id="product-basic" className="card">
+            <div id="product-basic" className={`card ${isVisibleSection("product-basic") ? "block" : "hidden"}`}>
               <div className={`mb-4 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
@@ -524,7 +529,7 @@ export default function EditProductPage() {
             </div>
 
             {/* Product Details */}
-            <div id="product-content" className="card">
+            <div id="product-content" className={`card ${isVisibleSection("product-content") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
               </h3>
@@ -724,7 +729,7 @@ export default function EditProductPage() {
           {/* Right Column - Image & Pricing */}
           <div className="space-y-6">
             {/* Image Upload */}
-            <div id="product-media" className="card">
+            <div id="product-media" className={`card ${isVisibleSection("product-media") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("image")}
               </h3>
@@ -769,7 +774,7 @@ export default function EditProductPage() {
             </div>
 
             {/* Pricing & Inventory */}
-            <div id="product-pricing" className="card">
+            <div id="product-pricing" className={`card ${isVisibleSection("product-pricing") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
               </h3>

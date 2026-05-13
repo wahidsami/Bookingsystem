@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
 import { API_BASE_URL, tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { hasAIAssistantEntitlement } from "@/lib/packageEntitlements";
 import { DEFAULT_PRODUCT_CATEGORIES } from "@/lib/productHelpers";
@@ -14,7 +14,6 @@ import { ServiceEditorFrame, type ServiceEditorSection } from "@/components/Serv
 export default function NewProductPage() {
   const t = useTranslations("Products");
   const params = useParams();
-  const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
 
@@ -25,6 +24,7 @@ export default function NewProductPage() {
   const [aiMode, setAiMode] = useState<'search' | 'enhance'>('search');
   const [showNotFoundPopup, setShowNotFoundPopup] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [globalSettings, setGlobalSettings] = useState({
     taxRate: 15.00,
     productCommissionRate: 10.00
@@ -101,6 +101,7 @@ export default function NewProductPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    if (success) setSuccess("");
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
@@ -146,6 +147,7 @@ export default function NewProductPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const submitData = new FormData();
@@ -188,7 +190,7 @@ export default function NewProductPage() {
       const response = await tenantApi.createProduct(submitData);
 
       if (response.success) {
-        router.push(`/${locale}/dashboard/products`);
+        setSuccess(locale === 'ar' ? 'تم حفظ المنتج بنجاح.' : 'Product saved successfully.');
       } else {
         setError(response.message || t("createError"));
       }
@@ -360,11 +362,9 @@ export default function NewProductPage() {
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
-    const target = document.getElementById(sectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   };
+
+  const isVisibleSection = (sectionId: string) => activeSection === sectionId;
 
   return (
     <TenantLayout>
@@ -427,10 +427,15 @@ export default function NewProductPage() {
 
       {/* Form */}
       <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+        {success ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+            {success}
+          </div>
+        ) : null}
         <div className="grid grid-cols-1 gap-6">
           <div className="space-y-6">
             {/* Basic Information */}
-            <div id="product-basic" className="card">
+            <div id="product-basic" className={`card ${isVisibleSection("product-basic") ? "block" : "hidden"}`}>
               <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
@@ -545,7 +550,7 @@ export default function NewProductPage() {
             </div>
 
             {/* Product Details */}
-            <div id="product-content" className="card">
+            <div id="product-content" className={`card ${isVisibleSection("product-content") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}
               </h3>
@@ -802,7 +807,7 @@ export default function NewProductPage() {
 
           <div className="space-y-6">
             {/* Image Upload */}
-            <div id="product-media" className="card">
+            <div id="product-media" className={`card ${isVisibleSection("product-media") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("images")} <span className="text-red-500">*</span>
               </h3>
@@ -862,7 +867,7 @@ export default function NewProductPage() {
             </div>
 
             {/* Pricing & Inventory */}
-            <div id="product-pricing" className="card">
+            <div id="product-pricing" className={`card ${isVisibleSection("product-pricing") ? "block" : "hidden"}`}>
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {locale === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
               </h3>
