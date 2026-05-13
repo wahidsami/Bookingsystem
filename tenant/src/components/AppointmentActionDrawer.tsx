@@ -173,6 +173,10 @@ export function AppointmentActionDrawer({
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerCustomers, setPickerCustomers] = useState<CustomerItem[]>([]);
+  const [pickerSearch, setPickerSearch] = useState("");
 
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
     firstName: "",
@@ -218,6 +222,10 @@ export function AppointmentActionDrawer({
         email: prefill.customer.email || "",
         phone: prefill.customer.phone || ""
       } : null);
+      setShowCustomerPicker(false);
+      setPickerLoading(false);
+      setPickerCustomers([]);
+      setPickerSearch("");
       setNewCustomer({
         firstName: "",
         lastName: "",
@@ -249,6 +257,32 @@ export function AppointmentActionDrawer({
     setBreakType((existingBreak?.type as any) || "other");
     setBreakLabel(existingBreak?.label || "");
   }, [open, mode, defaultStaffId, defaultDate, defaultTime, prefill, existingBreak]);
+
+  useEffect(() => {
+    if (!open || mode !== "appointment" || customerMode !== "existing" || !showCustomerPicker) {
+      return;
+    }
+
+    const query = pickerSearch.trim();
+    const timer = setTimeout(async () => {
+      try {
+        setPickerLoading(true);
+        const response = await tenantApi.getCustomers({ search: query || undefined, limit: 100 });
+        if (response.success) {
+          setPickerCustomers(response.data?.customers || []);
+        } else {
+          setPickerCustomers([]);
+        }
+      } catch (err) {
+        console.error("Failed to load customers for picker:", err);
+        setPickerCustomers([]);
+      } finally {
+        setPickerLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [open, mode, customerMode, showCustomerPicker, pickerSearch]);
 
   useEffect(() => {
     if (!open || mode !== "appointment") {
@@ -608,17 +642,31 @@ export function AppointmentActionDrawer({
 
                   {customerMode === "existing" ? (
                     <div className="mt-4 space-y-3">
-                      <input
-                        type="text"
-                        value={customerSearch}
-                        onChange={(e) => {
-                          setSelectedCustomer(null);
-                          setCustomerSearch(e.target.value);
-                        }}
-                        placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={customerSearch}
+                          onChange={(e) => {
+                            setSelectedCustomer(null);
+                            setCustomerSearch(e.target.value);
+                          }}
+                          placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
+                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomerPicker(true)}
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-gray-300 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
+                          title={locale === "ar" ? "اختيار من كل العملاء" : "Pick from all customers"}
+                          aria-label={locale === "ar" ? "اختيار من كل العملاء" : "Pick from all customers"}
+                        >
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                            <path d="M6.25 7.25a2.75 2.75 0 115.5 0 2.75 2.75 0 01-5.5 0zM10.5 11.5a4.5 4.5 0 00-4.5 4.5.75.75 0 001.5 0 3 3 0 013-3h2.5a.75.75 0 000-1.5h-2.5z" />
+                            <path d="M13.25 8.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zm2.893 6.198a3.25 3.25 0 00-2.893-1.698h-.75a.75.75 0 000 1.5h.75c.664 0 1.294.322 1.688.863a.75.75 0 001.205-.865z" />
+                          </svg>
+                        </button>
+                      </div>
 
                       {customerLoading ? (
                         <div className="text-xs text-gray-500">{locale === "ar" ? "جارٍ البحث..." : "Searching..."}</div>
@@ -735,6 +783,71 @@ export function AppointmentActionDrawer({
                     </div>
                   )}
                 </div>
+
+                {showCustomerPicker && (
+                  <div className="fixed inset-0 z-[70]">
+                    <div className="absolute inset-0 bg-slate-950/35" onClick={() => setShowCustomerPicker(false)} />
+                    <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h5 className="text-base font-semibold text-gray-900">
+                          {locale === "ar" ? "اختيار عميل" : "Select Customer"}
+                        </h5>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomerPicker(false)}
+                          className="rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={pickerSearch}
+                        onChange={(e) => setPickerSearch(e.target.value)}
+                        placeholder={locale === "ar" ? "ابحث داخل كل العملاء..." : "Search all customers..."}
+                        className="mb-3 w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? "right" : "left" }}
+                      />
+
+                      <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+                        {pickerLoading ? (
+                          <p className="text-sm text-gray-500">{locale === "ar" ? "جارٍ التحميل..." : "Loading customers..."}</p>
+                        ) : pickerCustomers.length === 0 ? (
+                          <p className="rounded-2xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
+                            {locale === "ar" ? "لا يوجد عملاء لعرضهم." : "No customers to show."}
+                          </p>
+                        ) : (
+                          pickerCustomers.map((customer) => (
+                            <button
+                              key={customer.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
+                                setShowCustomerPicker(false);
+                              }}
+                              className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-purple-50"
+                            >
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
+                                {getInitials(customer.firstName, customer.lastName)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-semibold text-gray-900">
+                                  {customer.firstName} {customer.lastName}
+                                </p>
+                                <p className="truncate text-xs text-gray-500">{customer.email || "-"}</p>
+                                <p className="truncate text-xs text-gray-500">{customer.phone || "-"}</p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-3xl border border-gray-200 bg-white p-4">
                   <h4 className="text-base font-semibold text-gray-900">
