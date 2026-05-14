@@ -129,6 +129,7 @@ export default function AppointmentsPage() {
   const params = useParams();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
+  const advancedDragEnabled = process.env.NEXT_PUBLIC_APPOINTMENTS_ADVANCED_DRAG !== "0";
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -1634,7 +1635,7 @@ export default function AppointmentsPage() {
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
           onReassignAppointment={handleReassignAppointment}
-          onDropAppointmentChange={handleDropAppointmentChange}
+          onDropAppointmentChange={advancedDragEnabled ? handleDropAppointmentChange : undefined}
           onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
           onStaffHeaderMenuRequest={handleStaffHeaderMenu}

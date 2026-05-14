@@ -30,6 +30,7 @@ const { sendEmail } = require('../utils/emailService');
 
 const INVITE_EXPIRY_HOURS = 72;
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
+const TENANT_APPOINTMENT_ADVANCED_DRAG_ENABLED = process.env.TENANT_APPOINTMENT_ADVANCED_DRAG !== '0';
 
 function logTenantAppointmentAudit(event, payload = {}) {
     if (!TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED) {
@@ -1629,6 +1630,14 @@ exports.rescheduleAppointment = async (req, res) => {
 exports.reassignRescheduleAppointment = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
+        if (!TENANT_APPOINTMENT_ADVANCED_DRAG_ENABLED) {
+            await transaction.rollback();
+            return res.status(403).json({
+                success: false,
+                message: 'Advanced drag and drop scheduling is currently disabled'
+            });
+        }
+
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { staffId, startTime, notifyCustomer = false } = req.body || {};
@@ -1647,6 +1656,14 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid startTime'
+            });
+        }
+
+        if (requestedStart.getTime() <= Date.now()) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'New appointment time must be in the future'
             });
         }
 
@@ -1763,7 +1780,7 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             nextStartTime: requestedStart.toISOString()
         });
 
-        if (notifyCustomer) {
+        if (notifyCustomer && appointment.platformUserId) {
             try {
                 const appointmentDate = requestedStart.toLocaleString('en-US', {
                     weekday: 'short',
