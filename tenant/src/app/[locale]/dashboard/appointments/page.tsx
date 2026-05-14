@@ -1507,6 +1507,9 @@ export default function AppointmentsPage() {
           onBreakClick={handleOpenBlockedTime}
           onAppointmentSettingsClick={handleOpenAppointmentDetails}
           onOpenTools={() => setShowFilters(true)}
+          onShowAllProviders={() => {
+            setFilterStaffId("");
+          }}
           activeFilterCount={activeFilterCount}
           serviceCapabilityMap={serviceCapabilityMap}
           locale={locale}

@@ -84,6 +84,7 @@ interface CalendarViewProps {
   onBreakClick?: (breakItem: EmployeeBreak) => void;
   onAppointmentSettingsClick?: (appointmentId: string) => void;
   onOpenTools?: () => void;
+  onShowAllProviders?: () => void;
   activeFilterCount?: number;
   serviceCapabilityMap?: Map<string, Set<string>>;
   locale: string;
@@ -113,6 +114,7 @@ export function CalendarView({
   onBreakClick,
   onAppointmentSettingsClick,
   onOpenTools,
+  onShowAllProviders,
   activeFilterCount = 0,
   serviceCapabilityMap,
   locale,
@@ -592,6 +594,11 @@ export function CalendarView({
     });
   };
 
+  const showAllProviders = () => {
+    setVisibleStaffIds(new Set(employees.map((employee) => employee.id)));
+    onShowAllProviders?.();
+  };
+
   const handleStaffDragOver = (event: DragEvent<HTMLDivElement>, staffId: string) => {
     if (!onReassignAppointment || !draggedAppointmentId) {
       return;
@@ -744,6 +751,18 @@ export function CalendarView({
         <div className={`flex flex-col md:flex-row items-start md:items-center gap-2 w-full md:w-auto ${isRTL ? 'md:flex-row-reverse' : ''}`}>
           <span className="text-sm text-gray-600 whitespace-nowrap">{t('scheduledTeam')}:</span>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={showAllProviders}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
+              title={locale === 'ar' ? 'إظهار جميع مقدمي الخدمة' : 'Show all service providers'}
+              aria-label={locale === 'ar' ? 'إظهار جميع مقدمي الخدمة' : 'Show all service providers'}
+            >
+              <svg className="h-4 w-4 text-gray-700" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10 9a3 3 0 100-6 3 3 0 000 6zM3 17a4 4 0 014-4h6a4 4 0 014 4v1H3v-1zM2 8a2 2 0 100-4 2 2 0 000 4zm16 0a2 2 0 100-4 2 2 0 000 4z" />
+              </svg>
+              <span>{locale === 'ar' ? 'الكل' : 'All'}</span>
+            </button>
             {employees.map(emp => (
               <button
                 key={emp.id}
