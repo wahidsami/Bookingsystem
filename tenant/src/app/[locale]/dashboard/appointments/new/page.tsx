@@ -296,7 +296,18 @@ export default function NewAppointmentPage() {
       }
     } catch (err: any) {
       console.error("Failed to create appointment:", err);
-      setError(err.message || (locale === "ar" ? "فشل إنشاء الموعد." : "Failed to create appointment."));
+      const rawMessage = `${err?.message || ''}`.toLowerCase();
+      if (rawMessage.includes('conflict') || rawMessage.includes('time slot not available')) {
+        setError(locale === "ar"
+          ? "الموعد غير متاح في هذا الوقت بسبب تعارض. اختر وقتًا أو مقدم خدمة آخر."
+          : "This time slot is not available due to a conflict. Please choose another time or provider.");
+      } else if (rawMessage.includes('session expired') || rawMessage.includes('authentication failed')) {
+        setError(locale === "ar"
+          ? "انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى."
+          : "Your session expired. Please login again.");
+      } else {
+        setError(err.message || (locale === "ar" ? "فشل إنشاء الموعد." : "Failed to create appointment."));
+      }
     } finally {
       setSaving(false);
     }

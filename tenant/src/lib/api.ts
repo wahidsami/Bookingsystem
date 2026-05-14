@@ -78,6 +78,13 @@ class TenantApiClient {
     localStorage.removeItem('rifah_tenant_refresh_token');
   }
 
+  private redirectToLogin(): void {
+    if (typeof window === 'undefined') return;
+    const path = window.location.pathname || '/ar/dashboard';
+    const locale = path.split('/')[1] || 'ar';
+    window.location.href = `/${locale}/login`;
+  }
+
   /**
    * Refresh access token using refresh token
    */
@@ -150,11 +157,15 @@ class TenantApiClient {
       } else {
         // Refresh failed, clear tokens and redirect to login
         this.clearTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/ar/login';
-        }
+        this.redirectToLogin();
         throw new Error('Authentication failed. Please login again.');
       }
+    }
+
+    if (response.status === 401) {
+      this.clearTokens();
+      this.redirectToLogin();
+      throw new Error('Your session expired. Please login again.');
     }
 
     // Check if response is JSON before parsing
@@ -212,11 +223,15 @@ class TenantApiClient {
         });
       } else {
         this.clearTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/ar/login';
-        }
+        this.redirectToLogin();
         throw new Error('Authentication failed. Please login again.');
       }
+    }
+
+    if (response.status === 401) {
+      this.clearTokens();
+      this.redirectToLogin();
+      throw new Error('Your session expired. Please login again.');
     }
 
     if (!response.ok) {
