@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import { getImageUrl, tenantApi } from "@/lib/api";
 
@@ -330,7 +329,6 @@ export function AppointmentDetailsDrawer({
   onClose,
   onRebook
 }: AppointmentDetailsDrawerProps) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [appointment, setAppointment] = useState<AppointmentItem | null>(null);
@@ -345,6 +343,9 @@ export function AppointmentDetailsDrawer({
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleValue, setRescheduleValue] = useState("");
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open || !appointmentId) {
@@ -358,6 +359,9 @@ export function AppointmentDetailsDrawer({
       setTransactionTypeFilter("all");
       setTransactionStatusFilter("all");
       setExpandedTransactionId(null);
+      setRescheduleOpen(false);
+      setRescheduleValue("");
+      setRescheduleSubmitting(false);
       setError("");
       setLoading(false);
       return;
@@ -531,8 +535,39 @@ export function AppointmentDetailsDrawer({
 
   const handleReschedule = () => {
     if (!appointment) return;
-    onClose();
-    router.push(`/${locale}/dashboard/appointments/${appointment.id}?reschedule=1`);
+    const start = new Date(appointment.startTime);
+    const localDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+    setRescheduleValue(localDate);
+    setRescheduleOpen(true);
+  };
+
+  const handleRescheduleConfirm = async () => {
+    if (!appointment || !rescheduleValue || rescheduleSubmitting) return;
+    try {
+      setRescheduleSubmitting(true);
+      const response = await tenantApi.rescheduleAppointment(appointment.id, {
+        startTime: new Date(rescheduleValue).toISOString(),
+        staffId: appointment.staff?.id
+      });
+
+      if (!response?.success) {
+        alert(response?.message || (locale === "ar" ? "تعذر إعادة الجدولة." : "Failed to reschedule."));
+        return;
+      }
+
+      const refreshed = await tenantApi.getAppointment(appointment.id);
+      if (refreshed?.success && refreshed?.appointment) {
+        setAppointment(refreshed.appointment);
+      }
+
+      setRescheduleOpen(false);
+      setRescheduleValue("");
+    } catch (err: any) {
+      console.error("Failed to reschedule from drawer:", err);
+      alert(err?.message || (locale === "ar" ? "تعذر إعادة الجدولة." : "Failed to reschedule."));
+    } finally {
+      setRescheduleSubmitting(false);
+    }
   };
 
   const handleRebook = () => {
@@ -1289,6 +1324,46 @@ export function AppointmentDetailsDrawer({
           </div>
         </div>
       </aside>
+
+      {rescheduleOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/35" onClick={() => !rescheduleSubmitting && setRescheduleOpen(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900">
+              {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {locale === "ar" ? "اختر التاريخ والوقت الجديدين." : "Choose the new date and time."}
+            </p>
+            <div className="mt-4">
+              <input
+                type="datetime-local"
+                value={rescheduleValue}
+                onChange={(event) => setRescheduleValue(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRescheduleOpen(false)}
+                disabled={rescheduleSubmitting}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {locale === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleRescheduleConfirm}
+                disabled={!rescheduleValue || rescheduleSubmitting}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
+              >
+                {rescheduleSubmitting ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "حفظ" : "Save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
