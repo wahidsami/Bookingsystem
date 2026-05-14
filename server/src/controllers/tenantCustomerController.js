@@ -6,6 +6,23 @@
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { buildPublicAssetUrl } = require('../utils/url');
+const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
+
+function logTenantAppointmentAudit(event, payload = {}) {
+    if (!TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED) {
+        return;
+    }
+
+    try {
+        console.info('[tenant-appointment-audit]', JSON.stringify({
+            event,
+            at: new Date().toISOString(),
+            ...payload
+        }));
+    } catch (error) {
+        console.info('[tenant-appointment-audit]', event, payload);
+    }
+}
 
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
@@ -1005,6 +1022,7 @@ exports.getCustomerTransactions = async (req, res) => {
         const { id } = req.params;
         const { startDate, endDate, limit = 50 } = req.query;
         const safeLimit = Math.max(parseInt(limit, 10) || 50, 1);
+        const requestId = `cust_tx_${Date.now()}_${id}`;
 
         const appointmentStart = parseDateValue(startDate, false);
         const appointmentEnd = parseDateValue(endDate, true);
@@ -1063,6 +1081,15 @@ exports.getCustomerTransactions = async (req, res) => {
                 order: [['createdAt', 'DESC']]
             })
         ]);
+        logTenantAppointmentAudit('customer_transactions_source_counts', {
+            requestId,
+            tenantId,
+            customerId: id,
+            appointmentsCount: appointments.length,
+            ordersCount: orders.length,
+            startDate: startDate || null,
+            endDate: endDate || null
+        });
 
         const appointmentIds = appointments.map((row) => row.id);
         const orderIds = orders.map((row) => row.id);
@@ -1196,6 +1223,13 @@ exports.getCustomerTransactions = async (req, res) => {
                 order: [['processedAt', 'DESC']]
             })
         ]);
+        logTenantAppointmentAudit('customer_transactions_payment_records_loaded', {
+            requestId,
+            tenantId,
+            customerId: id,
+            gatewayTransactionsCount: gatewayTransactions.length,
+            ledgerTransactionsCount: ledgerTransactions.length
+        });
 
         const transactions = [];
         const seenRecords = new Set();
@@ -1340,6 +1374,21 @@ exports.getCustomerTransactions = async (req, res) => {
         const refundedTotal = pagedTransactions
             .filter((item) => item.status === 'refunded' || item.type === 'refund')
             .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const appointmentStatusCounts = appointments.reduce((acc, appointment) => {
+            const key = `${appointment.paymentStatus || 'unknown'}`.toLowerCase();
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+        logTenantAppointmentAudit('customer_transactions_composed', {
+            requestId,
+            tenantId,
+            customerId: id,
+            totalComposedTransactions: transactions.length,
+            returnedTransactions: pagedTransactions.length,
+            appointmentStatusCounts,
+            completedTotal: parseFloat(completedTotal.toFixed(2)),
+            refundedTotal: parseFloat(refundedTotal.toFixed(2))
+        });
 
         res.json({
             success: true,

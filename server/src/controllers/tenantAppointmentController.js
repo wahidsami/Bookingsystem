@@ -29,6 +29,23 @@ const { getServerPublicUrl } = require('../utils/url');
 const { sendEmail } = require('../utils/emailService');
 
 const INVITE_EXPIRY_HOURS = 72;
+const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
+
+function logTenantAppointmentAudit(event, payload = {}) {
+    if (!TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED) {
+        return;
+    }
+
+    try {
+        console.info('[tenant-appointment-audit]', JSON.stringify({
+            event,
+            at: new Date().toISOString(),
+            ...payload
+        }));
+    } catch (error) {
+        console.info('[tenant-appointment-audit]', event, payload);
+    }
+}
 
 function generateInviteToken() {
     return crypto.randomBytes(32).toString('hex');
@@ -1004,6 +1021,7 @@ exports.updatePaymentStatus = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { paymentStatus, paymentMethod, transactionRef, notes } = req.body;
+        const requestId = `pay_${Date.now()}_${id}`;
 
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
@@ -1043,6 +1061,15 @@ exports.updatePaymentStatus = async (req, res) => {
 
         const previousTotalPaid = parseFloat(appointment.totalPaid || 0);
         const previousPaymentStatus = appointment.paymentStatus;
+        logTenantAppointmentAudit('payment_update_requested', {
+            requestId,
+            tenantId,
+            appointmentId: id,
+            previousPaymentStatus,
+            requestedPaymentStatus: paymentStatus,
+            previousTotalPaid,
+            requestedPaymentMethod: paymentMethod || null
+        });
 
         appointment.paymentStatus = paymentStatus;
         if (paymentMethod) {
@@ -1140,6 +1167,17 @@ exports.updatePaymentStatus = async (req, res) => {
         }
 
         await transaction.commit();
+        logTenantAppointmentAudit('payment_update_committed', {
+            requestId,
+            tenantId,
+            appointmentId: appointment.id,
+            previousPaymentStatus,
+            nextPaymentStatus: appointment.paymentStatus,
+            previousTotalPaid,
+            nextTotalPaid: parseFloat(appointment.totalPaid || 0),
+            paymentDelta,
+            paymentMethod: appointment.paymentMethod || null
+        });
 
         try {
             await appointmentLifecycleService.notifyPaymentCollected(appointment, {
@@ -1178,6 +1216,7 @@ exports.reassignAppointmentStaff = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { staffId } = req.body;
+        const requestId = `reassign_${Date.now()}_${id}`;
 
         if (!staffId) {
             await transaction.rollback();
@@ -1230,6 +1269,12 @@ exports.reassignAppointmentStaff = async (req, res) => {
 
         if (appointment.staffId === staffId) {
             await transaction.commit();
+            logTenantAppointmentAudit('reassign_noop', {
+                requestId,
+                tenantId,
+                appointmentId: appointment.id,
+                staffId
+            });
             return res.json({
                 success: true,
                 message: 'Appointment already assigned to this staff member',
@@ -1288,10 +1333,19 @@ exports.reassignAppointmentStaff = async (req, res) => {
 
         appointment.requestedStaffId = staffId;
         appointment.assignmentMode = 'tenant_reassigned';
+        const previousStaffId = appointment.staffId;
         appointment.staffId = staffId;
         await appointment.save({ transaction });
 
         await transaction.commit();
+        logTenantAppointmentAudit('reassign_committed', {
+            requestId,
+            tenantId,
+            appointmentId: appointment.id,
+            previousStaffId,
+            nextStaffId: staffId,
+            startTime: appointment.startTime
+        });
 
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
@@ -1366,6 +1420,7 @@ exports.rescheduleAppointment = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { startTime, staffId } = req.body;
+        const requestId = `reschedule_${Date.now()}_${id}`;
 
         if (!startTime) {
             await transaction.rollback();
@@ -1480,6 +1535,9 @@ exports.rescheduleAppointment = async (req, res) => {
             appointment.assignmentMode = 'tenant_reassigned';
         }
 
+        const previousStaffId = appointment.staffId;
+        const previousStartTime = appointment.startTime;
+        const previousEndTime = appointment.endTime;
         appointment.staffId = requestedStaffId;
         appointment.startTime = requestedStart;
         appointment.endTime = requestedEnd;
@@ -1487,6 +1545,17 @@ exports.rescheduleAppointment = async (req, res) => {
         appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });
         await transaction.commit();
+        logTenantAppointmentAudit('reschedule_committed', {
+            requestId,
+            tenantId,
+            appointmentId: appointment.id,
+            previousStaffId,
+            nextStaffId: requestedStaffId,
+            previousStartTime,
+            nextStartTime: requestedStart.toISOString(),
+            previousEndTime,
+            nextEndTime: requestedEnd.toISOString()
+        });
 
         try {
             const customerName = appointment.user
