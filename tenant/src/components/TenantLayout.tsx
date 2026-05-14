@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -84,6 +85,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const t = useTranslations("Navigation");
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
+  const notificationButtonRef = useRef<HTMLButtonElement | null>(null);
+  const notificationPanelRef = useRef<HTMLDivElement | null>(null);
   const [entitlements, setEntitlements] = useState<Record<string, any> | null>(null);
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
   const [entitlementsLoadFailed, setEntitlementsLoadFailed] = useState(false);
@@ -97,6 +100,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [now, setNow] = useState(() => new Date());
   const [notificationSeenAt, setNotificationSeenAt] = useState(0);
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
+  const [notificationPanelPosition, setNotificationPanelPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
   const announcedAppointmentAlertIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedAppointmentAlertsRef = useRef(false);
 
@@ -334,6 +338,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const renderNotificationMenu = () => (
     <div ref={notificationMenuRef} className="relative z-50">
       <button
+        ref={notificationButtonRef}
         type="button"
         onClick={() => {
           setUserMenuOpen(false);
@@ -351,99 +356,136 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       </button>
 
       {notificationMenuOpen && (
-        <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} z-[60] mt-2 w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
-          <div className="border-b border-gray-100 px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">
-                  {locale === 'ar' ? 'الإشعارات' : 'Notifications'}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {notificationCount > 0
-                    ? (locale === 'ar' ? `${notificationCount} إشعار` : `${notificationCount} item(s)`)
-                    : (locale === 'ar' ? 'لا توجد إشعارات جديدة' : 'No new notifications')}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={markAllNotificationsAsRead}
-                disabled={markingNotificationsRead || notificationCount === 0}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {markingNotificationsRead
-                  ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Marking...')
-                  : (locale === 'ar' ? 'تعيين الكل كمقروء' : 'Mark all as read')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setNotificationMenuOpen(false)}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-              >
-                {locale === 'ar' ? 'إغلاق' : 'Close'}
-              </button>
-            </div>
-          </div>
-          <div className="max-h-[420px] overflow-y-auto p-2">
-            {notificationFeed.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-                {locale === 'ar' ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
-              </div>
-            ) : notificationFeed.map((item) => (
-              <div
-                key={item.key}
-                className={`mb-2 rounded-xl border px-3 py-3 ${
-                  item.severity === 'high' ? 'border-rose-200 bg-rose-50' : 'border-gray-200 bg-white'
-                }`}
-                style={{ textAlign: isRTL ? 'right' : 'left' }}
-              >
-                <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-gray-600">{item.message}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                      item.kind === 'pos'
-                        ? 'bg-sky-100 text-sky-700'
-                        : item.kind === 'appointment'
-                          ? 'bg-amber-100 text-amber-700'
-                          : item.kind === 'review'
-                            ? 'bg-violet-100 text-violet-700'
-                          : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {item.kind === 'pos'
-                        ? (locale === 'ar' ? 'تحصيل' : 'POS')
-                        : item.kind === 'appointment'
-                          ? (locale === 'ar' ? 'موعد' : 'Appointment')
-                          : item.kind === 'review'
-                            ? (locale === 'ar' ? 'تقييم' : 'Review')
-                          : (locale === 'ar' ? 'اشتراك' : 'Subscription')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDismissNotification(item)}
-                      className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
-                    >
-                      {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
-                    </button>
-                  </div>
+        typeof document !== 'undefined' ? createPortal(
+          <div
+            ref={notificationPanelRef}
+            className="fixed z-[900] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            style={{
+              top: notificationPanelPosition.top,
+              left: notificationPanelPosition.left,
+              right: notificationPanelPosition.right
+            }}
+          >
+            <div className="border-b border-gray-100 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {locale === 'ar' ? 'الإشعارات' : 'Notifications'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {notificationCount > 0
+                      ? (locale === 'ar' ? `${notificationCount} إشعار` : `${notificationCount} item(s)`)
+                      : (locale === 'ar' ? 'لا توجد إشعارات جديدة' : 'No new notifications')}
+                  </p>
                 </div>
-                {item.detailPath ? (
-                  <Link
-                    href={`/${locale}${item.detailPath}`}
-                    onClick={() => setNotificationMenuOpen(false)}
-                    className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline"
-                  >
-                    {locale === 'ar' ? 'فتح التفاصيل' : 'Open details'}
-                  </Link>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={markAllNotificationsAsRead}
+                  disabled={markingNotificationsRead || notificationCount === 0}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {markingNotificationsRead
+                    ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Marking...')
+                    : (locale === 'ar' ? 'تعيين الكل كمقروء' : 'Mark all as read')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotificationMenuOpen(false)}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  {locale === 'ar' ? 'إغلاق' : 'Close'}
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+            <div className="max-h-[420px] overflow-y-auto p-2">
+              {notificationFeed.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                  {locale === 'ar' ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
+                </div>
+              ) : notificationFeed.map((item) => (
+                <div
+                  key={item.key}
+                  className={`mb-2 rounded-xl border px-3 py-3 ${
+                    item.severity === 'high' ? 'border-rose-200 bg-rose-50' : 'border-gray-200 bg-white'
+                  }`}
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                >
+                  <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-gray-600">{item.message}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                        item.kind === 'pos'
+                          ? 'bg-sky-100 text-sky-700'
+                          : item.kind === 'appointment'
+                            ? 'bg-amber-100 text-amber-700'
+                            : item.kind === 'review'
+                              ? 'bg-violet-100 text-violet-700'
+                            : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {item.kind === 'pos'
+                          ? (locale === 'ar' ? 'تحصيل' : 'POS')
+                          : item.kind === 'appointment'
+                            ? (locale === 'ar' ? 'موعد' : 'Appointment')
+                            : item.kind === 'review'
+                              ? (locale === 'ar' ? 'تقييم' : 'Review')
+                            : (locale === 'ar' ? 'اشتراك' : 'Subscription')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDismissNotification(item)}
+                        className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
+                      >
+                        {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
+                      </button>
+                    </div>
+                  </div>
+                  {item.detailPath ? (
+                    <Link
+                      href={`/${locale}${item.detailPath}`}
+                      onClick={() => setNotificationMenuOpen(false)}
+                      className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline"
+                    >
+                      {locale === 'ar' ? 'فتح التفاصيل' : 'Open details'}
+                    </Link>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>,
+          document.body
+        ) : null
       )}
     </div>
   );
+  useEffect(() => {
+    if (!notificationMenuOpen) return;
+
+    const updateNotificationPanelPosition = () => {
+      const anchor = notificationButtonRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const nextTop = rect.bottom + 8;
+
+      if (isRTL) {
+        setNotificationPanelPosition({ top: nextTop, left: Math.max(16, rect.left) });
+        return;
+      }
+
+      setNotificationPanelPosition({ top: nextTop, right: Math.max(16, window.innerWidth - rect.right) });
+    };
+
+    updateNotificationPanelPosition();
+    window.addEventListener('resize', updateNotificationPanelPosition);
+    window.addEventListener('scroll', updateNotificationPanelPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateNotificationPanelPosition);
+      window.removeEventListener('scroll', updateNotificationPanelPosition, true);
+    };
+  }, [isRTL, notificationMenuOpen]);
   useEffect(() => {
     if (!user) return;
     if (user.status === 'more_info_required' && !pathname?.includes('/onboarding/more-info')) {
@@ -480,7 +522,9 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         setUserMenuOpen(false);
       }
       if (notificationMenuRef.current && !notificationMenuRef.current.contains(target)) {
-        setNotificationMenuOpen(false);
+        if (!notificationPanelRef.current || !notificationPanelRef.current.contains(target)) {
+          setNotificationMenuOpen(false);
+        }
       }
     };
 
