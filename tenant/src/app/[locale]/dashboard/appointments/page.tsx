@@ -130,6 +130,7 @@ export default function AppointmentsPage() {
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
   const advancedDragEnabled = process.env.NEXT_PUBLIC_APPOINTMENTS_ADVANCED_DRAG !== "0";
+  const [hydrated, setHydrated] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -217,6 +218,10 @@ export default function AppointmentsPage() {
   useEffect(() => {
     loadServices();
     loadEmployees();
+  }, []);
+
+  useEffect(() => {
+    setHydrated(true);
   }, []);
 
   const selectedDateKey = useMemo(() => getLocalDateKey(selectedDate), [selectedDate]);
@@ -957,6 +962,16 @@ export default function AppointmentsPage() {
 
     window.localStorage.setItem("appointments-grid-hour-height", String(gridHourHeight));
   }, [gridHourHeight]);
+
+  if (!hydrated) {
+    return (
+      <TenantLayout fullWidth>
+        <div className="py-12 text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+        </div>
+      </TenantLayout>
+    );
+  }
 
   return (
     <TenantLayout fullWidth>
