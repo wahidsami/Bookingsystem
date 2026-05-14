@@ -199,7 +199,7 @@ function formatDateTime(value: string, locale: string) {
 function getStatusLabel(status: string, locale: string) {
   switch (status) {
     case "pending":
-      return locale === "ar" ? "غير مؤكد" : "Unconfirmed";
+      return locale === "ar" ? "محجوز" : "Booked";
     case "confirmed":
       return locale === "ar" ? "مؤكد" : "Confirmed";
     case "checked_in":
@@ -540,7 +540,7 @@ export function AppointmentDetailsDrawer({
     onRebook(appointment);
   };
 
-  const handleQuickStatusUpdate = async (nextStatus: "confirmed" | "checked_in" | "in_service" | "completed" | "no_show") => {
+  const handleQuickStatusUpdate = async (nextStatus: "confirmed" | "checked_in" | "in_service" | "completed" | "no_show" | "cancelled") => {
     if (!appointment || statusUpdating) return;
     try {
       setStatusUpdating(true);
@@ -553,6 +553,29 @@ export function AppointmentDetailsDrawer({
     } finally {
       setStatusUpdating(false);
     }
+  };
+
+  const getManualStatusOptions = (currentStatus: AppointmentItem["status"]) => {
+    const options: Array<{ value: AppointmentItem["status"]; label: string }> = [];
+    const push = (value: AppointmentItem["status"], label: string) => {
+      if (!options.some((option) => option.value === value)) {
+        options.push({ value, label });
+      }
+    };
+
+    push("pending", locale === "ar" ? "محجوز" : "Booked");
+    push("confirmed", locale === "ar" ? "مؤكد" : "Confirmed");
+    push("checked_in", locale === "ar" ? "تم الوصول" : "Arrived");
+    push("in_service", locale === "ar" ? "بدأت الخدمة" : "Started");
+    push("completed", locale === "ar" ? "مكتمل" : "Completed");
+    push("no_show", locale === "ar" ? "عدم حضور" : "No-show");
+    push("cancelled", locale === "ar" ? "ملغي" : "Cancelled");
+
+    if (["completed", "cancelled", "no_show"].includes(currentStatus)) {
+      return options.filter((option) => option.value === currentStatus);
+    }
+
+    return options;
   };
 
   if (!open) {
@@ -1143,57 +1166,31 @@ export function AppointmentDetailsDrawer({
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                         {locale === "ar" ? "تحديث الحالة" : "Update status"}
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {appointment.status === "pending" && (
-                          <button
-                            type="button"
-                            disabled={statusUpdating}
-                            onClick={() => handleQuickStatusUpdate("confirmed")}
-                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
-                          >
-                            {locale === "ar" ? "تأكيد" : "Confirm"}
-                          </button>
-                        )}
-                        {(appointment.status === "pending" || appointment.status === "confirmed") && (
-                          <button
-                            type="button"
-                            disabled={statusUpdating}
-                            onClick={() => handleQuickStatusUpdate("checked_in")}
-                            className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-50"
-                          >
-                            {locale === "ar" ? "تم الوصول" : "Arrived"}
-                          </button>
-                        )}
-                        {appointment.status === "checked_in" && (
-                          <button
-                            type="button"
-                            disabled={statusUpdating}
-                            onClick={() => handleQuickStatusUpdate("in_service")}
-                            className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50"
-                          >
-                            {locale === "ar" ? "بدء الخدمة" : "Start service"}
-                          </button>
-                        )}
-                        {appointment.status === "in_service" && (
-                          <button
-                            type="button"
-                            disabled={statusUpdating}
-                            onClick={() => handleQuickStatusUpdate("completed")}
-                            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
-                          >
-                            {locale === "ar" ? "إكمال" : "Complete"}
-                          </button>
-                        )}
-                        {(appointment.status === "pending" || appointment.status === "confirmed" || appointment.status === "checked_in") && (
-                          <button
-                            type="button"
-                            disabled={statusUpdating}
-                            onClick={() => handleQuickStatusUpdate("no_show")}
-                            className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
-                          >
-                            {locale === "ar" ? "عدم حضور" : "No-show"}
-                          </button>
-                        )}
+                      <div className="mt-3">
+                        <select
+                          value={appointment.status}
+                          disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                          onChange={(event) => {
+                            const nextStatus = event.target.value as AppointmentItem["status"];
+                            if (nextStatus === appointment.status) return;
+                            if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
+                              void handleQuickStatusUpdate(nextStatus);
+                              return;
+                            }
+                          }}
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {getManualStatusOptions(appointment.status).map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {locale === "ar"
+                            ? "يمكن تحديث الحالة يدويًا من هنا، أو تتغير تلقائيًا عند تأكيد العميل."
+                            : "Status can be changed manually here, and will also update automatically when customer confirms."}
+                        </p>
                       </div>
                     </div>
 

@@ -339,7 +339,7 @@ export default function AppointmentDetailsPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return t("pending");
+      case 'pending': return locale === 'ar' ? 'محجوز' : 'Booked';
       case 'confirmed': return t("confirmed");
       case 'checked_in': return t("checkedIn");
       case 'in_service': return t("inProgress");
