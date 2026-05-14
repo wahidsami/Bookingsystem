@@ -100,6 +100,8 @@ interface CalendarViewProps {
   t: (key: string) => string;
   sectionTitle?: string;
   hourHeight?: number;
+  calendarScope?: 'day' | 'week' | 'month';
+  focusedStaffId?: string | null;
 }
 
 // Time configuration
@@ -130,7 +132,9 @@ export function CalendarView({
   isRTL,
   t,
   sectionTitle,
-  hourHeight = 240
+  hourHeight = 240,
+  calendarScope = 'day',
+  focusedStaffId = null
 }: CalendarViewProps) {
   const router = useRouter();
   const params = useParams();
@@ -146,6 +150,7 @@ export function CalendarView({
   const boardScale = Math.max(0.85, Math.min(1.35, pixelsPerHour / 240));
   const timeColumnWidth = Math.round(72 * boardScale);
   const staffColumnWidth = Math.round(240 * boardScale);
+  const isDayScope = calendarScope === 'day';
 
   useEffect(() => {
     setVisibleStaffIds((previous) => {
@@ -233,7 +238,35 @@ export function CalendarView({
   const visibleStaff = useMemo(() => {
     return employees.filter(emp => visibleStaffIds.has(emp.id));
   }, [employees, visibleStaffIds]);
-  const boardMinWidth = timeColumnWidth + (visibleStaff.length * staffColumnWidth);
+  const boardDates = useMemo(() => {
+    const start = new Date(selectedDate);
+    start.setHours(0, 0, 0, 0);
+
+    if (calendarScope === 'day') {
+      return [new Date(start)];
+    }
+
+    if (calendarScope === 'week') {
+      const first = new Date(start);
+      first.setDate(start.getDate() - start.getDay());
+      return Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(first);
+        date.setDate(first.getDate() + index);
+        return date;
+      });
+    }
+
+    const first = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    const daysInMonth = last.getDate();
+    return Array.from({ length: daysInMonth }, (_, index) => {
+      const date = new Date(first);
+      date.setDate(first.getDate() + index);
+      return date;
+    });
+  }, [calendarScope, selectedDate]);
+
+  const boardMinWidth = timeColumnWidth + ((isDayScope ? visibleStaff.length : boardDates.length) * staffColumnWidth);
   const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
   // Generate time slots
@@ -253,7 +286,7 @@ export function CalendarView({
   }, [locale, pixelsPerHour, pixelsPerMinute]);
 
   // Calculate appointment position and height
-  const getAppointmentStyle = (appointment: Appointment) => {
+  const getAppointmentStyle = (appointment: Appointment, targetDateKey?: string) => {
     const start = new Date(appointment.startTime);
     const end = new Date(appointment.endTime);
     
@@ -270,7 +303,8 @@ export function CalendarView({
     const selectedMonth = selectedDate.getMonth();
     const selectedDay = selectedDate.getDate();
     
-    if (aptYear !== selectedYear || aptMonth !== selectedMonth || aptDay !== selectedDay) {
+    const appointmentDateKey = `${aptYear}-${String(aptMonth + 1).padStart(2, '0')}-${String(aptDay).padStart(2, '0')}`;
+    if (targetDateKey && appointmentDateKey !== targetDateKey) {
       return { display: 'none' };
     }
 
@@ -566,13 +600,25 @@ export function CalendarView({
 
   const goToPreviousDay = () => {
     const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
+    if (calendarScope === 'month') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else if (calendarScope === 'week') {
+      newDate.setDate(newDate.getDate() - 7);
+    } else {
+      newDate.setDate(newDate.getDate() - 1);
+    }
     onDateChange(newDate);
   };
 
   const goToNextDay = () => {
     const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + 1);
+    if (calendarScope === 'month') {
+      newDate.setMonth(newDate.getMonth() + 1);
+    } else if (calendarScope === 'week') {
+      newDate.setDate(newDate.getDate() + 7);
+    } else {
+      newDate.setDate(newDate.getDate() + 1);
+    }
     onDateChange(newDate);
   };
 
@@ -613,6 +659,9 @@ export function CalendarView({
       return;
     }
 
+    if (!isDayScope) {
+      return;
+    }
     const appointment = dayAppointments.find((item) => item.id === draggedAppointmentId);
     if (!appointment || appointment.staff.id === staffId) {
       return;
@@ -639,6 +688,9 @@ export function CalendarView({
       return;
     }
 
+    if (!isDayScope) {
+      return;
+    }
     const appointment = dayAppointments.find((item) => item.id === appointmentId);
     if (!appointment || appointment.staff.id === staffId) {
       return;
@@ -725,9 +777,9 @@ export function CalendarView({
   const totalHeight = (END_HOUR - START_HOUR) * pixelsPerHour;
   const currentTimePosition = getCurrentTimePosition();
   const summaryCounts = {
-    appointments: dayAppointments.length,
-    breaks: dayBreaks.length,
-    visibleStaff: visibleStaff.length
+    appointments: isDayScope ? dayAppointments.length : appointments.length,
+    breaks: isDayScope ? dayBreaks.length : 0,
+    visibleStaff: isDayScope ? visibleStaff.length : 1
   };
 
   return (
@@ -766,7 +818,7 @@ export function CalendarView({
               </svg>
             </button>
             <div className="px-4 py-2 font-semibold text-gray-900 min-w-[120px] text-center text-sm md:text-base">
-              {formatDate(selectedDate, locale)}
+              {formatBoardDateRange(selectedDate, locale, calendarScope)}
             </div>
             <button
               onClick={goToNextDay}
@@ -795,7 +847,7 @@ export function CalendarView({
               </svg>
               <span>{locale === 'ar' ? 'الكل' : 'All'}</span>
             </button>
-            {employees.map(emp => (
+            {isDayScope && employees.map(emp => (
               <button
                 key={emp.id}
                 onClick={() => toggleStaffVisibility(emp.id)}
@@ -883,28 +935,38 @@ export function CalendarView({
             </div>
 
             {/* Staff Columns */}
-            {visibleStaff.length === 0 ? (
+            {isDayScope && visibleStaff.length === 0 ? (
               <div className="flex-1 p-8 text-center text-gray-500">
                 {t('noStaffSelected')}
               </div>
             ) : (
-              visibleStaff.map(staff => {
-                const staffAppointments = dayAppointments.filter(
-                  apt => apt.staff.id === staff.id
-                );
-                const staffBreaks = dayBreaks.filter(
-                  breakItem => breakItem.staffId === staff.id
-                );
+              (isDayScope ? visibleStaff : boardDates).map((item) => {
+                const isDateColumn = !isDayScope;
+                const staff = isDayScope ? (item as { id: string; name: string; photo?: string }) : undefined;
+                const dateColumn = isDayScope ? undefined : (item as Date);
+                const dateKey = dateColumn
+                  ? `${dateColumn.getFullYear()}-${String(dateColumn.getMonth() + 1).padStart(2, '0')}-${String(dateColumn.getDate()).padStart(2, '0')}`
+                  : selectedDateKey;
+                const activeStaffId = isDayScope ? staff?.id : focusedStaffId;
+                const staffAppointments = (isDayScope ? dayAppointments : appointments).filter((apt) => {
+                  const aptDate = new Date(apt.startTime);
+                  const aptKey = `${aptDate.getFullYear()}-${String(aptDate.getMonth() + 1).padStart(2, '0')}-${String(aptDate.getDate()).padStart(2, '0')}`;
+                  return apt.staff.id === activeStaffId && aptKey === dateKey;
+                });
+                const staffBreaks = isDayScope
+                  ? dayBreaks.filter((breakItem) => breakItem.staffId === staff?.id)
+                  : [];
 
                 return (
                   <div
-                    key={staff.id}
-                    className={`flex-shrink-0 border-r border-gray-200 transition-colors ${dragOverStaffId === staff.id ? 'bg-primary/5' : ''}`}
+                    key={isDayScope ? (staff?.id || dateKey) : dateKey}
+                    className={`flex-shrink-0 border-r border-gray-200 transition-colors ${(isDayScope && staff && dragOverStaffId === staff.id) ? 'bg-primary/5' : ''}`}
                     style={{ minWidth: `${staffColumnWidth}px`, width: `${staffColumnWidth}px` }}
                   >
                     {/* Staff Header */}
-                    <div className="sticky top-0 z-10 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-start relative">
-                      <div className="absolute top-1.5 right-1.5 z-20">
+                    <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-start relative">
+                      {isDayScope && (
+                      <div className="absolute top-1.5 right-1.5 z-50">
                         <button
                           type="button"
                           onClick={(event) => {
@@ -915,7 +977,7 @@ export function CalendarView({
                             onStaffHeaderMenuRequest({
                               clientX: event.clientX,
                               clientY: event.clientY,
-                              staffId: staff.id,
+                              staffId: staff?.id || '',
                               date: selectedDateKey
                             });
                           }}
@@ -928,58 +990,72 @@ export function CalendarView({
                           </svg>
                         </button>
                       </div>
-                      <div className="mt-1 flex-shrink-0 mb-1.5 relative">
-                        {staff.photo ? (
-                          <>
-                            <img
-                              src={getImageUrl(staff.photo)}
-                              alt={staff.name}
-                              className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                              }}
-                            />
-                            <div className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center border-2 border-white shadow-sm hidden">
-                              <span className="text-primary font-semibold text-xs">
-                                {staff.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-white shadow-sm">
-                            <span className="text-primary font-semibold text-xs">
-                              {staff.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                            </span>
+                      )}
+                      {isDayScope ? (
+                        <>
+                          <div className="mt-1 flex-shrink-0 mb-1.5 relative z-40">
+                            {staff?.photo ? (
+                              <>
+                                <img
+                                  src={getImageUrl(staff.photo)}
+                                  alt={staff?.name || ''}
+                                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                                <div className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center border-2 border-white shadow-sm hidden">
+                                  <span className="text-primary font-semibold text-xs">
+                                    {staff?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-white shadow-sm">
+                                <span className="text-primary font-semibold text-xs">
+                                  {staff?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="text-xs font-semibold text-gray-900 text-center px-1 w-full flex items-center justify-center" style={{ 
-                        minHeight: '2.5rem',
-                        lineHeight: '1.3'
-                      }} title={staff.name}>
-                        <div className="break-words" style={{ 
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          wordBreak: 'break-word',
-                          hyphens: 'auto',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {staff.name}
+                          <div className="text-xs font-semibold text-gray-900 text-center px-1 w-full flex items-center justify-center" style={{ 
+                            minHeight: '2.5rem',
+                            lineHeight: '1.3'
+                          }} title={staff?.name}>
+                            <div className="break-words" style={{ 
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              wordBreak: 'break-word',
+                              hyphens: 'auto',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {staff?.name}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-full w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-center">
+                          <div className="text-xs font-semibold text-gray-900">
+                            {dateColumn?.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'short' })}
+                          </div>
+                          <div className="mt-1 text-sm font-bold text-primary">
+                            {dateColumn?.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { day: '2-digit', month: 'short' })}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Appointments Column */}
                     <div
                       className="relative z-20 overflow-hidden"
                       style={{ height: `${totalHeight}px` }}
-                      onDragOver={(event) => handleStaffDragOver(event, staff.id)}
-                      onDrop={(event) => handleStaffDrop(event, staff.id)}
-                      onDragLeave={() => handleStaffDropLeave(staff.id)}
+                      onDragOver={(event) => activeStaffId && handleStaffDragOver(event, activeStaffId)}
+                      onDrop={(event) => activeStaffId && handleStaffDrop(event, activeStaffId)}
+                      onDragLeave={() => activeStaffId && handleStaffDropLeave(activeStaffId)}
                       onContextMenu={(event) => {
                         if (!onGridContextMenu) {
                           return;
@@ -996,7 +1072,7 @@ export function CalendarView({
                         onGridContextMenu({
                           clientX: event.clientX,
                           clientY: event.clientY,
-                          staffId: staff.id,
+                          staffId: activeStaffId || '',
                           startTime: startTime.toISOString()
                         });
                       }}
@@ -1013,7 +1089,7 @@ export function CalendarView({
                       {/* Current Time Indicator */}
                       {currentTimePosition !== null && (
                         <div
-                          className="absolute left-0 right-0 z-10 pointer-events-none"
+                          className="absolute left-0 right-0 z-20 pointer-events-none"
                           style={{ top: `${currentTimePosition}px` }}
                         >
                           <div className="h-0.5 bg-red-500 relative">
@@ -1062,7 +1138,7 @@ export function CalendarView({
                         const endTime = new Date(appointment.endTime);
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
 
-                        const style = getAppointmentStyle(appointment);
+                        const style = getAppointmentStyle(appointment, dateKey);
                         const calculatedHeight = Number.parseFloat(String(style.height ?? '0')) || MIN_APPOINTMENT_HEIGHT;
                         const minHeight = Math.max(calculatedHeight, MIN_APPOINTMENT_HEIGHT);
                         const isCompactCard = minHeight < 160;
@@ -1093,7 +1169,7 @@ export function CalendarView({
                           }
                           return allowedStaffIds.has(employee.id);
                         });
-                        const canReassign = Boolean(onReassignAppointment || onDropAppointmentChange) &&
+                        const canReassign = isDayScope && Boolean(onReassignAppointment || onDropAppointmentChange) &&
                           !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
                           hasAlternativeEligibleStaff;
                         const isDragged = draggedAppointmentId === appointment.id;
@@ -1133,7 +1209,7 @@ export function CalendarView({
                               setDraggedAppointmentId(null);
                               setDragOverStaffId(null);
                             }}
-                            className={`${getAppointmentColor(appointment)} group relative z-30 text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
+                            className={`${getAppointmentColor(appointment)} group relative z-20 text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
@@ -1415,5 +1491,25 @@ function formatDate(date: Date, locale: string): string {
     weekday: 'short',
     day: 'numeric',
     month: 'short'
+  });
+}
+
+function formatBoardDateRange(date: Date, locale: string, scope: 'day' | 'week' | 'month'): string {
+  if (scope === 'day') {
+    return formatDate(date, locale);
+  }
+
+  if (scope === 'week') {
+    const start = new Date(date);
+    start.setDate(date.getDate() - date.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const formatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
+    return `${formatter.format(start)} - ${formatter.format(end)}`;
+  }
+
+  return date.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+    month: 'long',
+    year: 'numeric'
   });
 }

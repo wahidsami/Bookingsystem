@@ -147,6 +147,8 @@ export default function AppointmentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'cancelled'>('calendar');
+  const [calendarScope, setCalendarScope] = useState<'day' | 'week' | 'month'>('day');
+  const [calendarFocusedStaffId, setCalendarFocusedStaffId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showFilters, setShowFilters] = useState(false);
   const [showQuickDrawer, setShowQuickDrawer] = useState(false);
@@ -242,6 +244,8 @@ export default function AppointmentsPage() {
   const requestKey = useMemo(() => {
     const filterKey = [
       viewMode,
+      calendarScope,
+      calendarFocusedStaffId || '-',
       selectedDateKey,
       startDate,
       endDate,
@@ -252,7 +256,7 @@ export default function AppointmentsPage() {
     ].join('|');
 
     return filterKey;
-  }, [viewMode, selectedDateKey, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
+  }, [viewMode, calendarScope, calendarFocusedStaffId, selectedDateKey, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
 
   useEffect(() => {
     if (requestTimerRef.current) {
@@ -346,6 +350,13 @@ export default function AppointmentsPage() {
     }
   };
 
+  const getCalendarRange = (scope: 'day' | 'week' | 'month', baseDate: Date) => {
+    const baseKey = getLocalDateKey(baseDate);
+    if (scope === 'week') return getWeekRangeFromDateKey(baseKey);
+    if (scope === 'month') return getMonthRangeFromDateKey(baseKey);
+    return { start: baseKey, end: baseKey };
+  };
+
   const loadAppointmentsBoard = async (silent = false) => {
     try {
       if (!silent) {
@@ -353,14 +364,31 @@ export default function AppointmentsPage() {
       }
       setError("");
 
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const date = `${year}-${month}-${day}`;
+      if (calendarScope !== 'day') {
+        const range = getCalendarRange(calendarScope, selectedDate);
+        const response = await tenantApi.getAppointments({
+          startDate: range.start,
+          endDate: range.end,
+          limit: 500,
+          staffId: calendarFocusedStaffId || undefined,
+          serviceId: filterServiceId || undefined,
+          status: filterStatus || undefined
+        });
+
+        if (response.success) {
+          setAppointments(response.appointments || []);
+          setBreaks([]);
+        } else {
+          setError(response.message || t("loadError"));
+        }
+        return;
+      }
+
+      const date = getLocalDateKey(selectedDate);
 
       const response = await tenantApi.getAppointmentsBoard({
         date,
-        staffId: filterStaffId || undefined,
+        staffId: calendarFocusedStaffId || filterStaffId || undefined,
         serviceId: filterServiceId || undefined,
         status: filterStatus || undefined,
         paymentStatus: filterPaymentStatus || undefined
@@ -433,7 +461,7 @@ export default function AppointmentsPage() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [viewMode, selectedDateKey, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
+  }, [viewMode, calendarScope, calendarFocusedStaffId, selectedDateKey, startDate, endDate, filterStaffId, filterServiceId, filterStatus, filterPaymentStatus]);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -940,19 +968,12 @@ export default function AppointmentsPage() {
     if (!boardContextMenu) return;
     const staffId = boardContextMenu.staffId;
     const dateKey = boardContextMenu.dateKey || selectedDateKey;
-    setFilterStaffId(staffId);
+    setCalendarFocusedStaffId(staffId);
     setBoardContextMenu(null);
 
-    if (mode === "day") {
-      setSelectedDate(new Date(`${dateKey}T00:00:00`));
-      setViewMode("calendar");
-      return;
-    }
-
-    const range = mode === "week" ? getWeekRangeFromDateKey(dateKey) : getMonthRangeFromDateKey(dateKey);
-    setStartDate(range.start);
-    setEndDate(range.end);
-    setViewMode("list");
+    setSelectedDate(new Date(`${dateKey}T00:00:00`));
+    setCalendarScope(mode);
+    setViewMode("calendar");
   };
 
   useEffect(() => {
@@ -1656,6 +1677,8 @@ export default function AppointmentsPage() {
           onAppointmentSettingsClick={handleOpenAppointmentDetails}
           onOpenTools={() => setShowFilters(true)}
           onShowAllProviders={() => {
+            setCalendarScope("day");
+            setCalendarFocusedStaffId(null);
             setFilterStaffId("");
           }}
           activeFilterCount={activeFilterCount}
@@ -1665,6 +1688,8 @@ export default function AppointmentsPage() {
           t={t}
           sectionTitle={t("title")}
           hourHeight={gridHourHeight}
+          calendarScope={calendarScope}
+          focusedStaffId={calendarFocusedStaffId}
         />
       )}
 
