@@ -893,8 +893,7 @@ export default function AppointmentsPage() {
           isRecurring: item.isRecurring,
           startDate: item.isRecurring ? (shiftSharedRange.startDate || item.startDate || null) : null,
           endDate: item.isRecurring ? (shiftSharedRange.endDate || item.endDate || null) : null,
-          label: item.label || undefined,
-          isActive: item.isActive
+          label: item.label || undefined
         })
       ));
 
@@ -907,8 +906,7 @@ export default function AppointmentsPage() {
           isRecurring: item.isRecurring,
           startDate: item.isRecurring ? (shiftSharedRange.startDate || item.startDate || null) : null,
           endDate: item.isRecurring ? (shiftSharedRange.endDate || item.endDate || null) : null,
-          label: item.label || undefined,
-          isActive: item.isActive
+          label: item.label || undefined
         })
       ));
 
