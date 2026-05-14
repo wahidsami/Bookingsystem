@@ -900,7 +900,7 @@ export function CalendarView({
 
       {/* Calendar Grid */}
       <div className="relative z-20 bg-white border-x border-b border-slate-300 overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-360px)]">
+        <div className="overflow-auto h-[calc(100vh-220px)] min-h-[520px]">
           <div
             className="inline-flex min-w-full items-start"
             style={{ minWidth: `${boardMinWidth}px` }}
