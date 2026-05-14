@@ -127,6 +127,9 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
   const paymentMethodValue = typeof record.paymentMethod === 'string'
       ? record.paymentMethod
       : (record.paymentMethod?.type || appointment?.paymentMethod || order?.paymentMethod || 'cash');
+  const normalizedAppointmentPayment = appointment
+      ? normalizeAppointmentPaymentState(appointment, record.source || 'transaction')
+      : null;
 
   return {
     id: record.id,
@@ -142,6 +145,10 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
     status: record.status || 'completed',
     paymentMethod: paymentMethodValue,
     paymentMethodLabel: formatPaymentMethodLabel(record.paymentMethod || paymentMethodValue),
+    normalizedPaymentStatus: normalizedAppointmentPayment?.normalizedPaymentStatus || null,
+    appointmentOutstandingAmount: normalizedAppointmentPayment?.outstandingAmount ?? null,
+    appointmentPaidAmount: normalizedAppointmentPayment?.paidAmount ?? null,
+    paymentEvidenceSource: normalizedAppointmentPayment?.paymentEvidenceSource || (record.source || 'transaction'),
     transactionRef: record.transactionRef || null,
         notes: record.notes || null,
         processedAt,
@@ -165,6 +172,39 @@ function calculateAppointmentOutstandingAmount(appointment) {
   }
 
   return 0;
+}
+
+function normalizeAppointmentPaymentState(appointment, evidenceSource = 'appointment') {
+    const rawStatus = `${appointment?.paymentStatus || ''}`.trim().toLowerCase();
+    const price = Number(appointment?.price || 0);
+    const totalPaid = Number(appointment?.totalPaid || 0);
+    const depositAmount = Number(appointment?.depositAmount || 0);
+    const remainderAmount = Number(appointment?.remainderAmount || 0);
+    const fallbackOutstanding = calculateAppointmentOutstandingAmount(appointment);
+    const paidAmount = Number.isFinite(totalPaid) && totalPaid > 0
+        ? totalPaid
+        : (rawStatus === 'deposit_paid' ? Math.max(0, depositAmount) : 0);
+    const outstandingAmount = Math.max(
+        0,
+        Number.isFinite(price) && price > 0
+            ? price - paidAmount
+            : fallbackOutstanding
+    );
+
+    let normalizedPaymentStatus = rawStatus || 'pending';
+    if ((normalizedPaymentStatus === 'fully_paid' || normalizedPaymentStatus === 'paid') && outstandingAmount > 0.009) {
+        normalizedPaymentStatus = 'deposit_paid';
+    }
+    if (normalizedPaymentStatus === 'deposit_paid' && outstandingAmount <= 0.009 && remainderAmount <= 0.009) {
+        normalizedPaymentStatus = 'fully_paid';
+    }
+
+    return {
+        normalizedPaymentStatus,
+        paidAmount: Number.isFinite(paidAmount) ? parseFloat(paidAmount.toFixed(2)) : 0,
+        outstandingAmount: parseFloat(outstandingAmount.toFixed(2)),
+        paymentEvidenceSource: evidenceSource
+    };
 }
 
 /**
@@ -651,6 +691,7 @@ exports.getCustomer = async (req, res) => {
             customerType: customerType,
             // All appointments (complete history)
             allAppointments: appointments.map(a => ({
+                ...normalizeAppointmentPaymentState(a, 'appointment'),
                 id: a.id,
                 service: a.service,
                 staff: a.staff,
@@ -666,8 +707,7 @@ exports.getCustomer = async (req, res) => {
                 serviceVariantDuration: a.serviceVariantDuration || null,
                 depositAmount: a.depositAmount ?? null,
                 remainderAmount: a.remainderAmount ?? null,
-                totalPaid: a.totalPaid ?? null,
-                outstandingAmount: calculateAppointmentOutstandingAmount(a)
+                totalPaid: a.totalPaid ?? null
             })),
             // All orders (complete history)
             allOrders: orders.map(o => ({
@@ -685,6 +725,7 @@ exports.getCustomer = async (req, res) => {
             })),
             // Recent activity (for backward compatibility)
             recentAppointments: appointments.slice(0, 10).map(a => ({
+                ...normalizeAppointmentPaymentState(a, 'appointment'),
                 id: a.id,
                 service: a.service,
                 staff: a.staff,
@@ -699,8 +740,7 @@ exports.getCustomer = async (req, res) => {
                 serviceVariantDuration: a.serviceVariantDuration || null,
                 depositAmount: a.depositAmount ?? null,
                 remainderAmount: a.remainderAmount ?? null,
-                totalPaid: a.totalPaid ?? null,
-                outstandingAmount: calculateAppointmentOutstandingAmount(a)
+                totalPaid: a.totalPaid ?? null
             })),
             recentOrders: orders.slice(0, 10).map(o => ({
                 id: o.id,
@@ -935,12 +975,17 @@ exports.getCustomerHistory = async (req, res) => {
         const history = [];
 
         appointments.forEach(apt => {
+            const normalizedPayment = normalizeAppointmentPaymentState(apt, 'appointment');
             history.push({
                 type: 'appointment',
                 id: apt.id,
                 date: apt.startTime,
                 status: apt.status,
                 paymentStatus: apt.paymentStatus,
+                normalizedPaymentStatus: normalizedPayment.normalizedPaymentStatus,
+                paidAmount: normalizedPayment.paidAmount,
+                outstandingAmount: normalizedPayment.outstandingAmount,
+                paymentEvidenceSource: normalizedPayment.paymentEvidenceSource,
                 amount: parseFloat(apt.price || 0),
                 details: {
                     service: apt.service,

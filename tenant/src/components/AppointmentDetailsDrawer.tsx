@@ -66,12 +66,15 @@ interface CustomerAppointmentHistoryItem {
   endTime?: string | null;
   status: AppointmentItem["status"];
   paymentStatus: AppointmentItem["paymentStatus"];
+  normalizedPaymentStatus?: AppointmentItem["paymentStatus"] | null;
+  paidAmount?: number | null;
   paymentMethod?: string | null;
   price?: number;
   depositAmount?: number | null;
   remainderAmount?: number | null;
   totalPaid?: number | null;
   outstandingAmount?: number | null;
+  paymentEvidenceSource?: "transaction" | "ledger" | "appointment" | "appointment_derived" | string | null;
   notes?: string;
   bookingReference?: string | null;
   serviceVariantName?: string | null;
@@ -110,6 +113,10 @@ interface CustomerTransactionRecord {
   currency: string;
   type: string;
   status: string;
+  normalizedPaymentStatus?: string | null;
+  appointmentOutstandingAmount?: number | null;
+  appointmentPaidAmount?: number | null;
+  paymentEvidenceSource?: string | null;
   paymentMethod: string | null;
   paymentMethodLabel: string;
   transactionRef: string | null;
@@ -212,11 +219,17 @@ function getStatusLabel(status: string, locale: string) {
 
 function resolveEffectivePaymentStatus(item: {
   paymentStatus?: string | null;
+  normalizedPaymentStatus?: string | null;
   price?: number | null;
   totalPaid?: number | null;
   outstandingAmount?: number | null;
   remainderAmount?: number | null;
 }) {
+  const normalizedStatus = `${item.normalizedPaymentStatus || ''}`.trim().toLowerCase();
+  if (normalizedStatus) {
+    return normalizedStatus;
+  }
+
   const rawStatus = `${item.paymentStatus || ''}`.trim().toLowerCase();
   const price = Number(item.price || 0);
   const totalPaid = Number(item.totalPaid || 0);
@@ -494,7 +507,7 @@ export function AppointmentDetailsDrawer({
 
   const paymentSnapshot = useMemo(() => {
     const pendingAppointments = customerAppointments.filter((item) => {
-      const paymentStatus = item.paymentStatus;
+      const paymentStatus = resolveEffectivePaymentStatus(item);
       return paymentStatus === "pending" || paymentStatus === "deposit_paid" || Number(item.outstandingAmount || 0) > 0;
     });
 
