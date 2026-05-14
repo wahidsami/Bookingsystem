@@ -1208,6 +1208,13 @@ class TenantApiClient {
     });
   }
 
+  async reassignRescheduleAppointment(
+    id: string,
+    data: { staffId: string; startTime: string; notifyCustomer?: boolean }
+  ): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/reassign-reschedule`, data);
+  }
+
   /**
    * Record remainder payment at center (for deposit_paid appointments).
    */

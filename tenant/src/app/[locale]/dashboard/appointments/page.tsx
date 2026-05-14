@@ -178,6 +178,20 @@ export default function AppointmentsPage() {
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftLoading, setShiftLoading] = useState(false);
   const [shiftSharedRange, setShiftSharedRange] = useState<{ startDate: string | null; endDate: string | null }>({ startDate: null, endDate: null });
+  const [pendingDropChange, setPendingDropChange] = useState<null | {
+    appointmentId: string;
+    staffId: string;
+    startTime: string;
+    endTime: string;
+    changedTime: boolean;
+    changedStaff: boolean;
+    oldStaffName: string;
+    newStaffName: string;
+    oldTimeLabel: string;
+    newTimeLabel: string;
+  }>(null);
+  const [notifyCustomerOnDropChange, setNotifyCustomerOnDropChange] = useState(true);
+  const [dropChangeSaving, setDropChangeSaving] = useState(false);
   const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestKeyRef = useRef<string>("");
   const refreshInFlightRef = useRef(false);
@@ -547,6 +561,70 @@ export default function AppointmentsPage() {
     } catch (err: any) {
       console.error("Failed to reassign appointment staff:", err);
       alert(err.message || t("updateError"));
+    }
+  };
+
+  const handleDropAppointmentChange = async (payload: {
+    appointmentId: string;
+    staffId: string;
+    startTime: string;
+    endTime: string;
+    changedTime: boolean;
+    changedStaff: boolean;
+  }) => {
+    if (!payload.changedStaff && !payload.changedTime) {
+      return;
+    }
+
+    if (payload.changedStaff && !payload.changedTime) {
+      await handleReassignAppointment(payload.appointmentId, payload.staffId);
+      return;
+    }
+
+    const appointment = appointments.find((item) => item.id === payload.appointmentId);
+    if (!appointment) {
+      return;
+    }
+    const targetStaff = employees.find((item) => item.id === payload.staffId);
+    const oldStart = new Date(appointment.startTime);
+    const newStart = new Date(payload.startTime);
+    const oldTimeLabel = oldStart.toLocaleString(locale === "ar" ? "ar-SA" : "en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const newTimeLabel = newStart.toLocaleString(locale === "ar" ? "ar-SA" : "en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    setNotifyCustomerOnDropChange(true);
+    setPendingDropChange({
+      ...payload,
+      oldStaffName: appointment.staff.name,
+      newStaffName: targetStaff?.name || appointment.staff.name,
+      oldTimeLabel,
+      newTimeLabel
+    });
+  };
+
+  const confirmDropAppointmentChange = async () => {
+    if (!pendingDropChange) return;
+    setDropChangeSaving(true);
+    try {
+      const response = await tenantApi.reassignRescheduleAppointment(pendingDropChange.appointmentId, {
+        staffId: pendingDropChange.staffId,
+        startTime: pendingDropChange.startTime,
+        notifyCustomer: notifyCustomerOnDropChange
+      });
+      if (response.success) {
+        if (viewMode === "calendar") {
+          await loadAppointmentsBoard();
+        } else {
+          await loadAppointments();
+        }
+        setPendingDropChange(null);
+      } else {
+        alert(response.message || t("updateError"));
+      }
+    } catch (err: any) {
+      console.error("Failed to apply drag/drop appointment change:", err);
+      alert(err?.message || t("updateError"));
+    } finally {
+      setDropChangeSaving(false);
     }
   };
 
@@ -1336,6 +1414,61 @@ export default function AppointmentsPage() {
         </div>
       )}
 
+      {pendingDropChange && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" onClick={() => !dropChangeSaving && setPendingDropChange(null)} />
+          <div className="relative z-10 w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900">
+              {locale === "ar" ? "تأكيد تعديل الموعد" : "Confirm appointment change"}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              {locale === "ar"
+                ? "تم تغيير وقت الموعد بالسحب. راجع التفاصيل قبل الحفظ."
+                : "The appointment time changed after drag-and-drop. Review details before saving."}
+            </p>
+
+            <div className="mt-4 space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm">
+              <p><span className="font-semibold">{locale === "ar" ? "الموظف:" : "Provider:"}</span> {pendingDropChange.oldStaffName} → {pendingDropChange.newStaffName}</p>
+              <p><span className="font-semibold">{locale === "ar" ? "الوقت:" : "Time:"}</span> {pendingDropChange.oldTimeLabel} → {pendingDropChange.newTimeLabel}</p>
+            </div>
+
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={notifyCustomerOnDropChange}
+                onChange={(event) => setNotifyCustomerOnDropChange(event.target.checked)}
+                disabled={dropChangeSaving}
+              />
+              <span className="text-sm text-gray-700">
+                {locale === "ar"
+                  ? "إرسال إشعار للعميل بتغيير الموعد وتحديث وقت الموعد في تطبيق العميل."
+                  : "Notify customer about this schedule change and update the appointment time in customer app."}
+              </span>
+            </label>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingDropChange(null)}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                disabled={dropChangeSaving}
+              >
+                {locale === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={confirmDropAppointmentChange}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                disabled={dropChangeSaving}
+              >
+                {dropChangeSaving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "تأكيد" : "Confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -1501,6 +1634,7 @@ export default function AppointmentsPage() {
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
           onReassignAppointment={handleReassignAppointment}
+          onDropAppointmentChange={handleDropAppointmentChange}
           onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
           onStaffHeaderMenuRequest={handleStaffHeaderMenu}

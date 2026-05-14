@@ -1623,6 +1623,189 @@ exports.rescheduleAppointment = async (req, res) => {
 };
 
 /**
+ * Reassign and/or reschedule appointment from board drag-drop in one atomic operation.
+ * PATCH /api/v1/tenant/appointments/:id/reassign-reschedule
+ */
+exports.reassignRescheduleAppointment = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const { id } = req.params;
+        const { staffId, startTime, notifyCustomer = false } = req.body || {};
+
+        if (!staffId || !startTime) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'staffId and startTime are required'
+            });
+        }
+
+        const requestedStart = new Date(startTime);
+        if (Number.isNaN(requestedStart.getTime())) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid startTime'
+            });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: { id },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    where: { tenantId },
+                    required: true
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    where: { tenantId },
+                    required: true
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
+            transaction
+        });
+
+        if (!appointment) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Appointment not found'
+            });
+        }
+
+        if (['completed', 'cancelled', 'no_show'].includes(appointment.status)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Closed appointments cannot be changed'
+            });
+        }
+
+        const assignedStaff = await db.Staff.findOne({
+            where: { id: staffId, tenantId, isActive: true },
+            transaction
+        });
+
+        if (!assignedStaff) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Staff member not found'
+            });
+        }
+
+        const canPerform = await db.ServiceEmployee.findOne({
+            where: {
+                serviceId: appointment.serviceId,
+                staffId
+            },
+            transaction
+        });
+
+        if (!canPerform) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Selected staff cannot perform this service'
+            });
+        }
+
+        const currentStart = new Date(appointment.startTime);
+        const currentEnd = new Date(appointment.endTime);
+        const durationMinutes = Math.max(15, Math.round((currentEnd.getTime() - currentStart.getTime()) / 60000));
+        const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
+
+        const hasConflict = await bookingService.hasConflict(
+            staffId,
+            requestedStart,
+            requestedEnd,
+            appointment.id,
+            transaction
+        );
+
+        if (hasConflict) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected slot is not available'
+            });
+        }
+
+        const changedStaff = appointment.staffId !== staffId;
+        const changedTime = currentStart.getTime() !== requestedStart.getTime();
+
+        appointment.staffId = staffId;
+        appointment.requestedStaffId = staffId;
+        appointment.assignmentMode = 'tenant_reassigned';
+        appointment.startTime = requestedStart;
+        appointment.endTime = requestedEnd;
+        appointment.customerReminderSentAt = null;
+        appointment.noShowMarkedAt = null;
+        await appointment.save({ transaction });
+
+        await transaction.commit();
+        logTenantAppointmentAudit('reassign_reschedule_committed', {
+            tenantId,
+            appointmentId: appointment.id,
+            changedStaff,
+            changedTime,
+            nextStaffId: staffId,
+            nextStartTime: requestedStart.toISOString()
+        });
+
+        if (notifyCustomer) {
+            try {
+                const appointmentDate = requestedStart.toLocaleString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: `Your appointment is now scheduled for ${appointmentDate}.`,
+                    data: {
+                        type: 'booking_rescheduled',
+                        appointmentId: appointment.id,
+                        startTime: requestedStart.toISOString(),
+                        staffId
+                    }
+                });
+            } catch (notificationError) {
+                console.warn('Board drag-drop customer notification warning:', notificationError.message);
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: 'Appointment updated successfully',
+            appointment,
+            changedStaff,
+            changedTime
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Reassign-reschedule appointment error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update appointment',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Get appointment statistics
  * GET /api/v1/tenant/appointments/stats
  */

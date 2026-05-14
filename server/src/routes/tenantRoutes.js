@@ -136,6 +136,7 @@ router.patch('/appointments/:id/status', tenantAppointmentController.updateAppoi
 router.patch('/appointments/:id/payment', tenantAppointmentController.updatePaymentStatus);
 router.patch('/appointments/:id/reassign-staff', tenantAppointmentController.reassignAppointmentStaff);
 router.patch('/appointments/:id/reschedule', tenantAppointmentController.rescheduleAppointment);
+router.patch('/appointments/:id/reassign-reschedule', tenantAppointmentController.reassignRescheduleAppointment);
 
 // Financial management
 router.get('/financial/overview', tenantFinancialController.getFinancialOverview);

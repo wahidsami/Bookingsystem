@@ -67,6 +67,14 @@ interface CalendarViewProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
   onReassignAppointment?: (appointmentId: string, staffId: string) => Promise<void> | void;
+  onDropAppointmentChange?: (payload: {
+    appointmentId: string;
+    staffId: string;
+    startTime: string;
+    endTime: string;
+    changedTime: boolean;
+    changedStaff: boolean;
+  }) => Promise<void> | void;
   onAppointmentClick?: (appointmentId: string) => void;
   onGridContextMenu?: (payload: {
     clientX: number;
@@ -108,6 +116,7 @@ export function CalendarView({
   selectedDate,
   onDateChange,
   onReassignAppointment,
+  onDropAppointmentChange,
   onAppointmentClick,
   onGridContextMenu,
   onStaffHeaderMenuRequest,
@@ -600,7 +609,7 @@ export function CalendarView({
   };
 
   const handleStaffDragOver = (event: DragEvent<HTMLDivElement>, staffId: string) => {
-    if (!onReassignAppointment || !draggedAppointmentId) {
+    if (!(onReassignAppointment || onDropAppointmentChange) || !draggedAppointmentId) {
       return;
     }
 
@@ -626,7 +635,7 @@ export function CalendarView({
     setDraggedAppointmentId(null);
     setDragOverStaffId(null);
 
-    if (!onReassignAppointment || !appointmentId) {
+    if (!(onReassignAppointment || onDropAppointmentChange) || !appointmentId) {
       return;
     }
 
@@ -644,8 +653,16 @@ export function CalendarView({
       return;
     }
 
-    const appointmentStart = new Date(appointment.startTime).getTime();
-    const appointmentEnd = new Date(appointment.endTime).getTime();
+    const snappedTargetStart = getSnappedDateTimeFromPointer(
+      event.clientY,
+      event.currentTarget.getBoundingClientRect().top
+    );
+    const currentStart = new Date(appointment.startTime);
+    const currentEnd = new Date(appointment.endTime);
+    const durationMinutes = Math.max(15, Math.round((currentEnd.getTime() - currentStart.getTime()) / 60000));
+    const targetEnd = new Date(snappedTargetStart.getTime() + durationMinutes * 60000);
+    const appointmentStart = snappedTargetStart.getTime();
+    const appointmentEnd = targetEnd.getTime();
     const hasConflict = dayAppointments.some((item) => {
       if (item.id === appointment.id) {
         return false;
@@ -672,7 +689,22 @@ export function CalendarView({
       return;
     }
 
-    await onReassignAppointment(appointmentId, staffId);
+    const changedTime = snappedTargetStart.getTime() !== currentStart.getTime();
+    const changedStaff = appointment.staff.id !== staffId;
+
+    if (onDropAppointmentChange) {
+      await onDropAppointmentChange({
+        appointmentId,
+        staffId,
+        startTime: snappedTargetStart.toISOString(),
+        endTime: targetEnd.toISOString(),
+        changedTime,
+        changedStaff
+      });
+      return;
+    }
+
+    await onReassignAppointment?.(appointmentId, staffId);
   };
 
   const handleStaffDropLeave = (staffId: string) => {
@@ -869,9 +901,6 @@ export function CalendarView({
                     key={staff.id}
                     className={`flex-shrink-0 border-r border-gray-200 transition-colors ${dragOverStaffId === staff.id ? 'bg-primary/5' : ''}`}
                     style={{ minWidth: `${staffColumnWidth}px`, width: `${staffColumnWidth}px` }}
-                    onDragOver={(event) => handleStaffDragOver(event, staff.id)}
-                    onDrop={(event) => handleStaffDrop(event, staff.id)}
-                    onDragLeave={() => handleStaffDropLeave(staff.id)}
                   >
                     {/* Staff Header */}
                     <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
@@ -949,6 +978,9 @@ export function CalendarView({
                     <div
                       className="relative overflow-hidden"
                       style={{ height: `${totalHeight}px` }}
+                      onDragOver={(event) => handleStaffDragOver(event, staff.id)}
+                      onDrop={(event) => handleStaffDrop(event, staff.id)}
+                      onDragLeave={() => handleStaffDropLeave(staff.id)}
                       onContextMenu={(event) => {
                         if (!onGridContextMenu) {
                           return;
@@ -1062,7 +1094,7 @@ export function CalendarView({
                           }
                           return allowedStaffIds.has(employee.id);
                         });
-                        const canReassign = Boolean(onReassignAppointment) &&
+                        const canReassign = Boolean(onReassignAppointment || onDropAppointmentChange) &&
                           !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
                           hasAlternativeEligibleStaff;
                         const isDragged = draggedAppointmentId === appointment.id;
