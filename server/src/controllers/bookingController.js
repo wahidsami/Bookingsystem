@@ -671,7 +671,7 @@ const respondToInvite = async (req, res) => {
 
         return res.json({
             success: true,
-            message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment declined',
+            message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment cancelled',
             appointment
         });
     } catch (error) {
@@ -715,10 +715,9 @@ const respondToInviteByToken = async (req, res) => {
             return res.status(400).json({ success: false, message: 'This invite has already been handled' });
         }
 
-        if (appointment.platformUserId && platformUserId && appointment.platformUserId !== platformUserId) {
-            return res.status(403).json({ success: false, message: 'You are not authorized for this appointment' });
-        }
-
+        // Token-based confirmation is intentionally permitted even when the
+        // currently authenticated app user differs from the appointment owner.
+        // The token itself is the authorization secret for this flow.
         if (!appointment.platformUserId && platformUserId) {
             appointment.platformUserId = platformUserId;
         }
@@ -730,7 +729,7 @@ const respondToInviteByToken = async (req, res) => {
 
         return res.json({
             success: true,
-            message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment declined',
+            message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment cancelled',
             appointment
         });
     } catch (error) {

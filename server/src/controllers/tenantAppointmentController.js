@@ -261,6 +261,9 @@ exports.createAppointment = async (req, res) => {
         const inviteExpiresAt = new Date(Date.now() + (INVITE_EXPIRY_HOURS * 60 * 60 * 1000));
         appointment.customerConfirmationRequired = true;
         appointment.customerConfirmationStatus = 'pending';
+        // Tenant-created appointments that require customer action must remain unconfirmed
+        // until the customer explicitly responds from the invite flow.
+        appointment.status = 'pending';
         appointment.inviteToken = inviteToken;
         appointment.inviteExpiresAt = inviteExpiresAt;
         await appointment.save({ transaction });

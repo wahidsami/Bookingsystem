@@ -20,6 +20,11 @@ export const getImageUrl = (path: string | null | undefined): string | undefined
     // Normalize path (convert backslashes to forward slashes if any)
     const normalizedPath = path.replace(/\\/g, '/');
 
+    // Absolute server path (not necessarily under /uploads)
+    if (normalizedPath.startsWith('/')) {
+        return `${SERVER_URL}${normalizedPath}`;
+    }
+
     // Check if the path already starts with /uploads
     if (normalizedPath.startsWith('uploads/') || normalizedPath.startsWith('/uploads/')) {
         const fullPath = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
