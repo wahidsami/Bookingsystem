@@ -585,7 +585,17 @@ export function CalendarView({
   };
 
   const handleStaffDragOver = (event: DragEvent<HTMLDivElement>, staffId: string) => {
-    if (!onReassignAppointment) {
+    if (!onReassignAppointment || !draggedAppointmentId) {
+      return;
+    }
+
+    const appointment = dayAppointments.find((item) => item.id === draggedAppointmentId);
+    if (!appointment || appointment.staff.id === staffId) {
+      return;
+    }
+
+    const allowedStaffIds = serviceCapabilityMap?.get(appointment.service.id);
+    if (allowedStaffIds && !allowedStaffIds.has(staffId)) {
       return;
     }
 
@@ -993,7 +1003,16 @@ export function CalendarView({
                           return 'border-slate-300/20 bg-white/8 text-slate-50';
                         })();
                         const isNoteOpen = openNoteAppointmentId === appointment.id;
-                        const canReassign = Boolean(onReassignAppointment) && !['completed', 'cancelled', 'no_show'].includes(appointment.status);
+                        const allowedStaffIds = serviceCapabilityMap?.get(appointment.service.id);
+                        const hasAlternativeEligibleStaff = !allowedStaffIds || employees.some((employee) => {
+                          if (employee.id === appointment.staff.id) {
+                            return false;
+                          }
+                          return allowedStaffIds.has(employee.id);
+                        });
+                        const canReassign = Boolean(onReassignAppointment) &&
+                          !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
+                          hasAlternativeEligibleStaff;
                         const isDragged = draggedAppointmentId === appointment.id;
 
                         return (

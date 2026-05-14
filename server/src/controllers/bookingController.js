@@ -680,6 +680,65 @@ const respondToInvite = async (req, res) => {
     }
 };
 
+/**
+ * Token-based customer response to tenant-created invite (works without login).
+ * POST /api/v1/bookings/invites/:token/respond
+ */
+const respondToInviteByToken = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { response } = req.body || {};
+        const platformUserId = req.userId || null;
+
+        if (!['confirm', 'decline'].includes(`${response || ''}`)) {
+            return res.status(400).json({ success: false, message: 'response must be confirm or decline' });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: { inviteToken: token }
+        });
+
+        if (!appointment) {
+            return res.status(404).json({ success: false, message: 'Invite not found' });
+        }
+
+        const isExpired = !!appointment.inviteExpiresAt && new Date(appointment.inviteExpiresAt).getTime() < Date.now();
+        if (isExpired) {
+            return res.status(410).json({ success: false, message: 'Invite link has expired' });
+        }
+
+        if (!appointment.customerConfirmationRequired) {
+            return res.status(400).json({ success: false, message: 'This appointment does not require confirmation' });
+        }
+
+        if (appointment.customerConfirmationStatus !== 'pending') {
+            return res.status(400).json({ success: false, message: 'This invite has already been handled' });
+        }
+
+        if (appointment.platformUserId && platformUserId && appointment.platformUserId !== platformUserId) {
+            return res.status(403).json({ success: false, message: 'You are not authorized for this appointment' });
+        }
+
+        if (!appointment.platformUserId && platformUserId) {
+            appointment.platformUserId = platformUserId;
+        }
+
+        appointment.customerConfirmationStatus = response === 'confirm' ? 'confirmed' : 'declined';
+        appointment.customerConfirmedAt = new Date();
+        appointment.status = response === 'confirm' ? 'confirmed' : 'cancelled';
+        await appointment.save();
+
+        return res.json({
+            success: true,
+            message: response === 'confirm' ? 'Appointment confirmed' : 'Appointment declined',
+            appointment
+        });
+    } catch (error) {
+        console.error('Respond to invite by token error:', error);
+        return res.status(500).json({ success: false, message: error.message || 'Failed to submit response' });
+    }
+};
+
 module.exports = {
     searchAvailability,
     getRecommendations,
@@ -690,5 +749,6 @@ module.exports = {
     getNextAvailableSlot,
     getInviteDetails,
     openInvite,
-    respondToInvite
+    respondToInvite,
+    respondToInviteByToken
 };

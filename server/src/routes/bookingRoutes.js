@@ -13,6 +13,7 @@ router.get('/recommendations', optionalAuth, bookingController.getRecommendation
 router.get('/next-available', bookingController.getNextAvailableSlot);
 router.get('/invites/:token', bookingController.getInviteDetails);
 router.get('/invites/:token/open', bookingController.openInvite);
+router.post('/invites/:token/respond', optionalAuth, bookingController.respondToInviteByToken);
 
 // Create a new booking (requires authentication)
 router.post('/create', authenticateUser, bookingController.createBooking);

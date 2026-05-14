@@ -1409,6 +1409,14 @@ class ApiClient {
         return normalizeBooking(payload.appointment);
     }
 
+    async respondToAppointmentInviteByToken(token: string, response: 'confirm' | 'decline'): Promise<Booking> {
+        const payload = await this.post<{ success: boolean; appointment: Booking }>(
+            `/bookings/invites/${encodeURIComponent(token)}/respond`,
+            { response }
+        );
+        return normalizeBooking(payload.appointment);
+    }
+
     /**
      * Get user orders
      */

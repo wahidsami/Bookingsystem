@@ -541,7 +541,6 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         children: catalogChildren
       },
       { kind: "link", name: t("teams"), href: `/${locale}/dashboard/employees`, icon: UserGroupIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.employees },
-      { kind: "link", name: locale === 'ar' ? 'الجداول' : 'Schedules', href: `/${locale}/dashboard/schedules`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.schedules },
       { kind: "link", name: t("appointments"), href: `/${locale}/dashboard/appointments`, icon: CalendarDaysIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.appointments },
       {
         kind: "link",

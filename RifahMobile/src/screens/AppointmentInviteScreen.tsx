@@ -38,7 +38,7 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
         if (!invite) return;
         try {
             setSubmitting(true);
-            await api.respondToAppointmentInvite(invite.appointmentId, response);
+            await api.respondToAppointmentInviteByToken(token, response);
             Alert.alert(
                 language === 'ar' ? 'تم' : 'Done',
                 response === 'confirm'
@@ -78,30 +78,45 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>{language === 'ar' ? 'تأكيد الموعد' : 'Appointment Confirmation'}</Text>
-            <Text style={styles.subtitle}>
-                {invite.tenant?.name || 'Refah'} - {serviceName}
-            </Text>
-            <Text style={styles.timeText}>{new Date(invite.startTime).toLocaleString()}</Text>
-
-            {invite.isExpired ? (
-                <Text style={styles.errorText}>{language === 'ar' ? 'انتهت صلاحية رابط الدعوة.' : 'Invite link has expired.'}</Text>
-            ) : invite.customerConfirmationStatus !== 'pending' ? (
-                <Text style={styles.infoText}>
-                    {invite.customerConfirmationStatus === 'confirmed'
-                        ? (language === 'ar' ? 'تم تأكيد هذا الموعد مسبقًا.' : 'This appointment was already confirmed.')
-                        : (language === 'ar' ? 'تم التعامل مع هذه الدعوة مسبقًا.' : 'This invite was already handled.')}
-                </Text>
-            ) : (
-                <View style={styles.actions}>
-                    <TouchableOpacity style={styles.confirmButton} disabled={submitting} onPress={() => submitResponse('confirm')}>
-                        <Text style={styles.confirmText}>{language === 'ar' ? 'سأحضر' : 'I will attend'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.declineButton} disabled={submitting} onPress={() => submitResponse('decline')}>
-                        <Text style={styles.declineText}>{language === 'ar' ? 'لا أستطيع الحضور' : "I can't attend"}</Text>
-                    </TouchableOpacity>
+            <View style={styles.card}>
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>Refah</Text>
                 </View>
-            )}
+                <Text style={styles.title}>{language === 'ar' ? 'تأكيد الموعد' : 'Appointment Confirmation'}</Text>
+                <Text style={styles.subtitle}>
+                    {invite.tenant?.name || 'Refah'} - {serviceName}
+                </Text>
+                <Text style={styles.timeText}>{new Date(invite.startTime).toLocaleString()}</Text>
+
+                {invite.isExpired ? (
+                    <Text style={styles.errorText}>{language === 'ar' ? 'انتهت صلاحية رابط الدعوة.' : 'Invite link has expired.'}</Text>
+                ) : invite.customerConfirmationStatus !== 'pending' ? (
+                    <Text style={styles.infoText}>
+                        {invite.customerConfirmationStatus === 'confirmed'
+                            ? (language === 'ar' ? 'تم تأكيد هذا الموعد مسبقًا.' : 'This appointment was already confirmed.')
+                            : (language === 'ar' ? 'تم التعامل مع هذه الدعوة مسبقًا.' : 'This invite was already handled.')}
+                    </Text>
+                ) : (
+                    <View style={styles.actions}>
+                        <TouchableOpacity style={styles.confirmButton} disabled={submitting} onPress={() => submitResponse('confirm')}>
+                            <Text style={styles.confirmText}>{language === 'ar' ? 'سأحضر' : 'I will attend'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.declineButton} disabled={submitting} onPress={() => submitResponse('decline')}>
+                            <Text style={styles.declineText}>{language === 'ar' ? 'لا أستطيع الحضور' : "I can't attend"}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+                {submitting ? (
+                    <View style={styles.inlineLoader}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                ) : null}
+            </View>
+            <Text style={styles.footerText}>
+                {language === 'ar'
+                    ? 'يمكنك تحديث قرارك قبل انتهاء صلاحية الرابط.'
+                    : 'You can update your response before the invite expires.'}
+            </Text>
         </View>
     );
 }
@@ -109,9 +124,32 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#f5f7fb',
         padding: spacing.xl,
         justifyContent: 'center',
+    },
+    card: {
+        backgroundColor: '#ffffff',
+        borderRadius: borderRadius.lg,
+        padding: spacing.xl,
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 4
+    },
+    badge: {
+        alignSelf: 'center',
+        backgroundColor: '#eef2ff',
+        borderRadius: 999,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.md
+    },
+    badgeText: {
+        color: colors.primary,
+        fontWeight: '700',
+        fontSize: fontSize.sm
     },
     center: {
         flex: 1,
@@ -174,4 +212,14 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: fontSize.md,
     },
+    inlineLoader: {
+        marginTop: spacing.md,
+        alignItems: 'center'
+    },
+    footerText: {
+        marginTop: spacing.md,
+        color: '#64748b',
+        textAlign: 'center',
+        fontSize: fontSize.sm
+    }
 });
