@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { api, AppointmentInviteDetails } from '../api/client';
+import { api, AppointmentInviteDetails, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -75,10 +75,22 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
     const serviceName = language === 'ar'
         ? (invite.service?.name_ar || invite.service?.name_en || '-')
         : (invite.service?.name_en || invite.service?.name_ar || '-');
+    const tenantLogoUrl = getImageUrl(invite.tenant?.logo);
+    const tenantName = (invite.tenant?.name || 'Refah').trim();
+    const tenantInitial = tenantName.charAt(0).toUpperCase();
 
     return (
         <View style={styles.container}>
             <View style={styles.card}>
+                {tenantLogoUrl ? (
+                    <View style={styles.logoWrap}>
+                        <Image source={{ uri: tenantLogoUrl }} style={styles.logo} resizeMode="cover" />
+                    </View>
+                ) : (
+                    <View style={styles.logoFallbackWrap}>
+                        <Text style={styles.logoFallbackText}>{tenantInitial || 'R'}</Text>
+                    </View>
+                )}
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>Refah</Text>
                 </View>
@@ -145,6 +157,39 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
         marginBottom: spacing.md
+    },
+    logoWrap: {
+        alignSelf: 'center',
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        padding: 3,
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        marginBottom: spacing.sm
+    },
+    logo: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 35
+    },
+    logoFallbackWrap: {
+        alignSelf: 'center',
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: '#ede9fe',
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+        marginBottom: spacing.sm,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    logoFallbackText: {
+        color: colors.primaryDark,
+        fontSize: fontSize.xl,
+        fontWeight: '700'
     },
     badgeText: {
         color: colors.primary,
