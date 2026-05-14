@@ -860,7 +860,7 @@ export function CalendarView({
               className="flex-shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white"
               style={{ width: `${timeColumnWidth}px` }}
             >
-              <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
+              <div className="sticky top-0 z-10 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
               <div className="relative" style={{ height: `${totalHeight}px` }}>
                 {timeSlots.map((slot, index) => (
                   <div
@@ -903,8 +903,8 @@ export function CalendarView({
                     style={{ minWidth: `${staffColumnWidth}px`, width: `${staffColumnWidth}px` }}
                   >
                     {/* Staff Header */}
-                    <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
-                      <div className="flex w-full items-start justify-between">
+                    <div className="sticky top-0 z-10 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-start relative">
+                      <div className="absolute top-1.5 right-1.5 z-20">
                         <button
                           type="button"
                           onClick={(event) => {
@@ -927,9 +927,8 @@ export function CalendarView({
                             <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.1 1.02l-4.25 4.5a.75.75 0 01-1.1 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                           </svg>
                         </button>
-                        <div className="w-7" />
                       </div>
-                      <div className="flex-shrink-0 mb-1.5 relative -mt-2">
+                      <div className="mt-1 flex-shrink-0 mb-1.5 relative">
                         {staff.photo ? (
                           <>
                             <img
@@ -976,7 +975,7 @@ export function CalendarView({
 
                     {/* Appointments Column */}
                     <div
-                      className="relative overflow-hidden"
+                      className="relative z-20 overflow-hidden"
                       style={{ height: `${totalHeight}px` }}
                       onDragOver={(event) => handleStaffDragOver(event, staff.id)}
                       onDrop={(event) => handleStaffDrop(event, staff.id)}
@@ -1138,7 +1137,7 @@ export function CalendarView({
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
-                              <div className={`pointer-events-none absolute z-[9999] w-72 rounded-3xl border border-white/20 bg-slate-950/95 p-4 text-white shadow-2xl ring-1 ring-black/25 backdrop-blur-xl opacity-0 transition-all duration-150 group-hover:z-[9999] group-hover:opacity-100 group-hover:translate-y-0 ${isRTL ? 'right-full mr-3 translate-y-2' : 'left-full ml-3 translate-y-2'} top-0`}>
+                              <div className={`pointer-events-none absolute z-30 w-72 rounded-3xl border border-white/20 bg-slate-950/95 p-4 text-white shadow-2xl ring-1 ring-black/25 backdrop-blur-xl opacity-0 transition-all duration-150 ${isDragged ? 'hidden' : 'group-hover:opacity-100 group-hover:translate-y-0'} ${isRTL ? 'right-full mr-3 translate-y-2' : 'left-full ml-3 translate-y-2'} top-0`}>
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <div className="truncate text-base font-semibold leading-tight">{serviceName}</div>

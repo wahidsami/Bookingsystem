@@ -1355,7 +1355,7 @@ export default function AppointmentsPage() {
       )}
 
       {showShiftEditorModal && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" onClick={discardShiftEditorChanges} />
           <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-auto rounded-3xl bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
@@ -1414,7 +1414,7 @@ export default function AppointmentsPage() {
       )}
 
       {pendingDropChange && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[310] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" onClick={() => !dropChangeSaving && setPendingDropChange(null)} />
           <div className="relative z-10 w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-gray-900">
