@@ -75,6 +75,12 @@ interface CalendarViewProps {
     startTime: string;
     appointmentId?: string;
   }) => void;
+  onStaffHeaderMenuRequest?: (payload: {
+    clientX: number;
+    clientY: number;
+    staffId: string;
+    date: string;
+  }) => void;
   onBreakClick?: (breakItem: EmployeeBreak) => void;
   onAppointmentSettingsClick?: (appointmentId: string) => void;
   onOpenTools?: () => void;
@@ -103,6 +109,7 @@ export function CalendarView({
   onReassignAppointment,
   onAppointmentClick,
   onGridContextMenu,
+  onStaffHeaderMenuRequest,
   onBreakClick,
   onAppointmentSettingsClick,
   onOpenTools,
@@ -216,6 +223,7 @@ export function CalendarView({
     return employees.filter(emp => visibleStaffIds.has(emp.id));
   }, [employees, visibleStaffIds]);
   const boardMinWidth = timeColumnWidth + (visibleStaff.length * staffColumnWidth);
+  const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
   // Generate time slots
   const timeSlots = useMemo(() => {
@@ -848,7 +856,32 @@ export function CalendarView({
                   >
                     {/* Staff Header */}
                     <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-center">
-                      <div className="flex-shrink-0 mb-1.5 relative">
+                      <div className="flex w-full items-start justify-between">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            if (!onStaffHeaderMenuRequest) {
+                              return;
+                            }
+                            event.stopPropagation();
+                            onStaffHeaderMenuRequest({
+                              clientX: event.clientX,
+                              clientY: event.clientY,
+                              staffId: staff.id,
+                              date: selectedDateKey
+                            });
+                          }}
+                          className="rounded-full border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition hover:bg-gray-50"
+                          aria-label={locale === 'ar' ? 'فتح قائمة الموظف' : 'Open staff menu'}
+                          title={locale === 'ar' ? 'إجراءات الموظف' : 'Staff actions'}
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.1 1.02l-4.25 4.5a.75.75 0 01-1.1 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        <div className="w-7" />
+                      </div>
+                      <div className="flex-shrink-0 mb-1.5 relative -mt-2">
                         {staff.photo ? (
                           <>
                             <img

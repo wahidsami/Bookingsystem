@@ -5,6 +5,7 @@ import { TenantLayout } from "@/components/TenantLayout";
 import { CalendarView } from "@/components/CalendarView";
 import { AppointmentActionDrawer, type AppointmentActionDrawerPrefill } from "@/components/AppointmentActionDrawer";
 import { AppointmentDetailsDrawer, type AppointmentItem } from "@/components/AppointmentDetailsDrawer";
+import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklyScheduleEditor";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
@@ -12,6 +13,7 @@ import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import {
   ArrowPathIcon,
+  ChevronDownIcon,
   CalendarDaysIcon,
   FunnelIcon,
   PlusIcon,
@@ -87,6 +89,20 @@ interface EmployeeBreak {
   endDateTime?: string | null;
 }
 
+type ShiftDraft = {
+  id: string;
+  dayOfWeek: number | null;
+  specificDate: string | null;
+  startTime: string;
+  endTime: string;
+  isRecurring: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  label: string | null;
+  isActive: boolean;
+  isDraft?: boolean;
+};
+
 function getCurrentMonthRange() {
   const start = new Date();
   start.setDate(1);
@@ -152,7 +168,16 @@ export default function AppointmentsPage() {
     staffId: string;
     startTime: string;
     appointmentId?: string;
+    mode?: "grid" | "staff";
+    dateKey?: string;
   } | null>(null);
+  const [showShiftEditorModal, setShowShiftEditorModal] = useState(false);
+  const [shiftEditorStaffId, setShiftEditorStaffId] = useState<string | null>(null);
+  const [shiftDraft, setShiftDraft] = useState<ShiftDraft[]>([]);
+  const [shiftOriginal, setShiftOriginal] = useState<ShiftDraft[]>([]);
+  const [shiftSaving, setShiftSaving] = useState(false);
+  const [shiftLoading, setShiftLoading] = useState(false);
+  const [shiftSharedRange, setShiftSharedRange] = useState<{ startDate: string | null; endDate: string | null }>({ startDate: null, endDate: null });
   const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestKeyRef = useRef<string>("");
   const refreshInFlightRef = useRef(false);
@@ -606,7 +631,26 @@ export default function AppointmentsPage() {
       y: payload.clientY,
       staffId: payload.staffId,
       startTime: start.toISOString(),
-      appointmentId: payload.appointmentId
+      appointmentId: payload.appointmentId,
+      mode: "grid",
+      dateKey: getLocalDateKey(start)
+    });
+  };
+
+  const handleStaffHeaderMenu = (payload: {
+    clientX: number;
+    clientY: number;
+    staffId: string;
+    date: string;
+  }) => {
+    const start = new Date(`${payload.date}T09:00:00`);
+    setBoardContextMenu({
+      x: payload.clientX,
+      y: payload.clientY,
+      staffId: payload.staffId,
+      startTime: start.toISOString(),
+      mode: "staff",
+      dateKey: payload.date
     });
   };
 
@@ -648,6 +692,185 @@ export default function AppointmentsPage() {
     setFilterServiceId("");
     setFilterStatus("");
     setFilterPaymentStatus("");
+  };
+
+  const getWeekRangeFromDateKey = (dateKey: string) => {
+    const base = new Date(`${dateKey}T00:00:00`);
+    const day = base.getDay();
+    const diffToSunday = day;
+    const start = new Date(base);
+    start.setDate(base.getDate() - diffToSunday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return {
+      start: getLocalDateKey(start),
+      end: getLocalDateKey(end)
+    };
+  };
+
+  const getMonthRangeFromDateKey = (dateKey: string) => {
+    const base = new Date(`${dateKey}T00:00:00`);
+    const start = new Date(base.getFullYear(), base.getMonth(), 1);
+    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    return {
+      start: getLocalDateKey(start),
+      end: getLocalDateKey(end)
+    };
+  };
+
+  const openShiftEditorFromMenu = async () => {
+    if (!boardContextMenu) return;
+    const staffId = boardContextMenu.staffId;
+    setBoardContextMenu(null);
+    setShiftEditorStaffId(staffId);
+    setShiftLoading(true);
+    setShowShiftEditorModal(true);
+
+    try {
+      const response = await tenantApi.getEmployeeShifts(staffId);
+      const list = Array.isArray(response?.shifts)
+        ? response.shifts
+        : Array.isArray(response?.data?.shifts)
+          ? response.data.shifts
+          : [];
+      const normalized = list.map((item: any) => ({
+        id: `${item.id || crypto.randomUUID()}`,
+        dayOfWeek: item.dayOfWeek ?? null,
+        specificDate: item.specificDate ?? null,
+        startTime: `${item.startTime || "09:00"}`.slice(0, 5),
+        endTime: `${item.endTime || "18:00"}`.slice(0, 5),
+        isRecurring: item.isRecurring !== false,
+        startDate: item.startDate ?? null,
+        endDate: item.endDate ?? null,
+        label: item.label ?? null,
+        isActive: item.isActive !== false,
+        isDraft: false
+      }));
+      setShiftOriginal(normalized);
+      setShiftDraft(normalized);
+      const recurringWithRange = normalized.find((item: ShiftDraft) => item.isRecurring && (item.startDate || item.endDate));
+      setShiftSharedRange({
+        startDate: recurringWithRange?.startDate || null,
+        endDate: recurringWithRange?.endDate || null
+      });
+    } catch (error) {
+      console.error("Failed to load staff shifts for modal:", error);
+      alert(locale === "ar" ? "تعذر تحميل ورديات الموظف." : "Failed to load staff shifts.");
+      setShowShiftEditorModal(false);
+      setShiftEditorStaffId(null);
+      setShiftOriginal([]);
+      setShiftDraft([]);
+    } finally {
+      setShiftLoading(false);
+    }
+  };
+
+  const saveShiftEditorChanges = async () => {
+    if (!shiftEditorStaffId) return;
+
+    const originalMap = new Map(shiftOriginal.map((item) => [item.id, item]));
+    const currentMap = new Map(shiftDraft.map((item) => [item.id, item]));
+    const toDelete = shiftOriginal.filter((item) => !currentMap.has(item.id));
+    const toCreate = shiftDraft.filter((item) => item.isDraft || !originalMap.has(item.id) || item.id.startsWith("draft-") || item.id.startsWith("temp-"));
+    const toUpdate = shiftDraft.filter((item) => {
+      if (toCreate.some((createItem) => createItem.id === item.id)) {
+        return false;
+      }
+      const prev = originalMap.get(item.id);
+      if (!prev) return false;
+      return JSON.stringify({
+        dayOfWeek: item.dayOfWeek,
+        specificDate: item.specificDate,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        isRecurring: item.isRecurring,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        label: item.label,
+        isActive: item.isActive
+      }) !== JSON.stringify({
+        dayOfWeek: prev.dayOfWeek,
+        specificDate: prev.specificDate,
+        startTime: prev.startTime,
+        endTime: prev.endTime,
+        isRecurring: prev.isRecurring,
+        startDate: prev.startDate,
+        endDate: prev.endDate,
+        label: prev.label,
+        isActive: prev.isActive
+      });
+    });
+
+    setShiftSaving(true);
+    try {
+      await Promise.all(toDelete.map((item) => tenantApi.deleteEmployeeShift(shiftEditorStaffId, item.id)));
+
+      await Promise.all(toCreate.map((item) =>
+        tenantApi.createEmployeeShift(shiftEditorStaffId, {
+          dayOfWeek: item.isRecurring ? item.dayOfWeek : null,
+          specificDate: item.isRecurring ? null : (item.specificDate || shiftSharedRange.startDate || null),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          isRecurring: item.isRecurring,
+          startDate: item.isRecurring ? (shiftSharedRange.startDate || item.startDate || null) : null,
+          endDate: item.isRecurring ? (shiftSharedRange.endDate || item.endDate || null) : null,
+          label: item.label || undefined,
+          isActive: item.isActive
+        })
+      ));
+
+      await Promise.all(toUpdate.map((item) =>
+        tenantApi.updateEmployeeShift(shiftEditorStaffId, item.id, {
+          dayOfWeek: item.isRecurring ? item.dayOfWeek : null,
+          specificDate: item.isRecurring ? null : (item.specificDate || shiftSharedRange.startDate || null),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          isRecurring: item.isRecurring,
+          startDate: item.isRecurring ? (shiftSharedRange.startDate || item.startDate || null) : null,
+          endDate: item.isRecurring ? (shiftSharedRange.endDate || item.endDate || null) : null,
+          label: item.label || undefined,
+          isActive: item.isActive
+        })
+      ));
+
+      setShowShiftEditorModal(false);
+      setShiftEditorStaffId(null);
+      setShiftDraft([]);
+      setShiftOriginal([]);
+      alert(locale === "ar" ? "تم حفظ التعديلات على الورديات." : "Shift changes saved.");
+    } catch (error: any) {
+      console.error("Failed to save shift editor changes:", error);
+      alert(error?.message || (locale === "ar" ? "تعذر حفظ الورديات." : "Failed to save shifts."));
+    } finally {
+      setShiftSaving(false);
+    }
+  };
+
+  const discardShiftEditorChanges = () => {
+    setShowShiftEditorModal(false);
+    setShiftEditorStaffId(null);
+    setShiftDraft([]);
+    setShiftOriginal([]);
+    setShiftSharedRange({ startDate: null, endDate: null });
+  };
+
+  const applyProviderViewFromMenu = (mode: "day" | "week" | "month") => {
+    if (!boardContextMenu) return;
+    const staffId = boardContextMenu.staffId;
+    const dateKey = boardContextMenu.dateKey || selectedDateKey;
+    setFilterStaffId(staffId);
+    setBoardContextMenu(null);
+
+    if (mode === "day") {
+      setSelectedDate(new Date(`${dateKey}T00:00:00`));
+      setViewMode("calendar");
+      return;
+    }
+
+    const range = mode === "week" ? getWeekRangeFromDateKey(dateKey) : getMonthRangeFromDateKey(dateKey);
+    setStartDate(range.start);
+    setEndDate(range.end);
+    setViewMode("list");
   };
 
   useEffect(() => {
@@ -1018,6 +1241,97 @@ export default function AppointmentsPage() {
               <CalendarDaysIcon className="h-4 w-4 text-primary" />
               <span>{locale === 'ar' ? 'إضافة وقت محجوز' : 'Add blocked time'}</span>
             </button>
+            <button
+              type="button"
+              onClick={openShiftEditorFromMenu}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              <ChevronDownIcon className="h-4 w-4 text-primary" />
+              <span>{locale === 'ar' ? 'تعديل الورديات' : 'Edit shift'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyProviderViewFromMenu("day")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              <CalendarDaysIcon className="h-4 w-4 text-primary" />
+              <span>{locale === 'ar' ? 'عرض اليوم' : 'Day view'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyProviderViewFromMenu("week")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              <CalendarDaysIcon className="h-4 w-4 text-primary" />
+              <span>{locale === 'ar' ? 'عرض الأسبوع' : 'Week view'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyProviderViewFromMenu("month")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              <CalendarDaysIcon className="h-4 w-4 text-primary" />
+              <span>{locale === 'ar' ? 'عرض الشهر' : 'Month view'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showShiftEditorModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" onClick={discardShiftEditorChanges} />
+          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-auto rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{locale === "ar" ? "تعديل الورديات" : "Edit shifts"}</h3>
+                <p className="text-sm text-gray-500">
+                  {locale === "ar" ? "عدّل جدول الموظف ثم احفظ أو تراجع." : "Adjust the provider schedule, then save or discard."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={discardShiftEditorChanges}
+                className="rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {shiftLoading ? (
+              <div className="py-12 text-center">
+                <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+            ) : (
+              <EmployeeWeeklyScheduleEditor
+                draftMode
+                locale={locale}
+                isRTL={isRTL}
+                draftShifts={shiftDraft as any}
+                onDraftShiftsChange={(next) => setShiftDraft(next as ShiftDraft[])}
+                sharedStartDate={shiftSharedRange.startDate}
+                sharedEndDate={shiftSharedRange.endDate}
+                onSharedRangeChange={setShiftSharedRange}
+              />
+            )}
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={discardShiftEditorChanges}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                disabled={shiftSaving}
+              >
+                {locale === "ar" ? "تراجع" : "Discard"}
+              </button>
+              <button
+                type="button"
+                onClick={saveShiftEditorChanges}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                disabled={shiftSaving || shiftLoading}
+              >
+                {shiftSaving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "حفظ" : "Save")}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1189,6 +1503,7 @@ export default function AppointmentsPage() {
           onReassignAppointment={handleReassignAppointment}
           onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
+          onStaffHeaderMenuRequest={handleStaffHeaderMenu}
           onBreakClick={handleOpenBlockedTime}
           onAppointmentSettingsClick={handleOpenAppointmentDetails}
           onOpenTools={() => setShowFilters(true)}
