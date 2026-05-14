@@ -947,6 +947,9 @@ export function CalendarView({
                 const dateKey = dateColumn
                   ? `${dateColumn.getFullYear()}-${String(dateColumn.getMonth() + 1).padStart(2, '0')}-${String(dateColumn.getDate()).padStart(2, '0')}`
                   : selectedDateKey;
+                const dayOfWeek = dateColumn?.getDay() ?? -1;
+                const isWeekendColumn = !isDayScope && (dayOfWeek === 5 || dayOfWeek === 6);
+                const isWeekBoundary = !isDayScope && dayOfWeek === 0;
                 const activeStaffId = isDayScope ? staff?.id : focusedStaffId;
                 const staffAppointments = (isDayScope ? dayAppointments : appointments).filter((apt) => {
                   const aptDate = new Date(apt.startTime);
@@ -960,7 +963,7 @@ export function CalendarView({
                 return (
                   <div
                     key={isDayScope ? (staff?.id || dateKey) : dateKey}
-                    className={`flex-shrink-0 border-r border-gray-200 transition-colors ${(isDayScope && staff && dragOverStaffId === staff.id) ? 'bg-primary/5' : ''}`}
+                    className={`flex-shrink-0 border-r border-gray-200 transition-colors ${(isDayScope && staff && dragOverStaffId === staff.id) ? 'bg-primary/5' : ''} ${isWeekBoundary ? 'border-l-2 border-l-slate-300' : ''}`}
                     style={{ minWidth: `${staffColumnWidth}px`, width: `${staffColumnWidth}px` }}
                   >
                     {/* Staff Header */}
@@ -1038,7 +1041,7 @@ export function CalendarView({
                           </div>
                         </>
                       ) : (
-                        <div className="h-full w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-center">
+                        <div className={`h-full w-full rounded-xl border px-2 py-1 text-center ${isWeekendColumn ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
                           <div className="text-xs font-semibold text-gray-900">
                             {dateColumn?.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'short' })}
                           </div>
@@ -1051,7 +1054,7 @@ export function CalendarView({
 
                     {/* Appointments Column */}
                     <div
-                      className="relative z-20 overflow-hidden"
+                      className={`relative z-20 overflow-hidden ${isWeekendColumn ? 'bg-amber-50/30' : ''}`}
                       style={{ height: `${totalHeight}px` }}
                       onDragOver={(event) => activeStaffId && handleStaffDragOver(event, activeStaffId)}
                       onDrop={(event) => activeStaffId && handleStaffDrop(event, activeStaffId)}
