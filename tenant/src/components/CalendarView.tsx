@@ -236,8 +236,12 @@ export function CalendarView({
 
   // Filter visible staff
   const visibleStaff = useMemo(() => {
+    if (isDayScope && focusedStaffId) {
+      const selected = employees.find((emp) => emp.id === focusedStaffId);
+      return selected ? [selected] : [];
+    }
     return employees.filter(emp => visibleStaffIds.has(emp.id));
-  }, [employees, visibleStaffIds]);
+  }, [employees, focusedStaffId, isDayScope, visibleStaffIds]);
   const boardDates = useMemo(() => {
     const start = new Date(selectedDate);
     start.setHours(0, 0, 0, 0);
@@ -266,7 +270,7 @@ export function CalendarView({
     });
   }, [calendarScope, selectedDate]);
 
-  const boardMinWidth = timeColumnWidth + ((isDayScope ? visibleStaff.length : boardDates.length) * staffColumnWidth);
+  const boardMinWidth = timeColumnWidth + ((isDayScope ? Math.max(1, visibleStaff.length) : boardDates.length) * staffColumnWidth);
   const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
   // Generate time slots
@@ -783,13 +787,24 @@ export function CalendarView({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-0">
       {/* Date Navigation */}
-      <div className={`flex flex-col md:flex-row items-start md:items-center justify-between bg-white rounded-lg p-4 shadow-sm gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
-        <div className={`flex flex-col gap-1 ${isRTL ? 'items-end' : 'items-start'}`}>
-          <h3 className="text-2xl font-bold text-gray-900">
-            {sectionTitle || (locale === 'ar' ? 'المواعيد' : 'Appointments')}
-          </h3>
+      <div className={`flex flex-col md:flex-row items-start md:items-center justify-between border border-slate-300 bg-white p-4 gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
+        <div className={`flex flex-col gap-2 ${isRTL ? 'items-end' : 'items-start'}`}>
+          <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <h3 className="text-4xl font-bold tracking-tight text-gray-900">
+              {sectionTitle || (locale === 'ar' ? 'المواعيد' : 'Appointments')}
+            </h3>
+            <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+              {locale === 'ar' ? `${summaryCounts.appointments} حجوزات` : `${summaryCounts.appointments} bookings`}
+            </span>
+            <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+              {locale === 'ar' ? `${summaryCounts.breaks} استراحات` : `${summaryCounts.breaks} breaks`}
+            </span>
+            <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+              {locale === 'ar' ? `${summaryCounts.visibleStaff} موظفين` : `${summaryCounts.visibleStaff} staff`}
+            </span>
+          </div>
           <p className="text-sm text-gray-500">
             {locale === 'ar'
               ? 'اسحب الموعد بين الموظفين لتغيير مقدم الخدمة.'
@@ -883,25 +898,8 @@ export function CalendarView({
         </div>
       </div>
 
-      <div className={`rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 ${isRTL ? 'text-right' : ''}`}>
-        <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {locale === 'ar' ? 'مفاتيح اللوحة' : 'Board Guide'}
-          </span>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-            {locale === 'ar' ? `${summaryCounts.appointments} حجوزات` : `${summaryCounts.appointments} bookings`}
-          </span>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-            {locale === 'ar' ? `${summaryCounts.breaks} استراحات` : `${summaryCounts.breaks} breaks`}
-          </span>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-            {locale === 'ar' ? `${summaryCounts.visibleStaff} موظفين ظاهرين` : `${summaryCounts.visibleStaff} visible staff`}
-          </span>
-        </div>
-      </div>
-
       {/* Calendar Grid */}
-      <div className="relative z-20 bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="relative z-20 bg-white border-x border-b border-slate-300 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-360px)]">
           <div
             className="inline-flex min-w-full items-start"
@@ -909,10 +907,10 @@ export function CalendarView({
           >
             {/* Time Column */}
             <div
-              className="flex-shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white"
+              className="flex-shrink-0 border-r border-slate-300 sticky left-0 z-20 bg-white"
               style={{ width: `${timeColumnWidth}px` }}
             >
-              <div className="sticky top-0 z-10 h-24 md:h-20 border-b border-gray-200 bg-gray-50"></div>
+              <div className="sticky top-0 z-10 h-28 border-b border-slate-300 bg-[#ececec]"></div>
               <div className="relative" style={{ height: `${totalHeight}px` }}>
                 {timeSlots.map((slot, index) => (
                   <div
@@ -927,7 +925,7 @@ export function CalendarView({
                 {timeSlots.map((slot, index) => (
                   <div
                     key={`line-${index}`}
-                    className="absolute left-0 right-0 border-t border-dotted border-gray-300"
+                    className="absolute left-0 right-0 border-t border-slate-300/80"
                     style={{ top: `${slot.position}px` }}
                   />
                 ))}
@@ -963,11 +961,14 @@ export function CalendarView({
                 return (
                   <div
                     key={isDayScope ? (staff?.id || dateKey) : dateKey}
-                    className={`flex-shrink-0 border-r border-gray-200 transition-colors ${(isDayScope && staff && dragOverStaffId === staff.id) ? 'bg-primary/5' : ''} ${isWeekBoundary ? 'border-l-2 border-l-slate-300' : ''}`}
-                    style={{ minWidth: `${staffColumnWidth}px`, width: `${staffColumnWidth}px` }}
+                    className={`flex-shrink-0 border-r border-slate-300 transition-colors ${(isDayScope && staff && dragOverStaffId === staff.id) ? 'bg-primary/5' : ''} ${isWeekBoundary ? 'border-l-2 border-l-slate-300' : ''}`}
+                    style={{
+                      minWidth: isDayScope && focusedStaffId ? `calc(100vw - ${timeColumnWidth + 64}px)` : `${staffColumnWidth}px`,
+                      width: isDayScope && focusedStaffId ? `calc(100vw - ${timeColumnWidth + 64}px)` : `${staffColumnWidth}px`
+                    }}
                   >
                     {/* Staff Header */}
-                    <div className="sticky top-0 z-40 h-24 md:h-20 border-b border-gray-200 bg-gray-50 p-2 md:p-3 flex flex-col items-center justify-start relative">
+                    <div className="sticky top-0 z-40 h-28 border-b border-slate-300 bg-[#ececec] p-2 flex flex-col items-center justify-start relative overflow-hidden">
                       {isDayScope && (
                       <div className="absolute top-1.5 right-1.5 z-50">
                         <button
@@ -984,7 +985,7 @@ export function CalendarView({
                               date: selectedDateKey
                             });
                           }}
-                          className="rounded-full border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition hover:bg-gray-50"
+                          className="rounded-full border border-black bg-black p-1.5 text-white shadow-sm transition hover:bg-slate-800"
                           aria-label={locale === 'ar' ? 'فتح قائمة الموظف' : 'Open staff menu'}
                           title={locale === 'ar' ? 'إجراءات الموظف' : 'Staff actions'}
                         >
@@ -996,35 +997,35 @@ export function CalendarView({
                       )}
                       {isDayScope ? (
                         <>
-                          <div className="mt-1 flex-shrink-0 mb-1.5 relative z-40">
+                          <div className="mt-1.5 flex-shrink-0 mb-0.5 relative z-40">
                             {staff?.photo ? (
                               <>
                                 <img
                                   src={getImageUrl(staff.photo)}
                                   alt={staff?.name || ''}
-                                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                                  className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     const fallback = e.currentTarget.nextElementSibling as HTMLElement;
                                     if (fallback) fallback.style.display = 'flex';
                                   }}
                                 />
-                                <div className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center border-2 border-white shadow-sm hidden">
+                                <div className="w-14 h-14 rounded-full bg-primary/20 items-center justify-center border-2 border-white shadow-sm hidden">
                                   <span className="text-primary font-semibold text-xs">
                                     {staff?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
                                   </span>
                                 </div>
                               </>
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-white shadow-sm">
+                              <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center border-2 border-white shadow-sm">
                                 <span className="text-primary font-semibold text-xs">
                                   {staff?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
                                 </span>
                               </div>
                             )}
                           </div>
-                          <div className="text-xs font-semibold text-gray-900 text-center px-1 w-full flex items-center justify-center" style={{ 
-                            minHeight: '2.5rem',
+                          <div className="text-sm font-semibold text-gray-900 text-center px-1 w-full flex items-start justify-center" style={{
+                            minHeight: '1.2rem',
                             lineHeight: '1.3'
                           }} title={staff?.name}>
                             <div className="break-words" style={{ 
@@ -1084,7 +1085,7 @@ export function CalendarView({
                       {timeSlots.map((slot, index) => (
                         <div
                           key={`column-line-${index}`}
-                          className="absolute left-0 right-0 border-t border-dotted border-gray-200 pointer-events-none"
+                          className="absolute left-0 right-0 border-t border-slate-300/70 pointer-events-none"
                           style={{ top: `${slot.position}px` }}
                         />
                       ))}

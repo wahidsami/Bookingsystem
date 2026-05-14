@@ -86,13 +86,16 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>{t('appLanguage')}</Text>
-                <Text style={styles.cardDescription}>{t('tapToSwitchLanguage')}</Text>
-                <TouchableOpacity style={styles.actionButton} onPress={handleLanguageToggle}>
-                    <Text style={styles.actionButtonText}>
-                        {nextLanguage === 'ar' ? t('arabicLanguage') : t('englishLanguage')}
+                <View style={styles.simpleRow}>
+                    <Text style={styles.currentValue}>
+                        {language === 'ar' ? t('arabicLanguage') : t('englishLanguage')}
                     </Text>
-                </TouchableOpacity>
-                <Text style={styles.hint}>{t('languageRestartHint')}</Text>
+                    <TouchableOpacity style={styles.actionButton} onPress={handleLanguageToggle}>
+                        <Text style={styles.actionButtonText}>
+                            {nextLanguage === 'ar' ? t('arabicLanguage') : t('englishLanguage')}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={styles.card}>
@@ -164,12 +167,24 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         lineHeight: 22,
     },
+    simpleRow: {
+        marginTop: spacing.xs,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+    },
+    currentValue: {
+        fontSize: fontSize.md,
+        color: colors.text,
+        fontWeight: '600',
+    },
     actionButton: {
         backgroundColor: colors.primary,
         borderRadius: 12,
         paddingVertical: spacing.sm,
         alignItems: 'center',
-        marginTop: spacing.sm,
+        marginTop: 0,
     },
     actionButtonText: {
         color: '#FFFFFF',

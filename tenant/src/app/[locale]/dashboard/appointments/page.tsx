@@ -1364,14 +1364,6 @@ export default function AppointmentsPage() {
             </button>
             <button
               type="button"
-              onClick={() => applyProviderViewFromMenu("day")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-            >
-              <CalendarDaysIcon className="h-4 w-4 text-primary" />
-              <span>{locale === 'ar' ? 'عرض اليوم' : 'Day view'}</span>
-            </button>
-            <button
-              type="button"
               onClick={() => applyProviderViewFromMenu("week")}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
             >

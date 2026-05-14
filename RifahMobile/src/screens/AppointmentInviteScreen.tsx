@@ -78,32 +78,56 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
     const tenantLogoUrl = getImageUrl(invite.tenant?.logo);
     const tenantName = (invite.tenant?.name || 'Refah').trim();
     const tenantInitial = tenantName.charAt(0).toUpperCase();
+    const providerName = invite.staff?.name || (language === 'ar' ? 'مقدم الخدمة' : 'Service provider');
+    const customerName = language === 'ar' ? 'عميلنا' : 'Customer';
+    const detailDate = new Date(invite.startTime).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 
     return (
         <View style={styles.container}>
-            <View style={styles.bgOrbOne} />
-            <View style={styles.bgOrbTwo} />
-            <View style={styles.card}>
-                <View style={styles.logoShell}>
-                    {tenantLogoUrl ? (
-                        <View style={styles.logoWrap}>
-                            <Image source={{ uri: tenantLogoUrl }} style={styles.logo} resizeMode="cover" />
-                        </View>
-                    ) : (
-                        <View style={styles.logoFallbackWrap}>
-                            <Text style={styles.logoFallbackText}>{tenantInitial || 'R'}</Text>
-                        </View>
-                    )}
-                </View>
-                <Text style={styles.centerName}>{tenantName}</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{language === 'ar' ? 'دعوة حضور' : 'Attendance request'}</Text>
-                </View>
-                <Text style={styles.title}>{language === 'ar' ? 'تأكيد الموعد' : 'Appointment Confirmation'}</Text>
-                <Text style={styles.subtitle}>
-                    {invite.tenant?.name || 'Refah'} - {serviceName}
+            <View style={styles.topBand} />
+            <View style={styles.logoCard}>
+                {tenantLogoUrl ? (
+                    <Image source={{ uri: tenantLogoUrl }} style={styles.logo} resizeMode="cover" />
+                ) : (
+                    <View style={styles.logoFallbackWrap}>
+                        <Text style={styles.logoFallbackText}>{tenantInitial || 'R'}</Text>
+                    </View>
+                )}
+            </View>
+            <Text style={styles.heroTitle}>{language === 'ar' ? 'تأكيد الموعد' : 'Appointment confirmation'}</Text>
+
+            <View style={styles.content}>
+                <Text style={styles.greeting}>
+                    {language === 'ar' ? `مرحباً ${customerName}` : `Hi ${customerName}`}
                 </Text>
-                <Text style={styles.timeText}>{new Date(invite.startTime).toLocaleString()}</Text>
+                <Text style={styles.messageLine}>
+                    {language === 'ar' ? 'لديك موعد لدى' : 'You have an appointment at'}
+                </Text>
+                <Text style={styles.messageTenant}>{tenantName}</Text>
+
+                <View style={styles.detailsCard}>
+                    <Text style={styles.detailsText}>{detailDate}</Text>
+                    <Text style={styles.detailsText}>{serviceName}</Text>
+                    <Text style={styles.detailsText}>{providerName}</Text>
+                </View>
+
+                <View style={styles.providerAvatar}>
+                    <Text style={styles.providerAvatarText}>
+                        {providerName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP'}
+                    </Text>
+                </View>
+
+                <Text style={styles.confirmLine}>
+                    {language === 'ar'
+                        ? 'يرجى تأكيد الحضور أو الاعتذار عن الموعد'
+                        : 'Please confirm if you would like to attend or not'}
+                </Text>
 
                 {invite.isExpired ? (
                     <Text style={styles.errorText}>{language === 'ar' ? 'انتهت صلاحية رابط الدعوة.' : 'Invite link has expired.'}</Text>
@@ -116,10 +140,10 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
                 ) : (
                     <View style={styles.actions}>
                         <TouchableOpacity style={styles.confirmButton} disabled={submitting} onPress={() => submitResponse('confirm')}>
-                            <Text style={styles.confirmText}>{language === 'ar' ? 'سأحضر' : 'I will attend'}</Text>
+                            <Text style={styles.confirmText}>{language === 'ar' ? 'نعم، سأحضر' : 'Sure, i will attend'}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.declineButton} disabled={submitting} onPress={() => submitResponse('decline')}>
-                            <Text style={styles.declineText}>{language === 'ar' ? 'لا أستطيع الحضور' : "I can't attend"}</Text>
+                            <Text style={styles.declineText}>{language === 'ar' ? 'عذرًا، لا أستطيع الحضور' : "Sorry, i can’t attend"}</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -129,11 +153,6 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
                     </View>
                 ) : null}
             </View>
-            <Text style={styles.footerText}>
-                {language === 'ar'
-                    ? 'يمكنك تحديث قرارك قبل انتهاء صلاحية الرابط.'
-                    : 'You can update your response before the invite expires.'}
-            </Text>
         </View>
     );
 }
@@ -141,99 +160,109 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#eef1f8',
-        padding: spacing.xl,
-        justifyContent: 'center',
+        backgroundColor: '#efedf0',
     },
-    bgOrbOne: {
+    topBand: {
+        height: 195,
+        backgroundColor: '#7e53d3'
+    },
+    heroTitle: {
         position: 'absolute',
-        top: -80,
-        right: -40,
-        width: 220,
-        height: 220,
-        borderRadius: 110,
-        backgroundColor: 'rgba(126, 81, 211, 0.20)'
+        top: 110,
+        left: 196,
+        right: 20,
+        fontSize: 52 / 2,
+        lineHeight: 56 / 2,
+        color: '#fff',
+        fontWeight: '800'
     },
-    bgOrbTwo: {
+    logoCard: {
         position: 'absolute',
-        bottom: -100,
-        left: -60,
-        width: 240,
-        height: 240,
-        borderRadius: 120,
-        backgroundColor: 'rgba(56, 189, 248, 0.14)'
+        top: 98,
+        left: 26,
+        width: 152,
+        height: 152,
+        borderRadius: 36,
+        backgroundColor: '#000',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center'
     },
-    card: {
-        backgroundColor: '#ffffff',
-        borderRadius: 28,
-        padding: spacing.xl,
-        shadowColor: '#0f172a',
-        shadowOpacity: 0.14,
-        shadowRadius: 24,
-        shadowOffset: { width: 0, height: 10 },
-        elevation: 6,
-        borderWidth: 1,
-        borderColor: '#e2e8f0'
+    content: {
+        marginTop: 30,
+        paddingHorizontal: 24
     },
-    logoShell: {
-        alignSelf: 'center',
-        borderRadius: 44,
-        padding: 6,
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        marginBottom: spacing.xs
-    },
-    centerName: {
+    greeting: {
         textAlign: 'center',
-        color: '#0f172a',
-        fontSize: fontSize.md,
+        fontSize: 42 / 2,
+        fontWeight: '800',
+        color: '#0b0b0b'
+    },
+    messageLine: {
+        marginTop: 8,
+        textAlign: 'center',
+        color: '#121212',
+        fontSize: 24 / 2
+    },
+    messageTenant: {
+        textAlign: 'center',
+        color: '#121212',
+        fontSize: 24 / 2,
         fontWeight: '700',
-        marginBottom: spacing.sm
+        marginBottom: 16
     },
-    badge: {
-        alignSelf: 'center',
-        backgroundColor: '#f1effc',
-        borderRadius: 999,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-        marginBottom: spacing.md
+    detailsCard: {
+        height: 164,
+        borderRadius: 14,
+        backgroundColor: '#7e53d3',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6
     },
-    logoWrap: {
+    detailsText: {
+        color: '#fff',
+        fontSize: 20 / 2,
+        fontWeight: '500'
+    },
+    providerAvatar: {
         alignSelf: 'center',
-        width: 76,
-        height: 76,
-        borderRadius: 38,
-        padding: 2,
-        backgroundColor: '#ffffff',
-        borderWidth: 2,
-        borderColor: '#ddd6fe'
+        marginTop: -28,
+        width: 98,
+        height: 98,
+        borderRadius: 49,
+        backgroundColor: '#000',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    providerAvatarText: {
+        color: '#fff',
+        fontWeight: '800',
+        fontSize: 26 / 2
+    },
+    confirmLine: {
+        marginTop: 20,
+        textAlign: 'center',
+        color: '#0f0f0f',
+        fontSize: 22 / 2,
+        marginBottom: 20
     },
     logo: {
         width: '100%',
         height: '100%',
-        borderRadius: 35
+        borderRadius: 36
     },
     logoFallbackWrap: {
-        alignSelf: 'center',
-        width: 76,
-        height: 76,
-        borderRadius: 38,
-        backgroundColor: '#f5f3ff',
-        borderWidth: 1,
-        borderColor: '#ddd6fe',
+        width: '100%',
+        height: '100%',
+        borderRadius: 36,
+        backgroundColor: '#111',
         alignItems: 'center',
         justifyContent: 'center'
     },
     logoFallbackText: {
-        color: colors.primaryDark,
-        fontSize: fontSize.xl,
+        color: '#fff',
+        fontSize: 36 / 2,
         fontWeight: '700'
-    },
-    badgeText: {
-        color: colors.primary,
-        fontWeight: '700',
-        fontSize: fontSize.sm
     },
     center: {
         flex: 1,
@@ -241,56 +270,32 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: spacing.xl,
     },
-    title: {
-        fontSize: fontSize.xxl,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: spacing.sm,
-        textAlign: 'center',
-    },
-    subtitle: {
-        fontSize: fontSize.lg,
-        color: colors.text,
-        textAlign: 'center',
-    },
-    timeText: {
-        marginTop: spacing.sm,
-        fontSize: fontSize.md,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        marginBottom: spacing.lg,
-    },
     actions: {
-        gap: spacing.md,
+        gap: 14,
     },
     confirmButton: {
-        backgroundColor: colors.primary,
+        backgroundColor: '#7e53d3',
         borderRadius: 14,
-        paddingVertical: spacing.md + 2,
+        paddingVertical: 18,
         alignItems: 'center',
-        shadowColor: colors.primary,
-        shadowOpacity: 0.28,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 4
     },
     declineButton: {
-        borderColor: '#ef4444',
-        borderWidth: 1,
+        borderColor: '#7e53d3',
+        borderWidth: 2,
         borderRadius: 14,
-        paddingVertical: spacing.md + 2,
+        paddingVertical: 16,
         alignItems: 'center',
-        backgroundColor: '#fff'
+        backgroundColor: 'transparent'
     },
     confirmText: {
         color: '#fff',
         fontWeight: '700',
-        fontSize: fontSize.md,
+        fontSize: 20 / 2,
     },
     declineText: {
-        color: '#ef4444',
+        color: '#7e53d3',
         fontWeight: '700',
-        fontSize: fontSize.md,
+        fontSize: 20 / 2,
     },
     errorText: {
         color: '#ef4444',
@@ -306,10 +311,4 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
         alignItems: 'center'
     },
-    footerText: {
-        marginTop: spacing.lg,
-        color: '#64748b',
-        textAlign: 'center',
-        fontSize: fontSize.sm
-    }
 });
