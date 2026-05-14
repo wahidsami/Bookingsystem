@@ -960,7 +960,7 @@ export default function AppointmentsPage() {
 
   return (
     <TenantLayout fullWidth>
-      <div className={`fixed inset-0 z-50 transition ${showFilters ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <div className={`fixed inset-0 z-[500] transition ${showFilters ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div
           className={`absolute inset-0 bg-slate-950/35 backdrop-blur-[1px] transition-opacity duration-300 ${showFilters ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setShowFilters(false)}

@@ -786,7 +786,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 lg:h-dvh lg:overflow-hidden">
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white/90 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="lg:hidden bg-white/90 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div
           className="px-4 py-4 flex items-center justify-between"
           style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
@@ -857,7 +857,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         </div>
 
         <header
-          className="relative z-50 h-full overflow-visible border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="relative z-10 h-full overflow-visible border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
           style={{ gridArea: 'header' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -1090,7 +1090,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
           </nav>
         </aside>
 
-        <main className="relative z-0 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
+        <main className="relative z-20 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
           <div className={fullWidth ? 'p-4 lg:p-6' : 'p-4 lg:p-8'}>
             <div className={`mx-auto w-full ${fullWidth ? 'max-w-none' : 'max-w-[1600px]'}`}>
               {children}

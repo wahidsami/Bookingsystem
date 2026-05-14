@@ -849,7 +849,7 @@ export function CalendarView({
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="relative z-20 bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-360px)]">
           <div
             className="inline-flex min-w-full items-start"
@@ -1133,7 +1133,7 @@ export function CalendarView({
                               setDraggedAppointmentId(null);
                               setDragOverStaffId(null);
                             }}
-                            className={`${getAppointmentColor(appointment)} group relative z-[2] text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
+                            className={`${getAppointmentColor(appointment)} group relative z-30 text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
                             title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
                           >
