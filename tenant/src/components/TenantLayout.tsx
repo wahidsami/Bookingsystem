@@ -359,7 +359,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         typeof document !== 'undefined' ? createPortal(
           <div
             ref={notificationPanelRef}
-            className="fixed z-[900] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            className="fixed isolate z-[5000] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
             style={{
               top: notificationPanelPosition.top,
               left: notificationPanelPosition.left,
@@ -830,7 +830,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 lg:h-dvh lg:overflow-hidden">
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white/90 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+      <header className="lg:hidden bg-white/90 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
         <div
           className="px-4 py-4 flex items-center justify-between"
           style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
@@ -901,7 +901,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         </div>
 
         <header
-          className="relative z-10 h-full overflow-visible border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="relative z-[2000] h-full overflow-visible border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
           style={{ gridArea: 'header' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -920,7 +920,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     {locale === 'ar' ? 'EN' : 'عربي'}
                   </Link>
 
-                  <div ref={userMenuRef} className="relative">
+                  <div ref={userMenuRef} className="relative isolate z-[10000]">
                     <button
                       type="button"
                       onClick={() => {
@@ -948,7 +948,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     </button>
 
                     {userMenuOpen && (
-                      <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
+                      <div className={`absolute isolate z-[10001] ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
                         <div className="border-b border-gray-100 px-4 py-4">
                           <p className="text-sm font-semibold text-gray-900">{displayName}</p>
                           <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
@@ -987,7 +987,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                             type="button"
                             onClick={() => {
                               setUserMenuOpen(false);
-                              logout();
+                              void logout();
+                              if (typeof window !== 'undefined') {
+                                window.location.href = `/${locale}/login`;
+                              }
                             }}
                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
@@ -1038,7 +1041,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     {locale === 'ar' ? 'EN' : 'عربي'}
                   </Link>
 
-                  <div ref={userMenuRef} className="relative">
+                  <div ref={userMenuRef} className="relative isolate z-[10000]">
                     <button
                       type="button"
                       onClick={() => {
@@ -1066,7 +1069,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     </button>
 
                     {userMenuOpen && (
-                      <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
+                      <div className={`absolute isolate z-[10001] ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
                         <div className="border-b border-gray-100 px-4 py-4">
                           <p className="text-sm font-semibold text-gray-900">{displayName}</p>
                           <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
@@ -1105,7 +1108,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                             type="button"
                             onClick={() => {
                               setUserMenuOpen(false);
-                              logout();
+                              void logout();
+                              if (typeof window !== 'undefined') {
+                                window.location.href = `/${locale}/login`;
+                              }
                             }}
                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
@@ -1134,7 +1140,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
           </nav>
         </aside>
 
-        <main className="relative z-20 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
+        <main className="relative z-0 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
           <div className={fullWidth ? 'p-4 lg:p-6' : 'p-4 lg:p-8'}>
             <div className={`mx-auto w-full ${fullWidth ? 'max-w-none' : 'max-w-[1600px]'}`}>
               {children}
