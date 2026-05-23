@@ -92,7 +92,8 @@ export default function EditServicePage() {
     employeeIds: [] as string[],
     isActive: true,
     availableInCenter: true,
-    availableHomeVisit: false
+    availableHomeVisit: false,
+    allowReschedule: false
   });
   const [newInclude, setNewInclude] = useState("");
   const [variants, setVariants] = useState<ServiceVariant[]>([]);
@@ -167,7 +168,8 @@ export default function EditServicePage() {
           employeeIds: service.employees ? service.employees.map((e: any) => e.id) : [],
           isActive: service.isActive !== undefined ? service.isActive : true,
           availableInCenter: service.availableInCenter !== undefined ? service.availableInCenter : true,
-          availableHomeVisit: service.availableHomeVisit !== undefined ? service.availableHomeVisit : false
+          availableHomeVisit: service.availableHomeVisit !== undefined ? service.availableHomeVisit : false,
+          allowReschedule: service.allowReschedule === true
         });
 
         setServiceEmployeeAssignments(
@@ -244,7 +246,7 @@ export default function EditServicePage() {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
-    if (name === "hasOffer" || name === "hasGift" || name === "isActive" || name === "availableInCenter" || name === "availableHomeVisit") {
+    if (name === "hasOffer" || name === "hasGift" || name === "isActive" || name === "availableInCenter" || name === "availableHomeVisit" || name === "allowReschedule") {
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -448,6 +450,7 @@ export default function EditServicePage() {
       submitData.append("isActive", formData.isActive.toString());
       submitData.append("availableInCenter", formData.availableInCenter.toString());
       submitData.append("availableHomeVisit", formData.availableHomeVisit.toString());
+      submitData.append("allowReschedule", formData.allowReschedule.toString());
 
       // Image (only if new file selected)
       if (imageFile) {
@@ -1002,7 +1005,8 @@ export default function EditServicePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {[
                       { name: 'availableInCenter', label: locale === 'ar' ? 'متوفر في المركز' : 'Available in Center' },
-                      { name: 'availableHomeVisit', label: locale === 'ar' ? 'متوفر كزيارة منزلية' : 'Available as Home Visit' }
+                      { name: 'availableHomeVisit', label: locale === 'ar' ? 'متوفر كزيارة منزلية' : 'Available as Home Visit' },
+                      { name: 'allowReschedule', label: locale === 'ar' ? 'السماح بإعادة الجدولة للعميل' : 'Allow customer reschedule' }
                     ].map((item) => (
                       <label key={item.name} className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3">
                         <input

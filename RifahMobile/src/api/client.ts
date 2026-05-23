@@ -189,6 +189,7 @@ export interface Service {
     rawPrice?: number;
     finalPrice?: number;
     paymentOptions?: Array<'at-center' | 'online-full' | 'booking-fee'>;
+    allowReschedule?: boolean;
     variants?: ServiceVariant[];
     employees?: Staff[];
 }
@@ -640,6 +641,7 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
     rawPrice: toNumber(service?.rawPrice),
     finalPrice: toNumber(service?.finalPrice),
     paymentOptions: normalizeServicePaymentOptionsValue((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions),
+    allowReschedule: toBoolean((service as Partial<Service> & { allowReschedule?: unknown }).allowReschedule, false),
     variants: Array.isArray((service as Partial<Service> & { variants?: unknown }).variants)
         ? ((service as Partial<Service> & { variants?: unknown }).variants as unknown[])
             .map((variant) => normalizeServiceVariant(variant))
@@ -1387,6 +1389,14 @@ class ApiClient {
             `/bookings/${id}/cancel`
         );
         return response.success;
+    }
+
+    async rescheduleBooking(id: string, data: { startTime: string; staffId?: string }): Promise<Booking> {
+        const response = await this.patch<{ success: boolean; appointment: Booking }>(
+            `/bookings/${id}/reschedule`,
+            data
+        );
+        return normalizeBooking(response.appointment);
     }
 
     /**

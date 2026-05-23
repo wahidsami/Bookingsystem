@@ -509,7 +509,8 @@ exports.getPublicServices = async (req, res) => {
                 'variants',
                 'paymentOptions',
                 'availableInCenter',
-                'availableHomeVisit'
+                'availableHomeVisit',
+                'allowReschedule'
             ],
             order: [['createdAt', 'DESC']]
         });
@@ -560,7 +561,8 @@ exports.getPublicService = async (req, res) => {
                 'variants',
                 'paymentOptions',
                 'availableInCenter',
-                'availableHomeVisit'
+                'availableHomeVisit',
+                'allowReschedule'
             ],
             include: [
                 {
@@ -959,7 +961,7 @@ exports.createPublicBooking = async (req, res) => {
                 tenantId,
                 isActive: true
             },
-            attributes: ['id', 'name_en', 'name_ar', 'paymentOptions']
+            attributes: ['id', 'name_en', 'name_ar', 'paymentOptions', 'allowReschedule']
         });
 
         if (!service) {

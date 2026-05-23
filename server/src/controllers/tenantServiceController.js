@@ -431,7 +431,8 @@ exports.createService = async (req, res) => {
             employeeIds, // JSON string or array of staff IDs
             isActive = true,
             availableInCenter = true,
-            availableHomeVisit = false
+            availableHomeVisit = false,
+            allowReschedule = false
         } = req.body;
 
         // Validation
@@ -547,7 +548,8 @@ exports.createService = async (req, res) => {
             giftDetails: giftDetails || null,
             isActive: isActive === true || isActive === 'true',
             availableInCenter: availableInCenter === true || availableInCenter === 'true',
-            availableHomeVisit: availableHomeVisit === true || availableHomeVisit === 'true'
+            availableHomeVisit: availableHomeVisit === true || availableHomeVisit === 'true',
+            allowReschedule: allowReschedule === true || allowReschedule === 'true'
         }, { transaction });
 
         // Assign employees to service
@@ -626,7 +628,8 @@ exports.updateService = async (req, res) => {
             employeeIds,
             isActive,
             availableInCenter,
-            availableHomeVisit
+            availableHomeVisit,
+            allowReschedule
         } = req.body;
 
         // Find service
@@ -751,6 +754,7 @@ exports.updateService = async (req, res) => {
         if (isActive !== undefined) service.isActive = isActive === true || isActive === 'true';
         if (availableInCenter !== undefined) service.availableInCenter = availableInCenter === true || availableInCenter === 'true';
         if (availableHomeVisit !== undefined) service.availableHomeVisit = availableHomeVisit === true || availableHomeVisit === 'true';
+        if (allowReschedule !== undefined) service.allowReschedule = allowReschedule === true || allowReschedule === 'true';
 
         // Handle image upload
         if (req.file) {

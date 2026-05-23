@@ -10,6 +10,7 @@ import {
     Alert,
     Modal,
     ScrollView,
+    TextInput,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
@@ -49,6 +50,10 @@ export function BookingsScreen({ navigation }: any) {
     const [selectedBookingGroup, setSelectedBookingGroup] = useState<BookingGroup | null>(null);
     const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
     const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
+    const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
+    const [rescheduleDate, setRescheduleDate] = useState('');
+    const [rescheduleTime, setRescheduleTime] = useState('');
+    const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -157,6 +162,46 @@ export function BookingsScreen({ navigation }: any) {
         return language === 'ar'
             ? service?.name_ar || service?.name_en || '-'
             : service?.name_en || service?.name_ar || '-';
+    };
+
+    const openReschedule = (booking: Booking) => {
+        const baseDate = new Date(booking.startTime);
+        const yyyy = baseDate.getFullYear();
+        const mm = String(baseDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(baseDate.getDate()).padStart(2, '0');
+        const hh = String(baseDate.getHours()).padStart(2, '0');
+        const min = String(baseDate.getMinutes()).padStart(2, '0');
+        setRescheduleDate(`${yyyy}-${mm}-${dd}`);
+        setRescheduleTime(`${hh}:${min}`);
+        setRescheduleBooking(booking);
+    };
+
+    const submitReschedule = async () => {
+        if (!rescheduleBooking || !rescheduleDate || !rescheduleTime || rescheduleSubmitting) return;
+        try {
+            setRescheduleSubmitting(true);
+            const dateTime = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
+            if (Number.isNaN(dateTime.getTime())) {
+                throw new Error(language === 'ar' ? 'تاريخ/وقت غير صالح' : 'Invalid date/time');
+            }
+            await api.rescheduleBooking(rescheduleBooking.id, {
+                startTime: dateTime.toISOString(),
+                staffId: rescheduleBooking.staffId,
+            });
+            setRescheduleBooking(null);
+            await loadBookings();
+            Alert.alert(
+                language === 'ar' ? 'تم' : 'Done',
+                language === 'ar' ? 'تمت إعادة جدولة الموعد بنجاح' : 'Appointment rescheduled successfully'
+            );
+        } catch (error: any) {
+            Alert.alert(
+                language === 'ar' ? 'خطأ' : 'Error',
+                error?.message || (language === 'ar' ? 'تعذرت إعادة الجدولة' : 'Failed to reschedule')
+            );
+        } finally {
+            setRescheduleSubmitting(false);
+        }
     };
 
     const getServiceVariantLabel = (booking: Booking) => {
@@ -514,12 +559,24 @@ export function BookingsScreen({ navigation }: any) {
                                             )}
 
                                             {['confirmed', 'pending'].includes(booking.status) && activeTab === 'upcoming' && (
-                                                <TouchableOpacity
-                                                    style={styles.cancelButton}
-                                                    onPress={() => handleCancel(booking.id)}
-                                                >
-                                                    <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
-                                                </TouchableOpacity>
+                                                <>
+                                                    {(booking.Service?.allowReschedule || booking.service?.allowReschedule) ? (
+                                                        <TouchableOpacity
+                                                            style={styles.rescheduleButton}
+                                                            onPress={() => openReschedule(booking)}
+                                                        >
+                                                            <Text style={styles.rescheduleButtonText}>
+                                                                {language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    ) : null}
+                                                    <TouchableOpacity
+                                                        style={styles.cancelButton}
+                                                        onPress={() => handleCancel(booking.id)}
+                                                    >
+                                                        <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
+                                                    </TouchableOpacity>
+                                                </>
                                             )}
                                             {booking.status === 'completed' && activeTab === 'history' && (
                                                 reviewedAppointmentIds.has(booking.id) ? (
@@ -556,6 +613,55 @@ export function BookingsScreen({ navigation }: any) {
                     loadBookings();
                 }}
             />
+            <Modal
+                visible={!!rescheduleBooking}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !rescheduleSubmitting && setRescheduleBooking(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.rescheduleModalCard}>
+                        <Text style={styles.modalTitle}>
+                            {language === 'ar' ? 'إعادة جدولة الموعد' : 'Reschedule Booking'}
+                        </Text>
+                        <Text style={styles.rescheduleHint}>
+                            {language === 'ar' ? 'أدخل التاريخ والوقت الجديدين' : 'Enter new date and time'}
+                        </Text>
+                        <TextInput
+                            value={rescheduleDate}
+                            onChangeText={setRescheduleDate}
+                            placeholder="YYYY-MM-DD"
+                            autoCapitalize="none"
+                            style={styles.rescheduleInput}
+                        />
+                        <TextInput
+                            value={rescheduleTime}
+                            onChangeText={setRescheduleTime}
+                            placeholder="HH:MM"
+                            autoCapitalize="none"
+                            style={styles.rescheduleInput}
+                        />
+                        <View style={styles.rescheduleActions}>
+                            <TouchableOpacity
+                                style={styles.rescheduleCancelBtn}
+                                onPress={() => setRescheduleBooking(null)}
+                                disabled={rescheduleSubmitting}
+                            >
+                                <Text style={styles.rescheduleCancelText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.rescheduleSaveBtn}
+                                onPress={submitReschedule}
+                                disabled={rescheduleSubmitting}
+                            >
+                                <Text style={styles.rescheduleSaveText}>
+                                    {rescheduleSubmitting ? (language === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ' : 'Save')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -796,6 +902,19 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
+    rescheduleButton: {
+        marginTop: spacing.sm,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        alignItems: 'center',
+    },
+    rescheduleButtonText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+    },
     reviewButton: {
         marginTop: spacing.sm,
         backgroundColor: colors.primary,
@@ -898,6 +1017,57 @@ const styles = StyleSheet.create({
     modalBody: {
         gap: spacing.md,
         paddingBottom: spacing.xl,
+    },
+    rescheduleModalCard: {
+        width: '90%',
+        alignSelf: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        marginBottom: spacing.xl,
+    },
+    rescheduleHint: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        marginBottom: spacing.md,
+    },
+    rescheduleInput: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        color: colors.text,
+        marginBottom: spacing.sm,
+    },
+    rescheduleActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginTop: spacing.sm,
+    },
+    rescheduleCancelBtn: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        backgroundColor: '#FFFFFF',
+    },
+    rescheduleCancelText: {
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
+    rescheduleSaveBtn: {
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.primary,
+    },
+    rescheduleSaveText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
     },
     modalSectionTitle: {
         fontSize: fontSize.md,

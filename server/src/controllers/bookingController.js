@@ -503,6 +503,129 @@ const getNextAvailableSlot = async (req, res) => {
 };
 
 /**
+ * Reschedule a booking (customer app)
+ * PATCH /api/v1/bookings/:id/reschedule
+ */
+const rescheduleBooking = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const platformUserId = req.userId;
+        const { startTime, staffId } = req.body || {};
+
+        if (!startTime) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'startTime is required' });
+        }
+
+        const requestedStart = new Date(startTime);
+        if (Number.isNaN(requestedStart.getTime())) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Invalid startTime' });
+        }
+
+        const appointment = await db.Appointment.findOne({
+            where: { id, platformUserId },
+            include: [
+                { model: db.Service, as: 'service', required: true },
+                { model: db.Staff, as: 'staff', required: true }
+            ],
+            transaction
+        });
+
+        if (!appointment) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+
+        if (!['pending', 'confirmed'].includes(appointment.status)) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Only pending or confirmed bookings can be rescheduled' });
+        }
+
+        if (appointment.service?.allowReschedule !== true) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Reschedule is not enabled for this service' });
+        }
+
+        const hoursUntilCurrentStart = (new Date(appointment.startTime).getTime() - Date.now()) / (60 * 60 * 1000);
+        if (hoursUntilCurrentStart <= 24) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Bookings can only be rescheduled more than 24 hours before the original start time'
+            });
+        }
+
+        if (requestedStart.getTime() <= Date.now()) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'New booking time must be in the future' });
+        }
+
+        const requestedStaffId = staffId || appointment.staffId;
+        const assignedStaff = await db.Staff.findOne({
+            where: {
+                id: requestedStaffId,
+                tenantId: appointment.staff?.tenantId || appointment.tenantId,
+                isActive: true
+            },
+            transaction
+        });
+
+        if (!assignedStaff) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Staff member not found' });
+        }
+
+        const durationMinutes =
+            parseInt(appointment.service?.duration, 10) ||
+            Math.max(15, Math.round((new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime()) / 60000));
+        const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
+
+        const hasConflict = await bookingService.hasConflict(
+            requestedStaffId,
+            requestedStart,
+            requestedEnd,
+            appointment.id,
+            transaction
+        );
+
+        if (hasConflict) {
+            await transaction.rollback();
+            return res.status(409).json({ success: false, message: 'Selected time slot is no longer available' });
+        }
+
+        appointment.staffId = requestedStaffId;
+        appointment.startTime = requestedStart;
+        appointment.endTime = requestedEnd;
+        appointment.customerReminderSentAt = null;
+        appointment.noShowMarkedAt = null;
+        await appointment.save({ transaction });
+        await transaction.commit();
+
+        const refreshed = await db.Appointment.findByPk(appointment.id, {
+            include: [
+                { model: db.Service, as: 'service' },
+                { model: db.Staff, as: 'staff' },
+                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo'] }
+            ]
+        });
+
+        return res.json({
+            success: true,
+            message: 'Booking rescheduled successfully',
+            appointment: refreshed || appointment
+        });
+    } catch (error) {
+        if (transaction && !transaction.finished) {
+            await transaction.rollback();
+        }
+        console.error('Reschedule booking error:', error);
+        return res.status(500).json({ success: false, message: error.message || 'Failed to reschedule booking' });
+    }
+};
+
+/**
  * Public invite details endpoint (token-based).
  * GET /api/v1/bookings/invites/:token
  */
@@ -744,6 +867,7 @@ module.exports = {
     createBooking,
     getBooking,
     cancelBooking,
+    rescheduleBooking,
     listBookings,
     getNextAvailableSlot,
     getInviteDetails,

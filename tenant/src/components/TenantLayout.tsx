@@ -84,6 +84,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const { user, logout, permissions, sessionType } = useTenantAuth();
   const t = useTranslations("Navigation");
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const userMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const userMenuPanelRef = useRef<HTMLDivElement | null>(null);
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationButtonRef = useRef<HTMLButtonElement | null>(null);
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
@@ -101,6 +103,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [notificationSeenAt, setNotificationSeenAt] = useState(0);
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
   const [notificationPanelPosition, setNotificationPanelPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
+  const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
   const announcedAppointmentAlertIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedAppointmentAlertsRef = useRef(false);
 
@@ -460,6 +463,68 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       )}
     </div>
   );
+
+  const renderUserMenuPanel = () => (
+    <div
+      ref={userMenuPanelRef}
+      className="fixed isolate z-[10001] w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+      style={{
+        top: userMenuPosition.top,
+        left: userMenuPosition.left,
+        right: userMenuPosition.right
+      }}
+    >
+      <div className="border-b border-gray-100 px-4 py-4">
+        <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+        <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
+      </div>
+      <div className="p-2">
+        <button
+          type="button"
+          onClick={() => {
+            setUserMenuOpen(false);
+            router.push(`/${locale}/dashboard/settings`);
+          }}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        >
+          <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
+          <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+        </button>
+        <button
+          type="button"
+          disabled
+          title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+        >
+          <LifebuoyIcon className="h-5 w-5 text-gray-400" />
+          <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
+        </button>
+        <button
+          type="button"
+          disabled
+          title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+        >
+          <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+          <span>{locale === 'ar' ? 'حول' : 'About'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setUserMenuOpen(false);
+            void logout();
+            if (typeof window !== 'undefined') {
+              window.location.href = `/${locale}/login`;
+            }
+          }}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+        >
+          <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
+          <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
+        </button>
+      </div>
+    </div>
+  );
   useEffect(() => {
     if (!notificationMenuOpen) return;
 
@@ -516,10 +581,47 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   }, []);
 
   useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const updatePosition = () => {
+      const anchor = userMenuButtonRef.current;
+      if (!anchor) return;
+
+      const rect = anchor.getBoundingClientRect();
+      const top = Math.min(
+        window.innerHeight - 20,
+        rect.bottom + 8
+      );
+      if (isRTL) {
+        setUserMenuPosition({
+          top,
+          left: Math.max(8, rect.left)
+        });
+      } else {
+        setUserMenuPosition({
+          top,
+          right: Math.max(8, window.innerWidth - rect.right)
+        });
+      }
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isRTL, userMenuOpen]);
+
+  useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (userMenuRef.current && !userMenuRef.current.contains(target)) {
-        setUserMenuOpen(false);
+        if (!userMenuPanelRef.current || !userMenuPanelRef.current.contains(target)) {
+          setUserMenuOpen(false);
+        }
       }
       if (notificationMenuRef.current && !notificationMenuRef.current.contains(target)) {
         if (!notificationPanelRef.current || !notificationPanelRef.current.contains(target)) {
@@ -922,6 +1024,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
 
                   <div ref={userMenuRef} className="relative isolate z-[10000]">
                     <button
+                      ref={userMenuButtonRef}
                       type="button"
                       onClick={() => {
                         setNotificationMenuOpen(false);
@@ -947,59 +1050,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                       <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {userMenuOpen && (
-                      <div className={`absolute isolate z-[10001] ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
-                        <div className="border-b border-gray-100 px-4 py-4">
-                          <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                          <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
-                        </div>
-                        <div className="p-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUserMenuOpen(false);
-                              router.push(`/${locale}/dashboard/settings`);
-                            }}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
-                            <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled
-                            title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                          >
-                            <LifebuoyIcon className="h-5 w-5 text-gray-400" />
-                            <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled
-                            title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                          >
-                            <InformationCircleIcon className="h-5 w-5 text-gray-400" />
-                            <span>{locale === 'ar' ? 'حول' : 'About'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUserMenuOpen(false);
-                              void logout();
-                              if (typeof window !== 'undefined') {
-                                window.location.href = `/${locale}/login`;
-                              }
-                            }}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
-                            <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {userMenuOpen && (typeof document !== 'undefined' ? createPortal(renderUserMenuPanel(), document.body) : null)}
                   </div>
                 </div>
 
@@ -1043,6 +1094,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
 
                   <div ref={userMenuRef} className="relative isolate z-[10000]">
                     <button
+                      ref={userMenuButtonRef}
                       type="button"
                       onClick={() => {
                         setNotificationMenuOpen(false);
@@ -1068,59 +1120,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                       <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {userMenuOpen && (
-                      <div className={`absolute isolate z-[10001] ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl`}>
-                        <div className="border-b border-gray-100 px-4 py-4">
-                          <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                          <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
-                        </div>
-                        <div className="p-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUserMenuOpen(false);
-                              router.push(`/${locale}/dashboard/settings`);
-                            }}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
-                            <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled
-                            title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                          >
-                            <LifebuoyIcon className="h-5 w-5 text-gray-400" />
-                            <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled
-                            title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                          >
-                            <InformationCircleIcon className="h-5 w-5 text-gray-400" />
-                            <span>{locale === 'ar' ? 'حول' : 'About'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUserMenuOpen(false);
-                              void logout();
-                              if (typeof window !== 'undefined') {
-                                window.location.href = `/${locale}/login`;
-                              }
-                            }}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
-                            <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {userMenuOpen && (typeof document !== 'undefined' ? createPortal(renderUserMenuPanel(), document.body) : null)}
                   </div>
                 </div>
               </>

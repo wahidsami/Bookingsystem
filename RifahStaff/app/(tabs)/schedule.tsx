@@ -384,7 +384,7 @@ export default function ScheduleScreen() {
             const hour = Number(new Intl.DateTimeFormat('en-US', {
                 timeZone: 'Asia/Riyadh',
                 hour: '2-digit',
-                hour12: false,
+                hour12: true,
             }).format(new Date()));
             return Number.isFinite(hour) ? hour : 12;
         } catch {

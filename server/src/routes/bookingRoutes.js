@@ -27,5 +27,6 @@ router.get('/:id', optionalAuth, bookingController.getBooking);
 
 // Cancel a booking (requires authentication - users can only cancel their own)
 router.patch('/:id/cancel', authenticateUser, bookingController.cancelBooking);
+router.patch('/:id/reschedule', authenticateUser, bookingController.rescheduleBooking);
 
 module.exports = router;

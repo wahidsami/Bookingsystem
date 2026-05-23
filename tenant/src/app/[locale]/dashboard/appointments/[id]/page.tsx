@@ -930,6 +930,7 @@ export default function AppointmentDetailsPage() {
                     const time = new Date(slot.startTime).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US", {
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: true,
                     });
                     const selected = rescheduleSelectedSlot?.startTime === slot.startTime;
                     return (

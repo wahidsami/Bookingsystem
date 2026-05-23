@@ -198,6 +198,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
             comment: 'Service available as home visit'
+        },
+        allowReschedule: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+            comment: 'Allow customer to reschedule appointments for this service'
         }
     }, {
         sequelize,

@@ -502,7 +502,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                         <Text style={styles.summaryLabel}>No available slots for this date.</Text>
                     )}
                     {availableSlots.map(slot => {
-                        const label = format(new Date(slot.startTime), 'HH:mm');
+                        const label = format(new Date(slot.startTime), 'hh:mm a');
                         const isSelected = selectedTime?.startTime === slot.startTime;
                         return (
                             <TouchableOpacity
@@ -547,7 +547,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Time</Text>
                     <Text style={styles.summaryValue}>
-                        {selectedTime ? format(new Date(selectedTime.startTime), 'HH:mm') : ''}
+                        {selectedTime ? format(new Date(selectedTime.startTime), 'hh:mm a') : ''}
                     </Text>
                 </View>
                 {selectedVariantDuration ? (

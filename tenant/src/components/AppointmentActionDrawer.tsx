@@ -66,6 +66,8 @@ interface ExistingBreakItem {
   startTime: string;
   endTime: string;
   isRecurring?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
   startDateTime?: string | null;
   endDateTime?: string | null;
 }
@@ -168,7 +170,7 @@ export function AppointmentActionDrawer({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
+  const [customerMode, setCustomerMode] = useState<"existing" | "new" | "guest">("existing");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -197,6 +199,9 @@ export function AppointmentActionDrawer({
 
   const [breakEmployeeId, setBreakEmployeeId] = useState("");
   const [breakDate, setBreakDate] = useState(getTodayDateKey());
+  const [breakRecurrenceMode, setBreakRecurrenceMode] = useState<"single" | "continues" | "range">("single");
+  const [breakRangeStartDate, setBreakRangeStartDate] = useState(getTodayDateKey());
+  const [breakRangeEndDate, setBreakRangeEndDate] = useState("");
   const [breakStartTime, setBreakStartTime] = useState("10:00");
   const [breakEndTime, setBreakEndTime] = useState("10:30");
   const [breakType, setBreakType] = useState<"lunch" | "prayer" | "cleaning" | "other">("other");
@@ -252,6 +257,13 @@ export function AppointmentActionDrawer({
 
     setBreakEmployeeId(existingBreak?.staffId || defaultStaffId || "");
     setBreakDate(breakDateValue);
+    setBreakRangeStartDate(existingBreak?.startDate || breakDateValue);
+    setBreakRangeEndDate(existingBreak?.endDate || "");
+    if (existingBreak?.isRecurring) {
+      setBreakRecurrenceMode(existingBreak?.endDate ? "range" : "continues");
+    } else {
+      setBreakRecurrenceMode("single");
+    }
     setBreakStartTime(existingBreak?.startTime?.slice(0, 5) || defaultTime || "10:00");
     setBreakEndTime(existingBreak?.endTime?.slice(0, 5) || addMinutesToTime(defaultTime || "10:00", 30));
     setBreakType((existingBreak?.type as any) || "other");
@@ -416,6 +428,13 @@ export function AppointmentActionDrawer({
       }
     }
 
+    if (customerMode === "guest") {
+      if (!newCustomer.firstName.trim() || !newCustomer.lastName.trim()) {
+        setError(locale === "ar" ? "الرجاء إدخال اسم الضيف." : "Please enter guest name.");
+        return;
+      }
+    }
+
     if (!appointmentDate || !appointmentTime) {
       setError(locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.");
       return;
@@ -447,13 +466,14 @@ export function AppointmentActionDrawer({
         notes: notes.trim() || undefined,
         paymentMethod,
         platformUserId: customerMode === "existing" ? selectedCustomer?.id : undefined,
-        customer: customerMode === "new"
+        customer: customerMode === "new" || customerMode === "guest"
           ? {
               ...newCustomer,
               firstName: newCustomer.firstName.trim(),
               lastName: newCustomer.lastName.trim(),
-              email: newCustomer.email.trim(),
-              phone: newCustomer.phone.trim()
+              email: customerMode === "guest" ? "" : newCustomer.email.trim(),
+              phone: customerMode === "guest" ? "" : newCustomer.phone.trim(),
+              isGuest: customerMode === "guest"
             }
           : null,
         assignmentMode: selectedStaffId ? "tenant_reassigned" : "auto_assigned"
@@ -507,8 +527,16 @@ export function AppointmentActionDrawer({
 
     setSaving(true);
     try {
-      const isRecurringBreak = existingBreak?.isRecurring === true;
+      const isRecurringBreak = breakRecurrenceMode !== "single";
       const dayOfWeek = isRecurringBreak ? new Date(`${breakDate}T00:00:00`).getDay() : null;
+      const resolvedStartDate = breakRangeStartDate || breakDate;
+      const resolvedEndDate = breakRecurrenceMode === "range" ? breakRangeEndDate : null;
+      if (breakRecurrenceMode === "range" && (!resolvedStartDate || !resolvedEndDate)) {
+        throw new Error(locale === "ar" ? "الرجاء تحديد فترة التكرار (من - إلى)." : "Please choose recurrence period (from-to).");
+      }
+      if (breakRecurrenceMode === "range" && resolvedEndDate && resolvedStartDate && resolvedEndDate < resolvedStartDate) {
+        throw new Error(locale === "ar" ? "تاريخ النهاية يجب أن يكون بعد تاريخ البداية." : "End date must be after start date.");
+      }
       const response = await tenantApi.createEmployeeBreak(breakEmployeeId, {
         specificDate: isRecurringBreak ? null : breakDate,
         startTime: breakStartTime,
@@ -517,7 +545,8 @@ export function AppointmentActionDrawer({
         label: breakLabel.trim() || undefined,
         isRecurring: isRecurringBreak,
         dayOfWeek,
-        startDate: isRecurringBreak ? breakDate : undefined,
+        startDate: isRecurringBreak ? resolvedStartDate : undefined,
+        endDate: isRecurringBreak ? (resolvedEndDate || null) : undefined,
         referenceDate: breakDate
       });
 
@@ -648,6 +677,13 @@ export function AppointmentActionDrawer({
                       >
                         {locale === "ar" ? "جديد" : "New"}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerMode("guest")}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${customerMode === "guest" ? 'bg-primary text-white' : 'text-gray-700'}`}
+                      >
+                        {locale === "ar" ? "ضيف" : "Guest"}
+                      </button>
                     </div>
                   </div>
 
@@ -740,7 +776,7 @@ export function AppointmentActionDrawer({
                         </div>
                       )}
                     </div>
-                  ) : (
+                  ) : customerMode === "new" ? (
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <input
                         value={newCustomer.firstName}
@@ -791,6 +827,28 @@ export function AppointmentActionDrawer({
                         title={locale === "ar" ? "تاريخ الميلاد (اختياري)" : "Date of birth (optional)"}
                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                       />
+                    </div>
+                  ) : (
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <input
+                        value={newCustomer.firstName}
+                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, firstName: e.target.value }))}
+                        placeholder={locale === "ar" ? "اسم الضيف الأول" : "Guest first name"}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <input
+                        value={newCustomer.lastName}
+                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, lastName: e.target.value }))}
+                        placeholder={locale === "ar" ? "اسم الضيف الأخير" : "Guest last name"}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <p className="sm:col-span-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {locale === "ar"
+                          ? "وضع الضيف يسمح بالحجز بدون بريد إلكتروني أو رقم جوال."
+                          : "Guest mode allows booking without email or mobile number."}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1061,6 +1119,58 @@ export function AppointmentActionDrawer({
                       onChange={(e) => setBreakEndTime(e.target.value)}
                       className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                     />
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="mb-2 text-sm font-medium text-gray-700">{locale === "ar" ? "تكرار الوقت المحجوز" : "Blocked time recurrence"}</p>
+                    <div className={`inline-flex rounded-full border border-gray-200 bg-white p-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => setBreakRecurrenceMode("single")}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${breakRecurrenceMode === "single" ? 'bg-primary text-white' : 'text-gray-700'}`}
+                      >
+                        {locale === "ar" ? "مرة واحدة" : "Single"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBreakRecurrenceMode("continues");
+                          setBreakRangeStartDate((current) => current || breakDate);
+                          setBreakRangeEndDate("");
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${breakRecurrenceMode === "continues" ? 'bg-primary text-white' : 'text-gray-700'}`}
+                      >
+                        {locale === "ar" ? "مستمر" : "Continues"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBreakRecurrenceMode("range");
+                          setBreakRangeStartDate((current) => current || breakDate);
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${breakRecurrenceMode === "range" ? 'bg-primary text-white' : 'text-gray-700'}`}
+                      >
+                        {locale === "ar" ? "من - إلى" : "From - To"}
+                      </button>
+                    </div>
+
+                    {breakRecurrenceMode !== "single" ? (
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <input
+                          type="date"
+                          value={breakRangeStartDate}
+                          onChange={(e) => setBreakRangeStartDate(e.target.value)}
+                          className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        />
+                        <input
+                          type="date"
+                          value={breakRangeEndDate}
+                          onChange={(e) => setBreakRangeEndDate(e.target.value)}
+                          disabled={breakRecurrenceMode === "continues"}
+                          className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary disabled:bg-gray-100"
+                        />
+                      </div>
+                    ) : null}
                   </div>
 
                   <input

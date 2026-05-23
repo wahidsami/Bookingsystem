@@ -111,50 +111,6 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Staff App Access</Text>
-
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>View Clients</Text>
-                        <Text style={styles.debugValue}>{user?.permissions?.view_clients ? 'Enabled' : 'Disabled'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>View Booking Notes</Text>
-                        <Text style={styles.debugValue}>{user?.permissions?.view_booking_notes ? 'Enabled' : 'Disabled'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>View Reviews</Text>
-                        <Text style={styles.debugValue}>{user?.permissions?.view_reviews ? 'Enabled' : 'Disabled'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>Reply Reviews</Text>
-                        <Text style={styles.debugValue}>{user?.permissions?.reply_reviews ? 'Enabled' : 'Disabled'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>View Earnings</Text>
-                        <Text style={styles.debugValue}>{user?.permissions?.view_earnings ? 'Enabled' : 'Disabled'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>Reviews Feature</Text>
-                        <Text style={styles.debugValue}>{user?.features?.reviews ? 'Available' : 'Hidden'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>Earnings Feature</Text>
-                        <Text style={styles.debugValue}>{user?.features?.earnings ? 'Available' : 'Hidden'}</Text>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.debugRow}>
-                        <Text style={styles.debugLabel}>Messages Feature</Text>
-                        <Text style={styles.debugValue}>{user?.features?.messages ? 'Available' : 'Hidden'}</Text>
-                    </View>
-                </View>
-
                 <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
                     <Ionicons name="log-out-outline" size={20} color="#ef4444" style={{ marginHorizontal: 8 }} />
                     <Text style={styles.logoutText}>{t('profile.logout')}</Text>
@@ -339,23 +295,6 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#f3f4f6',
         marginLeft: 48,
-    },
-    debugRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 8,
-    },
-    debugLabel: {
-        fontSize: 15,
-        color: '#374151',
-        fontWeight: '500',
-    },
-    debugValue: {
-        fontSize: 14,
-        color: '#6b7280',
-        fontWeight: '700',
     },
     logoutButton: {
         flexDirection: 'row',

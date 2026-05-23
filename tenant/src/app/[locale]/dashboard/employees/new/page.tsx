@@ -55,7 +55,6 @@ export default function NewEmployeePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<'basic' | 'bio' | 'finance' | 'schedule' | 'access'>('basic');
-  const [tenantTaxRate, setTenantTaxRate] = useState(15);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -86,35 +85,14 @@ export default function NewEmployeePage() {
   });
   const [scheduleStartDate, setScheduleStartDate] = useState("");
   const [scheduleEndDate, setScheduleEndDate] = useState("");
+  const [scheduleContinues, setScheduleContinues] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const dashboardRoleKey = getDashboardRoleKeyForEmployeePosition(formData.position) || 'custom';
   const isServiceProvider = formData.position === 'service_provider';
 
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const response = await tenantApi.getSettings();
-        const taxRate = Number(response?.data?.settings?.taxRate ?? response?.data?.settings?.tax_rate ?? 15);
-        if (!Number.isNaN(taxRate)) {
-          setTenantTaxRate(taxRate);
-        }
-      } catch (settingsErr) {
-        console.warn("Failed to load tenant settings for finance preview:", settingsErr);
-      }
-    };
-
-    loadSettings();
-  }, []);
-
   const salaryValue = Number(formData.salary || 0);
-  const vatAmount = useMemo(() => {
-    if (!salaryValue || Number.isNaN(salaryValue)) {
-      return 0;
-    }
-    return salaryValue * (tenantTaxRate / 100);
-  }, [salaryValue, tenantTaxRate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -186,7 +164,7 @@ export default function NewEmployeePage() {
     const financeFields = [salaryValue > 0];
     const financeFilled = financeFields.filter(Boolean).length;
 
-    const scheduleFields = [formData.scheduleVisibilityWeeks.trim(), scheduleStartDate.trim(), scheduleEndDate.trim()];
+    const scheduleFields = [formData.scheduleVisibilityWeeks.trim(), scheduleStartDate.trim(), scheduleContinues || scheduleEndDate.trim()];
     const hasScheduleRows = scheduleSummary.activeDays > 0 || scheduleSummary.recurringShifts > 0 || scheduleSummary.oneTimeShifts > 0;
     const scheduleFilled = hasScheduleRows ? scheduleFields.filter(Boolean).length : 0;
 
@@ -206,7 +184,7 @@ export default function NewEmployeePage() {
       },
       access: { filled: accessFilled, total: accessFields.length, label: accessFilled > 0 ? `${accessFilled}/${accessFields.length}` : (locale === 'ar' ? 'اختياري' : 'Optional') }
     };
-  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, scheduleSummary.activeDays, scheduleSummary.oneTimeShifts, scheduleSummary.recurringShifts, scheduleStartDate, scheduleEndDate, staffAppPassword]);
+  }, [dashboardPermissions, formData.bio, formData.email, formData.experience, formData.gender, formData.name, formData.nationality, formData.phone, formData.position, formData.scheduleVisibilityWeeks, formData.skills.length, formData.spokenLanguages.length, isServiceProvider, locale, photoFile, photoPreview, salaryValue, scheduleSummary.activeDays, scheduleSummary.oneTimeShifts, scheduleSummary.recurringShifts, scheduleStartDate, scheduleEndDate, scheduleContinues, staffAppPassword]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId as typeof activeSection);
@@ -650,7 +628,7 @@ export default function NewEmployeePage() {
                     {locale === 'ar' ? 'المالية' : 'Finance'}
                   </h3>
                   <p className="text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {locale === 'ar' ? 'الراتب والضريبة تظهر هنا مع معاينة سريعة للقيمة النهائية.' : 'Salary and VAT preview live here.'}
+                    {locale === 'ar' ? 'أدخل الراتب الأساسي كما هو، بدون إضافة ضريبة القيمة المضافة.' : 'Enter the base salary directly with no VAT added.'}
                   </p>
                 </div>
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -711,27 +689,15 @@ export default function NewEmployeePage() {
 
                   <div className="rounded-lg bg-white p-3 text-sm text-gray-600">
                     <div className="flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <span>{locale === 'ar' ? 'الراتب قبل الضريبة' : 'Salary before VAT'}</span>
+                      <span>{locale === 'ar' ? 'الراتب المعتمد' : 'Recorded salary'}</span>
                       <span className="font-semibold text-gray-900">
                         <Currency amount={salaryValue || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <span>{locale === 'ar' ? 'قيمة الضريبة التقديرية' : 'Estimated VAT'}</span>
-                      <span className="font-semibold text-gray-900">
-                        <Currency amount={vatAmount || 0} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <span className="font-medium text-gray-700">{locale === 'ar' ? 'الإجمالي التقريبي' : 'Estimated total'}</span>
-                      <span className="font-semibold text-gray-900">
-                        <Currency amount={(salaryValue || 0) + (vatAmount || 0)} locale={locale === 'ar' ? 'ar-SA' : 'en-US'} />
-                      </span>
-                    </div>
                     <p className="mt-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                       {locale === 'ar'
-                        ? `تم احتساب الضريبة على معدل ${tenantTaxRate}% من إعدادات المركز الحالية.`
-                        : `VAT is estimated using the current tenant tax rate of ${tenantTaxRate}%.`}
+                        ? 'لا يتم احتساب ضريبة القيمة المضافة على الرواتب.'
+                        : 'VAT is not applied to salary calculations.'}
                     </p>
                   </div>
                 </div>
@@ -793,6 +759,27 @@ export default function NewEmployeePage() {
                     </div>
 
                     <div>
+                      <div className="mb-2 flex items-center justify-between gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <label className="block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'نطاق الجدول' : 'Schedule range'}
+                        </label>
+                        <label className="inline-flex items-center gap-2 text-sm text-gray-600" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                          <input
+                            type="checkbox"
+                            checked={scheduleContinues}
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setScheduleContinues(checked);
+                              if (checked) setScheduleEndDate("");
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <span>{locale === 'ar' ? 'مستمر' : 'Continues'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                         {locale === 'ar' ? 'تاريخ نهاية الجدول' : 'Schedule end date'}
                       </label>
@@ -800,9 +787,15 @@ export default function NewEmployeePage() {
                         type="date"
                         value={scheduleEndDate}
                         onChange={(event) => setScheduleEndDate(event.target.value)}
+                        disabled={scheduleContinues}
                         className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                         style={{ textAlign: isRTL ? 'right' : 'left' }}
                       />
+                      {scheduleContinues ? (
+                        <p className="mt-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          {locale === 'ar' ? 'سيستمر هذا الجدول بدون تاريخ نهاية.' : 'This schedule will continue with no end date.'}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -816,7 +809,7 @@ export default function NewEmployeePage() {
                   draftShifts={scheduleDraft}
                   onDraftShiftsChange={setScheduleDraft}
                   sharedStartDate={scheduleStartDate || null}
-                  sharedEndDate={scheduleEndDate || null}
+                  sharedEndDate={scheduleContinues ? null : (scheduleEndDate || null)}
                   onSummaryChange={setScheduleSummary}
                 />
               </div>

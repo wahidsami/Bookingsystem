@@ -133,11 +133,22 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     }
 
     const normalizedCustomer = customer || {};
-    const firstName = `${normalizedCustomer.firstName || ''}`.trim();
-    const lastName = `${normalizedCustomer.lastName || ''}`.trim();
-    const email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
-    const phone = `${normalizedCustomer.phone || ''}`.trim();
+    const isGuest = normalizedCustomer.isGuest === true;
+    const firstName = `${normalizedCustomer.firstName || ''}`.trim() || (isGuest ? 'Guest' : '');
+    const lastName = `${normalizedCustomer.lastName || ''}`.trim() || (isGuest ? 'Customer' : '');
+    let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
+    let phone = `${normalizedCustomer.phone || ''}`.trim();
     const password = `${normalizedCustomer.password || ''}`;
+
+    if (isGuest) {
+        if (!email) {
+            const guestTag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            email = `guest+${guestTag}@guest.refah.local`;
+        }
+        if (!phone) {
+            phone = `+9665${String(Date.now()).slice(-8)}`;
+        }
+    }
 
     if (!firstName || !lastName || !email || !phone) {
         throw new Error('Customer details are required when no existing customer is selected');
@@ -1537,6 +1548,14 @@ exports.rescheduleAppointment = async (req, res) => {
         if (staffId) {
             appointment.requestedStaffId = staffId;
             appointment.assignmentMode = 'tenant_reassigned';
+        }
+
+        if (appointment.service?.allowReschedule !== true) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Rescheduling is not enabled for this service'
+            });
         }
 
         const previousStaffId = appointment.staffId;
