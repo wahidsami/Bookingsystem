@@ -29,6 +29,7 @@ const navigation = [
   { name: "Users", href: "/dashboard/users", icon: "👥" },
   { name: "Financial", href: "/dashboard/financial", icon: "💰" },
   { name: "Packages", href: "/dashboard/packages", icon: "📦" },
+  { name: "Gift Cards", href: "/dashboard/gift-cards", icon: "🎁" },
   { name: "Marketing", href: "/dashboard/marketing", icon: "🔥" },
   { name: "Clients Control", href: "/dashboard/clients-control", icon: "🎛️" },
   { name: "Notifications", href: "/dashboard/notifications", icon: "🔔" },

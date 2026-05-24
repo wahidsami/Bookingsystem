@@ -506,6 +506,35 @@ class AdminApi {
   async updateFeaturePricing(key: string, unitPrice: number) {
     return this.request<{ success: boolean; feature: any }>(`/admin/feature-pricing/${key}`, 'PUT', { body: { unitPrice } });
   }
+
+  // Gift Cards (Wallet Packages)
+  async getGiftPackages() {
+    return this.request<{ success: boolean; packages: any[] }>('/admin/gift-packages');
+  }
+
+  async getGiftPackage(id: string) {
+    return this.request<{ success: boolean; package: any }>(`/admin/gift-packages/${id}`);
+  }
+
+  async createGiftPackage(data: any) {
+    return this.request<{ success: boolean; package: any; message?: string }>('/admin/gift-packages', 'POST', { body: data });
+  }
+
+  async updateGiftPackage(id: string, data: any) {
+    return this.request<{ success: boolean; package: any; message?: string }>(`/admin/gift-packages/${id}`, 'PUT', { body: data });
+  }
+
+  async deleteGiftPackage(id: string) {
+    return this.request<{ success: boolean; message?: string }>(`/admin/gift-packages/${id}`, 'DELETE');
+  }
+
+  async getGiftTransactions(params: { limit?: number; status?: string } = {}) {
+    const query = new URLSearchParams();
+    if (params.limit != null) query.append('limit', String(params.limit));
+    if (params.status) query.append('status', params.status);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{ success: boolean; transactions: any[]; count: number }>(`/admin/gift-transactions${suffix}`);
+  }
 }
 
 
