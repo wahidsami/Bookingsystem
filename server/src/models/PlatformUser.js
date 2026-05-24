@@ -38,6 +38,16 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'platformUserId',
                 as: 'walletLedgerEntries'
             });
+
+            PlatformUser.hasMany(models.GiftCardTransaction, {
+                foreignKey: 'senderPlatformUserId',
+                as: 'sentGiftCards'
+            });
+
+            PlatformUser.hasMany(models.GiftCardTransaction, {
+                foreignKey: 'recipientPlatformUserId',
+                as: 'receivedGiftCards'
+            });
         }
 
         // Instance method to check password

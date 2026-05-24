@@ -307,12 +307,19 @@ Acceptance:
 - Added wallet balance and wallet ledger read APIs.
 
 ## Phase 2 - Gift Packages (Admin)
-Status: `pending`
+Status: `in_progress`
 Tasks:
 - Admin APIs + admin UI CRUD for packages.
 - Active/inactive + scheduling.
 Acceptance:
 - Admin can fully manage gift package catalog.
+
+### Phase 2 Progress (2026-05-24)
+- Added `gift_card_packages` and `gift_card_transactions` SQL migration.
+- Added `GiftCardPackage` and `GiftCardTransaction` models with associations.
+- Added Admin CRUD APIs for gift packages.
+- Added Admin listing API for gift transactions.
+- Added public API to list active gift packages for customer app.
 
 ## Phase 3 - Customer Gifts UX
 Status: `pending`

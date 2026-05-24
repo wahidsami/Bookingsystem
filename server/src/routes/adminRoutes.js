@@ -12,6 +12,7 @@ const adminNotificationsController = require('../controllers/adminNotificationsC
 const adminFinancialController = require('../controllers/adminFinancialController');
 const adminCategoryController = require('../controllers/adminCategoryController');
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
+const adminGiftCardPackageController = require('../controllers/adminGiftCardPackageController');
 
 // All routes require super admin authentication
 router.use(authenticateSuperAdmin);
@@ -91,6 +92,14 @@ router.delete('/categories/:id', requirePermission('settings', 'edit'), adminCat
 // ===== FEATURE PRICING =====
 router.get('/feature-pricing', requirePermission('settings', 'view'), adminFeaturePricingController.getFeaturePricings);
 router.put('/feature-pricing/:key', requirePermission('settings', 'edit'), adminFeaturePricingController.updateFeaturePricing);
+
+// ===== GIFT CARD PACKAGES =====
+router.get('/gift-packages', requirePermission('settings', 'view'), adminGiftCardPackageController.listGiftPackages);
+router.get('/gift-packages/:id', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftPackage);
+router.post('/gift-packages', requirePermission('settings', 'edit'), adminGiftCardPackageController.createGiftPackage);
+router.put('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.updateGiftPackage);
+router.delete('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.deleteGiftPackage);
+router.get('/gift-transactions', requirePermission('settings', 'view'), adminGiftCardPackageController.listGiftTransactions);
 
 module.exports = router;
 
