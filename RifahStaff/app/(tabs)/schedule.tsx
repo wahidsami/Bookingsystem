@@ -143,6 +143,10 @@ export default function ScheduleScreen() {
     const [gridScalePercent, setGridScalePercent] = useState(42);
     const [settingsSliderWidth, setSettingsSliderWidth] = useState(1);
     const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+    const [displayHours, setDisplayHours] = useState<{ startMinute: number; endMinute: number }>({
+        startMinute: 6 * 60,
+        endMinute: 22 * 60,
+    });
     const timeOffEnabled = canRequestTimeOff(user);
     const canSeeBookingNotes = canViewBookingNotes(user);
     const canViewClientContext = canViewClients(user);
@@ -182,6 +186,12 @@ export default function ScheduleScreen() {
             setShifts(data.shifts);
             setBreaks(data.breaks);
             setTimeOff(data.timeOff);
+            if (data.displayHours && Number.isFinite(data.displayHours.startMinute) && Number.isFinite(data.displayHours.endMinute)) {
+                setDisplayHours({
+                    startMinute: Math.max(0, Math.min(23 * 60, Math.floor(data.displayHours.startMinute))),
+                    endMinute: Math.max(60, Math.min(24 * 60, Math.ceil(data.displayHours.endMinute))),
+                });
+            }
         } catch (error) {
             console.error('Failed to load schedule data', error);
         } finally {
@@ -516,8 +526,8 @@ export default function ScheduleScreen() {
     };
 
     const renderGridView = () => {
-        const gridStartMinute = 6 * 60;
-        const gridEndMinute = 22 * 60;
+        const gridStartMinute = Math.max(0, Math.min((23 * 60), displayHours.startMinute));
+        const gridEndMinute = Math.max(gridStartMinute + 60, Math.min((24 * 60), displayHours.endMinute));
         const slotMinutes = 30;
         const rowHeight = Math.round(12 + (gridScalePercent / 100) * 48);
         const totalRows = Math.max(1, Math.ceil((gridEndMinute - gridStartMinute) / slotMinutes));

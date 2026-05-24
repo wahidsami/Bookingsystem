@@ -35,6 +35,10 @@ export interface ScheduleData {
     shifts: Shift[];
     breaks: BreakWindow[];
     timeOff: TimeOff[];
+    displayHours?: {
+        startMinute: number;
+        endMinute: number;
+    };
 }
 
 const toText = (value: unknown): string => {
@@ -107,6 +111,7 @@ export const getSchedule = async (startDate: string, endDate: string): Promise<S
         const breaks: BreakWindow[] = [];
         const timeOffMap = new Map<string, TimeOff>();
 
+        let displayHours: ScheduleData['displayHours'];
         responses.forEach((response, index) => {
             if (!response.data?.success || !response.data?.schedule) {
                 return;
@@ -114,6 +119,12 @@ export const getSchedule = async (startDate: string, endDate: string): Promise<S
 
             const date = dates[index];
             const schedule = response.data.schedule;
+            if (!displayHours && schedule?.displayHours) {
+                displayHours = {
+                    startMinute: Number(schedule.displayHours.startMinute),
+                    endMinute: Number(schedule.displayHours.endMinute),
+                };
+            }
             (schedule.shifts || []).forEach((shift: any) => {
                 shifts.push(normalizeShift(shift, date));
             });
@@ -131,6 +142,9 @@ export const getSchedule = async (startDate: string, endDate: string): Promise<S
             shifts,
             breaks,
             timeOff: Array.from(timeOffMap.values()),
+            displayHours: displayHours && Number.isFinite(displayHours.startMinute) && Number.isFinite(displayHours.endMinute)
+                ? displayHours
+                : undefined,
         };
     } catch (error) {
         console.error('Error fetching schedule:', error);

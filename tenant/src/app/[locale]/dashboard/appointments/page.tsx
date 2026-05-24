@@ -124,6 +124,41 @@ function getLocalDateKey(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function parseClockToMinutes(value?: string | null) {
+  if (!value || typeof value !== "string") return null;
+  const [h, m] = value.split(":");
+  const hours = Number(h);
+  const minutes = Number(m);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return (hours * 60) + minutes;
+}
+
+function resolveDisplayHoursFromWorkingHours(workingHours: any): { startHour: number; endHour: number } {
+  const fallback = { startHour: 6, endHour: 22 };
+  if (!workingHours || typeof workingHours !== "object") return fallback;
+
+  const dayKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const opens: number[] = [];
+  const closes: number[] = [];
+
+  dayKeys.forEach((dayKey) => {
+    const day = workingHours?.[dayKey];
+    if (!day || day.isOpen === false) return;
+    const openMinute = parseClockToMinutes(day.open || day.startTime || day.from);
+    const closeMinute = parseClockToMinutes(day.close || day.endTime || day.to);
+    if (openMinute !== null) opens.push(openMinute);
+    if (closeMinute !== null) closes.push(closeMinute);
+  });
+
+  if (opens.length === 0 || closes.length === 0) return fallback;
+
+  const startHour = Math.max(0, Math.floor(Math.min(...opens) / 60));
+  const endHour = Math.min(24, Math.ceil(Math.max(...closes) / 60));
+  if (endHour <= startHour) return fallback;
+  return { startHour, endHour };
+}
+
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
@@ -165,6 +200,10 @@ export default function AppointmentsPage() {
     const stored = window.localStorage.getItem("appointments-grid-hour-height");
     const parsed = Number(stored);
     return Number.isFinite(parsed) ? Math.max(120, Math.min(360, parsed)) : 240;
+  });
+  const [boardDisplayHours, setBoardDisplayHours] = useState<{ startHour: number; endHour: number }>({
+    startHour: 6,
+    endHour: 22
   });
   const [boardContextMenu, setBoardContextMenu] = useState<{
     x: number;
@@ -220,7 +259,18 @@ export default function AppointmentsPage() {
   useEffect(() => {
     loadServices();
     loadEmployees();
+    loadBoardDisplayHours();
   }, []);
+
+  const loadBoardDisplayHours = async () => {
+    try {
+      const settingsResponse = await tenantApi.getSettings();
+      const workingHours = settingsResponse?.data?.business?.workingHours || settingsResponse?.data?.settings?.businessHours || null;
+      setBoardDisplayHours(resolveDisplayHoursFromWorkingHours(workingHours));
+    } catch (error) {
+      console.warn("Failed to load board display hours from tenant settings:", error);
+    }
+  };
 
   useEffect(() => {
     setHydrated(true);
@@ -1682,6 +1732,8 @@ export default function AppointmentsPage() {
           hourHeight={gridHourHeight}
           calendarScope={calendarScope}
           focusedStaffId={calendarFocusedStaffId}
+          startHour={boardDisplayHours.startHour}
+          endHour={boardDisplayHours.endHour}
         />
       )}
 

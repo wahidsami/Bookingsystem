@@ -89,6 +89,49 @@ const buildScheduleVisibilityBounds = (scheduleVisibilityWeeks = 1) => {
     };
 };
 
+const parseClockToMinutes = (value) => {
+    if (!value || typeof value !== 'string') return null;
+    const parts = value.split(':');
+    if (parts.length < 2) return null;
+    const hours = Number(parts[0]);
+    const minutes = Number(parts[1]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+    return (hours * 60) + minutes;
+};
+
+const resolveDisplayHoursFromWorkingHours = (workingHours) => {
+    const DEFAULT = { startMinute: 6 * 60, endMinute: 22 * 60 };
+    if (!workingHours || typeof workingHours !== 'object') {
+        return DEFAULT;
+    }
+
+    const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const opens = [];
+    const closes = [];
+
+    dayKeys.forEach((dayKey) => {
+        const day = workingHours[dayKey];
+        if (!day || day.isOpen === false) return;
+        const open = parseClockToMinutes(day.open || day.startTime || day.from);
+        const close = parseClockToMinutes(day.close || day.endTime || day.to);
+        if (open !== null) opens.push(open);
+        if (close !== null) closes.push(close);
+    });
+
+    if (opens.length === 0 || closes.length === 0) {
+        return DEFAULT;
+    }
+
+    const startMinute = Math.max(0, Math.min(...opens));
+    const endMinute = Math.min(24 * 60, Math.max(...closes));
+    if (endMinute <= startMinute) {
+        return DEFAULT;
+    }
+
+    return { startMinute, endMinute };
+};
+
 const normalizeEmail = (value) => value.trim().toLowerCase();
 
 const createAccessToken = (staffUser, staff) => jwt.sign({
@@ -744,7 +787,7 @@ const getSchedule = async (req, res) => {
             });
         }
 
-        const [shifts, breaks, timeOff] = await Promise.all([
+        const [shifts, breaks, timeOff, tenant] = await Promise.all([
             db.StaffShift.findAll({
                 where: {
                     staffId: req.staffId,
@@ -754,6 +797,24 @@ const getSchedule = async (req, res) => {
                         {
                             isRecurring: true,
                             dayOfWeek,
+                            [Op.and]: [
+                                {
+                                    [Op.or]: [
+                                        { startDate: null },
+                                        { startDate: { [Op.lte]: dateKey } }
+                                    ]
+                                },
+                                {
+                                    [Op.or]: [
+                                        { endDate: null },
+                                        { endDate: { [Op.gte]: dateKey } }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            isRecurring: true,
+                            dayOfWeek: null,
                             [Op.and]: [
                                 {
                                     [Op.or]: [
@@ -808,8 +869,13 @@ const getSchedule = async (req, res) => {
                     endDate: { [Op.gte]: dateKey }
                 },
                 order: [['startDate', 'ASC']]
+            }),
+            db.Tenant.findByPk(req.tenantId, {
+                attributes: ['workingHours']
             })
         ]);
+
+        const displayHours = resolveDisplayHoursFromWorkingHours(tenant?.workingHours);
 
         res.json({
             success: true,
@@ -819,6 +885,7 @@ const getSchedule = async (req, res) => {
                 breaks,
                 timeOff,
                 hasTimeOff: timeOff.length > 0,
+                displayHours,
                 workingWindow: shifts.map((shift) => ({
                     id: shift.id,
                     startTime: shift.startTime,

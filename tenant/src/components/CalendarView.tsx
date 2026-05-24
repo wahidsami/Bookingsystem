@@ -102,11 +102,13 @@ interface CalendarViewProps {
   hourHeight?: number;
   calendarScope?: 'day' | 'week' | 'month';
   focusedStaffId?: string | null;
+  startHour?: number;
+  endHour?: number;
 }
 
 // Time configuration
-const START_HOUR = 6; // 6 AM
-const END_HOUR = 22; // 10 PM
+const START_HOUR = 6; // default 6 AM
+const END_HOUR = 22; // default 10 PM
 const MINUTES_PER_SLOT = 30; // 30-minute intervals
 const MIN_APPOINTMENT_HEIGHT = 88;
 const MIN_BREAK_HEIGHT = 72;
@@ -134,7 +136,9 @@ export function CalendarView({
   sectionTitle,
   hourHeight = 240,
   calendarScope = 'day',
-  focusedStaffId = null
+  focusedStaffId = null,
+  startHour = START_HOUR,
+  endHour = END_HOUR
 }: CalendarViewProps) {
   const router = useRouter();
   const params = useParams();
@@ -151,6 +155,8 @@ export function CalendarView({
   const timeColumnWidth = Math.round(72 * boardScale);
   const staffColumnWidth = Math.round(240 * boardScale);
   const isDayScope = calendarScope === 'day';
+  const boardStartHour = Math.max(0, Math.min(23, Math.floor(startHour)));
+  const boardEndHour = Math.max(boardStartHour + 1, Math.min(24, Math.floor(endHour)));
 
   useEffect(() => {
     setVisibleStaffIds((previous) => {
@@ -276,18 +282,18 @@ export function CalendarView({
   // Generate time slots
   const timeSlots = useMemo(() => {
     const slots = [];
-    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+    for (let hour = boardStartHour; hour < boardEndHour; hour++) {
       for (let minute = 0; minute < 60; minute += MINUTES_PER_SLOT) {
         slots.push({
           hour,
           minute,
           label: formatTime(hour, minute, locale),
-          position: (hour - START_HOUR) * pixelsPerHour + minute * pixelsPerMinute
+          position: (hour - boardStartHour) * pixelsPerHour + minute * pixelsPerMinute
         });
       }
     }
     return slots;
-  }, [locale, pixelsPerHour, pixelsPerMinute]);
+  }, [boardEndHour, boardStartHour, locale, pixelsPerHour, pixelsPerMinute]);
 
   // Calculate appointment position and height
   const getAppointmentStyle = (appointment: Appointment, targetDateKey?: string) => {
@@ -312,8 +318,8 @@ export function CalendarView({
       return { display: 'none' };
     }
 
-    const boardStartMinutes = START_HOUR * 60;
-    const boardEndMinutes = END_HOUR * 60;
+    const boardStartMinutes = boardStartHour * 60;
+    const boardEndMinutes = boardEndHour * 60;
     const appointmentStartMinutes = (startHour * 60) + startMinute;
     const appointmentEndMinutes = (endHour * 60) + endMinute;
 
@@ -353,10 +359,10 @@ export function CalendarView({
   const getSnappedDateTimeFromPointer = (clientY: number, containerTop: number) => {
     const offsetMinutes = (clientY - containerTop) / pixelsPerMinute;
     const snappedMinutes = Math.round(offsetMinutes / MINUTES_PER_SLOT) * MINUTES_PER_SLOT;
-    const totalAvailableMinutes = (END_HOUR - START_HOUR) * 60;
+    const totalAvailableMinutes = (boardEndHour - boardStartHour) * 60;
     const clampedMinutes = Math.max(0, Math.min(totalAvailableMinutes - MINUTES_PER_SLOT, snappedMinutes));
     const baseDate = new Date(selectedDate);
-    baseDate.setHours(START_HOUR, 0, 0, 0);
+    baseDate.setHours(boardStartHour, 0, 0, 0);
     baseDate.setMinutes(baseDate.getMinutes() + clampedMinutes);
     return baseDate;
   };
@@ -370,7 +376,7 @@ export function CalendarView({
     const endHour = endParts[0] || 0;
     const endMinute = endParts[1] || 0;
 
-    const top = (startHour - START_HOUR) * pixelsPerHour + startMinute * pixelsPerMinute;
+    const top = (startHour - boardStartHour) * pixelsPerHour + startMinute * pixelsPerMinute;
     const duration = (endHour - startHour) * 60 + (endMinute - startMinute);
     const height = duration * pixelsPerMinute;
 
@@ -640,9 +646,9 @@ export function CalendarView({
 
     const hour = now.getHours();
     const minute = now.getMinutes();
-    const position = (hour - START_HOUR) * pixelsPerHour + minute * pixelsPerMinute;
+    const position = (hour - boardStartHour) * pixelsPerHour + minute * pixelsPerMinute;
 
-    if (hour < START_HOUR || hour >= END_HOUR) {
+    if (hour < boardStartHour || hour >= boardEndHour) {
       return null; // Outside visible range
     }
 
@@ -830,7 +836,7 @@ export function CalendarView({
     router.push(`/${params.locale}/dashboard/appointments/${appointmentId}`);
   };
 
-  const totalHeight = (END_HOUR - START_HOUR) * pixelsPerHour;
+  const totalHeight = (boardEndHour - boardStartHour) * pixelsPerHour;
   const currentTimePosition = getCurrentTimePosition();
   const summaryCounts = {
     appointments: isDayScope ? dayAppointments.length : appointments.length,
