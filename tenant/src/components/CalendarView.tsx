@@ -1163,8 +1163,18 @@ export function CalendarView({
                       {/* Appointment Blocks */}
                       {staffBreaks.map((breakItem) => {
                         const breakStyle = getBreakStyle(breakItem);
-                        const startLabel = `${breakItem.startTime}`.slice(0, 5);
-                        const endLabel = `${breakItem.endTime}`.slice(0, 5);
+                        const [startHourRaw, startMinuteRaw] = `${breakItem.startTime}`.split(':');
+                        const [endHourRaw, endMinuteRaw] = `${breakItem.endTime}`.split(':');
+                        const startLabel = formatTime(
+                          Number.parseInt(startHourRaw || '0', 10),
+                          Number.parseInt(startMinuteRaw || '0', 10),
+                          locale
+                        );
+                        const endLabel = formatTime(
+                          Number.parseInt(endHourRaw || '0', 10),
+                          Number.parseInt(endMinuteRaw || '0', 10),
+                          locale
+                        );
 
                         return (
                           <div
