@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     StyleSheet,
     View,
@@ -65,8 +65,15 @@ export default function MessagesScreen() {
         return !readArray.includes(user.id);
     };
 
+    const isAdminMessage = (msg: StaffMessage) => {
+        const senderType = `${msg.senderType || ''}`.trim().toLowerCase();
+        return senderType === 'admin' || senderType === 'tenant' || senderType === 'dashboard_admin';
+    };
+
+    const adminMessages = messages.filter(isAdminMessage);
+
     const normalizedSearch = searchQuery.trim().toLowerCase();
-    const filteredMessages = messages.filter((msg) => {
+    const filteredMessages = adminMessages.filter((msg) => {
                 const matchesFilter =
                     filterKey === 'all' ? true :
                         filterKey === 'unread' ? isUnread(msg) :
@@ -91,11 +98,11 @@ export default function MessagesScreen() {
             .includes(normalizedSearch);
     });
 
-    const unreadCount = messages.filter((msg) => isUnread(msg)).length;
-    const pinnedCount = messages.filter((msg) => msg.isPinned).length;
-    const recentCount = messages.filter((msg) => Date.now() - getTimeMsSafe(msg.createdAt) <= 1000 * 60 * 60 * 24 * 3).length;
+    const unreadCount = adminMessages.filter((msg) => isUnread(msg)).length;
+    const pinnedCount = adminMessages.filter((msg) => msg.isPinned).length;
+    const recentCount = adminMessages.filter((msg) => Date.now() - getTimeMsSafe(msg.createdAt) <= 1000 * 60 * 60 * 24 * 3).length;
     const filterOptions: { key: 'all' | 'unread' | 'pinned' | 'recent'; label: string; count: number }[] = [
-        { key: 'all', label: 'All', count: messages.length },
+        { key: 'all', label: 'All', count: adminMessages.length },
         { key: 'unread', label: 'Unread', count: unreadCount },
         { key: 'pinned', label: 'Pinned', count: pinnedCount },
         { key: 'recent', label: 'Recent', count: recentCount },
@@ -186,7 +193,7 @@ export default function MessagesScreen() {
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color="#8B5ADF" />
                 </View>
-            ) : messages.length === 0 ? (
+            ) : adminMessages.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <Ionicons name="mail-open-outline" size={64} color="#d1d5db" />
                     <Text style={styles.emptyTitle}>{t('messages.empty')}</Text>
@@ -200,7 +207,7 @@ export default function MessagesScreen() {
                         <View>
                             <View style={styles.statsGrid}>
                                 <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{messages.length}</Text>
+                                    <Text style={styles.statValue}>{adminMessages.length}</Text>
                                     <Text style={styles.statLabel}>Total</Text>
                                 </View>
                                 <View style={styles.statCard}>
@@ -255,7 +262,7 @@ export default function MessagesScreen() {
                             </ScrollView>
 
                             <Text style={styles.resultsLabel}>
-                                Showing {filteredMessages.length} of {messages.length} messages
+                                Showing {filteredMessages.length} of {adminMessages.length} messages
                             </Text>
                         </View>
                     )}

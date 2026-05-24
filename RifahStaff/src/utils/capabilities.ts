@@ -43,6 +43,9 @@ export const canViewEarnings = (user: StaffLike): boolean =>
 export const canViewMessages = (user: StaffLike): boolean =>
     Boolean(user?.features?.messages);
 
+export const canViewNotifications = (user: StaffLike): boolean =>
+    user?.features?.pushNotifications !== false;
+
 export const canRequestTimeOff = (user: StaffLike): boolean =>
     Boolean(user?.features?.timeOff);
 

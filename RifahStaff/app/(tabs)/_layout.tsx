@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { canViewEarnings, canViewMessages, canViewReviews } from '../../src/utils/capabilities';
+import { canViewEarnings, canViewMessages, canViewNotifications, canViewReviews } from '../../src/utils/capabilities';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -13,6 +13,7 @@ export default function TabLayout() {
   const reviewsVisible = canViewReviews(user);
   const earningsVisible = canViewEarnings(user);
   const messagesVisible = canViewMessages(user);
+  const notificationsVisible = canViewNotifications(user);
 
   return (
     <Tabs
@@ -38,6 +39,14 @@ export default function TabLayout() {
         options={{
           title: t('schedule.title').split(' ')[0],
           tabBarIcon: ({ color }) => <Ionicons name="calendar" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: notificationsVisible ? undefined : null,
+          title: 'Notifications',
+          tabBarIcon: ({ color }) => <Ionicons name="notifications-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen

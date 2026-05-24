@@ -68,8 +68,8 @@ export function usePushNotifications() {
                 return;
             }
 
-            // Route message-like and unknown events to messages tab as a safe default.
-            router.push('/(tabs)/messages');
+            // Route non-appointment events to the dedicated notifications tab.
+            router.push('/(tabs)/notifications');
         });
 
         return () => {
