@@ -368,12 +368,9 @@ exports.createBreak = async (req, res) => {
             });
         }
 
-        if (isRecurring && dayOfWeek === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'dayOfWeek is required for recurring breaks'
-            });
-        }
+        // Recurring breaks support both:
+        // - weekly recurrence when dayOfWeek is provided
+        // - daily recurrence when dayOfWeek is null
 
         if (!isRecurring && !specificDate) {
             return res.status(400).json({
@@ -616,6 +613,24 @@ exports.updateBreak = async (req, res) => {
                                         endTime: { [Op.lte]: nextEnd }
                                     }
                                 ]
+                            },
+                            {
+                                isRecurring: true,
+                                dayOfWeek: null,
+                                [Op.and]: [
+                                    {
+                                        [Op.or]: [
+                                            { startDate: null },
+                                            { startDate: { [Op.lte]: specificDate } }
+                                        ]
+                                    },
+                                    {
+                                        [Op.or]: [
+                                            { endDate: null },
+                                            { endDate: { [Op.gte]: specificDate } }
+                                        ]
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -634,6 +649,24 @@ exports.updateBreak = async (req, res) => {
                             {
                                 isRecurring: true,
                                 dayOfWeek: validationDayOfWeek,
+                                [Op.and]: [
+                                    {
+                                        [Op.or]: [
+                                            { startDate: null },
+                                            { startDate: { [Op.lte]: validationDate } }
+                                        ]
+                                    },
+                                    {
+                                        [Op.or]: [
+                                            { endDate: null },
+                                            { endDate: { [Op.gte]: validationDate } }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                isRecurring: true,
+                                dayOfWeek: null,
                                 [Op.and]: [
                                     {
                                         [Op.or]: [

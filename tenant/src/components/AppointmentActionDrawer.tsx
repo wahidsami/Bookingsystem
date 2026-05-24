@@ -542,7 +542,6 @@ export function AppointmentActionDrawer({
     setSaving(true);
     try {
       const isRecurringBreak = breakRecurrenceMode !== "single";
-      const dayOfWeek = isRecurringBreak ? new Date(`${breakDate}T00:00:00`).getDay() : null;
       const resolvedStartDate = breakRangeStartDate || breakDate;
       const resolvedEndDate = breakRecurrenceMode === "range" ? breakRangeEndDate : null;
       if (breakRecurrenceMode === "range" && (!resolvedStartDate || !resolvedEndDate)) {
@@ -558,7 +557,7 @@ export function AppointmentActionDrawer({
         type: breakType,
         label: breakLabel.trim() || undefined,
         isRecurring: isRecurringBreak,
-        dayOfWeek,
+        dayOfWeek: null,
         startDate: isRecurringBreak ? resolvedStartDate : undefined,
         endDate: isRecurringBreak ? (resolvedEndDate || null) : undefined,
         referenceDate: breakDate

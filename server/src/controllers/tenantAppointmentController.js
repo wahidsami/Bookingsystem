@@ -732,6 +732,24 @@ exports.getAppointmentsBoard = async (req, res) => {
                                     ]
                                 }
                             ]
+                        },
+                        {
+                            isRecurring: true,
+                            dayOfWeek: null,
+                            [Op.and]: [
+                                {
+                                    [Op.or]: [
+                                        { startDate: null },
+                                        { startDate: { [Op.lte]: dateKey } }
+                                    ]
+                                },
+                                {
+                                    [Op.or]: [
+                                        { endDate: null },
+                                        { endDate: { [Op.gte]: dateKey } }
+                                    ]
+                                }
+                            ]
                         }
                     ]
                 },

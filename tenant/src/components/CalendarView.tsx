@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, type DragEvent } from "react";
+import { useState, useEffect, useMemo, type DragEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
@@ -571,6 +571,58 @@ export function CalendarView({
     return locale === 'ar' ? resolved.ar : resolved.en;
   };
 
+  const getBreakTypeMeta = (breakItem: EmployeeBreak) => {
+    const map: Record<string, { ar: string; en: string }> = {
+      lunch: { ar: 'استراحة غداء', en: 'Lunch break' },
+      prayer: { ar: 'وقت صلاة', en: 'Prayer time' },
+      cleaning: { ar: 'وقت تنظيف', en: 'Cleaning time' },
+      other: { ar: 'وقت محجوز', en: 'Blocked time' }
+    };
+    const resolved = map[breakItem.type] || map.other;
+    return locale === 'ar' ? resolved.ar : resolved.en;
+  };
+
+  const getBreakRecurrenceLabel = (breakItem: EmployeeBreak) => {
+    if (!breakItem.isRecurring) {
+      return locale === 'ar' ? 'مرة واحدة' : 'Single';
+    }
+    if (breakItem.specificDate) {
+      return locale === 'ar' ? 'مرة واحدة' : 'Single';
+    }
+    return locale === 'ar' ? 'متكرر' : 'Recurring';
+  };
+
+  const getBreakTypeIcon = (breakItem: EmployeeBreak): ReactNode => {
+    const iconClass = "h-3.5 w-3.5";
+    switch (breakItem.type) {
+      case 'prayer':
+        return (
+          <svg className={iconClass} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10 2a.75.75 0 01.75.75v3.19l2.72 2.72a.75.75 0 11-1.06 1.06L9.47 6.78A.75.75 0 019.25 6.25V2.75A.75.75 0 0110 2z" />
+            <path d="M4 10a6 6 0 1112 0c0 3.314-2.686 6-6 6s-6-2.686-6-6zm6-4.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" />
+          </svg>
+        );
+      case 'lunch':
+        return (
+          <svg className={iconClass} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M5 2.5a.75.75 0 01.75.75V8a1.25 1.25 0 102.5 0V3.25a.75.75 0 011.5 0V8a2.75 2.75 0 11-5.5 0V3.25A.75.75 0 015 2.5zM13.5 2.5a.75.75 0 01.75.75V17a.75.75 0 01-1.5 0V3.25a.75.75 0 01.75-.75z" />
+          </svg>
+        );
+      case 'cleaning':
+        return (
+          <svg className={iconClass} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M12.72 2.22a.75.75 0 011.06 0l4 4a.75.75 0 01-1.06 1.06l-.72-.72-2.97 2.97a1.5 1.5 0 01-2.12 0l-.38-.38-4.72 4.72a.75.75 0 11-1.06-1.06l4.72-4.72-.38-.38a1.5 1.5 0 010-2.12L12 2.94l-.34-.34a.75.75 0 010-1.06z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className={iconClass} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm.75 4.5a.75.75 0 00-1.5 0V10c0 .2.08.39.22.53l2.25 2.25a.75.75 0 101.06-1.06l-2.03-2.03V6.5z" />
+          </svg>
+        );
+    }
+  };
+
   // Calculate current time position
   const getCurrentTimePosition = () => {
     const now = currentTime;
@@ -1117,8 +1169,17 @@ export function CalendarView({
                             onClick={() => onBreakClick?.(breakItem)}
                           >
                             <div className="flex items-center justify-between gap-2 text-xs font-semibold">
-                              <span className="truncate">{getBreakLabel(breakItem)}</span>
+                              <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+                                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-200/70 text-rose-700">
+                                  {getBreakTypeIcon(breakItem)}
+                                </span>
+                                <span className="truncate">{getBreakLabel(breakItem)}</span>
+                              </span>
                               <span className="whitespace-nowrap opacity-80">{startLabel} - {endLabel}</span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium opacity-85">
+                              <span className="truncate">{getBreakTypeMeta(breakItem)}</span>
+                              <span className="whitespace-nowrap">{getBreakRecurrenceLabel(breakItem)}</span>
                             </div>
                           </div>
                         );
