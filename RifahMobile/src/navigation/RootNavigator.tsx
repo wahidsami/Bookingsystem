@@ -16,6 +16,7 @@ import { InfoPageScreen } from '../screens/InfoPageScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { NotificationDetailScreen } from '../screens/NotificationDetailScreen';
 import { AppointmentInviteScreen } from '../screens/AppointmentInviteScreen';
+import { EmployeeProfileScreen } from '../screens/EmployeeProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -43,6 +44,7 @@ export function RootNavigator() {
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
             <Stack.Screen name="AppointmentInvite" component={AppointmentInviteScreen} />
+            <Stack.Screen name="EmployeeProfile" component={EmployeeProfileScreen} />
         </Stack.Navigator>
     );
 }

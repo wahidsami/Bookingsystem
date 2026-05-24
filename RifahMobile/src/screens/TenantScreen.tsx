@@ -453,28 +453,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         setSelectedServiceDetails(service);
     };
 
-    const openProviderProfile = async (provider: Staff) => {
-        setSelectedProvider(provider);
-        setProviderReviews([]);
-        setProviderReviewsSummary({ total: 0, avgRating: null });
-        try {
-            setProviderReviewsLoading(true);
-            const response = await api.get<{ success: boolean; reviews: StaffReview[]; summary?: { total: number; avgRating: number | null } }>(
-                `/public/staff/${provider.id}/reviews?limit=20`
-            );
-            if (response.success) {
-                const reviews = response.reviews || [];
-                setProviderReviews(reviews);
-                setProviderReviewsSummary({
-                    total: response.summary?.total || reviews.length,
-                    avgRating: response.summary?.avgRating ?? null,
-                });
-            }
-        } catch (error) {
-            console.warn('Failed to load provider reviews:', error);
-        } finally {
-            setProviderReviewsLoading(false);
-        }
+    const openProviderProfile = (provider: Staff) => {
+        navigation.navigate('EmployeeProfile', { provider });
     };
 
     const extractMapCoordinates = (mapUrl?: string | null): { lat: number; lng: number } | null => {
