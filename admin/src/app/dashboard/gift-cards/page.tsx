@@ -251,25 +251,58 @@ export default function GiftCardsPage() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-1 rounded-2xl border border-dark-700 bg-dark-800 p-5 space-y-3">
               <h2 className="text-lg font-semibold text-white">{title}</h2>
-              <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
-              <input className="input" placeholder="Title (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
-              <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
-              <textarea className="input min-h-20" placeholder="Description (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
+              <div>
+                <label className="mb-1 block text-xs font-medium text-dark-300">Title (EN)</label>
+                <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-dark-300">Title (AR)</label>
+                <input className="input" placeholder="Title (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-dark-300">Description (EN)</label>
+                <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-dark-300">Description (AR)</label>
+                <textarea className="input min-h-20" placeholder="Description (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
+              </div>
               <div className="grid grid-cols-2 gap-2">
-                <input className="input" type="number" placeholder="Display order" value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-dark-300">Display order</label>
+                  <input className="input" type="number" placeholder="Display order" value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
+                </div>
                 <label className="flex items-center gap-2 text-sm text-dark-100 px-2">
                   <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
                   Active
                 </label>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <input className="input" type="number" step="0.01" placeholder="Price" value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
-                <input className="input" type="number" step="0.01" placeholder="Wallet credit" value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
-                <input className="input" type="number" step="0.01" placeholder="Bonus" value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-dark-300">Price</label>
+                  <input className="input" type="number" step="0.01" placeholder="Price" value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
+                  <p className="mt-1 text-[11px] text-dark-400">Amount customer pays to purchase this gift card.</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-dark-300">Wallet credit</label>
+                  <input className="input" type="number" step="0.01" placeholder="Wallet credit" value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
+                  <p className="mt-1 text-[11px] text-dark-400">Base amount added to wallet or sent to recipient.</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-dark-300">Bonus</label>
+                  <input className="input" type="number" step="0.01" placeholder="Bonus" value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
+                  <p className="mt-1 text-[11px] text-dark-400">Extra promotional credit on top of wallet credit.</p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
-                <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-dark-300">Starts at</label>
+                  <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-dark-300">Ends at</label>
+                  <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
+                </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <button className="btn btn-primary flex-1" disabled={saving} onClick={submitPackage}>
