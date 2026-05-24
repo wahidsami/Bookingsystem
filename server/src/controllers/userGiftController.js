@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const db = require('../models');
 const walletService = require('../services/walletService');
+const paymentService = require('../services/paymentService');
 const notificationOrchestrator = require('../services/notificationOrchestratorService');
 const { sendEmail } = require('../utils/emailService');
 const { getServerPublicUrl } = require('../utils/url');
@@ -11,6 +12,58 @@ const { getServerPublicUrl } = require('../utils/url');
 const CLAIM_EXPIRY_HOURS = 24 * 30; // 30 days
 
 const normalize = (value) => `${value || ''}`.trim();
+
+const validateGiftPaymentPayload = (payload = {}) => {
+    const cardNumber = normalize(payload.cardNumber).replace(/[\s-]/g, '');
+    const expiryDate = normalize(payload.expiryDate);
+    const cvv = normalize(payload.cvv);
+    const cardholderName = normalize(payload.cardholderName);
+
+    if (!cardNumber || !expiryDate || !cvv || !cardholderName) {
+        throw new Error('cardNumber, expiryDate, cvv, and cardholderName are required');
+    }
+
+    paymentService.validateCard(cardNumber, expiryDate, cvv);
+
+    if (cardNumber === '4000000000000002') {
+        throw new Error('Payment declined by issuer');
+    }
+    if (cardNumber === '4000000000009995') {
+        throw new Error('Insufficient funds');
+    }
+
+    return { cardNumber, expiryDate, cvv, cardholderName };
+};
+
+const createGiftPurchaseTransaction = async ({
+    platformUserId,
+    amount,
+    cardNumber,
+    cardholderName,
+    giftFlow,
+    packageId,
+    tenantId = null,
+    transaction
+}) => {
+    return db.Transaction.create({
+        platformUserId,
+        tenantId,
+        amount,
+        currency: 'SAR',
+        type: 'wallet_topup',
+        status: 'completed',
+        platformFee: 0,
+        tenantRevenue: amount,
+        metadata: {
+            paymentSource: 'fake_gateway_card',
+            giftFlow,
+            packageId,
+            cardLast4: cardNumber.slice(-4),
+            cardBrand: paymentService.getCardBrand(cardNumber),
+            cardholderName
+        }
+    }, { transaction });
+};
 
 const findActivePackage = async (packageId) => {
     if (!packageId) return null;
@@ -53,6 +106,7 @@ exports.rechargeFromGiftPackage = async (req, res) => {
     try {
         const platformUserId = req.userId;
         const { packageId } = req.body || {};
+        const paymentPayload = validateGiftPaymentPayload(req.body || {});
 
         const giftPackage = await findActivePackage(packageId);
         if (!giftPackage) {
@@ -61,6 +115,17 @@ exports.rechargeFromGiftPackage = async (req, res) => {
         }
 
         const totalCredit = Number.parseFloat(giftPackage.walletCreditAmount || 0) + Number.parseFloat(giftPackage.bonusAmount || 0);
+        const purchaseAmount = Number.parseFloat(giftPackage.priceAmount || 0);
+
+        const paymentTransaction = await createGiftPurchaseTransaction({
+            platformUserId,
+            amount: purchaseAmount,
+            cardNumber: paymentPayload.cardNumber,
+            cardholderName: paymentPayload.cardholderName,
+            giftFlow: 'self_recharge',
+            packageId: giftPackage.id,
+            transaction
+        });
 
         const giftTx = await db.GiftCardTransaction.create({
             senderPlatformUserId: platformUserId,
@@ -73,7 +138,7 @@ exports.rechargeFromGiftPackage = async (req, res) => {
             status: 'redeemed',
             deliveryChannel: 'in_app',
             claimedAt: new Date(),
-            metadata: { flow: 'self_recharge' }
+            metadata: { flow: 'self_recharge', paymentTransactionId: paymentTransaction.id }
         }, { transaction });
 
         const walletResult = await walletService.creditWallet({
@@ -108,6 +173,7 @@ exports.sendGiftPackage = async (req, res) => {
     try {
         const senderId = req.userId;
         const { packageId, recipientEmail, recipientPhone, message } = req.body || {};
+        const paymentPayload = validateGiftPaymentPayload(req.body || {});
         const email = normalize(recipientEmail).toLowerCase();
         const phone = normalize(recipientPhone);
 
@@ -143,8 +209,19 @@ exports.sendGiftPackage = async (req, res) => {
         });
 
         const totalCredit = Number.parseFloat(giftPackage.walletCreditAmount || 0) + Number.parseFloat(giftPackage.bonusAmount || 0);
+        const purchaseAmount = Number.parseFloat(giftPackage.priceAmount || 0);
         const claimToken = crypto.randomBytes(24).toString('hex');
         const expiresAt = new Date(Date.now() + (CLAIM_EXPIRY_HOURS * 60 * 60 * 1000));
+
+        const paymentTransaction = await createGiftPurchaseTransaction({
+            platformUserId: senderId,
+            amount: purchaseAmount,
+            cardNumber: paymentPayload.cardNumber,
+            cardholderName: paymentPayload.cardholderName,
+            giftFlow: 'send_gift',
+            packageId: giftPackage.id,
+            transaction
+        });
 
         const giftTx = await db.GiftCardTransaction.create({
             senderPlatformUserId: senderId,
@@ -161,7 +238,7 @@ exports.sendGiftPackage = async (req, res) => {
             claimToken: recipient ? null : claimToken,
             claimedAt: recipient ? new Date() : null,
             expiresAt,
-            metadata: { senderMessage: normalize(message) || null }
+            metadata: { senderMessage: normalize(message) || null, paymentTransactionId: paymentTransaction.id }
         }, { transaction });
 
         let walletResult = null;
@@ -318,4 +395,3 @@ exports.openGiftClaimLink = async (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(200).send(html);
 };
-

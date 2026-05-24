@@ -29,6 +29,10 @@ export function GiftsScreen({ navigation, route }: any) {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
 
   useEffect(() => {
     const token = `${route?.params?.claimToken || ''}`.trim();
@@ -76,10 +80,18 @@ export function GiftsScreen({ navigation, route }: any) {
 
   const handleSelfRecharge = async () => {
     if (!selected) return;
+    if (!cardNumber.trim() || !expiryDate.trim() || !cvv.trim() || !cardholderName.trim()) {
+      Alert.alert('Payment required', 'Please enter card details to continue.');
+      return;
+    }
     try {
       setSaving(true);
       const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/recharge', {
-        packageId: selected.id
+        packageId: selected.id,
+        cardNumber: cardNumber.trim(),
+        expiryDate: expiryDate.trim(),
+        cvv: cvv.trim(),
+        cardholderName: cardholderName.trim()
       });
       if (!response.success) {
         Alert.alert('Error', response.message || 'Failed to recharge wallet');
@@ -87,6 +99,10 @@ export function GiftsScreen({ navigation, route }: any) {
       }
       Alert.alert('Success', `Wallet recharged. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
       setSelected(null);
+      setCardNumber('');
+      setExpiryDate('');
+      setCvv('');
+      setCardholderName('');
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to recharge wallet');
     } finally {
@@ -100,6 +116,10 @@ export function GiftsScreen({ navigation, route }: any) {
       Alert.alert('Recipient required', 'Please enter recipient email or phone.');
       return;
     }
+    if (!cardNumber.trim() || !expiryDate.trim() || !cvv.trim() || !cardholderName.trim()) {
+      Alert.alert('Payment required', 'Please enter card details to continue.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -107,7 +127,11 @@ export function GiftsScreen({ navigation, route }: any) {
         packageId: selected.id,
         recipientEmail: recipientEmail.trim() || undefined,
         recipientPhone: recipientPhone.trim() || undefined,
-        message: giftMessage.trim() || undefined
+        message: giftMessage.trim() || undefined,
+        cardNumber: cardNumber.trim(),
+        expiryDate: expiryDate.trim(),
+        cvv: cvv.trim(),
+        cardholderName: cardholderName.trim()
       });
       if (!response.success) {
         Alert.alert('Error', response.message || 'Failed to send gift');
@@ -118,6 +142,10 @@ export function GiftsScreen({ navigation, route }: any) {
       setRecipientEmail('');
       setRecipientPhone('');
       setGiftMessage('');
+      setCardNumber('');
+      setExpiryDate('');
+      setCvv('');
+      setCardholderName('');
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to send gift');
     } finally {
@@ -179,6 +207,16 @@ export function GiftsScreen({ navigation, route }: any) {
               </View>
             ) : null}
 
+            <View style={{ gap: spacing.sm }}>
+              <Text style={styles.paymentTitle}>{language === 'ar' ? 'بيانات الدفع' : 'Payment details'}</Text>
+              <TextInput style={styles.input} value={cardholderName} onChangeText={setCardholderName} placeholder={language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder name'} />
+              <TextInput style={styles.input} value={cardNumber} onChangeText={setCardNumber} placeholder={language === 'ar' ? 'رقم البطاقة' : 'Card number'} keyboardType="number-pad" />
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <TextInput style={[styles.input, { flex: 1 }]} value={expiryDate} onChangeText={setExpiryDate} placeholder="MM/YY" />
+                <TextInput style={[styles.input, { flex: 1 }]} value={cvv} onChangeText={setCvv} placeholder="CVV" keyboardType="number-pad" secureTextEntry />
+              </View>
+            </View>
+
             <TouchableOpacity
               style={[styles.submitBtn, saving && { opacity: 0.7 }]}
               onPress={mode === 'self' ? handleSelfRecharge : handleSendGift}
@@ -222,6 +260,7 @@ const styles = StyleSheet.create({
   modeBtnActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
   modeText: { color: '#374151', fontSize: fontSize.sm, fontWeight: '600' },
   modeTextActive: { color: colors.primary },
+  paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: borderRadius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#F9FAFB' },
   submitBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, alignItems: 'center', paddingVertical: spacing.md },
   submitText: { color: '#fff', fontWeight: '700', fontSize: fontSize.md }
