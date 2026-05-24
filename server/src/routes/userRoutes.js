@@ -3,6 +3,7 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const paymentMethodController = require('../controllers/paymentMethodController');
 const reviewController = require('../controllers/reviewController');
+const userGiftController = require('../controllers/userGiftController');
 const { authenticateUser } = require('../middleware/authUser');
 
 // Get user profile
@@ -40,6 +41,14 @@ router.get('/payment-methods', authenticateUser, paymentMethodController.getPaym
 router.post('/payment-methods', authenticateUser, paymentMethodController.addPaymentMethod);
 router.put('/payment-methods/:id/set-default', authenticateUser, paymentMethodController.setDefaultPaymentMethod);
 router.delete('/payment-methods/:id', authenticateUser, paymentMethodController.deletePaymentMethod);
+
+// Gifts & wallet packages
+router.get('/gifts/packages', authenticateUser, userGiftController.getGiftPackages);
+router.post('/gifts/recharge', authenticateUser, userGiftController.rechargeFromGiftPackage);
+router.post('/gifts/send', authenticateUser, userGiftController.sendGiftPackage);
+router.post('/gifts/claim', authenticateUser, userGiftController.claimGift);
+router.get('/gifts/history', authenticateUser, userGiftController.listMyGiftTransactions);
+router.get('/gifts/claim/open', userGiftController.openGiftClaimLink);
 
 module.exports = router;
 

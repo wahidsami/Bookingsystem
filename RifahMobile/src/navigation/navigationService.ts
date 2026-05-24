@@ -37,3 +37,12 @@ export const navigateToReview = (appointmentId: string): boolean => {
     navigationRef.navigate('Review', { appointmentId });
     return true;
 };
+
+export const navigateToGiftClaim = (token: string): boolean => {
+    if (!token || !navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('Gifts', { claimToken: token });
+    return true;
+};

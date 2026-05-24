@@ -59,6 +59,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     const menuItems = [
         { id: 'profile', icon: 'profile', label: t('profile'), action: () => navigation?.navigate('Profile') },
         { id: 'myAppointments', icon: 'bookings', label: t('myAppointments'), action: () => navigation?.navigate('Appointments') },
+        { id: 'gifts', icon: 'sparkles', label: language === 'ar' ? 'الهدايا والمحفظة' : 'Gifts & Wallet', action: () => navigation?.navigate('Gifts') },
         { id: 'browse', icon: 'search', label: t('browseSalons'), action: () => navigation?.navigate('Browse') },
         { id: 'myPurchases', icon: 'purchases', label: t('myPurchases'), action: () => navigation?.navigate('Purchases') },
         {
