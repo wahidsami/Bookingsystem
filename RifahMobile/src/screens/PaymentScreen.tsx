@@ -27,9 +27,27 @@ export function PaymentScreen({ route, navigation }: any) {
     const [cvv, setCvv] = useState('');
     const [cardholderName, setCardholderName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
+    const [walletBalance, setWalletBalance] = useState<number>(0);
+
+    React.useEffect(() => {
+        let mounted = true;
+        api.getWalletBalance()
+            .then((balance) => {
+                if (mounted) setWalletBalance(balance);
+            })
+            .catch(() => undefined);
+        return () => { mounted = false; };
+    }, []);
 
     const handlePay = async () => {
-        if (!cardNumber || !expiryDate || !cvv || !cardholderName) {
+        const amountValue = Number(amount);
+        if (paymentMethod === 'wallet' && walletBalance < amountValue) {
+            Alert.alert(t('error'), isRTL ? 'رصيد المحفظة غير كافٍ' : 'Insufficient wallet balance');
+            return;
+        }
+
+        if (paymentMethod === 'card' && (!cardNumber || !expiryDate || !cvv || !cardholderName)) {
             Alert.alert(t('error'), t('fillAllFields'));
             return;
         }
@@ -39,11 +57,12 @@ export function PaymentScreen({ route, navigation }: any) {
             const response = await api.processPayment({
                 appointmentId,
                 orderId,
-                amount: Number(amount),
-                cardNumber: cardNumber.replace(/\s/g, ''),
-                expiryDate,
-                cvv,
-                cardholderName,
+                amount: amountValue,
+                paymentMethod,
+                cardNumber: paymentMethod === 'card' ? cardNumber.replace(/\s/g, '') : undefined,
+                expiryDate: paymentMethod === 'card' ? expiryDate : undefined,
+                cvv: paymentMethod === 'card' ? cvv : undefined,
+                cardholderName: paymentMethod === 'card' ? cardholderName : undefined,
                 tenantId,
                 paymentChoice,
             });
@@ -59,6 +78,10 @@ export function PaymentScreen({ route, navigation }: any) {
                         },
                     },
                 ]);
+                if (paymentMethod === 'wallet') {
+                    const latest = await api.getWalletBalance().catch(() => walletBalance);
+                    setWalletBalance(latest);
+                }
             }
         } catch (error: any) {
             Alert.alert(t('error'), error.message || t('paymentFailed'));
@@ -99,64 +122,94 @@ export function PaymentScreen({ route, navigation }: any) {
                             {isRTL ? 'هذا هو عربون الحجز المطلوب لتأكيد الموعد.' : 'This is the booking fee required to confirm your appointment.'}
                         </Text>
                     ) : null}
+                    <Text style={styles.amountHint}>
+                        {isRTL ? `رصيد المحفظة: ${walletBalance.toFixed(2)} ريال` : `Wallet balance: ${walletBalance.toFixed(2)} SAR`}
+                    </Text>
                 </View>
 
-                {/* Virtual Card Tip */}
-                <TouchableOpacity style={styles.testCardButton} onPress={fillTestCard}>
-                    <View style={styles.testCardRow}>
-                        <AppIcon name="sparkles" size={16} color={colors.primary} />
-                        <Text style={styles.testCardText}>{t('useTestCard')}</Text>
-                    </View>
-                </TouchableOpacity>
+                <View style={styles.methodOptions}>
+                    <TouchableOpacity
+                        style={[styles.methodOption, paymentMethod === 'card' && styles.methodOptionActive]}
+                        onPress={() => setPaymentMethod('card')}
+                    >
+                        <AppIcon name="card" size={20} color={paymentMethod === 'card' ? colors.primary : colors.textSecondary} />
+                        <Text style={[styles.methodOptionText, paymentMethod === 'card' && styles.methodOptionTextActive]}>
+                            {isRTL ? 'بطاقة' : 'Card'}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.methodOption, paymentMethod === 'wallet' && styles.methodOptionActive]}
+                        onPress={() => setPaymentMethod('wallet')}
+                    >
+                        <AppIcon name="cash" size={20} color={paymentMethod === 'wallet' ? colors.primary : colors.textSecondary} />
+                        <Text style={[styles.methodOptionText, paymentMethod === 'wallet' && styles.methodOptionTextActive]}>
+                            {isRTL ? 'المحفظة' : 'Wallet'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {paymentMethod === 'card' ? (
+                    <>
+                        {/* Virtual Card Tip */}
+                        <TouchableOpacity style={styles.testCardButton} onPress={fillTestCard}>
+                            <View style={styles.testCardRow}>
+                                <AppIcon name="sparkles" size={16} color={colors.primary} />
+                                <Text style={styles.testCardText}>{t('useTestCard')}</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <View style={styles.form}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>{t('cardNumber')}</Text>
+                                <TextInput
+                                    style={[styles.input, isRTL && styles.rtlText]}
+                                    placeholder="0000 0000 0000 0000"
+                                    value={cardNumber}
+                                    onChangeText={setCardNumber}
+                                    keyboardType="numeric"
+                                    maxLength={19}
+                                />
+                            </View>
+
+                            <View style={styles.row}>
+                                <View style={[styles.inputGroup, { flex: 1, marginRight: spacing.md }]}>
+                                    <Text style={styles.label}>{t('expiryDate')}</Text>
+                                    <TextInput
+                                        style={[styles.input, isRTL && styles.rtlText]}
+                                        placeholder="MM/YY"
+                                        value={expiryDate}
+                                        onChangeText={setExpiryDate}
+                                        maxLength={5}
+                                    />
+                                </View>
+                                <View style={[styles.inputGroup, { flex: 1 }]}>
+                                    <Text style={styles.label}>{t('cvv')}</Text>
+                                    <TextInput
+                                        style={[styles.input, isRTL && styles.rtlText]}
+                                        placeholder="123"
+                                        value={cvv}
+                                        onChangeText={setCvv}
+                                        keyboardType="numeric"
+                                        maxLength={4}
+                                        secureTextEntry
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>{t('cardholderName')}</Text>
+                                <TextInput
+                                    style={[styles.input, isRTL && styles.rtlText]}
+                                    placeholder="John Doe"
+                                    value={cardholderName}
+                                    onChangeText={setCardholderName}
+                                />
+                            </View>
+                        </View>
+                    </>
+                ) : null}
 
                 <View style={styles.form}>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('cardNumber')}</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlText]}
-                            placeholder="0000 0000 0000 0000"
-                            value={cardNumber}
-                            onChangeText={setCardNumber}
-                            keyboardType="numeric"
-                            maxLength={19}
-                        />
-                    </View>
-
-                    <View style={styles.row}>
-                        <View style={[styles.inputGroup, { flex: 1, marginRight: spacing.md }]}>
-                            <Text style={styles.label}>{t('expiryDate')}</Text>
-                            <TextInput
-                                style={[styles.input, isRTL && styles.rtlText]}
-                                placeholder="MM/YY"
-                                value={expiryDate}
-                                onChangeText={setExpiryDate}
-                                maxLength={5}
-                            />
-                        </View>
-                        <View style={[styles.inputGroup, { flex: 1 }]}>
-                            <Text style={styles.label}>{t('cvv')}</Text>
-                            <TextInput
-                                style={[styles.input, isRTL && styles.rtlText]}
-                                placeholder="123"
-                                value={cvv}
-                                onChangeText={setCvv}
-                                keyboardType="numeric"
-                                maxLength={4}
-                                secureTextEntry
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('cardholderName')}</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlText]}
-                            placeholder="John Doe"
-                            value={cardholderName}
-                            onChangeText={setCardholderName}
-                        />
-                    </View>
-
                     <TouchableOpacity
                         style={[styles.payButton, loading && styles.disabledButton]}
                         onPress={handlePay}
@@ -165,7 +218,7 @@ export function PaymentScreen({ route, navigation }: any) {
                         {loading ? (
                             <ActivityIndicator color="#FFFFFF" />
                         ) : (
-                            <Text style={styles.payButtonText}>{t('payNow')}</Text>
+                            <Text style={styles.payButtonText}>{paymentMethod === 'wallet' ? (isRTL ? 'الدفع بالمحفظة' : 'Pay with Wallet') : t('payNow')}</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -242,6 +295,34 @@ const styles = StyleSheet.create({
     testCardText: {
         color: colors.primary,
         fontWeight: '600',
+    },
+    methodOptions: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        marginBottom: spacing.lg,
+    },
+    methodOption: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.md,
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    methodOptionActive: {
+        borderColor: colors.primary,
+        backgroundColor: '#F3E8FF',
+    },
+    methodOptionText: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
+    methodOptionTextActive: {
+        color: colors.primary,
     },
     form: {
         gap: spacing.lg,

@@ -19,6 +19,231 @@ const { createAppointmentTransaction } = require('./paymentTransactionLedgerServ
 const walletService = require('./walletService');
 
 class PaymentService {
+    async processWalletPayment(paymentData) {
+        const { platformUserId, appointmentId, orderId, amount, tenantId, paymentChoice } = paymentData;
+
+        if (!platformUserId) {
+            throw new Error('Authentication required');
+        }
+
+        if (!appointmentId && !orderId) {
+            throw new Error('appointmentId or orderId is required');
+        }
+
+        if (orderId) {
+            return this.processProductWalletPayment({ platformUserId, orderId, amount });
+        }
+
+        return this.processAppointmentWalletPayment({
+            platformUserId,
+            appointmentId,
+            amount,
+            tenantId,
+            paymentChoice
+        });
+    }
+
+    async processAppointmentWalletPayment({ platformUserId, appointmentId, amount, tenantId, paymentChoice }) {
+        const requestedAmount = parseFloat(amount);
+
+        const appointment = await db.Appointment.findByPk(appointmentId, {
+            include: [{ model: db.Service, as: 'service' }]
+        });
+
+        if (!appointment) throw new Error('Appointment not found');
+        if (appointment.platformUserId !== platformUserId) throw new Error('Unauthorized: This appointment does not belong to you');
+        if (appointment.status === 'cancelled') throw new Error('Cancelled appointments cannot be paid');
+        if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) throw new Error('Appointment is already paid');
+
+        const totalAmount = parseFloat(appointment.price || 0);
+        const totalPaid = parseFloat(appointment.totalPaid || 0);
+        const depositAmount = parseFloat(appointment.depositAmount || 0);
+        const outstandingAmount = parseFloat((totalAmount - totalPaid).toFixed(2));
+        if (outstandingAmount <= 0) throw new Error('Appointment has no outstanding balance');
+
+        const normalizedPaymentChoice = paymentChoice === 'booking-fee'
+            ? 'booking-fee'
+            : paymentChoice === 'online-full'
+                ? 'online-full'
+                : null;
+
+        let chargeAmount = outstandingAmount;
+        let ledgerType = totalPaid > 0 ? 'remainder' : 'full';
+        let nextPaymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
+        let nextDepositPaid = appointment.depositPaid || totalPaid > 0;
+        let nextRemainderAmount = 0;
+        let nextRemainderPaid = true;
+        let nextTotalPaid = totalAmount;
+
+        if (normalizedPaymentChoice === 'booking-fee' && appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
+            if (depositAmount <= 0) throw new Error('This booking does not have a deposit configured');
+            if (Math.abs(requestedAmount - depositAmount) > 0.01) {
+                throw new Error(`Payment amount must match the booking fee of ${depositAmount.toFixed(2)} SAR`);
+            }
+            chargeAmount = depositAmount;
+            ledgerType = depositAmount >= totalAmount ? 'full' : 'deposit';
+            nextPaymentStatus = depositAmount >= totalAmount
+                ? APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                : APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
+            nextDepositPaid = true;
+            nextRemainderAmount = parseFloat(Math.max(0, totalAmount - depositAmount).toFixed(2));
+            nextRemainderPaid = nextRemainderAmount <= 0;
+            nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
+        } else {
+            if (Math.abs(requestedAmount - outstandingAmount) > 0.01) {
+                throw new Error(`Payment amount must match the outstanding balance of ${outstandingAmount.toFixed(2)} SAR`);
+            }
+        }
+
+        const platformFee = parseFloat((chargeAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((chargeAmount - platformFee).toFixed(2));
+        const resolvedTenantId = tenantId || appointment.tenantId || appointment.service?.tenantId || null;
+
+        return db.sequelize.transaction(async (transaction) => {
+            const tx = await db.Transaction.create({
+                platformUserId,
+                tenantId: resolvedTenantId,
+                appointmentId,
+                amount: chargeAmount,
+                currency: 'SAR',
+                type: 'booking',
+                status: 'completed',
+                platformFee,
+                tenantRevenue,
+                metadata: {
+                    paymentSource: 'wallet'
+                }
+            }, { transaction });
+
+            await walletService.debitWallet({
+                platformUserId,
+                amount: chargeAmount,
+                type: 'service_payment_debit',
+                referenceType: 'transaction',
+                referenceId: tx.id,
+                metadata: {
+                    source: 'appointment_payment',
+                    appointmentId
+                },
+                transaction
+            });
+
+            const now = new Date();
+            await appointment.update({
+                status: 'confirmed',
+                paymentStatus: nextPaymentStatus,
+                paymentMethod: 'Wallet',
+                paidAt: now,
+                depositPaid: nextDepositPaid,
+                remainderAmount: nextRemainderAmount,
+                remainderPaid: nextRemainderPaid,
+                totalPaid: nextTotalPaid
+            }, { transaction });
+
+            await createAppointmentTransaction({
+                appointmentId,
+                type: ledgerType,
+                amount: chargeAmount,
+                paymentMethod: 'wallet',
+                status: 'completed',
+                processedBy: null,
+                processedAt: now,
+                transactionRef: `APP-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}-WALLET`,
+                notes: 'Wallet payment',
+                metadata: {
+                    source: 'customer_mobile_wallet',
+                    paymentChoice: normalizedPaymentChoice || appointment.paymentMethod || null,
+                    platformUserId,
+                    tenantId: resolvedTenantId
+                }
+            });
+
+            await db.PlatformUser.increment('totalSpent', {
+                by: chargeAmount,
+                where: { id: platformUserId },
+                transaction
+            });
+
+            if (resolvedTenantId) {
+                const insight = await db.CustomerInsight.findOne({
+                    where: { platformUserId, tenantId: resolvedTenantId },
+                    transaction
+                });
+                if (insight) {
+                    await insight.increment('totalSpent', { by: chargeAmount, transaction });
+                }
+            }
+
+            return { transaction: tx, paymentMethodId: null };
+        });
+    }
+
+    async processProductWalletPayment({ platformUserId, orderId, amount }) {
+        const requestedAmount = parseFloat(amount);
+
+        const order = await db.Order.findByPk(orderId);
+        if (!order) throw new Error('Order not found');
+        if (order.platformUserId !== platformUserId) throw new Error('Unauthorized: This order does not belong to you');
+        if (order.paymentStatus === 'paid') throw new Error('Order is already paid');
+        if (['cancelled', 'refunded'].includes(order.status)) throw new Error('This order can no longer be paid');
+
+        const totalAmount = parseFloat(order.totalAmount || 0);
+        if (Math.abs(requestedAmount - totalAmount) > 0.01) {
+            throw new Error(`Payment amount must match the order total of ${totalAmount.toFixed(2)} SAR`);
+        }
+
+        const platformFee = parseFloat((totalAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((totalAmount - platformFee).toFixed(2));
+        const tenantId = order.tenantId;
+
+        return db.sequelize.transaction(async (transaction) => {
+            const tx = await db.Transaction.create({
+                platformUserId,
+                tenantId,
+                orderId,
+                amount: totalAmount,
+                currency: 'SAR',
+                type: 'product_purchase',
+                status: 'completed',
+                platformFee,
+                tenantRevenue,
+                metadata: {
+                    paymentSource: 'wallet'
+                }
+            }, { transaction });
+
+            await walletService.debitWallet({
+                platformUserId,
+                amount: totalAmount,
+                type: 'product_payment_debit',
+                referenceType: 'transaction',
+                referenceId: tx.id,
+                metadata: {
+                    source: 'order_payment',
+                    orderId
+                },
+                transaction
+            });
+
+            const wasPaid = order.paymentStatus === 'paid';
+            await order.update({
+                paymentStatus: 'paid',
+                status: order.status === 'pending' ? 'confirmed' : order.status,
+                paidAt: new Date()
+            }, { transaction });
+
+            if (!wasPaid) {
+                await db.PlatformUser.increment('totalSpent', {
+                    by: totalAmount,
+                    where: { id: platformUserId },
+                    transaction
+                });
+            }
+
+            return { transaction: tx, paymentMethodId: null, order };
+        });
+    }
+
     /**
      * Validate fake card number with proper error handling
      */

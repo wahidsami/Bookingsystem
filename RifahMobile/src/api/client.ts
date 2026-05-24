@@ -1465,15 +1465,21 @@ class ApiClient {
         appointmentId?: string;
         orderId?: string;
         amount: number;
-        cardNumber: string;
-        expiryDate: string;
-        cvv: string;
-        cardholderName: string;
+        paymentMethod?: 'card' | 'wallet';
+        cardNumber?: string;
+        expiryDate?: string;
+        cvv?: string;
+        cardholderName?: string;
         saveCard?: boolean;
         tenantId?: string;
         paymentChoice?: 'online-full' | 'booking-fee';
     }): Promise<{ success: boolean; transaction: any }> {
         return this.post<{ success: boolean; transaction: any }>('/payments/process', data);
+    }
+
+    async getWalletBalance(): Promise<number> {
+        const response = await this.get<{ success: boolean; walletBalance: number }>('/payments/wallet/balance');
+        return toNumber(response.walletBalance, 0);
     }
 
     /**

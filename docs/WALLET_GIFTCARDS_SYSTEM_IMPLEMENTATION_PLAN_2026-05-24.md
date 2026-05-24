@@ -327,7 +327,7 @@ Acceptance:
   - Sidebar navigation integration
 
 ## Phase 3 - Customer Gifts UX
-Status: `pending`
+Status: `completed`
 Tasks:
 - Mobile Gifts section + package cards.
 - Package action sheet (self recharge / send).
@@ -335,7 +335,7 @@ Acceptance:
 - User can complete self recharge through package flow.
 
 ## Phase 4 - Send Gift to Others
-Status: `pending`
+Status: `completed`
 Tasks:
 - Recipient resolution flow.
 - Immediate credit or pending claim path.
@@ -344,12 +344,22 @@ Acceptance:
 - Recipient receives wallet credit and notification.
 
 ## Phase 5 - Wallet Payment in Checkout
-Status: `pending`
+Status: `in_progress`
 Tasks:
 - Add wallet option to service and product checkouts.
 - Balance validation + debit pipeline.
 Acceptance:
 - Wallet payment succeeds for both services and products.
+
+### Phase 5 Progress (2026-05-24)
+- Added backend wallet payment processing in `/payments/process` for:
+  - appointment payments (full/remainder/deposit logic preserved)
+  - product order payments
+- Added wallet debit ledger writes using `walletService.debitWallet`:
+  - `service_payment_debit`
+  - `product_payment_debit`
+- Added mobile customer payment flow support to choose `Card` or `Wallet` in `PaymentScreen`.
+- Added customer API helper to fetch wallet balance before wallet payment submission.
 
 ## Phase 6 - Reporting, QA, Hardening
 Status: `pending`

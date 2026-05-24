@@ -10,7 +10,7 @@ const walletService = require('../services/walletService');
  */
 const processPayment = async (req, res, next) => {
     try {
-        const { appointmentId, orderId, amount, cardNumber, expiryDate, cvv, cardholderName, saveCard, tenantId, paymentChoice } = req.body;
+        const { appointmentId, orderId, amount, cardNumber, expiryDate, cvv, cardholderName, saveCard, tenantId, paymentChoice, paymentMethod } = req.body;
         const platformUserId = req.userId;
 
         // Check authentication
@@ -25,10 +25,15 @@ const processPayment = async (req, res, next) => {
         const missingFields = [];
         if (!appointmentId && !orderId) missingFields.push('appointmentId or orderId');
         if (!amount) missingFields.push('amount');
-        if (!cardNumber) missingFields.push('cardNumber');
-        if (!expiryDate) missingFields.push('expiryDate');
-        if (!cvv) missingFields.push('cvv');
-        if (!cardholderName) missingFields.push('cardholderName');
+        const normalizedPaymentMethod = `${paymentMethod || 'card'}`.trim().toLowerCase();
+        const isWalletPayment = normalizedPaymentMethod === 'wallet';
+
+        if (!isWalletPayment) {
+            if (!cardNumber) missingFields.push('cardNumber');
+            if (!expiryDate) missingFields.push('expiryDate');
+            if (!cvv) missingFields.push('cvv');
+            if (!cardholderName) missingFields.push('cardholderName');
+        }
 
         if (missingFields.length > 0) {
             logger.warn('Payment request with missing fields', {
@@ -51,32 +56,43 @@ const processPayment = async (req, res, next) => {
 
         // Process payment based on type (booking or order)
         let result;
-        if (orderId) {
-            // Product order payment
-            result = await paymentService.processProductPayment({
-                platformUserId,
-                orderId,
-                amount,
-                cardNumber,
-                expiryDate,
-                cvv,
-                cardholderName,
-                saveCard: saveCard || false
-            });
-        } else {
-            // Booking payment (existing flow)
-            result = await paymentService.processPayment({
+        if (isWalletPayment) {
+            result = await paymentService.processWalletPayment({
                 platformUserId,
                 appointmentId,
+                orderId,
                 amount,
-                cardNumber,
-                expiryDate,
-                cvv,
-                cardholderName,
-                saveCard: saveCard || false,
                 tenantId,
                 paymentChoice
             });
+        } else {
+            if (orderId) {
+                // Product order payment
+                result = await paymentService.processProductPayment({
+                    platformUserId,
+                    orderId,
+                    amount,
+                    cardNumber,
+                    expiryDate,
+                    cvv,
+                    cardholderName,
+                    saveCard: saveCard || false
+                });
+            } else {
+                // Booking payment (existing flow)
+                result = await paymentService.processPayment({
+                    platformUserId,
+                    appointmentId,
+                    amount,
+                    cardNumber,
+                    expiryDate,
+                    cvv,
+                    cardholderName,
+                    saveCard: saveCard || false,
+                    tenantId,
+                    paymentChoice
+                });
+            }
         }
 
         res.json({
