@@ -4,6 +4,30 @@ const { Op } = require('sequelize');
 const { SERVICE_PAYMENT_METHOD_RULES } = require('../utils/tenantPaymentSettings');
 const { getServerPublicUrl } = require('../utils/url');
 
+const appendGroupGuestToNotes = (notes, groupGuest) => {
+    if (!groupGuest || typeof groupGuest !== 'object') {
+        return notes;
+    }
+
+    const firstName = `${groupGuest.firstName || ''}`.trim();
+    const lastName = `${groupGuest.lastName || ''}`.trim();
+    const phone = `${groupGuest.phone || ''}`.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    if (!fullName) {
+        return notes;
+    }
+
+    const payload = {
+        fullName,
+        phone: phone || null
+    };
+
+    const base = `${notes || ''}`.trim();
+    const marker = `[GROUP_GUEST] ${JSON.stringify(payload)}`;
+    return base ? `${base}\n${marker}` : marker;
+};
+
 const normalizeBookingItemPaymentMethod = (value) => {
     const normalized = `${value || 'at-center'}`.trim().toLowerCase();
     return SERVICE_PAYMENT_METHOD_RULES[normalized] ? normalized : null;
@@ -116,7 +140,8 @@ const createBooking = async (req, res) => {
             tenantId,
             notes,
             paymentMethod,
-            variantId
+            variantId,
+            groupGuest
         } = req.body;
         const platformUserId = req.userId; // From auth middleware
         const bookingItems = Array.isArray(req.body.items) ? req.body.items : [];
@@ -146,6 +171,8 @@ const createBooking = async (req, res) => {
             }
         }
 
+        const normalizedNotes = appendGroupGuestToNotes(notes, groupGuest);
+
         if (bookingItems.length > 0) {
             const normalizedItems = bookingItems.map((item, index) => {
                 const rawStartTime = item.startTime
@@ -168,7 +195,7 @@ const createBooking = async (req, res) => {
                     staffId: item.staffId || null,
                     requestedStaffId: item.requestedStaffId || item.staffId || null,
                     startTime: parsedStartTime.toISOString(),
-                    notes: item.notes || notes || null,
+                    notes: item.notes || normalizedNotes || null,
                     paymentMethod: normalizedPaymentMethod,
                     assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined)
                 };
@@ -178,7 +205,7 @@ const createBooking = async (req, res) => {
                 tenantId: finalTenantId,
                 platformUserId,
                 items: normalizedItems,
-                notes: notes || null,
+                notes: normalizedNotes || null,
                 paymentMethod: normalizedItems[0]?.paymentMethod || 'at-center'
             });
 
@@ -242,7 +269,7 @@ const createBooking = async (req, res) => {
             platformUserId,
             tenantId: finalTenantId,
             startTime,
-            notes,
+            notes: normalizedNotes,
             paymentMethod
         });
 

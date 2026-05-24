@@ -60,6 +60,10 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [selectedTime, setSelectedTime] = useState<SlotItem | null>(null);
     const [availableSlots, setAvailableSlots] = useState<SlotItem[]>([]);
     const [bookingNote, setBookingNote] = useState('');
+    const [includeGuest, setIncludeGuest] = useState(false);
+    const [guestFirstName, setGuestFirstName] = useState('');
+    const [guestLastName, setGuestLastName] = useState('');
+    const [guestPhone, setGuestPhone] = useState('');
     const [paymentSettings, setPaymentSettings] = useState(tenant?.paymentSettings || DEFAULT_BOOKING_PAYMENT_SETTINGS);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServicePaymentChoice>('at-center');
     const editingCartItemId: string | null = route.params?.cartItemId || null;
@@ -287,6 +291,11 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             return;
         }
 
+        if (includeGuest && (!guestFirstName.trim() || !guestLastName.trim())) {
+            Alert.alert('Guest Details', 'Please provide guest first and last name.');
+            return;
+        }
+
         try {
             setLoading(true);
             const response = await api.post<{ success: boolean; appointment: { id: string; bookingNumber?: string | null; price: number } }>('/bookings/create', {
@@ -298,6 +307,11 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 notes: bookingNote.trim() || undefined,
                 paymentMethod: selectedPaymentMethod,
                 variantId: selectedVariant?.id || undefined,
+                groupGuest: includeGuest ? {
+                    firstName: guestFirstName.trim(),
+                    lastName: guestLastName.trim(),
+                    phone: guestPhone.trim() || undefined
+                } : undefined
             });
 
             const appointmentId = response.appointment?.id;
@@ -584,6 +598,49 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 <Text style={styles.noteCounter}>
                     {bookingNote.length}/1000
                 </Text>
+            </View>
+
+            <View style={styles.noteCard}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.noteTitle}>{language === 'ar' ? 'حجز جماعي' : 'Group Booking'}</Text>
+                    <TouchableOpacity
+                        style={[styles.cartToggle, includeGuest && styles.cartToggleActive]}
+                        onPress={() => setIncludeGuest((prev) => !prev)}
+                    >
+                        <Text style={styles.cartToggleText}>{includeGuest ? (language === 'ar' ? 'مفعل' : 'On') : (language === 'ar' ? 'غير مفعل' : 'Off')}</Text>
+                    </TouchableOpacity>
+                </View>
+                <Text style={styles.noteDescription}>
+                    {language === 'ar'
+                        ? 'أضف ضيفًا واحدًا ليتم حجز نفس الموعد لك وله.'
+                        : 'Add one guest person to this same appointment booking.'}
+                </Text>
+                {includeGuest ? (
+                    <View style={{ gap: spacing.sm }}>
+                        <TextInput
+                            style={styles.noteInput}
+                            value={guestFirstName}
+                            onChangeText={setGuestFirstName}
+                            placeholder={language === 'ar' ? 'الاسم الأول للضيف' : 'Guest first name'}
+                            placeholderTextColor={colors.textSecondary}
+                        />
+                        <TextInput
+                            style={styles.noteInput}
+                            value={guestLastName}
+                            onChangeText={setGuestLastName}
+                            placeholder={language === 'ar' ? 'اسم العائلة للضيف' : 'Guest last name'}
+                            placeholderTextColor={colors.textSecondary}
+                        />
+                        <TextInput
+                            style={styles.noteInput}
+                            value={guestPhone}
+                            onChangeText={setGuestPhone}
+                            placeholder={language === 'ar' ? 'جوال الضيف (اختياري)' : 'Guest phone (optional)'}
+                            placeholderTextColor={colors.textSecondary}
+                            keyboardType="phone-pad"
+                        />
+                    </View>
+                ) : null}
             </View>
 
             <View style={styles.noteCard}>
@@ -883,6 +940,23 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-end',
         fontSize: fontSize.xs,
         color: colors.textSecondary,
+    },
+    cartToggle: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#FFFFFF',
+    },
+    cartToggleActive: {
+        borderColor: colors.primary,
+        backgroundColor: '#F3E8FF',
+    },
+    cartToggleText: {
+        color: colors.text,
+        fontSize: fontSize.xs,
+        fontWeight: '700',
     },
     paymentOptionCard: {
         flexDirection: 'row',

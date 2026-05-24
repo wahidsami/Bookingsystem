@@ -219,6 +219,24 @@ async function sendAppointmentInviteEmail({ to, customerName, tenantName, invite
     });
 }
 
+function appendGroupGuestToNotes(notes, groupGuest) {
+    if (!groupGuest || typeof groupGuest !== 'object') {
+        return notes;
+    }
+
+    const firstName = `${groupGuest.firstName || ''}`.trim();
+    const lastName = `${groupGuest.lastName || ''}`.trim();
+    const phone = `${groupGuest.phone || ''}`.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (!fullName) {
+        return notes;
+    }
+
+    const marker = `[GROUP_GUEST] ${JSON.stringify({ fullName, phone: phone || null })}`;
+    const base = `${notes || ''}`.trim();
+    return base ? `${base}\n${marker}` : marker;
+}
+
 /**
  * Create a new appointment from the tenant dashboard
  * POST /api/v1/tenant/appointments
@@ -237,7 +255,8 @@ exports.createAppointment = async (req, res) => {
             paymentMethod,
             platformUserId,
             customer,
-            assignmentMode
+            assignmentMode,
+            groupGuest
         } = req.body || {};
 
         if (!serviceId || !startTime) {
@@ -254,6 +273,8 @@ exports.createAppointment = async (req, res) => {
             transaction
         });
 
+        const normalizedNotes = appendGroupGuestToNotes(notes, groupGuest);
+
         const appointment = await bookingService.createBooking({
             serviceId,
             variantId: variantId || null,
@@ -262,7 +283,7 @@ exports.createAppointment = async (req, res) => {
             platformUserId: customerUser.id,
             tenantId,
             startTime,
-            notes,
+            notes: normalizedNotes,
             paymentMethod,
             assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
             skipAdvanceValidation: true

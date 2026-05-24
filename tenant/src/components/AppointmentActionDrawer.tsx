@@ -196,6 +196,8 @@ export function AppointmentActionDrawer({
   const [appointmentTime, setAppointmentTime] = useState("10:00");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
+  const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
+  const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "" });
 
   const [breakEmployeeId, setBreakEmployeeId] = useState("");
   const [breakDate, setBreakDate] = useState(getTodayDateKey());
@@ -246,6 +248,8 @@ export function AppointmentActionDrawer({
       setAppointmentTime(prefill?.time || defaultTime || "10:00");
       setPaymentMethod(prefill?.paymentMethod || "");
       setNotes(prefill?.notes || "");
+      setIncludeGroupGuest(false);
+      setGroupGuest({ firstName: "", lastName: "", phone: "" });
       return;
     }
 
@@ -450,6 +454,11 @@ export function AppointmentActionDrawer({
       return;
     }
 
+    if (includeGroupGuest && (!groupGuest.firstName.trim() || !groupGuest.lastName.trim())) {
+      setError(locale === "ar" ? "الرجاء إدخال الاسم الكامل للضيف الإضافي." : "Please enter the additional guest full name.");
+      return;
+    }
+
     setSaving(true);
     try {
       const startTime = new Date(`${appointmentDate}T${appointmentTime}`);
@@ -465,6 +474,11 @@ export function AppointmentActionDrawer({
         startTime: startTime.toISOString(),
         notes: notes.trim() || undefined,
         paymentMethod,
+        groupGuest: includeGroupGuest ? {
+          firstName: groupGuest.firstName.trim(),
+          lastName: groupGuest.lastName.trim(),
+          phone: groupGuest.phone.trim() || undefined
+        } : undefined,
         platformUserId: customerMode === "existing" ? selectedCustomer?.id : undefined,
         customer: customerMode === "new" || customerMode === "guest"
           ? {
@@ -1045,6 +1059,51 @@ export function AppointmentActionDrawer({
                         );
                       })}
                   </div>
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900">
+                        {locale === "ar" ? "حجز جماعي" : "Group booking"}
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        {locale === "ar" ? "أضف ضيفًا إضافيًا على نفس الموعد." : "Add one extra guest on the same appointment."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeGroupGuest((prev) => !prev)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${includeGroupGuest ? 'bg-primary text-white' : 'border border-gray-300 text-gray-700'}`}
+                    >
+                      {includeGroupGuest ? (locale === "ar" ? "مفعل" : "On") : (locale === "ar" ? "غير مفعل" : "Off")}
+                    </button>
+                  </div>
+                  {includeGroupGuest ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <input
+                        type="text"
+                        value={groupGuest.firstName}
+                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, firstName: e.target.value }))}
+                        placeholder={locale === "ar" ? "اسم الضيف الأول" : "Guest first name"}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        type="text"
+                        value={groupGuest.lastName}
+                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, lastName: e.target.value }))}
+                        placeholder={locale === "ar" ? "اسم العائلة" : "Guest last name"}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        type="tel"
+                        value={groupGuest.phone}
+                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, phone: e.target.value }))}
+                        placeholder={locale === "ar" ? "الجوال (اختياري)" : "Phone (optional)"}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="rounded-3xl border border-gray-200 bg-white p-4">
