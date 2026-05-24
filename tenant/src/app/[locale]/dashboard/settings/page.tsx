@@ -35,6 +35,25 @@ interface WorkingHours {
   saturday: WorkingDay;
 }
 
+function formatTime12Hour(value: string): string {
+  const [h, m] = value.split(':').map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+function buildTimeOptions(stepMinutes = 30): Array<{ value: string; label: string }> {
+  const options: Array<{ value: string; label: string }> = [];
+  for (let minuteOfDay = 0; minuteOfDay < 24 * 60; minuteOfDay += stepMinutes) {
+    const hours = Math.floor(minuteOfDay / 60);
+    const minutes = minuteOfDay % 60;
+    const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    options.push({ value, label: formatTime12Hour(value) });
+  }
+  return options;
+}
+
 export default function SettingsPage() {
   const t = useTranslations('Settings');
   const locale = useLocale();
@@ -372,6 +391,7 @@ export default function SettingsPage() {
   ];
 
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+  const timeOptions = buildTimeOptions(30);
 
   if (loading) {
     return (
@@ -796,25 +816,35 @@ export default function SettingsPage() {
                       </div>
                       {workingHours[day].isOpen && (
                         <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                          <input
-                            type="time"
+                          <select
                             value={workingHours[day].open}
                             onChange={(e) => setWorkingHours(prev => ({
                               ...prev,
                               [day]: { ...prev[day], open: e.target.value }
                             }))}
                             className="px-3 py-2 border border-gray-300 rounded-lg"
-                          />
+                          >
+                            {timeOptions.map((option) => (
+                              <option key={`open-${day}-${option.value}`} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                           <span className="text-gray-500">{t('to')}</span>
-                          <input
-                            type="time"
+                          <select
                             value={workingHours[day].close}
                             onChange={(e) => setWorkingHours(prev => ({
                               ...prev,
                               [day]: { ...prev[day], close: e.target.value }
                             }))}
                             className="px-3 py-2 border border-gray-300 rounded-lg"
-                          />
+                          >
+                            {timeOptions.map((option) => (
+                              <option key={`close-${day}-${option.value}`} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       )}
                       {!workingHours[day].isOpen && (
