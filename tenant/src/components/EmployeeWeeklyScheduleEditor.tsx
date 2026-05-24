@@ -55,12 +55,24 @@ const WEEK_DAYS = [
 
 const DEFAULT_START = "09:00";
 const DEFAULT_END = "18:00";
+const formatTime12Hour = (value: string, locale: string) => {
+  const [h, m] = value.split(":").map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  const period = h >= 12 ? (locale === "ar" ? "م" : "PM") : (locale === "ar" ? "ص" : "AM");
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+};
+
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
   const totalMinutes = index * 30;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  return value;
+  return {
+    value,
+    labelEn: formatTime12Hour(value, "en"),
+    labelAr: formatTime12Hour(value, "ar")
+  };
 });
 
 function normalizeShift(shift: Partial<ShiftRecord>): ShiftRecord {
@@ -768,7 +780,9 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                         disabled={Boolean(savingKey)}
                       >
                         {TIME_OPTIONS.map((option) => (
-                          <option key={option} value={option}>{option}</option>
+                          <option key={option.value} value={option.value}>
+                            {locale === "ar" ? option.labelAr : option.labelEn}
+                          </option>
                         ))}
                       </select>
                     ) : (
@@ -788,7 +802,9 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                         disabled={Boolean(savingKey)}
                       >
                         {TIME_OPTIONS.map((option) => (
-                          <option key={option} value={option}>{option}</option>
+                          <option key={option.value} value={option.value}>
+                            {locale === "ar" ? option.labelAr : option.labelEn}
+                          </option>
                         ))}
                       </select>
                     ) : (
@@ -851,7 +867,9 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                           disabled={Boolean(savingKey)}
                         >
                           {TIME_OPTIONS.map((option) => (
-                            <option key={option} value={option}>{option}</option>
+                            <option key={option.value} value={option.value}>
+                              {locale === "ar" ? option.labelAr : option.labelEn}
+                            </option>
                           ))}
                         </select>
 
@@ -863,7 +881,9 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                           disabled={Boolean(savingKey)}
                         >
                           {TIME_OPTIONS.map((option) => (
-                            <option key={option} value={option}>{option}</option>
+                            <option key={option.value} value={option.value}>
+                              {locale === "ar" ? option.labelAr : option.labelEn}
+                            </option>
                           ))}
                         </select>
 
