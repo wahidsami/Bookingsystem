@@ -528,10 +528,13 @@ class AdminApi {
     return this.request<{ success: boolean; message?: string }>(`/admin/gift-packages/${id}`, 'DELETE');
   }
 
-  async getGiftTransactions(params: { limit?: number; status?: string } = {}) {
+  async getGiftTransactions(params: { limit?: number; status?: string; packageId?: string; startDate?: string; endDate?: string } = {}) {
     const query = new URLSearchParams();
     if (params.limit != null) query.append('limit', String(params.limit));
     if (params.status) query.append('status', params.status);
+    if (params.packageId) query.append('packageId', params.packageId);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return this.request<{ success: boolean; transactions: any[]; count: number }>(`/admin/gift-transactions${suffix}`);
   }
@@ -561,6 +564,13 @@ class AdminApi {
           purchaseAmountTotal: number;
           creditAmountTotal: number;
         }>;
+        topRecipients: Array<{
+          recipientId: string;
+          recipientName: string;
+          recipientEmail?: string | null;
+          transactionsCount: number;
+          receivedCreditTotal: number;
+        }>;
         byPackage: Array<{
           packageId: string;
           packageTitle: string;
@@ -570,6 +580,16 @@ class AdminApi {
         }>;
       };
     }>(`/admin/gift-transactions/report${suffix}`);
+  }
+
+  async downloadGiftTransactionsReportCsv(params: { status?: string; packageId?: string; startDate?: string; endDate?: string } = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.append('status', params.status);
+    if (params.packageId) query.append('packageId', params.packageId);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.requestBlob(`/admin/gift-transactions/report.csv${suffix}`);
   }
 }
 

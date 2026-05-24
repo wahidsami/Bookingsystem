@@ -57,6 +57,8 @@ export default function GiftCardsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [report, setReport] = useState<{
     totals: {
       transactionsCount: number;
@@ -73,6 +75,13 @@ export default function GiftCardsPage() {
       purchaseAmountTotal: number;
       creditAmountTotal: number;
     }>;
+    topRecipients: Array<{
+      recipientId: string;
+      recipientName: string;
+      recipientEmail?: string | null;
+      transactionsCount: number;
+      receivedCreditTotal: number;
+    }>;
     byPackage: Array<{
       packageId: string;
       packageTitle: string;
@@ -88,15 +97,18 @@ export default function GiftCardsPage() {
     try {
       setLoading(true);
       setError(null);
+      const filters = {
+        ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {})
+      };
       const [packagesRes, txRes] = await Promise.all([
         adminApi.getGiftPackages(),
-        adminApi.getGiftTransactions({ limit: 100, ...(statusFilter !== 'all' ? { status: statusFilter } : {}) })
+        adminApi.getGiftTransactions({ limit: 100, ...filters })
       ]);
       setPackages(packagesRes.packages || []);
       setTransactions(txRes.transactions || []);
-      const reportRes = await adminApi.getGiftTransactionsReport(
-        statusFilter !== 'all' ? { status: statusFilter } : {}
-      );
+      const reportRes = await adminApi.getGiftTransactionsReport(filters);
       setReport(reportRes.report || null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load gift cards data');
@@ -107,7 +119,28 @@ export default function GiftCardsPage() {
 
   useEffect(() => {
     loadData();
-  }, [statusFilter]);
+  }, [statusFilter, startDate, endDate]);
+
+  const handleExportCsv = async () => {
+    try {
+      const filters = {
+        ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {})
+      };
+      const { blob, filename } = await adminApi.downloadGiftTransactionsReportCsv(filters);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename || 'gift-transactions-report.csv';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to export CSV');
+    }
+  };
 
   const resetForm = () => {
     setForm(defaultForm);
@@ -345,19 +378,34 @@ export default function GiftCardsPage() {
             <div className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
             <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
               <p className="text-sm text-dark-200">Gift transactions ({transactions.length})</p>
-              <select
-                className="input !w-44 !py-2"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All statuses</option>
-                <option value="purchased">Purchased</option>
-                <option value="sent_pending_claim">Pending claim</option>
-                <option value="sent_completed">Sent completed</option>
-                <option value="redeemed">Redeemed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="expired">Expired</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <input
+                  className="input !py-2"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+                <input
+                  className="input !py-2"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+                <select
+                  className="input !w-44 !py-2"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="purchased">Purchased</option>
+                  <option value="sent_pending_claim">Pending claim</option>
+                  <option value="sent_completed">Sent completed</option>
+                  <option value="redeemed">Redeemed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="expired">Expired</option>
+                </select>
+                <button className="btn btn-secondary" onClick={handleExportCsv}>Export CSV</button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
@@ -388,6 +436,33 @@ export default function GiftCardsPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-dark-300">No transactions found.</td>
                     </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-dark-700 text-sm text-dark-200">Top recipients</div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-dark-700/40 text-dark-200">
+                  <tr>
+                    <th className="text-left px-4 py-3">Recipient</th>
+                    <th className="text-left px-4 py-3">Transactions</th>
+                    <th className="text-left px-4 py-3">Received credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(report?.topRecipients || []).map((row) => (
+                    <tr key={row.recipientId} className="border-t border-dark-700 text-dark-100">
+                      <td className="px-4 py-3">{row.recipientName || row.recipientEmail || 'Unknown'}</td>
+                      <td className="px-4 py-3">{row.transactionsCount}</td>
+                      <td className="px-4 py-3"><Currency amount={row.receivedCreditTotal} /></td>
+                    </tr>
+                  ))}
+                  {(report?.topRecipients || []).length === 0 && (
+                    <tr><td colSpan={3} className="px-4 py-6 text-center text-dark-300">No recipient data yet.</td></tr>
                   )}
                 </tbody>
               </table>

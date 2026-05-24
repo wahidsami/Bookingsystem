@@ -377,6 +377,10 @@ Acceptance:
   - top purchasers ranking
   - package-level aggregates
 - Extended Admin Gift Cards UI with reporting cards and top purchaser tables.
+- Added top recipients analytics in report and UI.
+- Added date-range filtering for report and transactions.
+- Added CSV export endpoint and UI action:
+  - `GET /api/v1/admin/gift-transactions/report.csv`
 
 ---
 
