@@ -72,6 +72,26 @@ interface Override {
 
 type TabType = 'shifts' | 'breaks' | 'timeoff' | 'overrides';
 
+function formatTime12Hour(value: string, locale: string) {
+  const [h, m] = value.split(":").map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  const period = h >= 12 ? (locale === "ar" ? "م" : "PM") : (locale === "ar" ? "ص" : "AM");
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const totalMinutes = index * 30;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return {
+    value,
+    labelEn: formatTime12Hour(value, "en"),
+    labelAr: formatTime12Hour(value, "ar")
+  };
+});
+
 export default function SchedulesPage() {
     const dialog = useAppDialog();
   const params = useParams();
@@ -838,23 +858,33 @@ function ShiftModal({ employeeId, employeeName, shift, onClose, onSave, locale, 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">{locale === 'ar' ? 'وقت البدء' : 'Start Time'}</label>
-              <input
-                type="time"
+              <select
                 value={formData.startTime}
                 onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg"
                 required
-              />
+              >
+                {TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {locale === "ar" ? option.labelAr : option.labelEn}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">{locale === 'ar' ? 'وقت الانتهاء' : 'End Time'}</label>
-              <input
-                type="time"
+              <select
                 value={formData.endTime}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg"
                 required
-              />
+              >
+                {TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {locale === "ar" ? option.labelAr : option.labelEn}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1027,23 +1057,33 @@ function BreakModal({ employeeId, employeeName, breakItem, onClose, onSave, loca
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">{locale === 'ar' ? 'وقت البدء' : 'Start Time'}</label>
-              <input
-                type="time"
+              <select
                 value={formData.startTime}
                 onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg"
                 required
-              />
+              >
+                {TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {locale === "ar" ? option.labelAr : option.labelEn}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">{locale === 'ar' ? 'وقت الانتهاء' : 'End Time'}</label>
-              <input
-                type="time"
+              <select
                 value={formData.endTime}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg"
                 required
-              />
+              >
+                {TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {locale === "ar" ? option.labelAr : option.labelEn}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1257,21 +1297,31 @@ function OverrideModal({ employeeId, employeeName, override, onClose, onSave, lo
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">{locale === 'ar' ? 'وقت البدء' : 'Start Time'}</label>
-                <input
-                  type="time"
+                <select
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg"
-                />
+                >
+                  {TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {locale === "ar" ? option.labelAr : option.labelEn}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">{locale === 'ar' ? 'وقت الانتهاء' : 'End Time'}</label>
-                <input
-                  type="time"
+                <select
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg"
-                />
+                >
+                  {TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {locale === "ar" ? option.labelAr : option.labelEn}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

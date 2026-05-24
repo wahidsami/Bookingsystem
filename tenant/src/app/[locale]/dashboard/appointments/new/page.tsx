@@ -76,6 +76,26 @@ function getTodayDateKey() {
   return new Date().toISOString().split("T")[0];
 }
 
+function formatTime12Hour(value: string, locale: string) {
+  const [h, m] = value.split(":").map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  const period = h >= 12 ? (locale === "ar" ? "م" : "PM") : (locale === "ar" ? "ص" : "AM");
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const totalMinutes = index * 30;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return {
+    value,
+    labelEn: formatTime12Hour(value, "en"),
+    labelAr: formatTime12Hour(value, "ar")
+  };
+});
+
 export default function NewAppointmentPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
@@ -674,12 +694,17 @@ export default function NewAppointmentPage() {
                   <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'الوقت' : 'Time'} *
                   </label>
-                  <input
-                    type="time"
+                  <select
                     value={appointmentTime}
                     onChange={(e) => setAppointmentTime(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
-                  />
+                  >
+                    {TIME_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {locale === "ar" ? option.labelAr : option.labelEn}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

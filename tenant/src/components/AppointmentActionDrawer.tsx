@@ -150,6 +150,26 @@ function addMinutesToTime(time: string, minutesToAdd: number) {
   return base.toTimeString().slice(0, 5);
 }
 
+function formatTime12Hour(value: string, locale: string) {
+  const [h, m] = value.split(":").map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  const period = h >= 12 ? (locale === "ar" ? "م" : "PM") : (locale === "ar" ? "ص" : "AM");
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const totalMinutes = index * 30;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return {
+    value,
+    labelEn: formatTime12Hour(value, "en"),
+    labelAr: formatTime12Hour(value, "ar")
+  };
+});
+
 export function AppointmentActionDrawer({
   open,
   mode,
@@ -987,12 +1007,17 @@ export function AppointmentActionDrawer({
                         onChange={(e) => setAppointmentDate(e.target.value)}
                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                       />
-                      <input
-                        type="time"
+                      <select
                         value={appointmentTime}
                         onChange={(e) => setAppointmentTime(e.target.value)}
                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      />
+                      >
+                        {TIME_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {locale === "ar" ? option.labelAr : option.labelEn}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -1161,8 +1186,7 @@ export function AppointmentActionDrawer({
                       <option value="cleaning">{locale === "ar" ? "تنظيف" : "Cleaning"}</option>
                       <option value="other">{locale === "ar" ? "أخرى" : "Other"}</option>
                     </select>
-                    <input
-                      type="time"
+                    <select
                       value={breakStartTime}
                       onChange={(e) => {
                         const nextStart = e.target.value;
@@ -1170,13 +1194,24 @@ export function AppointmentActionDrawer({
                         setBreakEndTime(addMinutesToTime(nextStart, 30));
                       }}
                       className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="time"
+                    >
+                      {TIME_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {locale === "ar" ? option.labelAr : option.labelEn}
+                        </option>
+                      ))}
+                    </select>
+                    <select
                       value={breakEndTime}
                       onChange={(e) => setBreakEndTime(e.target.value)}
                       className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                    />
+                    >
+                      {TIME_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {locale === "ar" ? option.labelAr : option.labelEn}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-3">
