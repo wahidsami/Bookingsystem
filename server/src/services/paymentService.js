@@ -16,6 +16,7 @@ const logger = require('../utils/productionLogger');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
 const notificationOrchestrator = require('./notificationOrchestratorService');
 const { createAppointmentTransaction } = require('./paymentTransactionLedgerService');
+const walletService = require('./walletService');
 
 class PaymentService {
     /**
@@ -561,12 +562,12 @@ class PaymentService {
             throw new Error('User not found');
         }
 
-        await user.increment('walletBalance', { by: parseFloat(amount) });
+        const normalizedAmount = parseFloat(amount);
 
         // Create transaction
         const transaction = await db.Transaction.create({
             platformUserId,
-            amount: parseFloat(amount),
+            amount: normalizedAmount,
             currency: 'SAR',
             type: 'wallet_topup',
             status: 'completed',
@@ -576,9 +577,22 @@ class PaymentService {
             }
         });
 
+        const walletResult = await walletService.creditWallet({
+            platformUserId,
+            amount: normalizedAmount,
+            type: 'topup',
+            referenceType: 'transaction',
+            referenceId: transaction.id,
+            metadata: {
+                source: 'payment_topup',
+                cardLast4: cardNumber.slice(-4),
+                cardBrand: this.getCardBrand(cleanedCard)
+            }
+        });
+
         return {
             transaction,
-            newBalance: parseFloat(user.walletBalance) + parseFloat(amount)
+            newBalance: walletResult.balanceAfter
         };
     }
 }

@@ -2,6 +2,7 @@ const paymentService = require('../services/paymentService');
 const db = require('../models');
 const logger = require('../utils/productionLogger');
 const { handlePaymentError } = require('../utils/paymentErrorHandler');
+const walletService = require('../services/walletService');
 
 /**
  * Process payment for booking or order
@@ -186,9 +187,61 @@ const getPaymentHistory = async (req, res) => {
     }
 };
 
+/**
+ * Get wallet balance
+ * GET /api/v1/payments/wallet/balance
+ */
+const getWalletBalance = async (req, res) => {
+    try {
+        const platformUserId = req.userId;
+        const balance = await walletService.getBalance(platformUserId);
+
+        res.json({
+            success: true,
+            walletBalance: balance
+        });
+    } catch (error) {
+        console.error('Get wallet balance error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+/**
+ * Get wallet ledger history
+ * GET /api/v1/payments/wallet/ledger
+ */
+const getWalletLedger = async (req, res) => {
+    try {
+        const platformUserId = req.userId;
+        const { limit = 50, offset = 0 } = req.query;
+
+        const entries = await walletService.getLedger(platformUserId, {
+            limit,
+            offset
+        });
+
+        res.json({
+            success: true,
+            entries,
+            count: entries.length
+        });
+    } catch (error) {
+        console.error('Get wallet ledger error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 module.exports = {
     processPayment,
     topUpWallet,
-    getPaymentHistory
+    getPaymentHistory,
+    getWalletBalance,
+    getWalletLedger
 };
 

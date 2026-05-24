@@ -33,6 +33,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'platformUserId',
                 as: 'pushTokens'
             });
+
+            PlatformUser.hasMany(models.WalletLedgerEntry, {
+                foreignKey: 'platformUserId',
+                as: 'walletLedgerEntries'
+            });
         }
 
         // Instance method to check password

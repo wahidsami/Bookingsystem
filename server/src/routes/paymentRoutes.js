@@ -9,6 +9,8 @@ router.post('/process', authenticateUser, paymentLimiter, paymentController.proc
 
 // Top up wallet - with rate limiting
 router.post('/wallet/topup', authenticateUser, paymentLimiter, paymentController.topUpWallet);
+router.get('/wallet/balance', authenticateUser, paymentController.getWalletBalance);
+router.get('/wallet/ledger', authenticateUser, paymentController.getWalletLedger);
 
 // Get payment history
 router.get('/history', authenticateUser, paymentController.getPaymentHistory);
