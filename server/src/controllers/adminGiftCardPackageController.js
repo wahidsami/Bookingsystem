@@ -192,3 +192,115 @@ exports.listGiftTransactions = async (req, res) => {
     }
 };
 
+exports.getGiftTransactionsReport = async (req, res) => {
+    try {
+        const { status, packageId, startDate, endDate } = req.query;
+        const where = {};
+        if (status) where.status = status;
+        if (packageId) where.packageId = packageId;
+        if (startDate || endDate) {
+            where.createdAt = {};
+            if (startDate) where.createdAt[Op.gte] = new Date(startDate);
+            if (endDate) where.createdAt[Op.lte] = new Date(endDate);
+        }
+
+        const transactions = await db.GiftCardTransaction.findAll({
+            where,
+            include: [
+                { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
+                { model: db.GiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar'], required: false }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const totals = {
+            transactionsCount: transactions.length,
+            purchaseAmountTotal: 0,
+            creditAmountTotal: 0,
+            bonusAmountTotal: 0
+        };
+
+        const byStatus = {};
+        const topPurchasersMap = new Map();
+        const byPackageMap = new Map();
+
+        for (const tx of transactions) {
+            const purchase = toNumber(tx.purchaseAmount, 0);
+            const credit = toNumber(tx.creditAmount, 0);
+            const bonus = toNumber(tx.bonusAmount, 0);
+            const totalCredit = toNumber(tx.totalCreditAmount, credit + bonus);
+
+            totals.purchaseAmountTotal += purchase;
+            totals.creditAmountTotal += totalCredit;
+            totals.bonusAmountTotal += bonus;
+
+            byStatus[tx.status] = (byStatus[tx.status] || 0) + 1;
+
+            const senderId = tx.senderPlatformUserId || 'unknown';
+            const senderName = tx.sender
+                ? `${tx.sender.firstName || ''} ${tx.sender.lastName || ''}`.trim() || tx.sender.email || 'Unknown'
+                : tx.recipientEmail || 'Unknown';
+            const senderEmail = tx.sender?.email || null;
+
+            const currentSender = topPurchasersMap.get(senderId) || {
+                senderId,
+                senderName,
+                senderEmail,
+                transactionsCount: 0,
+                purchaseAmountTotal: 0,
+                creditAmountTotal: 0
+            };
+            currentSender.transactionsCount += 1;
+            currentSender.purchaseAmountTotal += purchase;
+            currentSender.creditAmountTotal += totalCredit;
+            topPurchasersMap.set(senderId, currentSender);
+
+            const packageIdValue = tx.packageId || 'unknown';
+            const packageTitle = tx.package?.title_en || tx.package?.title_ar || 'Unknown package';
+            const currentPackage = byPackageMap.get(packageIdValue) || {
+                packageId: packageIdValue,
+                packageTitle,
+                transactionsCount: 0,
+                purchaseAmountTotal: 0,
+                creditAmountTotal: 0
+            };
+            currentPackage.transactionsCount += 1;
+            currentPackage.purchaseAmountTotal += purchase;
+            currentPackage.creditAmountTotal += totalCredit;
+            byPackageMap.set(packageIdValue, currentPackage);
+        }
+
+        const topPurchasers = Array.from(topPurchasersMap.values())
+            .sort((a, b) => b.purchaseAmountTotal - a.purchaseAmountTotal)
+            .slice(0, 10);
+
+        const byPackage = Array.from(byPackageMap.values())
+            .sort((a, b) => b.purchaseAmountTotal - a.purchaseAmountTotal);
+
+        res.json({
+            success: true,
+            report: {
+                totals: {
+                    ...totals,
+                    purchaseAmountTotal: Number(totals.purchaseAmountTotal.toFixed(2)),
+                    creditAmountTotal: Number(totals.creditAmountTotal.toFixed(2)),
+                    bonusAmountTotal: Number(totals.bonusAmountTotal.toFixed(2))
+                },
+                byStatus,
+                topPurchasers: topPurchasers.map((item) => ({
+                    ...item,
+                    purchaseAmountTotal: Number(item.purchaseAmountTotal.toFixed(2)),
+                    creditAmountTotal: Number(item.creditAmountTotal.toFixed(2))
+                })),
+                byPackage: byPackage.map((item) => ({
+                    ...item,
+                    purchaseAmountTotal: Number(item.purchaseAmountTotal.toFixed(2)),
+                    creditAmountTotal: Number(item.creditAmountTotal.toFixed(2))
+                }))
+            }
+        });
+    } catch (error) {
+        console.error('Gift transactions report error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate gift transactions report' });
+    }
+};

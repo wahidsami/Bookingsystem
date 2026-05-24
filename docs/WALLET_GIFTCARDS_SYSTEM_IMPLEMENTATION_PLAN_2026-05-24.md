@@ -370,6 +370,14 @@ Tasks:
 Acceptance:
 - Stable production rollout with finance-grade traceability.
 
+### Phase 6 Progress (2026-05-24)
+- Added admin reporting endpoint: `GET /api/v1/admin/gift-transactions/report`
+  - totals (count, purchase sum, credit sum, bonus sum)
+  - status breakdown
+  - top purchasers ranking
+  - package-level aggregates
+- Extended Admin Gift Cards UI with reporting cards and top purchaser tables.
+
 ---
 
 ## QA/UAT Matrix

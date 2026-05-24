@@ -535,6 +535,42 @@ class AdminApi {
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return this.request<{ success: boolean; transactions: any[]; count: number }>(`/admin/gift-transactions${suffix}`);
   }
+
+  async getGiftTransactionsReport(params: { status?: string; packageId?: string; startDate?: string; endDate?: string } = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.append('status', params.status);
+    if (params.packageId) query.append('packageId', params.packageId);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{
+      success: boolean;
+      report: {
+        totals: {
+          transactionsCount: number;
+          purchaseAmountTotal: number;
+          creditAmountTotal: number;
+          bonusAmountTotal: number;
+        };
+        byStatus: Record<string, number>;
+        topPurchasers: Array<{
+          senderId: string;
+          senderName: string;
+          senderEmail?: string | null;
+          transactionsCount: number;
+          purchaseAmountTotal: number;
+          creditAmountTotal: number;
+        }>;
+        byPackage: Array<{
+          packageId: string;
+          packageTitle: string;
+          transactionsCount: number;
+          purchaseAmountTotal: number;
+          creditAmountTotal: number;
+        }>;
+      };
+    }>(`/admin/gift-transactions/report${suffix}`);
+  }
 }
 
 

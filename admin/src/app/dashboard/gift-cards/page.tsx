@@ -57,6 +57,30 @@ export default function GiftCardsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [report, setReport] = useState<{
+    totals: {
+      transactionsCount: number;
+      purchaseAmountTotal: number;
+      creditAmountTotal: number;
+      bonusAmountTotal: number;
+    };
+    byStatus: Record<string, number>;
+    topPurchasers: Array<{
+      senderId: string;
+      senderName: string;
+      senderEmail?: string | null;
+      transactionsCount: number;
+      purchaseAmountTotal: number;
+      creditAmountTotal: number;
+    }>;
+    byPackage: Array<{
+      packageId: string;
+      packageTitle: string;
+      transactionsCount: number;
+      purchaseAmountTotal: number;
+      creditAmountTotal: number;
+    }>;
+  } | null>(null);
 
   const title = useMemo(() => (editingId ? 'Edit Gift Package' : 'Create Gift Package'), [editingId]);
 
@@ -70,6 +94,10 @@ export default function GiftCardsPage() {
       ]);
       setPackages(packagesRes.packages || []);
       setTransactions(txRes.transactions || []);
+      const reportRes = await adminApi.getGiftTransactionsReport(
+        statusFilter !== 'all' ? { status: statusFilter } : {}
+      );
+      setReport(reportRes.report || null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load gift cards data');
     } finally {
@@ -248,7 +276,73 @@ export default function GiftCardsPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Gift purchases</p>
+                <p className="text-lg font-semibold text-white">{report?.totals.transactionsCount ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Total purchase amount</p>
+                <p className="text-lg font-semibold text-white"><Currency amount={report?.totals.purchaseAmountTotal ?? 0} /></p>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Total wallet credit</p>
+                <p className="text-lg font-semibold text-white"><Currency amount={report?.totals.creditAmountTotal ?? 0} /></p>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Total bonus</p>
+                <p className="text-lg font-semibold text-white"><Currency amount={report?.totals.bonusAmountTotal ?? 0} /></p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
+                <div className="px-4 py-3 border-b border-dark-700 text-sm text-dark-200">Top purchasers</div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-dark-700/40 text-dark-200">
+                      <tr>
+                        <th className="text-left px-4 py-3">Customer</th>
+                        <th className="text-left px-4 py-3">Purchases</th>
+                        <th className="text-left px-4 py-3">Amount</th>
+                        <th className="text-left px-4 py-3">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(report?.topPurchasers || []).map((row) => (
+                        <tr key={row.senderId} className="border-t border-dark-700 text-dark-100">
+                          <td className="px-4 py-3">{row.senderName || row.senderEmail || 'Unknown'}</td>
+                          <td className="px-4 py-3">{row.transactionsCount}</td>
+                          <td className="px-4 py-3"><Currency amount={row.purchaseAmountTotal} /></td>
+                          <td className="px-4 py-3"><Currency amount={row.creditAmountTotal} /></td>
+                        </tr>
+                      ))}
+                      {(report?.topPurchasers || []).length === 0 && (
+                        <tr><td colSpan={4} className="px-4 py-6 text-center text-dark-300">No purchaser data yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
+                <div className="px-4 py-3 border-b border-dark-700 text-sm text-dark-200">Status breakdown</div>
+                <div className="px-4 py-3 space-y-2">
+                  {Object.entries(report?.byStatus || {}).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between text-sm text-dark-100">
+                      <span>{key}</span>
+                      <span className="font-semibold">{value}</span>
+                    </div>
+                  ))}
+                  {Object.keys(report?.byStatus || {}).length === 0 && (
+                    <p className="text-dark-300 text-sm">No status data yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
             <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
               <p className="text-sm text-dark-200">Gift transactions ({transactions.length})</p>
               <select
@@ -298,6 +392,7 @@ export default function GiftCardsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         )}
       </div>

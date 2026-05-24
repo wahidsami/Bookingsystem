@@ -100,6 +100,7 @@ router.post('/gift-packages', requirePermission('settings', 'edit'), adminGiftCa
 router.put('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.updateGiftPackage);
 router.delete('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.deleteGiftPackage);
 router.get('/gift-transactions', requirePermission('settings', 'view'), adminGiftCardPackageController.listGiftTransactions);
+router.get('/gift-transactions/report', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftTransactionsReport);
 
 module.exports = router;
 
