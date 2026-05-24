@@ -28,3 +28,12 @@ export const navigateToAppointmentInvite = (token: string): boolean => {
     navigationRef.navigate('AppointmentInvite', { token });
     return true;
 };
+
+export const navigateToReview = (appointmentId: string): boolean => {
+    if (!appointmentId || !navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('Review', { appointmentId });
+    return true;
+};

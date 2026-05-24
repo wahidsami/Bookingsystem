@@ -14,6 +14,7 @@ router.get('/next-available', bookingController.getNextAvailableSlot);
 router.get('/invites/:token', bookingController.getInviteDetails);
 router.get('/invites/:token/open', bookingController.openInvite);
 router.post('/invites/:token/respond', optionalAuth, bookingController.respondToInviteByToken);
+router.get('/:id/review/open', bookingController.openReviewLink);
 
 // Create a new booking (requires authentication)
 router.post('/create', authenticateUser, bookingController.createBooking);

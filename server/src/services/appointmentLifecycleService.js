@@ -3,6 +3,8 @@
 const db = require('../models');
 const notificationOrchestrator = require('./notificationOrchestratorService');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const { sendEmail } = require('../utils/emailService');
+const { getServerPublicUrl } = require('../utils/url');
 
 const formatAppointmentDate = (appointment) => {
     const date = new Date(appointment?.startTime || Date.now());
@@ -139,6 +141,43 @@ const notifyServiceCompleted = async (appointment) => {
         serviceName,
         dueAmount
     });
+
+    try {
+        const contextAppointment = await db.Appointment.findByPk(appointment.id, {
+            include: [
+                { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar'], required: false },
+                { model: db.Staff, as: 'staff', attributes: ['id', 'name'], required: false },
+                { model: db.PlatformUser, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar', 'mapUrl'], required: false }
+            ]
+        });
+
+        const userEmail = contextAppointment?.user?.email;
+        if (!userEmail) {
+            return;
+        }
+
+        const effectiveServiceName = contextAppointment?.service?.name_en || contextAppointment?.service?.name_ar || serviceName;
+        const effectiveCustomerName = `${contextAppointment?.user?.firstName || ''} ${contextAppointment?.user?.lastName || ''}`.trim() || customerName;
+        const tenantName = contextAppointment?.tenant?.name || contextAppointment?.tenant?.name_en || contextAppointment?.tenant?.name_ar || 'Refah';
+        const reviewLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/bookings/${encodeURIComponent(contextAppointment.id)}/review/open`;
+
+        await sendEmail({
+            to: userEmail,
+            subject: 'How was your service? Leave a quick review',
+            template: 'customer_review_invite',
+            data: {
+                customerName: effectiveCustomerName,
+                tenantName,
+                serviceName: effectiveServiceName,
+                appointmentDate,
+                reviewLink,
+                googleReviewUrl: contextAppointment?.tenant?.mapUrl || ''
+            }
+        });
+    } catch (reviewInviteError) {
+        console.warn('Review invite email warning:', reviewInviteError.message);
+    }
 };
 
 const notifyPaymentCollected = async (appointment, {

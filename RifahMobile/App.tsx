@@ -24,7 +24,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
-import { navigationRef, navigateToAppointmentInvite, navigateToNotifications } from './src/navigation/navigationService';
+import { navigationRef, navigateToAppointmentInvite, navigateToNotifications, navigateToReview } from './src/navigation/navigationService';
 
 type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'googleOnboarding' | 'forgotPassword' | 'resetPassword' | 'home';
 
@@ -51,6 +51,7 @@ function AppContent() {
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+  const [pendingReviewAppointmentId, setPendingReviewAppointmentId] = useState<string | null>(null);
   const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
 
   const extractInviteToken = (url: string | null | undefined): string | null => {
@@ -68,6 +69,15 @@ function AppContent() {
     const pathMatch = decoded.match(/reset-password\/([^/?#]+)/i);
     if (pathMatch?.[1]) return pathMatch[1];
     const queryMatch = decoded.match(/[?&]token=([^&#]+)/i);
+    return queryMatch?.[1] || null;
+  };
+
+  const extractReviewAppointmentId = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    const decoded = decodeURIComponent(url);
+    const pathMatch = decoded.match(/review\/([^/?#]+)/i);
+    if (pathMatch?.[1]) return pathMatch[1];
+    const queryMatch = decoded.match(/[?&]appointmentId=([^&#]+)/i);
     return queryMatch?.[1] || null;
   };
 
@@ -93,8 +103,15 @@ function AppContent() {
       }
 
       const token = extractInviteToken(url);
-      if (!token) return;
-      setPendingInviteToken(token);
+      if (token) {
+        setPendingInviteToken(token);
+        return;
+      }
+
+      const reviewAppointmentId = extractReviewAppointmentId(url);
+      if (reviewAppointmentId) {
+        setPendingReviewAppointmentId(reviewAppointmentId);
+      }
     };
 
     Linking.getInitialURL()
@@ -160,6 +177,17 @@ function AppContent() {
       setPendingInviteToken(null);
     }
   }, [pendingInviteToken, isAuthenticated, currentScreen]);
+
+  useEffect(() => {
+    if (!pendingReviewAppointmentId || !isAuthenticated || currentScreen !== 'home') {
+      return;
+    }
+
+    if (navigationRef.isReady()) {
+      navigateToReview(pendingReviewAppointmentId);
+      setPendingReviewAppointmentId(null);
+    }
+  }, [pendingReviewAppointmentId, isAuthenticated, currentScreen]);
 
   const loadFontsAndLanguage = async () => {
     await loadFonts();

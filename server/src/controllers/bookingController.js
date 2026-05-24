@@ -721,6 +721,42 @@ console.log('Invite is linked to an existing Refah user');
 };
 
 /**
+ * Public review landing page to open app deep-link.
+ * GET /api/v1/bookings/:id/review/open
+ */
+const openReviewLink = async (req, res) => {
+    const { id } = req.params;
+    const normalizedId = encodeURIComponent(id || '');
+    const deepLinkPrimary = `com.refah.mobile://review?appointmentId=${normalizedId}`;
+    const deepLinkLegacy = `refah://review?appointmentId=${normalizedId}`;
+    const androidStore = process.env.ANDROID_APP_URL || 'https://play.google.com/store';
+    const iosStore = process.env.IOS_APP_URL || 'https://apps.apple.com';
+
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Refah Review</title>
+<style>body{font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:0 auto;color:#111}a.button{display:inline-block;margin-top:8px;padding:10px 14px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px}small{display:block;margin-top:16px;color:#666}</style>
+</head><body>
+<h2>Rate Your Appointment</h2>
+<p>Open Refah app to leave your review.</p>
+<a class="button" href="${deepLinkPrimary}">Open Refah App</a>
+<p>If you do not have the app yet, install it first:</p>
+<a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a>
+<small>If the app did not open automatically, use the button above.</small>
+<script>
+function tryOpenRefahApp() {
+  window.location.href='${deepLinkPrimary}';
+  setTimeout(function(){ window.location.href='${deepLinkLegacy}'; }, 450);
+}
+setTimeout(tryOpenRefahApp, 300);
+</script>
+</body></html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(html);
+};
+
+/**
  * Authenticated customer response to tenant-created invite.
  * POST /api/v1/bookings/:id/respond
  */
@@ -872,6 +908,7 @@ module.exports = {
     getNextAvailableSlot,
     getInviteDetails,
     openInvite,
+    openReviewLink,
     respondToInvite,
     respondToInviteByToken
 };
