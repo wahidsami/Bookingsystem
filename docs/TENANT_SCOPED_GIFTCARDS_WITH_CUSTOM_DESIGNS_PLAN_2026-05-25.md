@@ -360,9 +360,9 @@ Notification examples:
 ## 16) Phase Tracking
 - [x] Phase A - Foundation
 - [x] Phase B - Tenant Dashboard Management
-- [ ] Phase C - Customer App Experience
-- [ ] Phase D - Reporting & Reconciliation
-- [ ] Phase E - Hardening
+- [x] Phase C - Customer App Experience
+- [x] Phase D - Reporting & Reconciliation
+- [x] Phase E - Hardening
 
 ### Phase C progress note (2026-05-25)
 - Backend customer-facing tenant gift APIs implemented:

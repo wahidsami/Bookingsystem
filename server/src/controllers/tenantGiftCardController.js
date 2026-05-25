@@ -13,6 +13,15 @@ const parseDate = (value) => {
   return parsed;
 };
 
+const escapeCsvCell = (value) => {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
 const uploadStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const tenantId = ensureTenantId(req);
@@ -240,5 +249,82 @@ exports.getTransactionsReport = async (req, res) => {
   } catch (error) {
     console.error('tenant gift transactions report error:', error);
     return res.status(500).json({ success: false, message: 'Failed to load gift card transactions report' });
+  }
+};
+
+exports.exportTransactionsReportCsv = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const where = { tenantId };
+    if (req.query.status) where.status = req.query.status;
+    if (req.query.startDate || req.query.endDate) {
+      where.createdAt = {};
+      if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
+      if (req.query.endDate) where.createdAt[Op.lte] = new Date(req.query.endDate);
+    }
+
+    const rows = await db.TenantGiftCardTransaction.findAll({
+      where,
+      include: [
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['title_en', 'title_ar'], required: false },
+        { model: db.PlatformUser, as: 'sender', attributes: ['email', 'firstName', 'lastName'], required: false },
+        { model: db.PlatformUser, as: 'recipient', attributes: ['email', 'firstName', 'lastName'], required: false },
+        { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const headers = [
+      'transaction_id',
+      'status',
+      'delivery_channel',
+      'package_title_en',
+      'package_title_ar',
+      'purchase_amount',
+      'credit_amount',
+      'bonus_amount',
+      'total_credit_amount',
+      'sender_email',
+      'recipient_email',
+      'recipient_phone',
+      'settlement_status',
+      'gross_amount',
+      'platform_fee_amount',
+      'net_tenant_payable_amount',
+      'settled_at',
+      'created_at'
+    ];
+
+    const lines = [headers.join(',')];
+    rows.forEach((row) => {
+      lines.push([
+        escapeCsvCell(row.id),
+        escapeCsvCell(row.status),
+        escapeCsvCell(row.deliveryChannel),
+        escapeCsvCell(row.package?.title_en || ''),
+        escapeCsvCell(row.package?.title_ar || ''),
+        escapeCsvCell(Number(row.purchaseAmount || 0).toFixed(2)),
+        escapeCsvCell(Number(row.creditAmount || 0).toFixed(2)),
+        escapeCsvCell(Number(row.bonusAmount || 0).toFixed(2)),
+        escapeCsvCell(Number(row.totalCreditAmount || 0).toFixed(2)),
+        escapeCsvCell(row.sender?.email || ''),
+        escapeCsvCell(row.recipient?.email || row.recipientEmail || ''),
+        escapeCsvCell(row.recipientPhone || ''),
+        escapeCsvCell(row.settlement?.status || ''),
+        escapeCsvCell(row.settlement?.grossAmount != null ? Number(row.settlement.grossAmount).toFixed(2) : ''),
+        escapeCsvCell(row.settlement?.platformFeeAmount != null ? Number(row.settlement.platformFeeAmount).toFixed(2) : ''),
+        escapeCsvCell(row.settlement?.netTenantPayableAmount != null ? Number(row.settlement.netTenantPayableAmount).toFixed(2) : ''),
+        escapeCsvCell(row.settlement?.settledAt ? new Date(row.settlement.settledAt).toISOString() : ''),
+        escapeCsvCell(row.createdAt ? new Date(row.createdAt).toISOString() : '')
+      ].join(','));
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="tenant-gift-transactions-${stamp}.csv"`);
+    return res.send(lines.join('\n'));
+  } catch (error) {
+    console.error('tenant gift transactions csv export error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to export transactions CSV' });
   }
 };

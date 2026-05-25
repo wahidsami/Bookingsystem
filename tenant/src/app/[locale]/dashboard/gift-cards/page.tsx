@@ -136,6 +136,23 @@ export default function TenantGiftCardsPage() {
     }
   };
 
+  const exportCsv = async () => {
+    try {
+      setError(null);
+      const { blob, filename } = await tenantApi.downloadTenantGiftCardTransactionsCsv();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename || 'tenant-gift-transactions.csv';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to export CSV');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -156,6 +173,11 @@ export default function TenantGiftCardsPage() {
             <p className="text-xs text-gray-500">{isArabic ? 'آخر العمليات' : 'Recent transactions'}</p>
             <p className="text-xl font-semibold text-gray-900">{transactionsCount}</p>
           </div>
+        </div>
+        <div className="mt-4">
+          <button className="btn btn-secondary" onClick={exportCsv}>
+            {isArabic ? 'تصدير CSV' : 'Export CSV'}
+          </button>
         </div>
       </div>
 

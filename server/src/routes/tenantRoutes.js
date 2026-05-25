@@ -208,6 +208,7 @@ router.patch('/gift-cards/packages/:id/active', tenantGiftCardController.toggleP
 router.post('/gift-cards/packages/:id/image', tenantGiftCardController.uploadGiftCardImage, tenantGiftCardController.uploadPackageImage);
 router.get('/gift-cards/reports/summary', tenantGiftCardController.getSummaryReport);
 router.get('/gift-cards/reports/transactions', tenantGiftCardController.getTransactionsReport);
+router.get('/gift-cards/reports/transactions.csv', tenantGiftCardController.exportTransactionsReportCsv);
 
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);

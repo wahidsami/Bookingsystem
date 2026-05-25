@@ -1851,6 +1851,14 @@ class TenantApiClient {
     return this.get(`/tenant/gift-cards/reports/transactions${q.toString() ? `?${q.toString()}` : ''}`);
   }
 
+  async downloadTenantGiftCardTransactionsCsv(params?: { status?: string; startDate?: string; endDate?: string }): Promise<{ blob: Blob; filename: string }> {
+    const q = new URLSearchParams();
+    if (params?.status) q.append('status', params.status);
+    if (params?.startDate) q.append('startDate', params.startDate);
+    if (params?.endDate) q.append('endDate', params.endDate);
+    return this.requestBlob(`/tenant/gift-cards/reports/transactions.csv${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
   // --- Subscription ---
   async getSubscriptionLimits(): Promise<any> {
     return this.get('/tenant/settings/limits');
