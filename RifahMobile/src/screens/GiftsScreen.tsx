@@ -18,6 +18,16 @@ type GiftPackage = {
   bonusAmount: number;
 };
 
+type GiftHistoryItem = {
+  id: string;
+  tenantId?: string;
+  status: string;
+  totalCreditAmount: number;
+  purchaseAmount: number;
+  createdAt: string;
+  tenant?: { name?: string; name_en?: string; name_ar?: string } | null;
+};
+
 export function GiftsScreen({ navigation, route }: any) {
   const { language, isRTL } = useLanguage();
   const tenantId = route?.params?.tenantId as string | undefined;
@@ -26,6 +36,8 @@ export function GiftsScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [packages, setPackages] = useState<GiftPackage[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [history, setHistory] = useState<GiftHistoryItem[]>([]);
   const [selected, setSelected] = useState<GiftPackage | null>(null);
   const [mode, setMode] = useState<'self' | 'send'>('self');
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -90,6 +102,20 @@ export function GiftsScreen({ navigation, route }: any) {
       if (response.success) {
         setPackages(response.packages || []);
       }
+
+      if (tenantId) {
+        const walletRes = await api.get<{ success: boolean; balance: number; ledger?: any[] }>(`/users/tenant-gifts/wallet?tenantId=${encodeURIComponent(tenantId)}&limit=5`);
+        if (walletRes.success) {
+          setWalletBalance(Number(walletRes.balance || 0));
+        }
+        const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/tenant-gifts/history');
+        if (historyRes.success) {
+          setHistory((historyRes.transactions || []).filter((tx) => tx.tenantId === tenantId).slice(0, 5));
+        }
+      } else {
+        const generalWallet = await api.getWalletBalance().catch(() => 0);
+        setWalletBalance(generalWallet);
+      }
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to load gift packages');
     } finally {
@@ -130,6 +156,7 @@ export function GiftsScreen({ navigation, route }: any) {
         return;
       }
       Alert.alert('Success', `Wallet recharged. New balance: ${Number(finalResponse.walletBalance || 0).toFixed(2)} SAR`);
+      setWalletBalance(Number(finalResponse.walletBalance || 0));
       setSelected(null);
       setCardNumber('');
       setExpiryDate('');
@@ -205,6 +232,32 @@ export function GiftsScreen({ navigation, route }: any) {
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: scrollBottomPadding + spacing.lg }}>
+          {walletBalance !== null && (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryTitle}>
+                {tenantId
+                  ? (language === 'ar' ? 'رصيد هدايا هذا المركز' : 'This Center Gift Balance')
+                  : (language === 'ar' ? 'رصيد المحفظة' : 'Wallet Balance')}
+              </Text>
+              <Text style={styles.summaryBalance}>{walletBalance.toFixed(2)} SAR</Text>
+            </View>
+          )}
+
+          {!!history.length && (
+            <View style={styles.historyCard}>
+              <Text style={styles.historyTitle}>{language === 'ar' ? 'آخر العمليات' : 'Recent Transactions'}</Text>
+              {history.map((item) => (
+                <View key={item.id} style={styles.historyRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyStatus}>{item.status}</Text>
+                    <Text style={styles.historyDate}>{new Date(item.createdAt).toLocaleString()}</Text>
+                  </View>
+                  <Text style={styles.historyAmount}>+{Number(item.totalCreditAmount || 0).toFixed(2)} SAR</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {packages.map((pkg) => {
             const title = language === 'ar' ? pkg.title_ar : pkg.title_en;
             const desc = language === 'ar' ? pkg.description_ar : pkg.description_en;
@@ -285,6 +338,15 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   headerSpacer: { width: 36 },
   card: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' },
+  summaryCard: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' },
+  summaryTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 4 },
+  summaryBalance: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
+  historyCard: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' },
+  historyTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  historyRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: spacing.sm, marginTop: spacing.xs },
+  historyStatus: { fontSize: fontSize.sm, color: colors.text, fontWeight: '600' },
+  historyDate: { fontSize: 11, color: colors.textSecondary },
+  historyAmount: { fontSize: fontSize.sm, color: colors.primary, fontWeight: '700' },
   cardTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   cardDesc: { marginTop: 4, fontSize: fontSize.sm, color: colors.textSecondary },
   amountRow: { marginTop: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
