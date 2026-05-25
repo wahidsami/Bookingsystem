@@ -1809,6 +1809,48 @@ class TenantApiClient {
     return this.get('/tenant/hot-deals/limits');
   }
 
+  // ==================== Tenant Gift Cards ====================
+  async getTenantGiftCardPackages(): Promise<any> {
+    return this.get('/tenant/gift-cards/packages');
+  }
+
+  async createTenantGiftCardPackage(data: any): Promise<any> {
+    return this.post('/tenant/gift-cards/packages', data);
+  }
+
+  async updateTenantGiftCardPackage(id: string, data: any): Promise<any> {
+    return this.put(`/tenant/gift-cards/packages/${id}`, data);
+  }
+
+  async setTenantGiftCardPackageActive(id: string, isActive: boolean): Promise<any> {
+    return this.patch(`/tenant/gift-cards/packages/${id}/active`, { isActive });
+  }
+
+  async uploadTenantGiftCardPackageImage(id: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('image', file);
+    return this.request(`/tenant/gift-cards/packages/${id}/image`, {
+      method: 'POST',
+      body: formData
+    });
+  }
+
+  async getTenantGiftCardSummary(params?: { startDate?: string; endDate?: string }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.startDate) q.append('startDate', params.startDate);
+    if (params?.endDate) q.append('endDate', params.endDate);
+    return this.get(`/tenant/gift-cards/reports/summary${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async getTenantGiftCardTransactions(params?: { status?: string; startDate?: string; endDate?: string; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.status) q.append('status', params.status);
+    if (params?.startDate) q.append('startDate', params.startDate);
+    if (params?.endDate) q.append('endDate', params.endDate);
+    if (params?.limit) q.append('limit', String(params.limit));
+    return this.get(`/tenant/gift-cards/reports/transactions${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
   // --- Subscription ---
   async getSubscriptionLimits(): Promise<any> {
     return this.get('/tenant/settings/limits');

@@ -24,6 +24,7 @@ const tenantPosController = require('../controllers/tenantPosController');
 const tenantMessagesController = require('../controllers/tenantMessagesController');
 const tenantPayrollController = require('../controllers/tenantPayrollController');
 const tenantNotificationController = require('../controllers/tenantNotificationController');
+const tenantGiftCardController = require('../controllers/tenantGiftCardController');
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const aiController = require('../controllers/tenant/aiController');
 const { authenticateTenant, checkTenantFeature, rateLimitTenant } = require('../middleware/authTenant');
@@ -198,6 +199,15 @@ router.get('/notifications/history', checkTenantFeature('inAppMarketingNotificat
 router.get('/notifications/history/:id', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryDetail);
 router.get('/notifications/history/:id/recipients', checkTenantFeature('inAppMarketingNotifications'), tenantNotificationController.getPushHistoryRecipients);
 router.get('/notifications/delivery-logs', tenantNotificationController.getDeliveryLogs);
+
+// Tenant gift cards
+router.get('/gift-cards/packages', tenantGiftCardController.listPackages);
+router.post('/gift-cards/packages', tenantGiftCardController.createPackage);
+router.put('/gift-cards/packages/:id', tenantGiftCardController.updatePackage);
+router.patch('/gift-cards/packages/:id/active', tenantGiftCardController.togglePackageActive);
+router.post('/gift-cards/packages/:id/image', tenantGiftCardController.uploadGiftCardImage, tenantGiftCardController.uploadPackageImage);
+router.get('/gift-cards/reports/summary', tenantGiftCardController.getSummaryReport);
+router.get('/gift-cards/reports/transactions', tenantGiftCardController.getTransactionsReport);
 
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);

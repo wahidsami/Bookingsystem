@@ -1,0 +1,244 @@
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { Op } = require('sequelize');
+const db = require('../models');
+
+const ensureTenantId = (req) => req?.tenant?.id || null;
+
+const parseDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const tenantId = ensureTenantId(req);
+    const basePath = path.join(__dirname, '../../uploads/tenant-gift-cards', String(tenantId || 'unknown'));
+    if (!fs.existsSync(basePath)) {
+      fs.mkdirSync(basePath, { recursive: true });
+    }
+    cb(null, basePath);
+  },
+  filename: (_req, file, cb) => {
+    const stamp = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `gift-card-${stamp}${path.extname(file.originalname)}`);
+  }
+});
+
+const uploadFileFilter = (_req, file, cb) => {
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+  if (!allowed.includes(file.mimetype)) {
+    cb(new Error('Only JPG, PNG, and WEBP images are allowed.'));
+    return;
+  }
+  cb(null, true);
+};
+
+exports.uploadGiftCardImage = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: uploadFileFilter
+}).single('image');
+
+exports.listPackages = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const rows = await db.TenantGiftCardPackage.findAll({
+      where: { tenantId },
+      order: [['displayOrder', 'ASC'], ['createdAt', 'DESC']]
+    });
+    return res.json({ success: true, packages: rows });
+  } catch (error) {
+    console.error('tenant gift list packages error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load gift card packages' });
+  }
+};
+
+exports.createPackage = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const {
+      title_en,
+      title_ar,
+      description_en,
+      description_ar,
+      displayOrder = 0,
+      priceAmount = 0,
+      walletCreditAmount = 0,
+      bonusAmount = 0,
+      startsAt = null,
+      endsAt = null,
+      isActive = true
+    } = req.body || {};
+
+    if (!String(title_en || '').trim() || !String(title_ar || '').trim()) {
+      return res.status(400).json({ success: false, message: 'English and Arabic titles are required.' });
+    }
+
+    const created = await db.TenantGiftCardPackage.create({
+      tenantId,
+      title_en: String(title_en || '').trim(),
+      title_ar: String(title_ar || '').trim(),
+      description_en: description_en || null,
+      description_ar: description_ar || null,
+      displayOrder: Number(displayOrder || 0),
+      priceAmount: Number(priceAmount || 0),
+      walletCreditAmount: Number(walletCreditAmount || 0),
+      bonusAmount: Number(bonusAmount || 0),
+      startsAt: parseDate(startsAt),
+      endsAt: parseDate(endsAt),
+      isActive: isActive !== false
+    });
+
+    return res.status(201).json({ success: true, package: created });
+  } catch (error) {
+    console.error('tenant gift create package error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create gift card package' });
+  }
+};
+
+exports.updatePackage = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const item = await db.TenantGiftCardPackage.findOne({ where: { id: req.params.id, tenantId } });
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Gift card package not found' });
+    }
+
+    const payload = req.body || {};
+    if (payload.title_en !== undefined) item.title_en = String(payload.title_en || '').trim();
+    if (payload.title_ar !== undefined) item.title_ar = String(payload.title_ar || '').trim();
+    if (payload.description_en !== undefined) item.description_en = payload.description_en || null;
+    if (payload.description_ar !== undefined) item.description_ar = payload.description_ar || null;
+    if (payload.displayOrder !== undefined) item.displayOrder = Number(payload.displayOrder || 0);
+    if (payload.priceAmount !== undefined) item.priceAmount = Number(payload.priceAmount || 0);
+    if (payload.walletCreditAmount !== undefined) item.walletCreditAmount = Number(payload.walletCreditAmount || 0);
+    if (payload.bonusAmount !== undefined) item.bonusAmount = Number(payload.bonusAmount || 0);
+    if (payload.startsAt !== undefined) item.startsAt = parseDate(payload.startsAt);
+    if (payload.endsAt !== undefined) item.endsAt = parseDate(payload.endsAt);
+    if (payload.isActive !== undefined) item.isActive = payload.isActive !== false;
+
+    if (!String(item.title_en || '').trim() || !String(item.title_ar || '').trim()) {
+      return res.status(400).json({ success: false, message: 'English and Arabic titles are required.' });
+    }
+
+    await item.save();
+    return res.json({ success: true, package: item });
+  } catch (error) {
+    console.error('tenant gift update package error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update gift card package' });
+  }
+};
+
+exports.togglePackageActive = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const item = await db.TenantGiftCardPackage.findOne({ where: { id: req.params.id, tenantId } });
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Gift card package not found' });
+    }
+    item.isActive = req.body?.isActive !== false;
+    await item.save();
+    return res.json({ success: true, package: item });
+  } catch (error) {
+    console.error('tenant gift toggle active error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update gift card package status' });
+  }
+};
+
+exports.uploadPackageImage = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const item = await db.TenantGiftCardPackage.findOne({ where: { id: req.params.id, tenantId } });
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Gift card package not found' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Image file is required' });
+    }
+
+    const normalizedPath = req.file.path
+      .replace(/\\/g, '/')
+      .replace(/^.*uploads\//, 'uploads/');
+    item.imageUrl = `/${normalizedPath}`;
+    await item.save();
+
+    return res.json({ success: true, package: item, imageUrl: item.imageUrl });
+  } catch (error) {
+    console.error('tenant gift upload image error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to upload gift card image' });
+  }
+};
+
+exports.getSummaryReport = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const where = { tenantId };
+    if (req.query.startDate || req.query.endDate) {
+      where.createdAt = {};
+      if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
+      if (req.query.endDate) where.createdAt[Op.lte] = new Date(req.query.endDate);
+    }
+
+    const tx = await db.TenantGiftCardTransaction.findAll({ where });
+    const totals = tx.reduce((acc, row) => {
+      acc.transactionsCount += 1;
+      acc.grossSales += Number(row.purchaseAmount || 0);
+      acc.totalCredit += Number(row.totalCreditAmount || 0);
+      return acc;
+    }, { transactionsCount: 0, grossSales: 0, totalCredit: 0 });
+
+    const settlementRows = await db.TenantGiftCardSettlement.findAll({ where: { tenantId } });
+    const settlements = settlementRows.reduce((acc, row) => {
+      const net = Number(row.netTenantPayableAmount || 0);
+      if (row.status === 'settled') acc.settled += net;
+      else acc.pending += net;
+      return acc;
+    }, { pending: 0, settled: 0 });
+
+    return res.json({
+      success: true,
+      summary: {
+        ...totals,
+        pendingSettlementAmount: settlements.pending,
+        settledAmount: settlements.settled
+      }
+    });
+  } catch (error) {
+    console.error('tenant gift summary report error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load gift card summary report' });
+  }
+};
+
+exports.getTransactionsReport = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const where = { tenantId };
+    if (req.query.status) where.status = req.query.status;
+    if (req.query.startDate || req.query.endDate) {
+      where.createdAt = {};
+      if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
+      if (req.query.endDate) where.createdAt[Op.lte] = new Date(req.query.endDate);
+    }
+
+    const rows = await db.TenantGiftCardTransaction.findAll({
+      where,
+      include: [
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar', 'imageUrl'], required: false },
+        { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
+        { model: db.PlatformUser, as: 'recipient', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
+        { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['id', 'grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: Number(req.query.limit || 200)
+    });
+
+    return res.json({ success: true, transactions: rows });
+  } catch (error) {
+    console.error('tenant gift transactions report error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load gift card transactions report' });
+  }
+};

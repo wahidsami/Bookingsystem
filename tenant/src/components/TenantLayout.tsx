@@ -658,6 +658,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     return [
       { kind: "link", name: locale === 'ar' ? 'العروض الساخنة' : 'Hot Deals', href: `/${locale}/dashboard/hot-deals`, icon: SparklesIcon, visible: hasHotDeals, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP['hot-deals'] },
       { kind: "link", name: locale === 'ar' ? 'إشعارات العملاء' : 'Customer push', href: `/${locale}/dashboard/notifications`, icon: BellIcon, visible: hasPushNotifications, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
+      { kind: "link", name: locale === 'ar' ? 'بطاقات الهدايا' : 'Gift Cards', href: `/${locale}/dashboard/gift-cards`, icon: BanknotesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.notifications },
       { kind: "link", name: t("reviews"), href: `/${locale}/dashboard/reviews`, icon: SparklesIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reviews },
       { kind: "link", name: locale === 'ar' ? 'إعداد الصفحة' : 'Page Setup', href: `/${locale}/dashboard/page-setup`, icon: InformationCircleIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.mypage }
     ];

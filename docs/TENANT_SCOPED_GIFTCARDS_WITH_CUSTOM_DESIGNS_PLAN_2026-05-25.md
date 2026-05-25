@@ -359,7 +359,7 @@ Notification examples:
 
 ## 16) Phase Tracking
 - [x] Phase A - Foundation
-- [ ] Phase B - Tenant Dashboard Management
+- [x] Phase B - Tenant Dashboard Management
 - [ ] Phase C - Customer App Experience
 - [ ] Phase D - Reporting & Reconciliation
 - [ ] Phase E - Hardening
