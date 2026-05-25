@@ -20,6 +20,8 @@ type GiftPackage = {
 
 export function GiftsScreen({ navigation, route }: any) {
   const { language, isRTL } = useLanguage();
+  const tenantId = route?.params?.tenantId as string | undefined;
+  const tenantName = route?.params?.tenantName as string | undefined;
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,34 +38,55 @@ export function GiftsScreen({ navigation, route }: any) {
 
   useEffect(() => {
     const token = `${route?.params?.claimToken || ''}`.trim();
-    if (!token) return;
+    const tenantToken = `${route?.params?.tenantClaimToken || ''}`.trim();
+    if (!token && !tenantToken) return;
 
     const claimGift = async () => {
       try {
         setSaving(true);
-        const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
-        if (!response.success) {
-          Alert.alert('Error', response.message || 'Failed to claim gift');
-        } else {
-          Alert.alert('Success', `Gift claimed. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
+        if (tenantToken) {
+          const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token: tenantToken });
+          if (!response.success) {
+            Alert.alert('Error', response.message || 'Failed to claim gift');
+          } else {
+            Alert.alert('Success', `Gift claimed. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
+          }
+          return;
+        }
+
+        try {
+          const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
+          if (!response.success) {
+            Alert.alert('Error', response.message || 'Failed to claim gift');
+          } else {
+            Alert.alert('Success', `Gift claimed. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
+          }
+        } catch {
+          const tenantResponse = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token });
+          if (!tenantResponse.success) {
+            Alert.alert('Error', tenantResponse.message || 'Failed to claim gift');
+          } else {
+            Alert.alert('Success', `Gift claimed. New balance: ${Number(tenantResponse.walletBalance || 0).toFixed(2)} SAR`);
+          }
         }
       } catch (error: any) {
         Alert.alert('Error', error?.message || 'Failed to claim gift');
       } finally {
         setSaving(false);
-        if (route?.params?.claimToken) {
-          navigation?.setParams?.({ claimToken: undefined });
+        if (route?.params?.claimToken || route?.params?.tenantClaimToken) {
+          navigation?.setParams?.({ claimToken: undefined, tenantClaimToken: undefined });
         }
       }
     };
 
     claimGift();
-  }, [route?.params?.claimToken]);
+  }, [route?.params?.claimToken, route?.params?.tenantClaimToken]);
 
   const loadPackages = async () => {
     try {
       setLoading(true);
-      const response = await api.get<{ success: boolean; packages: GiftPackage[] }>('/users/gifts/packages');
+      const endpoint = tenantId ? `/public/tenant/${tenantId}/gift-cards` : '/users/gifts/packages';
+      const response = await api.get<{ success: boolean; packages: GiftPackage[] }>(endpoint);
       if (response.success) {
         setPackages(response.packages || []);
       }
@@ -86,18 +109,27 @@ export function GiftsScreen({ navigation, route }: any) {
     }
     try {
       setSaving(true);
-      const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/recharge', {
-        packageId: selected.id,
-        cardNumber: cardNumber.trim(),
-        expiryDate: expiryDate.trim(),
-        cvv: cvv.trim(),
-        cardholderName: cardholderName.trim()
-      });
-      if (!response.success) {
-        Alert.alert('Error', response.message || 'Failed to recharge wallet');
+      const finalResponse = tenantId
+        ? await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/purchase', {
+          tenantId,
+          packageId: selected.id,
+          cardNumber: cardNumber.trim(),
+          expiryDate: expiryDate.trim(),
+          cvv: cvv.trim(),
+          cardholderName: cardholderName.trim()
+        })
+        : await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/recharge', {
+          packageId: selected.id,
+          cardNumber: cardNumber.trim(),
+          expiryDate: expiryDate.trim(),
+          cvv: cvv.trim(),
+          cardholderName: cardholderName.trim()
+        });
+      if (!finalResponse.success) {
+        Alert.alert('Error', finalResponse.message || 'Failed to recharge wallet');
         return;
       }
-      Alert.alert('Success', `Wallet recharged. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
+      Alert.alert('Success', `Wallet recharged. New balance: ${Number(finalResponse.walletBalance || 0).toFixed(2)} SAR`);
       setSelected(null);
       setCardNumber('');
       setExpiryDate('');
@@ -123,7 +155,9 @@ export function GiftsScreen({ navigation, route }: any) {
 
     try {
       setSaving(true);
-      const response = await api.post<{ success: boolean; message?: string }>('/users/gifts/send', {
+      const endpoint = tenantId ? '/users/tenant-gifts/send' : '/users/gifts/send';
+      const response = await api.post<{ success: boolean; message?: string }>(endpoint, {
+        ...(tenantId ? { tenantId } : {}),
         packageId: selected.id,
         recipientEmail: recipientEmail.trim() || undefined,
         recipientPhone: recipientPhone.trim() || undefined,
@@ -159,7 +193,11 @@ export function GiftsScreen({ navigation, route }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <AppIcon name="arrow_back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{language === 'ar' ? 'الهدايا' : 'Gifts'}</Text>
+        <Text style={styles.headerTitle}>
+          {tenantId
+            ? (language === 'ar' ? `بطاقات ${tenantName || 'المركز'}` : `${tenantName || 'Center'} Gift Cards`)
+            : (language === 'ar' ? 'الهدايا' : 'Gifts')}
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 

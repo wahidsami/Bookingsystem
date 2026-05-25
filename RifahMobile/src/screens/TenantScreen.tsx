@@ -38,6 +38,18 @@ type StaffReview = {
     createdAt: string;
 };
 
+type TenantGiftPackage = {
+    id: string;
+    title_en: string;
+    title_ar: string;
+    description_en?: string | null;
+    description_ar?: string | null;
+    priceAmount: number;
+    walletCreditAmount: number;
+    bonusAmount: number;
+    imageUrl?: string | null;
+};
+
 const { width } = Dimensions.get('window');
 
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
@@ -48,7 +60,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [tenant, setTenant] = useState<Tenant | null>(null);
     const [pageData, setPageData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'services' | 'products' | 'reviews' | 'about'>('services');
+    const [activeTab, setActiveTab] = useState<'services' | 'products' | 'gifts' | 'reviews' | 'about'>('services');
     const [services, setServices] = useState<Service[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [staff, setStaff] = useState<Staff[]>([]);
@@ -56,6 +68,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showProductsTab, setShowProductsTab] = useState(false);
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
+    const [showGiftsTab, setShowGiftsTab] = useState(false);
+    const [giftPackages, setGiftPackages] = useState<TenantGiftPackage[]>([]);
     const [reviews, setReviews] = useState<TenantReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
@@ -189,6 +203,17 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 if (staffRes.success) setStaff((staffRes.staff || []).map((member) => normalizeStaff(member)));
             } catch {
                 setStaff([]);
+            }
+
+            // 6. Fetch tenant gift cards (isolated tenant scope)
+            try {
+                const giftsRes = await api.get<{ success: boolean; packages: TenantGiftPackage[] }>(`/public/tenant/${idToFetch}/gift-cards`);
+                const packages = giftsRes.success ? (giftsRes.packages || []) : [];
+                setGiftPackages(packages);
+                setShowGiftsTab(packages.length > 0);
+            } catch {
+                setGiftPackages([]);
+                setShowGiftsTab(false);
             }
 
             if (isReviewsEnabled) {
@@ -605,6 +630,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         const availableTabs: string[] = [];
         if (showServicesTab) availableTabs.push('services');
         if (showProductsTab) availableTabs.push('products');
+        if (showGiftsTab) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
         if (showAboutTab) availableTabs.push('about');
 
@@ -626,6 +652,47 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             </View>
         );
     };
+
+    const renderGifts = () => (
+        <View style={styles.contentSection}>
+            {giftPackages.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>{isRTL ? 'لا توجد بطاقات هدايا حالياً.' : 'No gift cards available right now.'}</Text>
+                </View>
+            ) : (
+                giftPackages.map((pkg) => {
+                    const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                    return (
+                        <View key={pkg.id} style={styles.giftCard}>
+                            {pkg.imageUrl ? (
+                                <Image source={{ uri: getImageUrl(pkg.imageUrl) }} style={styles.giftCardImage} />
+                            ) : null}
+                            <Text style={styles.giftCardTitle}>{isRTL ? pkg.title_ar : pkg.title_en}</Text>
+                            {!!(isRTL ? pkg.description_ar : pkg.description_en) && (
+                                <Text style={styles.giftCardDesc} numberOfLines={2}>
+                                    {isRTL ? pkg.description_ar : pkg.description_en}
+                                </Text>
+                            )}
+                            <Text style={styles.giftCardAmount}>
+                                {Number(pkg.priceAmount).toFixed(2)} SAR {'->'} {totalCredit.toFixed(2)} SAR
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.giftCardButton}
+                                onPress={() => navigation.navigate('Gifts', {
+                                    tenantId: tenant?.id,
+                                    tenantName: tenant?.name
+                                })}
+                            >
+                                <Text style={styles.giftCardButtonText}>
+                                    {isRTL ? 'شراء / إرسال' : 'Buy / Send'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    );
+                })
+            )}
+        </View>
+    );
 
     const renderServices = () => {
         // Group services by category
@@ -921,6 +988,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 {renderTabs()}
                 {activeTab === 'services' && renderServices()}
                 {activeTab === 'products' && renderProducts()}
+                {activeTab === 'gifts' && renderGifts()}
                 {activeTab === 'reviews' && renderReviews()}
                 {activeTab === 'about' && renderAbout()}
             </ScrollView>
@@ -1865,6 +1933,49 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: fontSize.md,
         fontWeight: '700',
+    },
+    giftCard: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    giftCardImage: {
+        width: '100%',
+        height: 140,
+        borderRadius: borderRadius.md,
+        marginBottom: spacing.sm,
+    },
+    giftCardTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    giftCardDesc: {
+        marginTop: 4,
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+    },
+    giftCardAmount: {
+        marginTop: spacing.sm,
+        fontSize: fontSize.sm,
+        color: colors.primary,
+        fontWeight: '700',
+    },
+    giftCardButton: {
+        marginTop: spacing.md,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.sm,
+    },
+    giftCardButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: fontSize.sm,
     },
     emptyState: {
         alignItems: 'center',
