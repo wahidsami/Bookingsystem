@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getImageUrl, tenantApi } from '@/lib/api';
+import { TenantLayout } from '@/components/TenantLayout';
 
 type GiftPackage = {
   id: string;
@@ -154,6 +155,7 @@ export default function TenantGiftCardsPage() {
   };
 
   return (
+    <TenantLayout>
     <div className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <h1 className="text-2xl font-bold text-gray-900">{isArabic ? 'بطاقات الهدايا' : 'Gift Cards'}</h1>
@@ -246,5 +248,6 @@ export default function TenantGiftCardsPage() {
         </div>
       </div>
     </div>
+    </TenantLayout>
   );
 }
