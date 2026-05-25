@@ -41,7 +41,7 @@ function AppContent() {
   const [appPhase, setAppPhase] = useState<AppPhase>('splash');
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [hasSavedLanguage, setHasSavedLanguage] = useState(false);
-  const [authInitialRoute, setAuthInitialRoute] = useState<AuthInitialRoute>('Login');
+  const [authInitialRoute, setAuthInitialRoute] = useState<AuthInitialRoute>('Welcome');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
@@ -163,7 +163,7 @@ function AppContent() {
         const hasActiveSession = await api.hasActiveSession();
         if (!hasActiveSession) {
           setIsAuthenticated(false);
-          setAuthInitialRoute('Login');
+          setAuthInitialRoute('Welcome');
           setAppPhase('auth');
           return;
         }
@@ -239,7 +239,7 @@ function AppContent() {
     } else {
       const authenticated = await api.hasActiveSession();
       setIsAuthenticated(authenticated);
-      setAuthInitialRoute('Login');
+      setAuthInitialRoute('Welcome');
       setAppPhase(authenticated ? 'home' : 'auth');
     }
   };
@@ -251,7 +251,7 @@ function AppContent() {
 
   const handleOnboardingComplete = async () => {
     await markOnboardingComplete();
-    setAuthInitialRoute('Login');
+    setAuthInitialRoute('Welcome');
     setAppPhase('auth');
   };
 
@@ -271,7 +271,7 @@ function AppContent() {
     await unregisterCustomerPushNotifications();
     await api.clearTokens();
     setIsAuthenticated(false);
-    setAuthInitialRoute('Login');
+    setAuthInitialRoute('Welcome');
     setAppPhase('auth');
   };
 
