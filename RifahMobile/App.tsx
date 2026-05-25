@@ -299,6 +299,15 @@ function AppContent() {
           setAppPhase('auth');
         },
         continueAsGuest: () => setAppPhase('home'),
+        ensureAuthenticated: (onAuthenticated?: () => void) => {
+          if (!isAuthenticated) {
+            setAuthInitialRoute('Login');
+            setAppPhase('auth');
+            return false;
+          }
+          onAuthenticated?.();
+          return true;
+        },
       }}
     >
       {appPhase === 'splash' ? (

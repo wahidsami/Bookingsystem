@@ -44,7 +44,7 @@ const MIN_CART_LEAD_MINUTES = 60;
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
     const { t, isRTL, language } = useLanguage();
-    const { showLogin } = useAppSession();
+    const { ensureAuthenticated } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
     const { addItem, updateItem } = useServiceBookingCart();
     const [step, setStep] = useState<BookingStep>('staff');
@@ -282,14 +282,15 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const handleBooking = async () => {
         if (!selectedTime) return;
 
-        const user = await api.getUser();
-        if (!user) {
+        if (!ensureAuthenticated()) {
             Alert.alert(t('guestTitle'), t('loginToOrderBookings'), [
                 { text: t('cancel'), style: 'cancel' },
-                { text: t('loginNow'), onPress: showLogin },
+                { text: t('loginNow') },
             ]);
             return;
         }
+        const user = await api.getUser();
+        if (!user) return;
 
         if (includeGuest && (!guestFirstName.trim() || !guestLastName.trim())) {
             Alert.alert('Guest Details', 'Please provide guest first and last name.');

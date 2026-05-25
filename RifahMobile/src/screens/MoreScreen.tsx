@@ -17,7 +17,7 @@ interface MoreScreenProps {
 
 export function MoreScreen({ navigation }: MoreScreenProps) {
     const { t, language } = useLanguage();
-    const { isAuthenticated, logout, showLogin } = useAppSession();
+    const { isAuthenticated, logout, showLogin, ensureAuthenticated } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
     const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
@@ -191,10 +191,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             key={item.id}
                             style={styles.menuItem}
                             onPress={() => {
-                                if (!isAuthenticated && item.id !== 'browse') {
-                                    showLogin();
-                                    return;
-                                }
+                                if (item.id !== 'browse' && !ensureAuthenticated()) return;
 
                                 if (item.action) {
                                     item.action();
@@ -242,10 +239,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             key={item.id}
                             style={styles.menuItem}
                             onPress={() => {
-                                if (!isAuthenticated) {
-                                    showLogin();
-                                    return;
-                                }
+                                if (!ensureAuthenticated()) return;
 
                                 void item.action();
                             }}

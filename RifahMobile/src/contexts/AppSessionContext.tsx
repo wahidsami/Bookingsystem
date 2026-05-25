@@ -8,6 +8,7 @@ interface AppSessionContextValue {
     showRegister: () => void;
     showForgotPassword: () => void;
     continueAsGuest: () => void;
+    ensureAuthenticated: (onAuthenticated?: () => void) => boolean;
 }
 
 const AppSessionContext = createContext<AppSessionContextValue | undefined>(undefined);

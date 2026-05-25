@@ -17,7 +17,7 @@ interface HomeHeaderProps {
 
 export function HomeHeader({ navigation }: HomeHeaderProps) {
     const { t } = useLanguage();
-    const { showLogin, isAuthenticated } = useAppSession();
+    const { ensureAuthenticated, isAuthenticated } = useAppSession();
     const { topInset } = useScreenSafeArea();
     const [user, setUser] = useState<User | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -65,7 +65,7 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
         <View style={[styles.container, { paddingTop: spacing.xl + topInset }]}>
             {/* Left: Avatar */}
             <TouchableOpacity
-                onPress={() => (user ? navigation.navigate('Profile') : showLogin())}
+                onPress={() => ensureAuthenticated(() => navigation.navigate('Profile'))}
                 style={styles.avatarTouchable}
             >
                 <UserAvatar
@@ -86,7 +86,7 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
             <View style={styles.iconsRow}>
                 <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => (isAuthenticated ? navigation.navigate('Notifications') : showLogin())}
+                    onPress={() => ensureAuthenticated(() => navigation.navigate('Notifications'))}
                 >
                     <AppIcon name="bell" size={20} color={colors.primary} />
                     {unreadCount > 0 ? (
