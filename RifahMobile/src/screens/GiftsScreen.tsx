@@ -48,6 +48,33 @@ export function GiftsScreen({ navigation, route }: any) {
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
 
+  const getStatusLabel = (status?: string) => {
+    const key = (status || '').toLowerCase();
+    if (language === 'ar') {
+      if (key === 'redeemed') return 'تم الاستلام';
+      if (key === 'sent_completed') return 'تم الإرسال';
+      if (key === 'sent_pending_claim') return 'بانتظار الاستلام';
+      if (key === 'purchased') return 'تم الشراء';
+      if (key === 'cancelled') return 'ملغي';
+      if (key === 'expired') return 'منتهي';
+      return status || 'غير معروف';
+    }
+    if (key === 'redeemed') return 'Redeemed';
+    if (key === 'sent_completed') return 'Sent';
+    if (key === 'sent_pending_claim') return 'Pending claim';
+    if (key === 'purchased') return 'Purchased';
+    if (key === 'cancelled') return 'Cancelled';
+    if (key === 'expired') return 'Expired';
+    return status || 'Unknown';
+  };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US');
+  };
+
   useEffect(() => {
     const token = `${route?.params?.claimToken || ''}`.trim();
     const tenantToken = `${route?.params?.tenantClaimToken || ''}`.trim();
@@ -249,8 +276,8 @@ export function GiftsScreen({ navigation, route }: any) {
               {history.map((item) => (
                 <View key={item.id} style={styles.historyRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.historyStatus}>{item.status}</Text>
-                    <Text style={styles.historyDate}>{new Date(item.createdAt).toLocaleString()}</Text>
+                    <Text style={styles.historyStatus}>{getStatusLabel(item.status)}</Text>
+                    <Text style={styles.historyDate}>{formatDateTime(item.createdAt)}</Text>
                   </View>
                   <Text style={styles.historyAmount}>+{Number(item.totalCreditAmount || 0).toFixed(2)} SAR</Text>
                 </View>
