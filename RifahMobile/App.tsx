@@ -50,6 +50,27 @@ function AppContent() {
   const [pendingGiftClaimToken, setPendingGiftClaimToken] = useState<string | null>(null);
   const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
 
+  const flushDeferredDeepLinks = () => {
+    if (!isAuthenticated || appPhase !== 'home' || !navigationRef.isReady()) {
+      return;
+    }
+
+    if (pendingInviteToken) {
+      navigateToAppointmentInvite(pendingInviteToken);
+      setPendingInviteToken(null);
+    }
+
+    if (pendingReviewAppointmentId) {
+      navigateToReview(pendingReviewAppointmentId);
+      setPendingReviewAppointmentId(null);
+    }
+
+    if (pendingGiftClaimToken) {
+      navigateToGiftClaim(pendingGiftClaimToken);
+      setPendingGiftClaimToken(null);
+    }
+  };
+
   const extractInviteToken = (url: string | null | undefined): string | null => {
     if (!url) return null;
     const decoded = decodeURIComponent(url);
@@ -181,36 +202,15 @@ function AppContent() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!pendingInviteToken || !isAuthenticated || appPhase !== 'home') {
-      return;
-    }
-
-    if (navigationRef.isReady()) {
-      navigateToAppointmentInvite(pendingInviteToken);
-      setPendingInviteToken(null);
-    }
+    flushDeferredDeepLinks();
   }, [pendingInviteToken, isAuthenticated, appPhase]);
 
   useEffect(() => {
-    if (!pendingReviewAppointmentId || !isAuthenticated || appPhase !== 'home') {
-      return;
-    }
-
-    if (navigationRef.isReady()) {
-      navigateToReview(pendingReviewAppointmentId);
-      setPendingReviewAppointmentId(null);
-    }
+    flushDeferredDeepLinks();
   }, [pendingReviewAppointmentId, isAuthenticated, appPhase]);
 
   useEffect(() => {
-    if (!pendingGiftClaimToken || !isAuthenticated || appPhase !== 'home') {
-      return;
-    }
-
-    if (navigationRef.isReady()) {
-      navigateToGiftClaim(pendingGiftClaimToken);
-      setPendingGiftClaimToken(null);
-    }
+    flushDeferredDeepLinks();
   }, [pendingGiftClaimToken, isAuthenticated, appPhase]);
 
   const loadFontsAndLanguage = async () => {
@@ -344,10 +344,7 @@ function AppContent() {
                   }
                 })
                 .catch(() => undefined);
-              if (pendingInviteToken) {
-                navigateToAppointmentInvite(pendingInviteToken);
-                setPendingInviteToken(null);
-              }
+              flushDeferredDeepLinks();
               consumePendingNotificationCampaignId()
                 .then((pendingNotification) => {
                   if (pendingNotification) {
