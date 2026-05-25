@@ -65,6 +65,7 @@ export default function TenantGiftCardsPage() {
   const [summary, setSummary] = useState<any>(null);
   const [form, setForm] = useState(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'builder' | 'reports'>('builder');
 
   const loadData = async () => {
     try {
@@ -218,7 +219,21 @@ export default function TenantGiftCardsPage() {
             <p className="text-xl font-semibold text-gray-900">{transactionsCount}</p>
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+            <button
+              className={`rounded-lg px-3 py-2 text-sm ${activeTab === 'builder' ? 'bg-white font-semibold text-gray-900 shadow-sm' : 'text-gray-600'}`}
+              onClick={() => setActiveTab('builder')}
+            >
+              {isArabic ? 'إنشاء البطاقات' : 'Card Builder'}
+            </button>
+            <button
+              className={`rounded-lg px-3 py-2 text-sm ${activeTab === 'reports' ? 'bg-white font-semibold text-gray-900 shadow-sm' : 'text-gray-600'}`}
+              onClick={() => setActiveTab('reports')}
+            >
+              {isArabic ? 'التقارير' : 'Reports'}
+            </button>
+          </div>
           <button className="btn btn-secondary" onClick={exportCsv}>
             {isArabic ? 'تصدير CSV' : 'Export CSV'}
           </button>
@@ -227,133 +242,137 @@ export default function TenantGiftCardsPage() {
 
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 xl:col-span-1">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">{editingId ? (isArabic ? 'تعديل البطاقة' : 'Edit package') : (isArabic ? 'إضافة بطاقة جديدة' : 'Create package')}</h2>
-          <div className="space-y-3">
-            <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
-            <input className="input" placeholder="العنوان (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
-            <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
-            <textarea className="input min-h-20" placeholder="الوصف (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
-            <div className="grid grid-cols-2 gap-2">
-              <input className="input" type="number" placeholder={isArabic ? 'الترتيب' : 'Display order'} value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
-              <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3">
-                <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
-                <span>{isArabic ? 'فعالة' : 'Active'}</span>
-              </label>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <input className="input" type="number" step="0.01" placeholder={isArabic ? 'السعر' : 'Price'} value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
-              <input className="input" type="number" step="0.01" placeholder={isArabic ? 'الرصيد' : 'Credit'} value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
-              <input className="input" type="number" step="0.01" placeholder={isArabic ? 'البونص' : 'Bonus'} value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
-              <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
-            </div>
-            <div className="flex gap-2">
-              <button className="btn btn-primary flex-1" disabled={saving} onClick={submit}>{saving ? (isArabic ? 'جارٍ الحفظ...' : 'Saving...') : (editingId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إنشاء' : 'Create'))}</button>
-              {editingId && <button className="btn btn-secondary" onClick={resetForm}>{isArabic ? 'إلغاء' : 'Cancel'}</button>}
+      {activeTab === 'builder' && (
+        <div className="grid gap-6 xl:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 xl:col-span-1">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">{editingId ? (isArabic ? 'تعديل البطاقة' : 'Edit package') : (isArabic ? 'إضافة بطاقة جديدة' : 'Create package')}</h2>
+            <div className="space-y-3">
+              <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
+              <input className="input" placeholder="العنوان (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
+              <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
+              <textarea className="input min-h-20" placeholder="الوصف (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <input className="input" type="number" placeholder={isArabic ? 'الترتيب' : 'Display order'} value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
+                <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3">
+                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
+                  <span>{isArabic ? 'فعالة' : 'Active'}</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'السعر' : 'Price'} value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
+                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'الرصيد' : 'Credit'} value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
+                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'البونص' : 'Bonus'} value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
+                <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
+              </div>
+              <div className="flex gap-2">
+                <button className="btn btn-primary flex-1" disabled={saving} onClick={submit}>{saving ? (isArabic ? 'جارٍ الحفظ...' : 'Saving...') : (editingId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إنشاء' : 'Create'))}</button>
+                {editingId && <button className="btn btn-secondary" onClick={resetForm}>{isArabic ? 'إلغاء' : 'Cancel'}</button>}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white xl:col-span-2">
-          <div className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600">{isArabic ? `الحزم (${packages.length})` : `Packages (${packages.length})`}</div>
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">{isArabic ? 'جارٍ التحميل...' : 'Loading...'}</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {packages.map((pkg) => (
-                <div key={pkg.id} className="p-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <img src={getImageUrl(pkg.imageUrl)} alt={pkg.title_en} className="h-16 w-28 rounded-lg border border-gray-200 object-cover" />
-                    <div className="min-w-52 flex-1">
-                      <p className="font-semibold text-gray-900">{isArabic ? pkg.title_ar : pkg.title_en}</p>
-                      <p className="text-xs text-gray-500">
-                        {Number(pkg.priceAmount).toFixed(2)} SAR {'->'} {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR
-                      </p>
+          <div className="rounded-2xl border border-gray-200 bg-white xl:col-span-2">
+            <div className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600">{isArabic ? `الحزم (${packages.length})` : `Packages (${packages.length})`}</div>
+            {loading ? (
+              <div className="p-8 text-center text-gray-500">{isArabic ? 'جارٍ التحميل...' : 'Loading...'}</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {packages.map((pkg) => (
+                  <div key={pkg.id} className="p-4">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <img src={getImageUrl(pkg.imageUrl)} alt={pkg.title_en} className="h-16 w-28 rounded-lg border border-gray-200 object-cover" />
+                      <div className="min-w-52 flex-1">
+                        <p className="font-semibold text-gray-900">{isArabic ? pkg.title_ar : pkg.title_en}</p>
+                        <p className="text-xs text-gray-500">
+                          {Number(pkg.priceAmount).toFixed(2)} SAR {'->'} {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-xs ${pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>{pkg.isActive ? (isArabic ? 'فعالة' : 'Active') : (isArabic ? 'متوقفة' : 'Inactive')}</span>
+                      <button className="btn btn-secondary" onClick={() => startEdit(pkg)}>{isArabic ? 'تعديل' : 'Edit'}</button>
+                      <button className="btn btn-secondary" onClick={() => toggleActive(pkg)}>{pkg.isActive ? (isArabic ? 'إيقاف' : 'Deactivate') : (isArabic ? 'تفعيل' : 'Activate')}</button>
+                      <label className="btn btn-secondary cursor-pointer">
+                        {isArabic ? 'رفع صورة' : 'Upload image'}
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => onUploadImage(pkg.id, e.target.files?.[0])} />
+                      </label>
                     </div>
-                    <span className={`rounded-full px-2 py-1 text-xs ${pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>{pkg.isActive ? (isArabic ? 'فعالة' : 'Active') : (isArabic ? 'متوقفة' : 'Inactive')}</span>
-                    <button className="btn btn-secondary" onClick={() => startEdit(pkg)}>{isArabic ? 'تعديل' : 'Edit'}</button>
-                    <button className="btn btn-secondary" onClick={() => toggleActive(pkg)}>{pkg.isActive ? (isArabic ? 'إيقاف' : 'Deactivate') : (isArabic ? 'تفعيل' : 'Activate')}</button>
-                    <label className="btn btn-secondary cursor-pointer">
-                      {isArabic ? 'رفع صورة' : 'Upload image'}
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => onUploadImage(pkg.id, e.target.files?.[0])} />
-                    </label>
                   </div>
-                </div>
-              ))}
-              {!packages.length && <div className="p-8 text-center text-gray-500">{isArabic ? 'لا توجد بطاقات حالياً' : 'No gift card packages yet'}</div>}
-            </div>
-          )}
+                ))}
+                {!packages.length && <div className="p-8 text-center text-gray-500">{isArabic ? 'لا توجد بطاقات حالياً' : 'No gift card packages yet'}</div>}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <div className="border-b border-gray-200 px-4 py-3">
-          <h3 className="text-sm font-semibold text-gray-800">
-            {isArabic ? 'تقرير تفصيلي لحركة بطاقات الهدايا' : 'Detailed Gift Card Transactions'}
-          </h3>
-          <p className="mt-1 text-xs text-gray-500">
-            {isArabic
-              ? 'يعرض من اشترى البطاقة، لمن أُرسلت، أين ذهب الرصيد، وحالة التسوية المالية.'
-              : 'Shows purchaser, recipient, where credit went, and settlement status.'}
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="px-3 py-2 text-left">{isArabic ? 'التاريخ' : 'Date'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'الباقة' : 'Package'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'المشتري' : 'Purchaser'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'المستلم' : 'Recipient'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'قناة الإرسال' : 'Delivery'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'الحالة' : 'Status'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'المدفوع' : 'Paid'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'الرصيد المضاف' : 'Credited'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'إلى رصيد' : 'Balance Destination'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'صافي مستحق المركز' : 'Net Tenant Payable'}</th>
-                <th className="px-3 py-2 text-left">{isArabic ? 'حالة التسوية' : 'Settlement'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((tx) => {
-                const packageTitle = isArabic ? (tx.package?.title_ar || tx.package?.title_en || '-') : (tx.package?.title_en || tx.package?.title_ar || '-');
-                const recipientLabel = personLabel(tx.recipient) !== '-' ? personLabel(tx.recipient) : (tx.recipientEmail || tx.recipientPhone || '-');
-                const destination = tx.recipient
-                  ? `${isArabic ? 'محفظة المستخدم' : 'User wallet'} (${recipientLabel})`
-                  : (tx.recipientEmail || tx.recipientPhone
-                    ? `${isArabic ? 'مطالبة لاحقة عبر' : 'Pending claim via'} ${tx.recipientEmail || tx.recipientPhone}`
-                    : (isArabic ? 'محفظة المشتري' : 'Purchaser wallet'));
-                return (
-                  <tr key={tx.id} className="border-t border-gray-100">
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{new Date(tx.createdAt).toLocaleString(isArabic ? 'ar-SA' : 'en-US')}</td>
-                    <td className="px-3 py-2 text-gray-800">{packageTitle}</td>
-                    <td className="px-3 py-2 text-gray-700">{personLabel(tx.sender)}</td>
-                    <td className="px-3 py-2 text-gray-700">{recipientLabel}</td>
-                    <td className="px-3 py-2 text-gray-700">{tx.deliveryChannel || '-'}</td>
-                    <td className="px-3 py-2 text-gray-700">{formatStatus(tx.status)}</td>
-                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{Number(tx.purchaseAmount || 0).toFixed(2)} SAR</td>
-                    <td className="px-3 py-2 text-emerald-700 whitespace-nowrap">+{Number(tx.totalCreditAmount || 0).toFixed(2)} SAR</td>
-                    <td className="px-3 py-2 text-gray-700">{destination}</td>
-                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{Number(tx.settlement?.netTenantPayableAmount || 0).toFixed(2)} SAR</td>
-                    <td className="px-3 py-2 text-gray-700">{formatStatus(tx.settlement?.status)}</td>
-                  </tr>
-                );
-              })}
-              {!transactions.length && (
+      {activeTab === 'reports' && (
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <div className="border-b border-gray-200 px-4 py-3">
+            <h3 className="text-sm font-semibold text-gray-800">
+              {isArabic ? 'تقرير تفصيلي لحركة بطاقات الهدايا' : 'Detailed Gift Card Transactions'}
+            </h3>
+            <p className="mt-1 text-xs text-gray-500">
+              {isArabic
+                ? 'يعرض من اشترى البطاقة، لمن أُرسلت، أين ذهب الرصيد، وحالة التسوية المالية.'
+                : 'Shows purchaser, recipient, where credit went, and settlement status.'}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
-                    {isArabic ? 'لا توجد عمليات حتى الآن' : 'No transactions yet'}
-                  </td>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'التاريخ' : 'Date'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'الباقة' : 'Package'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'المشتري' : 'Purchaser'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'المستلم' : 'Recipient'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'قناة الإرسال' : 'Delivery'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'الحالة' : 'Status'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'المدفوع' : 'Paid'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'الرصيد المضاف' : 'Credited'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'إلى رصيد' : 'Balance Destination'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'صافي مستحق المركز' : 'Net Tenant Payable'}</th>
+                  <th className="px-3 py-2 text-left">{isArabic ? 'حالة التسوية' : 'Settlement'}</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {transactions.map((tx) => {
+                  const packageTitle = isArabic ? (tx.package?.title_ar || tx.package?.title_en || '-') : (tx.package?.title_en || tx.package?.title_ar || '-');
+                  const recipientLabel = personLabel(tx.recipient) !== '-' ? personLabel(tx.recipient) : (tx.recipientEmail || tx.recipientPhone || '-');
+                  const destination = tx.recipient
+                    ? `${isArabic ? 'محفظة المستخدم' : 'User wallet'} (${recipientLabel})`
+                    : (tx.recipientEmail || tx.recipientPhone
+                      ? `${isArabic ? 'مطالبة لاحقة عبر' : 'Pending claim via'} ${tx.recipientEmail || tx.recipientPhone}`
+                      : (isArabic ? 'محفظة المشتري' : 'Purchaser wallet'));
+                  return (
+                    <tr key={tx.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{new Date(tx.createdAt).toLocaleString(isArabic ? 'ar-SA' : 'en-US')}</td>
+                      <td className="px-3 py-2 text-gray-800">{packageTitle}</td>
+                      <td className="px-3 py-2 text-gray-700">{personLabel(tx.sender)}</td>
+                      <td className="px-3 py-2 text-gray-700">{recipientLabel}</td>
+                      <td className="px-3 py-2 text-gray-700">{tx.deliveryChannel || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{formatStatus(tx.status)}</td>
+                      <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{Number(tx.purchaseAmount || 0).toFixed(2)} SAR</td>
+                      <td className="px-3 py-2 text-emerald-700 whitespace-nowrap">+{Number(tx.totalCreditAmount || 0).toFixed(2)} SAR</td>
+                      <td className="px-3 py-2 text-gray-700">{destination}</td>
+                      <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{Number(tx.settlement?.netTenantPayableAmount || 0).toFixed(2)} SAR</td>
+                      <td className="px-3 py-2 text-gray-700">{formatStatus(tx.settlement?.status)}</td>
+                    </tr>
+                  );
+                })}
+                {!transactions.length && (
+                  <tr>
+                    <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                      {isArabic ? 'لا توجد عمليات حتى الآن' : 'No transactions yet'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
     </TenantLayout>
   );
