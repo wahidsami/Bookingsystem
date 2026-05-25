@@ -4,6 +4,7 @@ const userController = require('../controllers/userController');
 const paymentMethodController = require('../controllers/paymentMethodController');
 const reviewController = require('../controllers/reviewController');
 const userGiftController = require('../controllers/userGiftController');
+const userTenantGiftController = require('../controllers/userTenantGiftController');
 const { authenticateUser } = require('../middleware/authUser');
 
 // Get user profile
@@ -49,6 +50,14 @@ router.post('/gifts/send', authenticateUser, userGiftController.sendGiftPackage)
 router.post('/gifts/claim', authenticateUser, userGiftController.claimGift);
 router.get('/gifts/history', authenticateUser, userGiftController.listMyGiftTransactions);
 router.get('/gifts/claim/open', userGiftController.openGiftClaimLink);
+
+// Tenant-scoped gifts & wallet
+router.post('/tenant-gifts/purchase', authenticateUser, userTenantGiftController.purchaseForSelf);
+router.post('/tenant-gifts/send', authenticateUser, userTenantGiftController.sendGift);
+router.post('/tenant-gifts/claim', authenticateUser, userTenantGiftController.claimGift);
+router.get('/tenant-gifts/history', authenticateUser, userTenantGiftController.listMyTenantGiftTransactions);
+router.get('/tenant-gifts/wallet', authenticateUser, userTenantGiftController.getTenantWalletBalance);
+router.get('/tenant-gifts/claim/open', userTenantGiftController.openGiftClaimLink);
 
 module.exports = router;
 

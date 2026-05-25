@@ -9,6 +9,7 @@ const publicTenantController = require('../controllers/publicTenantController');
 const publicBillPaymentController = require('../controllers/publicBillPaymentController');
 const reviewController = require('../controllers/reviewController');
 const publicGiftController = require('../controllers/publicGiftController');
+const publicTenantGiftController = require('../controllers/publicTenantGiftController');
 const { optionalAuth } = require('../middleware/authUser');
 
 // Get all active tenants (for browse/discovery)
@@ -46,6 +47,7 @@ router.post('/tenant/:tenantId/orders', optionalAuth, publicTenantController.cre
 // Contact form
 router.post('/tenant/:tenantId/contact', publicTenantController.submitContactForm);
 router.get('/gifts/packages', publicGiftController.listActiveGiftPackages);
+router.get('/tenant/:tenantId/gift-cards', publicTenantGiftController.listTenantGiftPackages);
 
 // Bill payment links
 router.get('/bills/by-token/:token', publicBillPaymentController.getBillByToken);

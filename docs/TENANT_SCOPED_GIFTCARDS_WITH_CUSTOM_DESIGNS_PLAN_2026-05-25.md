@@ -363,3 +363,14 @@ Notification examples:
 - [ ] Phase C - Customer App Experience
 - [ ] Phase D - Reporting & Reconciliation
 - [ ] Phase E - Hardening
+
+### Phase C progress note (2026-05-25)
+- Backend customer-facing tenant gift APIs implemented:
+  - public tenant package listing
+  - purchase for self
+  - send gift
+  - claim gift
+  - tenant wallet balance/ledger endpoint
+- Remaining in Phase C:
+  - customer app tenant page tab + purchase UX wiring
+  - claim deep-link handling screen wiring
