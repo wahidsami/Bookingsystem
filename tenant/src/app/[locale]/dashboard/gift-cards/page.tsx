@@ -204,7 +204,9 @@ export default function TenantGiftCardsPage() {
                     <img src={getImageUrl(pkg.imageUrl)} alt={pkg.title_en} className="h-16 w-28 rounded-lg border border-gray-200 object-cover" />
                     <div className="min-w-52 flex-1">
                       <p className="font-semibold text-gray-900">{isArabic ? pkg.title_ar : pkg.title_en}</p>
-                      <p className="text-xs text-gray-500">{Number(pkg.priceAmount).toFixed(2)} SAR -> {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR</p>
+                      <p className="text-xs text-gray-500">
+                        {Number(pkg.priceAmount).toFixed(2)} SAR {'->'} {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR
+                      </p>
                     </div>
                     <span className={`rounded-full px-2 py-1 text-xs ${pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>{pkg.isActive ? (isArabic ? 'فعالة' : 'Active') : (isArabic ? 'متوقفة' : 'Inactive')}</span>
                     <button className="btn btn-secondary" onClick={() => startEdit(pkg)}>{isArabic ? 'تعديل' : 'Edit'}</button>
@@ -224,4 +226,3 @@ export default function TenantGiftCardsPage() {
     </div>
   );
 }
-
