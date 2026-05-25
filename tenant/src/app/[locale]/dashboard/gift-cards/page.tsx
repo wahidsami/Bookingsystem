@@ -21,6 +21,23 @@ type GiftPackage = {
   isActive: boolean;
 };
 
+type GiftTransaction = {
+  id: string;
+  status: string;
+  deliveryChannel: string;
+  purchaseAmount: number;
+  creditAmount: number;
+  bonusAmount: number;
+  totalCreditAmount: number;
+  recipientEmail?: string | null;
+  recipientPhone?: string | null;
+  createdAt: string;
+  sender?: { firstName?: string; lastName?: string; email?: string } | null;
+  recipient?: { firstName?: string; lastName?: string; email?: string } | null;
+  package?: { title_en?: string; title_ar?: string } | null;
+  settlement?: { status?: string; grossAmount?: number; platformFeeAmount?: number; netTenantPayableAmount?: number } | null;
+};
+
 const defaultForm = {
   title_en: '',
   title_ar: '',
@@ -44,6 +61,7 @@ export default function TenantGiftCardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [packages, setPackages] = useState<GiftPackage[]>([]);
   const [transactionsCount, setTransactionsCount] = useState(0);
+  const [transactions, setTransactions] = useState<GiftTransaction[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [form, setForm] = useState(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,6 +77,7 @@ export default function TenantGiftCardsPage() {
       ]);
       setPackages(packagesRes?.packages || []);
       setSummary(summaryRes?.summary || null);
+      setTransactions(txRes?.transactions || []);
       setTransactionsCount((txRes?.transactions || []).length);
     } catch (err: any) {
       setError(err?.message || 'Failed to load gift cards');
@@ -154,6 +173,29 @@ export default function TenantGiftCardsPage() {
     }
   };
 
+  const personLabel = (person?: { firstName?: string; lastName?: string; email?: string } | null) => {
+    if (!person) return '-';
+    const full = `${person.firstName || ''} ${person.lastName || ''}`.trim();
+    return full || person.email || '-';
+  };
+
+  const formatStatus = (status?: string) => {
+    const key = (status || '').toLowerCase();
+    if (isArabic) {
+      if (key === 'redeemed') return 'تم الاستلام';
+      if (key === 'sent_completed') return 'تم الإرسال';
+      if (key === 'sent_pending_claim') return 'بانتظار الاستلام';
+      if (key === 'purchased') return 'تم الشراء';
+      if (key === 'cancelled') return 'ملغي';
+      if (key === 'expired') return 'منتهي';
+      if (key === 'pending') return 'معلق';
+      if (key === 'partially_settled') return 'تسوية جزئية';
+      if (key === 'settled') return 'تمت التسوية';
+      return status || '-';
+    }
+    return status || '-';
+  };
+
   return (
     <TenantLayout>
     <div className="space-y-6">
@@ -245,6 +287,71 @@ export default function TenantGiftCardsPage() {
               {!packages.length && <div className="p-8 text-center text-gray-500">{isArabic ? 'لا توجد بطاقات حالياً' : 'No gift card packages yet'}</div>}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="border-b border-gray-200 px-4 py-3">
+          <h3 className="text-sm font-semibold text-gray-800">
+            {isArabic ? 'تقرير تفصيلي لحركة بطاقات الهدايا' : 'Detailed Gift Card Transactions'}
+          </h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {isArabic
+              ? 'يعرض من اشترى البطاقة، لمن أُرسلت، أين ذهب الرصيد، وحالة التسوية المالية.'
+              : 'Shows purchaser, recipient, where credit went, and settlement status.'}
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="px-3 py-2 text-left">{isArabic ? 'التاريخ' : 'Date'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'الباقة' : 'Package'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'المشتري' : 'Purchaser'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'المستلم' : 'Recipient'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'قناة الإرسال' : 'Delivery'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'الحالة' : 'Status'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'المدفوع' : 'Paid'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'الرصيد المضاف' : 'Credited'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'إلى رصيد' : 'Balance Destination'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'صافي مستحق المركز' : 'Net Tenant Payable'}</th>
+                <th className="px-3 py-2 text-left">{isArabic ? 'حالة التسوية' : 'Settlement'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => {
+                const packageTitle = isArabic ? (tx.package?.title_ar || tx.package?.title_en || '-') : (tx.package?.title_en || tx.package?.title_ar || '-');
+                const recipientLabel = personLabel(tx.recipient) !== '-' ? personLabel(tx.recipient) : (tx.recipientEmail || tx.recipientPhone || '-');
+                const destination = tx.recipient
+                  ? `${isArabic ? 'محفظة المستخدم' : 'User wallet'} (${recipientLabel})`
+                  : (tx.recipientEmail || tx.recipientPhone
+                    ? `${isArabic ? 'مطالبة لاحقة عبر' : 'Pending claim via'} ${tx.recipientEmail || tx.recipientPhone}`
+                    : (isArabic ? 'محفظة المشتري' : 'Purchaser wallet'));
+                return (
+                  <tr key={tx.id} className="border-t border-gray-100">
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{new Date(tx.createdAt).toLocaleString(isArabic ? 'ar-SA' : 'en-US')}</td>
+                    <td className="px-3 py-2 text-gray-800">{packageTitle}</td>
+                    <td className="px-3 py-2 text-gray-700">{personLabel(tx.sender)}</td>
+                    <td className="px-3 py-2 text-gray-700">{recipientLabel}</td>
+                    <td className="px-3 py-2 text-gray-700">{tx.deliveryChannel || '-'}</td>
+                    <td className="px-3 py-2 text-gray-700">{formatStatus(tx.status)}</td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{Number(tx.purchaseAmount || 0).toFixed(2)} SAR</td>
+                    <td className="px-3 py-2 text-emerald-700 whitespace-nowrap">+{Number(tx.totalCreditAmount || 0).toFixed(2)} SAR</td>
+                    <td className="px-3 py-2 text-gray-700">{destination}</td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{Number(tx.settlement?.netTenantPayableAmount || 0).toFixed(2)} SAR</td>
+                    <td className="px-3 py-2 text-gray-700">{formatStatus(tx.settlement?.status)}</td>
+                  </tr>
+                );
+              })}
+              {!transactions.length && (
+                <tr>
+                  <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                    {isArabic ? 'لا توجد عمليات حتى الآن' : 'No transactions yet'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
