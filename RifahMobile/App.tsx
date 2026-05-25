@@ -1,23 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppState, AppStateStatus, Linking, StyleSheet, Text, View } from 'react-native';
+import { AppState, AppStateStatus, Linking, Text } from 'react-native';
 import * as Font from 'expo-font';
 import { SplashScreen } from './src/screens/SplashScreen';
-import { LanguageSelection } from './src/screens/LanguageSelection';
-import { OnboardingScreens } from './src/screens/OnboardingScreens';
-import { WelcomeScreen } from './src/screens/WelcomeScreen';
-import { LoginScreen } from './src/screens/LoginScreen';
-import { RegisterScreen } from './src/screens/RegisterScreen';
-import { GoogleOnboardingScreen } from './src/screens/GoogleOnboardingScreen';
-import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
-import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { LanguageProvider, useLanguage } from './src/contexts/LanguageContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { ServiceBookingCartProvider } from './src/contexts/ServiceBookingCartContext';
 import { getLanguage } from './src/utils/language';
 import { hasCompletedOnboarding, markOnboardingComplete } from './src/utils/onboarding';
-import { colors } from './src/theme/colors';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -25,8 +16,10 @@ import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
 import { navigationRef, navigateToAppointmentInvite, navigateToGiftClaim, navigateToNotifications, navigateToReview } from './src/navigation/navigationService';
+import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
+import { AuthInitialRoute, AuthNavigator } from './src/navigation/AuthNavigator';
 
-type AppScreen = 'splash' | 'language' | 'onboarding' | 'welcome' | 'login' | 'register' | 'googleOnboarding' | 'forgotPassword' | 'resetPassword' | 'home';
+type AppPhase = 'splash' | 'onboarding' | 'auth' | 'home';
 
 // Load Cairo fonts
 const loadFonts = async () => {
@@ -45,8 +38,10 @@ const loadFonts = async () => {
 };
 
 function AppContent() {
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('splash');
+  const [appPhase, setAppPhase] = useState<AppPhase>('splash');
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [hasSavedLanguage, setHasSavedLanguage] = useState(false);
+  const [authInitialRoute, setAuthInitialRoute] = useState<AuthInitialRoute>('Login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
@@ -108,7 +103,8 @@ function AppContent() {
       const resetToken = extractPasswordResetToken(url);
       if (resetToken) {
         setPasswordResetToken(resetToken);
-        setCurrentScreen('resetPassword');
+        setAuthInitialRoute('ResetPassword');
+        setAppPhase('auth');
         return;
       }
 
@@ -167,7 +163,8 @@ function AppContent() {
         const hasActiveSession = await api.hasActiveSession();
         if (!hasActiveSession) {
           setIsAuthenticated(false);
-          setCurrentScreen('login');
+          setAuthInitialRoute('Login');
+          setAppPhase('auth');
           return;
         }
 
@@ -184,7 +181,7 @@ function AppContent() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!pendingInviteToken || !isAuthenticated || currentScreen !== 'home') {
+    if (!pendingInviteToken || !isAuthenticated || appPhase !== 'home') {
       return;
     }
 
@@ -192,10 +189,10 @@ function AppContent() {
       navigateToAppointmentInvite(pendingInviteToken);
       setPendingInviteToken(null);
     }
-  }, [pendingInviteToken, isAuthenticated, currentScreen]);
+  }, [pendingInviteToken, isAuthenticated, appPhase]);
 
   useEffect(() => {
-    if (!pendingReviewAppointmentId || !isAuthenticated || currentScreen !== 'home') {
+    if (!pendingReviewAppointmentId || !isAuthenticated || appPhase !== 'home') {
       return;
     }
 
@@ -203,10 +200,10 @@ function AppContent() {
       navigateToReview(pendingReviewAppointmentId);
       setPendingReviewAppointmentId(null);
     }
-  }, [pendingReviewAppointmentId, isAuthenticated, currentScreen]);
+  }, [pendingReviewAppointmentId, isAuthenticated, appPhase]);
 
   useEffect(() => {
-    if (!pendingGiftClaimToken || !isAuthenticated || currentScreen !== 'home') {
+    if (!pendingGiftClaimToken || !isAuthenticated || appPhase !== 'home') {
       return;
     }
 
@@ -214,7 +211,7 @@ function AppContent() {
       navigateToGiftClaim(pendingGiftClaimToken);
       setPendingGiftClaimToken(null);
     }
-  }, [pendingGiftClaimToken, isAuthenticated, currentScreen]);
+  }, [pendingGiftClaimToken, isAuthenticated, appPhase]);
 
   const loadFontsAndLanguage = async () => {
     await loadFonts();
@@ -224,6 +221,7 @@ function AppContent() {
 
   const checkAppState = async () => {
     const savedLanguage = await getLanguage();
+    setHasSavedLanguage(Boolean(savedLanguage));
     if (savedLanguage) {
       await setLanguage(savedLanguage);
     }
@@ -231,46 +229,50 @@ function AppContent() {
 
   const handleSplashFinish = async () => {
     const savedLanguage = await getLanguage();
+    setHasSavedLanguage(Boolean(savedLanguage));
     const onboardingCompleted = await hasCompletedOnboarding();
 
     if (!savedLanguage) {
-      setCurrentScreen('language');
+      setAppPhase('onboarding');
     } else if (!onboardingCompleted) {
-      setCurrentScreen('onboarding');
+      setAppPhase('onboarding');
     } else {
       const authenticated = await api.hasActiveSession();
       setIsAuthenticated(authenticated);
-      setCurrentScreen(authenticated ? 'home' : 'login');
+      setAuthInitialRoute('Login');
+      setAppPhase(authenticated ? 'home' : 'auth');
     }
   };
 
   const handleLanguageSelect = async (language: 'ar' | 'en') => {
-    await setLanguage(language); // Use context's setLanguage instead
-    setCurrentScreen('onboarding');
+    await setLanguage(language);
+    setHasSavedLanguage(true);
   };
 
   const handleOnboardingComplete = async () => {
     await markOnboardingComplete();
-    setCurrentScreen('login');
+    setAuthInitialRoute('Login');
+    setAppPhase('auth');
   };
 
   const handleLoginSuccess = () => {
     api.touchSession().catch(() => undefined);
     setIsAuthenticated(true);
-    setCurrentScreen('home');
+    setAppPhase('home');
   };
 
   const handleRegisterSuccess = () => {
     api.touchSession().catch(() => undefined);
     setIsAuthenticated(true);
-    setCurrentScreen('home');
+    setAppPhase('home');
   };
 
   const handleLogout = async () => {
     await unregisterCustomerPushNotifications();
     await api.clearTokens();
     setIsAuthenticated(false);
-    setCurrentScreen('login');
+    setAuthInitialRoute('Login');
+    setAppPhase('auth');
   };
 
   // Show nothing while fonts are loading
@@ -284,97 +286,53 @@ function AppContent() {
         isAuthenticated,
         login: handleLoginSuccess,
         logout: handleLogout,
-        showLogin: () => setCurrentScreen('login'),
-        showRegister: () => setCurrentScreen('register'),
-        showForgotPassword: () => setCurrentScreen('forgotPassword'),
-        continueAsGuest: () => setCurrentScreen('home'),
+        showLogin: () => {
+          setAuthInitialRoute('Login');
+          setAppPhase('auth');
+        },
+        showRegister: () => {
+          setAuthInitialRoute('Register');
+          setAppPhase('auth');
+        },
+        showForgotPassword: () => {
+          setAuthInitialRoute('ForgotPassword');
+          setAppPhase('auth');
+        },
+        continueAsGuest: () => setAppPhase('home'),
       }}
     >
-      {currentScreen === 'splash' ? (
+      {appPhase === 'splash' ? (
         <><SplashScreen onFinish={handleSplashFinish} /><StatusBar style="light" /></>
       ) : null}
 
-      {currentScreen === 'language' ? (
-        <><LanguageSelection onLanguageSelect={handleLanguageSelect} /><StatusBar style="dark" /></>
-      ) : null}
-
-      {currentScreen === 'onboarding' ? (
+      {appPhase === 'onboarding' ? (
         <>
-          <OnboardingScreens
-            onComplete={handleOnboardingComplete}
-            onBackToLanguage={() => setCurrentScreen('language')}
-          />
+          <NavigationContainer>
+            <OnboardingNavigator
+              hasSavedLanguage={hasSavedLanguage}
+              onLanguageSelected={handleLanguageSelect}
+              onOnboardingCompleted={handleOnboardingComplete}
+            />
+          </NavigationContainer>
           <StatusBar style="dark" />
         </>
       ) : null}
 
-      {currentScreen === 'welcome' ? (
+      {appPhase === 'auth' ? (
         <>
-          <WelcomeScreen
-            onLogin={() => setCurrentScreen('login')}
-            onRegister={() => setCurrentScreen('register')}
-            onGuest={() => setCurrentScreen('home')}
-          />
+          <NavigationContainer key={`${authInitialRoute}:${passwordResetToken || ''}`}>
+            <AuthNavigator
+              initialRoute={authInitialRoute}
+              passwordResetToken={passwordResetToken}
+              onAuthSuccess={handleLoginSuccess}
+              onContinueAsGuest={() => setAppPhase('home')}
+            />
+          </NavigationContainer>
           <StatusBar style="dark" />
         </>
       ) : null}
 
-      {currentScreen === 'login' ? (
-        <>
-          <LoginScreen
-            onLoginSuccess={handleLoginSuccess}
-            onBackToWelcome={() => setCurrentScreen('welcome')}
-            onGoToRegister={() => setCurrentScreen('register')}
-            onForgotPassword={() => setCurrentScreen('forgotPassword')}
-            onGoogleSignIn={() => setCurrentScreen('googleOnboarding')}
-          />
-          <StatusBar style="dark" />
-        </>
-      ) : null}
-
-      {currentScreen === 'register' ? (
-        <>
-          <RegisterScreen
-            onRegisterSuccess={handleRegisterSuccess}
-            onBackToWelcome={() => setCurrentScreen('welcome')}
-            onGoToLogin={() => setCurrentScreen('login')}
-            onGoogleSignIn={() => setCurrentScreen('googleOnboarding')}
-          />
-          <StatusBar style="dark" />
-        </>
-      ) : null}
-
-      {currentScreen === 'googleOnboarding' ? (
-        <>
-          <GoogleOnboardingScreen
-            onSuccess={handleLoginSuccess}
-            onBack={() => setCurrentScreen('welcome')}
-          />
-          <StatusBar style="dark" />
-        </>
-      ) : null}
-
-      {currentScreen === 'forgotPassword' ? (
-        <>
-          <ForgotPasswordScreen
-            onBackToLogin={() => setCurrentScreen('login')}
-            onBackToWelcome={() => setCurrentScreen('welcome')}
-          />
-          <StatusBar style="dark" />
-        </>
-      ) : null}
-
-      {currentScreen === 'resetPassword' ? (
-        <>
-          <ResetPasswordScreen
-            token={passwordResetToken || ''}
-            onBackToLogin={() => setCurrentScreen('login')}
-          />
-          <StatusBar style="dark" />
-        </>
-      ) : null}
-
-      {currentScreen === 'home' ? (
+      {appPhase === 'home' ? (
         <ServiceBookingCartProvider>
           <NavigationContainer
             ref={navigationRef}
@@ -401,6 +359,7 @@ function AppContent() {
           >
             <RootNavigator />
           </NavigationContainer>
+          <StatusBar style="dark" />
         </ServiceBookingCartProvider>
       ) : null}
     </AppSessionProvider>
@@ -420,24 +379,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 8,
-  },
-});
