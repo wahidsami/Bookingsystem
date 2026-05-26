@@ -205,6 +205,10 @@ Status: `Planned`
    - Updated `RegisterScreen` with matching visual hierarchy and auth surface card
    - Updated `GoogleOnboardingScreen` with consistent gradient backdrop and elevated card styling
    - Authentication logic and API flows unchanged
+4. Phase 1 checkpoint 3 completed:
+   - Added subtle onboarding text transition animation (fade + upward settle) per slide
+   - Added welcome CTA entrance animation for primary/secondary actions
+   - Motion implemented with native `Animated` API to avoid dependency risk
 
 ## 11) Immediate Next Step
 Continue Phase 1 on `Login`, `Register`, and `GoogleOnboarding` visual hierarchy and motion polish while preserving auth logic.

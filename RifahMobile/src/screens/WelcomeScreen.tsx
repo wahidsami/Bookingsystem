@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, Easing } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -22,8 +22,30 @@ interface WelcomeScreenProps {
 export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenProps) {
     const { t, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
+    const ctaAnim = useRef(new Animated.Value(0)).current;
 
     const paddingHorizontal = Math.max(16, SCREEN_WIDTH * 0.07); // ~7% of screen width
+
+    useEffect(() => {
+        Animated.timing(ctaAnim, {
+            toValue: 1,
+            duration: 420,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [ctaAnim]);
+
+    const ctaAnimatedStyle = {
+        opacity: ctaAnim,
+        transform: [
+            {
+                translateY: ctaAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [16, 0],
+                }),
+            },
+        ],
+    };
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -59,7 +81,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
                 </View>
 
                 {/* 4 & 5 Button Section */}
-                <View style={styles.buttonsContainer}>
+                <Animated.View style={[styles.buttonsContainer, ctaAnimatedStyle]}>
                     <TouchableOpacity
                         style={styles.primaryButton}
                         onPress={onLogin}
@@ -75,7 +97,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
                     >
                         <Text style={styles.secondaryButtonText}>{t('registerButton')}</Text>
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
 
                 {/* 6. Divider */}
                 <View style={styles.dividerContainer}>

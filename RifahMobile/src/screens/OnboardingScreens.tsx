@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Image, I18nManager } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Image, I18nManager, Animated, Easing } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import Swiper from 'react-native-swiper';
@@ -24,6 +24,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
     const { t, language } = useLanguage();
     const swiperRef = useRef<Swiper>(null);
     const [activeIndex, setActiveIndex] = useState(0);
+    const textAnim = useRef(new Animated.Value(0)).current;
     const insets = useSafeAreaInsets();
 
     const screens = [
@@ -59,6 +60,28 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
         } else {
             onComplete();
         }
+    };
+
+    useEffect(() => {
+        textAnim.setValue(0);
+        Animated.timing(textAnim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [activeIndex, textAnim]);
+
+    const textAnimatedStyle = {
+        opacity: textAnim,
+        transform: [
+            {
+                translateY: textAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [14, 0],
+                }),
+            },
+        ],
     };
 
     const handlePrevious = () => {
@@ -160,7 +183,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
                         </View>
 
                         {/* 2. Text Block (Safely below image) */}
-                        <View style={styles.textContainer}>
+                        <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
                             <View style={styles.textCard}>
                             <Text style={styles.title}>
                                 {screen.title}
@@ -169,7 +192,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
                                 {screen.description}
                             </Text>
                             </View>
-                        </View>
+                        </Animated.View>
 
                         {/* Ensure pagination space doesn't clash with subtitle */}
                         <View style={styles.spacerBelowText} />
