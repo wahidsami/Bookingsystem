@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText as Text } from '../components/ThemedText';
 import { useLanguage } from '../contexts/LanguageContext';
 import { colors } from '../theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -26,6 +27,12 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            <LinearGradient
+                colors={['#FFFFFF', '#F8F2FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
             <View style={[styles.contentWrapper, { paddingHorizontal }]}>
 
                 {/* 1. Brand Logo */}
@@ -38,6 +45,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
                 </View>
 
                 {/* Typography Block */}
+                <View style={styles.heroCard}>
                 <View style={styles.textContainer}>
                     {/* 2. Title */}
                     <Text style={[styles.title, isRTL && styles.rtlText]}>
@@ -47,6 +55,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
                     <Text style={[styles.subtitle, isRTL && styles.rtlText]} numberOfLines={2}>
                         {t('welcomeSubtitle')}
                     </Text>
+                </View>
                 </View>
 
                 {/* 4 & 5 Button Section */}
@@ -124,8 +133,20 @@ const styles = StyleSheet.create({
     textContainer: {
         width: '100%',
         alignItems: 'center',
-        marginTop: clamp(12, SCREEN_HEIGHT * 0.05, 28),
-        marginBottom: clamp(18, SCREEN_HEIGHT * 0.08, 48),
+        marginTop: clamp(8, SCREEN_HEIGHT * 0.03, 18),
+        marginBottom: clamp(18, SCREEN_HEIGHT * 0.06, 36),
+    },
+    heroCard: {
+        width: '100%',
+        borderRadius: 24,
+        backgroundColor: `${colors.surface}CC`,
+        paddingVertical: clamp(10, SCREEN_HEIGHT * 0.02, 20),
+        paddingHorizontal: clamp(10, SCREEN_WIDTH * 0.04, 20),
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 3,
     },
     title: {
         fontSize: clamp(18, SCREEN_HEIGHT * 0.026, 24),

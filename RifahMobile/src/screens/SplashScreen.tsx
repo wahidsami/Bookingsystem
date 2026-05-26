@@ -3,6 +3,7 @@ import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { colors } from '../theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export function SplashScreen({ onFinish }: { onFinish: () => void }) {
     const { bottomInset } = useScreenSafeArea();
@@ -17,7 +18,9 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
     }, [onFinish]);
 
     return (
-        <View style={styles.container}>
+        <LinearGradient colors={[colors.primaryDark, colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+            <View style={styles.glowTop} />
+            <View style={styles.glowBottom} />
             {/* Refah Logo */}
             <View style={styles.logoContainer}>
                 <Image
@@ -35,16 +38,33 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
             />
 
             <Text style={[styles.version, { bottom: bottomInset }]}>Version 1.0.0</Text>
-        </View>
+        </LinearGradient>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    glowTop: {
+        position: 'absolute',
+        top: -80,
+        right: -60,
+        width: 220,
+        height: 220,
+        borderRadius: 110,
+        backgroundColor: `${colors.textInverse}1A`,
+    },
+    glowBottom: {
+        position: 'absolute',
+        bottom: -90,
+        left: -70,
+        width: 260,
+        height: 260,
+        borderRadius: 130,
+        backgroundColor: `${colors.textInverse}14`,
     },
     logoContainer: {
         alignItems: 'center',
