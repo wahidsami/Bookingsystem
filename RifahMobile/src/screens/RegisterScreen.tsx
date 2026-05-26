@@ -263,9 +263,9 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                                 onPress={() => setShowPassword(!showPassword)}
                             >
                                 {showPassword ? (
-                                    <EyeOpenIcon width={20} height={20} color="#6B7280" />
+                                    <EyeOpenIcon width={20} height={20} color={colors.textSecondary} />
                                 ) : (
-                                    <EyeClosedIcon width={20} height={20} color="#6B7280" />
+                                    <EyeClosedIcon width={20} height={20} color={colors.textSecondary} />
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -290,9 +290,9 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                             >
                                 {showConfirmPassword ? (
-                                    <EyeOpenIcon width={20} height={20} color="#6B7280" />
+                                    <EyeOpenIcon width={20} height={20} color={colors.textSecondary} />
                                 ) : (
-                                    <EyeClosedIcon width={20} height={20} color="#6B7280" />
+                                    <EyeClosedIcon width={20} height={20} color={colors.textSecondary} />
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -366,15 +366,15 @@ const styles = StyleSheet.create({
         writingDirection: 'rtl',
     },
     errorContainer: {
-        backgroundColor: '#FEE2E2',
+        backgroundColor: `${colors.error}22`,
         borderWidth: 1,
-        borderColor: '#FCA5A5',
+        borderColor: `${colors.error}66`,
         borderRadius: borderRadius.md,
         padding: spacing.md,
         marginBottom: spacing.lg,
     },
     errorText: {
-        color: '#DC2626',
+        color: colors.error,
         fontSize: fontSize.sm,
     },
     form: {
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     googleButton: {
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: '#ffffff',
+        backgroundColor: colors.background,
         borderRadius: borderRadius.lg,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
         marginRight: spacing.sm,
     },
     googleButtonText: {
-        color: '#111827',
+        color: colors.text,
         fontSize: fontSize.lg,
         fontWeight: '700',
     },

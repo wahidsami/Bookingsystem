@@ -3,6 +3,7 @@ import { View, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-nat
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import { useLanguage } from '../contexts/LanguageContext';
+import { colors } from '../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -96,7 +97,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF', // Clean premium white
+        backgroundColor: colors.background,
         alignItems: 'center',
     },
     contentWrapper: {
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: clamp(18, SCREEN_HEIGHT * 0.026, 24),
         fontWeight: '700', // Bold/SemiBold
-        color: '#111111',
+        color: colors.textPrimary,
         textAlign: 'center',
         marginBottom: clamp(8, SCREEN_HEIGHT * 0.015, 12),
         lineHeight: clamp(28, SCREEN_HEIGHT * 0.035, 36),
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: clamp(13, SCREEN_HEIGHT * 0.020, 16),
         fontWeight: '400',
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: clamp(20, SCREEN_HEIGHT * 0.026, 26),
     },
@@ -155,20 +156,20 @@ const styles = StyleSheet.create({
         width: Math.min(SCREEN_WIDTH * 0.86, 480),
         height: clamp(48, SCREEN_HEIGHT * 0.07, 56),
         borderRadius: 999, // Pill shape
-        backgroundColor: '#8B5CF6', // Rifah Purple Fill
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: clamp(12, SCREEN_HEIGHT * 0.02, 16),
 
         // Shadow Elevation
-        shadowColor: '#8B5CF6',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
         shadowRadius: 8,
         elevation: 5,
     },
     primaryButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 16,
         fontWeight: '700',
         letterSpacing: 0.5,
@@ -179,13 +180,13 @@ const styles = StyleSheet.create({
         borderRadius: 999, // Pill shape
         backgroundColor: 'transparent',
         borderWidth: 1.5,
-        borderColor: '#8B5CF6', // Rifah Purple Stroke
+        borderColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 20,
     },
     secondaryButtonText: {
-        color: '#8B5CF6',
+        color: colors.primary,
         fontSize: 16,
         fontWeight: '700',
         letterSpacing: 0.5,
@@ -201,11 +202,11 @@ const styles = StyleSheet.create({
     line: {
         flex: 1,
         height: 1,
-        backgroundColor: '#E5E7EB', // Thin border
+        backgroundColor: colors.border,
     },
     orText: {
         marginHorizontal: 16,
-        color: '#9CA3AF',
+        color: colors.textTertiary,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         position: 'absolute',
         bottom: 0,
-        backgroundColor: '#FFFFFF', // Prevent bleed
+        backgroundColor: colors.background,
         paddingTop: 16,
     },
     guestButton: {
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     guestButtonText: {
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontSize: 16,
         fontWeight: '600',
         textDecorationLine: 'underline',
