@@ -65,6 +65,7 @@ export default function TenantGiftCardsPage() {
   const [summary, setSummary] = useState<any>(null);
   const [form, setForm] = useState(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [createImageFile, setCreateImageFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<'builder' | 'reports'>('builder');
 
   const loadData = async () => {
@@ -93,6 +94,7 @@ export default function TenantGiftCardsPage() {
 
   const resetForm = () => {
     setForm(defaultForm);
+    setCreateImageFile(null);
     setEditingId(null);
   };
 
@@ -119,6 +121,10 @@ export default function TenantGiftCardsPage() {
         setError(isArabic ? 'الاسم مطلوب بالعربية والإنجليزية' : 'English and Arabic titles are required');
         return;
       }
+      if (!editingId && !createImageFile) {
+        setError(isArabic ? 'صورة البطاقة مطلوبة عند الإنشاء' : 'Gift card image is required when creating');
+        return;
+      }
       setSaving(true);
       setError(null);
       const payload = {
@@ -127,7 +133,7 @@ export default function TenantGiftCardsPage() {
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null
       };
       if (editingId) await tenantApi.updateTenantGiftCardPackage(editingId, payload);
-      else await tenantApi.createTenantGiftCardPackage(payload);
+      else await tenantApi.createTenantGiftCardPackage(payload, createImageFile);
       resetForm();
       await loadData();
     } catch (err: any) {
@@ -299,6 +305,24 @@ export default function TenantGiftCardsPage() {
                   <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'تاريخ النهاية' : 'End date'}</label>
                   <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  {isArabic ? 'صورة البطاقة' : 'Card image'}
+                  {!editingId ? <span className="ml-1 text-rose-500">*</span> : null}
+                </label>
+                <input
+                  className="input"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setCreateImageFile(e.target.files?.[0] || null)}
+                />
+                {createImageFile ? (
+                  <p className="mt-1 text-xs text-gray-500">{isArabic ? 'الملف المحدد:' : 'Selected file:'} {createImageFile.name}</p>
+                ) : null}
+                {editingId ? (
+                  <p className="mt-1 text-xs text-gray-400">{isArabic ? 'لتغيير صورة بطاقة موجودة استخدم زر "رفع صورة" من القائمة.' : 'To change an existing card image, use "Upload image" in the package list.'}</p>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <button className="btn btn-primary flex-1" disabled={saving} onClick={submit}>{saving ? (isArabic ? 'جارٍ الحفظ...' : 'Saving...') : (editingId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إنشاء' : 'Create'))}</button>

@@ -202,7 +202,7 @@ router.get('/notifications/delivery-logs', tenantNotificationController.getDeliv
 
 // Tenant gift cards
 router.get('/gift-cards/packages', tenantGiftCardController.listPackages);
-router.post('/gift-cards/packages', tenantGiftCardController.createPackage);
+router.post('/gift-cards/packages', tenantGiftCardController.uploadGiftCardImageOptional, tenantGiftCardController.createPackage);
 router.put('/gift-cards/packages/:id', tenantGiftCardController.updatePackage);
 router.patch('/gift-cards/packages/:id/active', tenantGiftCardController.togglePackageActive);
 router.post('/gift-cards/packages/:id/image', tenantGiftCardController.uploadGiftCardImage, tenantGiftCardController.uploadPackageImage);

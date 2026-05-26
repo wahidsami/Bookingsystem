@@ -52,6 +52,12 @@ exports.uploadGiftCardImage = multer({
   fileFilter: uploadFileFilter
 }).single('image');
 
+exports.uploadGiftCardImageOptional = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: uploadFileFilter
+}).single('image');
+
 exports.listPackages = async (req, res) => {
   try {
     const tenantId = ensureTenantId(req);
@@ -101,6 +107,14 @@ exports.createPackage = async (req, res) => {
       endsAt: parseDate(endsAt),
       isActive: isActive !== false
     });
+
+    if (req.file) {
+      const normalizedPath = req.file.path
+        .replace(/\\/g, '/')
+        .replace(/^.*uploads\//, 'uploads/');
+      created.imageUrl = `/${normalizedPath}`;
+      await created.save();
+    }
 
     return res.status(201).json({ success: true, package: created });
   } catch (error) {

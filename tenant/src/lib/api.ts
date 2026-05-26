@@ -1814,7 +1814,19 @@ class TenantApiClient {
     return this.get('/tenant/gift-cards/packages');
   }
 
-  async createTenantGiftCardPackage(data: any): Promise<any> {
+  async createTenantGiftCardPackage(data: any, imageFile?: File | null): Promise<any> {
+    if (imageFile) {
+      const formData = new FormData();
+      Object.entries(data || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        formData.append(key, String(value));
+      });
+      formData.append('image', imageFile);
+      return this.request('/tenant/gift-cards/packages', {
+        method: 'POST',
+        body: formData
+      });
+    }
     return this.post('/tenant/gift-cards/packages', data);
   }
 
