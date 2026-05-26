@@ -111,8 +111,8 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                         <Switch
                             value={pushEnabled}
                             onValueChange={handlePushToggle}
-                            trackColor={{ false: '#D1D5DB', true: '#C4B5FD' }}
-                            thumbColor={pushEnabled ? colors.primary : '#9CA3AF'}
+                            trackColor={{ false: colors.borderStrong, true: colors.primaryLight }}
+                            thumbColor={pushEnabled ? colors.primary : colors.textTertiary}
                         />
                     )}
                 </View>
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.lg,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
         width: 24,
     },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         margin: spacing.lg,
         borderRadius: 20,
         padding: spacing.lg,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
         marginTop: 0,
     },
     actionButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.md,
         fontWeight: '700',
     },

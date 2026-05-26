@@ -97,12 +97,12 @@ export function DashboardScreen() {
                     <View style={styles.statCard}>
                         <Text style={styles.statLabel}>{t('upcomingBookings')}</Text>
                         <Text style={styles.statValue}>{stats.upcomingCount}</Text>
-                        <AppIcon name="bookings" size={40} color="rgba(255,255,255,0.35)" />
+                        <AppIcon name="bookings" size={40} color="rgba(255, 255, 255, 0.35)" />
                     </View>
                     <View style={[styles.statCard, styles.statCardSecondary]}>
                         <Text style={styles.statLabel}>{t('payments')}</Text>
                         <Text style={styles.statValue}>{stats.pendingPayment}</Text>
-                        <AppIcon name="card" size={40} color="rgba(255,255,255,0.35)" />
+                        <AppIcon name="card" size={40} color="rgba(255, 255, 255, 0.35)" />
                     </View>
                 </View>
 
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: spacing.xl,
         paddingBottom: spacing.lg,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
     },
     greeting: {
         fontSize: fontSize.md,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerAvatarText: {
-        color: '#FFF',
+        color: colors.textInverse,
         fontSize: fontSize.lg,
         fontWeight: 'bold',
     },
@@ -247,16 +247,16 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     statCardSecondary: {
-        backgroundColor: '#10B981', // Emerald 500
+        backgroundColor: colors.success,
     },
     statLabel: {
-        color: 'rgba(255,255,255,0.9)',
+        color: 'rgba(255, 255, 255, 0.9)',
         fontSize: fontSize.xs,
         marginBottom: spacing.xs,
         fontWeight: '600',
     },
     statValue: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 32,
         fontWeight: 'bold',
     },
@@ -295,12 +295,12 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.md,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     bookingCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.md,
         marginBottom: spacing.md,
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     emptyState: {
         alignItems: 'center',
         padding: spacing.lg,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.backgroundGray,
         borderRadius: borderRadius.lg,
     },
     emptyStateText: {
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
     },
     bookNowText: {
-        color: '#FFF',
+        color: colors.textInverse,
         fontWeight: '600',
     },
 });

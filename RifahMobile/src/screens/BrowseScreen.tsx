@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
         gap: spacing.md,
         paddingHorizontal: spacing.xl,
         paddingBottom: spacing.lg,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
     },
     searchInput: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.lg,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.xl,
     },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         overflow: 'hidden',
         borderWidth: 1,
