@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: spacing.lg,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     },
     progressContainer: {
         height: 4,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: colors.border,
         width: '100%',
     },
     progressBar: {
@@ -775,7 +775,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.md,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.md,
         borderWidth: 1,
         borderColor: colors.border,
@@ -790,7 +790,7 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
     },
     staffName: {
         fontSize: fontSize.md,
@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         marginRight: spacing.md,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
     },
     selectedDateCard: {
         backgroundColor: colors.primary,
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
         color: colors.text,
     },
     selectedDateText: {
-        color: 'white',
+        color: colors.textInverse,
     },
     subTitle: {
         fontSize: fontSize.lg,
@@ -857,7 +857,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         minWidth: '30%',
         alignItems: 'center',
     },
@@ -869,11 +869,11 @@ const styles = StyleSheet.create({
         color: colors.text,
     },
     selectedSlotText: {
-        color: 'white',
+        color: colors.textInverse,
         fontWeight: '600',
     },
     summaryCard: {
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         padding: spacing.lg,
         borderRadius: borderRadius.lg,
         borderWidth: 1,
@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
         color: colors.primary,
     },
     noteCard: {
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         padding: spacing.lg,
         borderRadius: borderRadius.lg,
         borderWidth: 1,
@@ -948,7 +948,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.full,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
     },
     cartToggleActive: {
         borderColor: colors.primary,
@@ -967,7 +967,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
     },
     selectedPaymentOptionCard: {
         borderColor: colors.primary,
@@ -1010,7 +1010,7 @@ const styles = StyleSheet.create({
     },
     footer: {
         padding: spacing.lg,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
         flexDirection: 'row',
@@ -1025,7 +1025,7 @@ const styles = StyleSheet.create({
     },
     secondaryButton: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         paddingVertical: spacing.md,
         borderRadius: borderRadius.lg,
         alignItems: 'center',
@@ -1038,8 +1038,9 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     buttonText: {
-        color: 'white',
+        color: colors.textInverse,
         fontSize: fontSize.md,
         fontWeight: 'bold',
     },
 });
+

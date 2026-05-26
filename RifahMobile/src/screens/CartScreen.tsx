@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
     },
     continueButtonText: {
-        color: 'white',
+        color: colors.textInverse,
         fontWeight: 'bold',
         fontSize: fontSize.md,
     },
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingBottom: spacing.md,
         paddingHorizontal: spacing.md,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
         padding: spacing.md,
     },
     section: {
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: borderRadius.md,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
     },
     itemInfo: {
         flex: 1,
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     qtyControls: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
         borderRadius: borderRadius.sm,
         alignSelf: 'flex-start',
     },
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     input: {
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
         padding: spacing.md,
         borderRadius: borderRadius.md,
         marginBottom: spacing.md,
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
         color: colors.primary,
     },
     footer: {
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         padding: spacing.lg,
         borderTopWidth: 1,
         borderTopColor: colors.border,
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     checkoutBtnText: {
-        color: 'white',
+        color: colors.textInverse,
         fontSize: fontSize.lg,
         fontWeight: 'bold',
     },

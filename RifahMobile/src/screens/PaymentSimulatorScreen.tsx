@@ -64,7 +64,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
         return (
             <SafeAreaView style={[styles.container, styles.centerAll]} edges={['top', 'bottom']}>
                 <View style={styles.successCircle}>
-                    <AppIcon name="star" size={60} color="white" />
+                    <AppIcon name="star" size={60} color={colors.textInverse} />
                 </View>
                 <Text style={styles.successTitle}>Payment Successful!</Text>
                 <Text style={styles.successSubtitle}>Your order has been placed.</Text>
@@ -174,7 +174,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.backgroundGray,
     },
     centerAll: {
         justifyContent: 'center',
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.md,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     },
     simulatorWarning: {
         backgroundColor: '#FEF3C7',
-        color: '#D97706',
+        color: colors.warning,
         padding: spacing.md,
         borderRadius: borderRadius.md,
         fontSize: fontSize.sm,
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
         ...Platform.select({
             ios: {
-                shadowColor: '#000',
+                shadowColor: '#000000',
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.05,
                 shadowRadius: 4,
@@ -283,9 +283,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.backgroundGray,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: colors.border,
         borderRadius: borderRadius.md,
         padding: spacing.md,
         fontSize: fontSize.md,
@@ -301,18 +301,18 @@ const styles = StyleSheet.create({
     },
     footer: {
         padding: spacing.lg,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
     },
     payButton: {
-        backgroundColor: '#10B981', // green for pay
+        backgroundColor: colors.success, // green for pay
         paddingVertical: spacing.md,
         borderRadius: borderRadius.lg,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 2,
-        shadowColor: '#10B981',
+        shadowColor: colors.success,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
         opacity: 0.7,
     },
     payButtonText: {
-        color: 'white',
+        color: colors.textInverse,
         fontSize: fontSize.lg,
         fontWeight: 'bold',
     },

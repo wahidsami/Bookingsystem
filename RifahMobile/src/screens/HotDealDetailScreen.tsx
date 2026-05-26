@@ -154,7 +154,7 @@ export function HotDealDetailScreen() {
                         }
                     >
                         <Text style={styles.ctaText}>{t('bookAtLabel')} {tenantName}</Text>
-                        <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={20} color="#fff" />
+                        <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={20} color={colors.textInverse} />
                     </TouchableOpacity>
                 )}
 
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.md,
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -201,8 +201,8 @@ const styles = StyleSheet.create({
     bannerSave: {
         fontSize: fontSize.sm,
         fontWeight: '700',
-        color: 'rgba(255,255,255,0.85)',
-        backgroundColor: 'rgba(0,0,0,0.2)',
+        color: 'rgba(255, 255, 255, 0.85)',
+        backgroundColor: 'rgba(0, 0, 0, 0.2)',
         paddingHorizontal: spacing.md,
         paddingVertical: 4,
         borderRadius: borderRadius.md,
@@ -212,19 +212,19 @@ const styles = StyleSheet.create({
     bannerTitle: {
         fontSize: fontSize.xxl,
         fontWeight: '800',
-        color: '#fff',
+        color: colors.textInverse,
         textAlign: 'center',
         marginBottom: spacing.xs,
     },
     bannerService: {
         fontSize: fontSize.md,
-        color: 'rgba(255,255,255,0.8)',
+        color: 'rgba(255, 255, 255, 0.8)',
         textAlign: 'center',
     },
     tenantCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.md,
         marginBottom: spacing.md,
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     tenantLogoLetter: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
     tenantName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
     pricingCard: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
@@ -258,21 +258,21 @@ const styles = StyleSheet.create({
         marginBottom: spacing.sm,
     },
     priceLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 2 },
-    discountedPrice: { fontSize: 28, fontWeight: '800', color: '#10B981' },
+    discountedPrice: { fontSize: 28, fontWeight: '800', color: colors.success },
     savingsBadge: {
         backgroundColor: '#FEE2E2',
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         borderRadius: borderRadius.md,
     },
-    savingsText: { fontSize: fontSize.md, fontWeight: '700', color: '#DC2626' },
+    savingsText: { fontSize: fontSize.md, fontWeight: '700', color: colors.error },
     originalPrice: {
         fontSize: fontSize.sm,
         color: colors.textSecondary,
         textDecorationLine: 'line-through',
     },
     detailsCard: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     detailText: { fontSize: fontSize.md, color: colors.text },
     descCard: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
@@ -311,5 +311,5 @@ const styles = StyleSheet.create({
             android: { elevation: 6 },
         }),
     },
-    ctaText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
+    ctaText: { fontSize: fontSize.lg, fontWeight: '700', color: colors.textInverse },
 });
