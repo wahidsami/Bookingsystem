@@ -107,6 +107,19 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         }
     }, [selectedServiceId, services]);
 
+    useEffect(() => {
+        const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
+        if (showServicesTab) availableTabs.push('services');
+        if (showProductsTab) availableTabs.push('products');
+        if (showGiftsTab) availableTabs.push('gifts');
+        if (showReviewsTab) availableTabs.push('reviews');
+        if (showAboutTab) availableTabs.push('about');
+        if (!availableTabs.length) return;
+        if (!availableTabs.includes(activeTab)) {
+            setActiveTab(availableTabs[0]);
+        }
+    }, [activeTab, showServicesTab, showProductsTab, showGiftsTab, showReviewsTab, showAboutTab]);
+
     const loadTenantDetails = async () => {
         try {
             setLoading(true);

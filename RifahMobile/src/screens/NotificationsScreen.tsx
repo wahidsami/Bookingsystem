@@ -32,6 +32,14 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
             const response = await api.getNotifications(1, 50);
             setNotifications(response.notifications || []);
             setUnreadCount(response.unreadCount || 0);
+            const unreadItems = (response.notifications || []).filter((item) => !item.readAt);
+            if (unreadItems.length > 0) {
+                await Promise.allSettled(unreadItems.map((item) => api.markNotificationRead(item.id)));
+                setNotifications((prev) =>
+                    prev.map((item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() }))
+                );
+                setUnreadCount(0);
+            }
         } catch (error) {
             console.warn('Failed to load notifications:', error);
             setNotifications([]);

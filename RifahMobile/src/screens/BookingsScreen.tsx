@@ -38,6 +38,11 @@ interface BookingGroup {
     payableNowTotal: number;
 }
 
+type GroupGuestMeta = {
+    fullName: string;
+    phone?: string | null;
+};
+
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const { showLogin } = useAppSession();
@@ -54,6 +59,26 @@ export function BookingsScreen({ navigation }: any) {
     const [rescheduleDate, setRescheduleDate] = useState('');
     const [rescheduleTime, setRescheduleTime] = useState('');
     const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+
+    const parseGroupGuestFromNotes = (notes?: string | null): GroupGuestMeta | null => {
+        if (!notes) return null;
+        const markerPrefix = '[GROUP_GUEST]';
+        const lines = `${notes}`.split('\n').map((line) => line.trim()).filter(Boolean);
+        const markerLine = lines.find((line) => line.startsWith(markerPrefix));
+        if (!markerLine) return null;
+        const jsonPart = markerLine.slice(markerPrefix.length).trim();
+        if (!jsonPart) return null;
+        try {
+            const parsed = JSON.parse(jsonPart) as GroupGuestMeta;
+            if (!parsed?.fullName || !`${parsed.fullName}`.trim()) return null;
+            return {
+                fullName: `${parsed.fullName}`.trim(),
+                phone: parsed.phone ? `${parsed.phone}`.trim() : null,
+            };
+        } catch {
+            return null;
+        }
+    };
 
     useFocusEffect(
         React.useCallback(() => {
@@ -256,6 +281,7 @@ export function BookingsScreen({ navigation }: any) {
     const renderBookingCard = ({ item }: { item: BookingGroup }) => {
         const isArabic = language === 'ar';
         const representative = item.items[0];
+        const groupGuest = parseGroupGuestFromNotes(representative.notes);
         const dateDate = new Date(item.startTime);
         const serviceCount = item.items.length;
 
@@ -333,6 +359,12 @@ export function BookingsScreen({ navigation }: any) {
                         <View style={styles.staffRow}>
                             <Text style={styles.staffLabel}>{t('specialist')}: </Text>
                             <Text style={styles.staffName}>{representative.Staff.name}</Text>
+                        </View>
+                    )}
+                    {groupGuest && activeTab === 'upcoming' && (
+                        <View style={styles.staffRow}>
+                            <Text style={styles.staffLabel}>{language === 'ar' ? 'الضيف' : 'Guest'}: </Text>
+                            <Text style={styles.staffName}>{groupGuest.fullName}</Text>
                         </View>
                     )}
                 </View>

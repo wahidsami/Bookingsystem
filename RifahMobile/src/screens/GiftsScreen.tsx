@@ -319,19 +319,30 @@ export function GiftsScreen({ navigation, route }: any) {
 
             {mode === 'send' ? (
               <View style={{ gap: spacing.sm }}>
+                <Text style={styles.inputLabel}>{language === 'ar' ? 'البريد الإلكتروني للمستلم' : 'Recipient Email'}</Text>
                 <TextInput style={styles.input} value={recipientEmail} onChangeText={setRecipientEmail} placeholder={language === 'ar' ? 'بريد المستلم' : 'Recipient email'} />
+                <Text style={styles.inputLabel}>{language === 'ar' ? 'جوال المستلم' : 'Recipient Phone'}</Text>
                 <TextInput style={styles.input} value={recipientPhone} onChangeText={setRecipientPhone} placeholder={language === 'ar' ? 'جوال المستلم' : 'Recipient phone'} />
+                <Text style={styles.inputLabel}>{language === 'ar' ? 'الرسالة (اختياري)' : 'Message (Optional)'}</Text>
                 <TextInput style={styles.input} value={giftMessage} onChangeText={setGiftMessage} placeholder={language === 'ar' ? 'رسالة (اختياري)' : 'Message (optional)'} />
               </View>
             ) : null}
 
             <View style={{ gap: spacing.sm }}>
               <Text style={styles.paymentTitle}>{language === 'ar' ? 'بيانات الدفع' : 'Payment details'}</Text>
+              <Text style={styles.inputLabel}>{language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder Name'}</Text>
               <TextInput style={styles.input} value={cardholderName} onChangeText={setCardholderName} placeholder={language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder name'} />
+              <Text style={styles.inputLabel}>{language === 'ar' ? 'رقم البطاقة' : 'Card Number'}</Text>
               <TextInput style={styles.input} value={cardNumber} onChangeText={setCardNumber} placeholder={language === 'ar' ? 'رقم البطاقة' : 'Card number'} keyboardType="number-pad" />
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <TextInput style={[styles.input, { flex: 1 }]} value={expiryDate} onChangeText={setExpiryDate} placeholder="MM/YY" />
-                <TextInput style={[styles.input, { flex: 1 }]} value={cvv} onChangeText={setCvv} placeholder="CVV" keyboardType="number-pad" secureTextEntry />
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={styles.inputLabel}>{language === 'ar' ? 'تاريخ الانتهاء (MM/YY)' : 'Expiry Date (MM/YY)'}</Text>
+                  <TextInput style={[styles.input, { flex: 1 }]} value={expiryDate} onChangeText={setExpiryDate} placeholder="MM/YY" />
+                </View>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={styles.inputLabel}>{language === 'ar' ? 'رمز الأمان (CVV)' : 'CVV'}</Text>
+                  <TextInput style={[styles.input, { flex: 1 }]} value={cvv} onChangeText={setCvv} placeholder="CVV" keyboardType="number-pad" secureTextEntry />
+                </View>
               </View>
             </View>
 
@@ -388,6 +399,7 @@ const styles = StyleSheet.create({
   modeText: { color: '#374151', fontSize: fontSize.sm, fontWeight: '600' },
   modeTextActive: { color: colors.primary },
   paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
+  inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: borderRadius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#F9FAFB' },
   submitBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, alignItems: 'center', paddingVertical: spacing.md },
   submitText: { color: '#fff', fontWeight: '700', fontSize: fontSize.md }

@@ -68,7 +68,10 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
             label: notificationUnreadCount > 0
                 ? `${t('notifications')} (${notificationUnreadCount})`
                 : t('notifications'),
-            action: () => navigation?.navigate('Notifications')
+            action: () => {
+                setNotificationUnreadCount(0);
+                navigation?.navigate('Notifications');
+            }
         },
     ];
 
