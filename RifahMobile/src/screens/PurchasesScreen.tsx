@@ -252,12 +252,12 @@ export function PurchasesScreen({ navigation }: any) {
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'delivered': return '#10B981'; // Green
-        case 'shipped': return '#3B82F6';   // Blue
-        case 'processing': return '#8B5CF6'; // Purple
-        case 'pending': return '#F59E0B';   // Orange
-        case 'cancelled': return '#EF4444'; // Red
-        default: return '#6B7280';          // Gray
+        case 'delivered': return colors.success;
+        case 'shipped': return colors.info;
+        case 'processing': return colors.primary;
+        case 'pending': return colors.warning;
+        case 'cancelled': return colors.error;
+        default: return colors.textSecondary;
     }
 };
 
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.xl,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         flexDirection: 'row',
@@ -324,10 +324,10 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     payButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
@@ -457,13 +457,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         borderWidth: 1,
-        borderColor: '#EF4444',
+        borderColor: colors.error,
         borderRadius: borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',
     },
     cancelButtonText: {
-        color: '#EF4444',
+        color: colors.error,
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
@@ -496,12 +496,12 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
     },
     bookButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontWeight: '600',
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(255,255,255,0.7)',
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
         alignItems: 'center',
         justifyContent: 'center',
     },

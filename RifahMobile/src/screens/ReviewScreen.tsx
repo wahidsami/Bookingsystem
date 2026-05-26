@@ -114,7 +114,7 @@ export function ReviewScreen({ route, navigation }: any) {
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity key={star} onPress={() => setRating(star)} style={{ padding: 2 }}>
-                  <AppIcon name="star" size={38} color={star <= rating ? '#F59E0B' : '#D1D5DB'} />
+                  <AppIcon name="star" size={38} color={star <= rating ? colors.warning : colors.borderStrong} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -130,7 +130,7 @@ export function ReviewScreen({ route, navigation }: any) {
             />
 
             <TouchableOpacity style={[styles.submitButton, submitting ? { opacity: 0.7 } : null]} onPress={handleSubmit} disabled={submitting}>
-              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>{isRTL ? 'إرسال التقييم' : 'Submit Review'}</Text>}
+              {submitting ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitText}>{isRTL ? 'إرسال التقييم' : 'Submit Review'}</Text>}
             </TouchableOpacity>
           </View>
         )}
@@ -150,9 +150,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB'
+    borderBottomColor: colors.border
   },
   backButton: {
     width: 36,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F4F6'
+    backgroundColor: colors.backgroundGray
   },
   headerTitle: {
     fontSize: fontSize.lg,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg
   },
@@ -199,8 +199,8 @@ const styles = StyleSheet.create({
   input: {
     marginTop: spacing.lg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundGray,
     borderRadius: borderRadius.md,
     minHeight: 110,
     padding: spacing.md,
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   submitText: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontSize: fontSize.md,
     fontWeight: '700'
   }
