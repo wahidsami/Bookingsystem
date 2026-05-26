@@ -110,7 +110,7 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
                     </View>
                     {imageUrl ? (
                         <View style={styles.imageBadge}>
-                            <AppIcon name="image" size={14} color="#6b7280" />
+                            <AppIcon name="image" size={14} color={colors.textSecondary} />
                             <Text style={styles.imageBadgeText}>{language === 'ar' ? 'صورة' : 'Image'}</Text>
                         </View>
                     ) : null}
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
     },
     cardUnread: {
-        borderColor: '#d8b4fe',
-        backgroundColor: '#faf5ff',
+        borderColor: `${colors.primary}66`,
+        backgroundColor: `${colors.primary}12`,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.sm,
         paddingVertical: 6,
         borderRadius: borderRadius.full,
-        backgroundColor: '#f3e8ff',
+        backgroundColor: `${colors.primary}20`,
     },
     linkBadgeText: {
         fontSize: fontSize.xs,
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.sm,
         paddingVertical: 6,
         borderRadius: borderRadius.full,
-        backgroundColor: '#f3f4f6',
+        backgroundColor: colors.surfaceAlt,
     },
     imageBadgeText: {
         fontSize: fontSize.xs,

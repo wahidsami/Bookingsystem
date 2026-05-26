@@ -173,7 +173,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                         lastName={user?.lastName}
                         profileImage={user?.profileImage}
                         size={60}
-                        backgroundColor="#FFFFFF"
+                        backgroundColor={colors.textInverse}
                         textColor={colors.primary}
                     />
                     <View>
@@ -269,8 +269,8 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                                 value={pushEnabled}
                                 onValueChange={handlePushToggle}
                                 disabled={!isAuthenticated}
-                                trackColor={{ false: '#D1D5DB', true: '#C4B5FD' }}
-                                thumbColor={pushEnabled ? colors.primary : '#9CA3AF'}
+                                trackColor={{ false: colors.borderDark, true: `${colors.primary}66` }}
+                                thumbColor={pushEnabled ? colors.primary : colors.textTertiary}
                             />
                         )}
                     </View>
@@ -298,7 +298,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
 
                 {/* Logout Button */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleAuthAction}>
-                    <AppIcon name={isAuthenticated ? 'logout' : 'lock'} size={20} color="#DC2626" />
+                    <AppIcon name={isAuthenticated ? 'logout' : 'lock'} size={20} color={colors.error} />
                     <Text style={styles.logoutText}>{isAuthenticated ? t('logout') : t('loginNow')}</Text>
                 </TouchableOpacity>
 
@@ -329,19 +329,19 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: fontSize.lg,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.textInverse,
         marginBottom: 4,
     },
     userEmail: {
         fontSize: fontSize.sm,
-        color: '#FFFFFF',
+        color: colors.textInverse,
         opacity: 0.9,
     },
     content: {
         flex: 1,
     },
     menuSection: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         marginTop: spacing.md,
         borderTopWidth: 1,
         borderBottomWidth: 1,
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     socialCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         marginHorizontal: spacing.lg,
         marginTop: spacing.sm,
         borderRadius: 20,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: spacing.sm,
-        backgroundColor: '#FEE2E2',
+        backgroundColor: `${colors.error}22`,
         marginHorizontal: spacing.lg,
         marginTop: spacing.xl,
         padding: spacing.lg,
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     logoutText: {
         fontSize: fontSize.md,
         fontWeight: '600',
-        color: '#DC2626',
+        color: colors.error,
     },
     appInfo: {
         alignItems: 'center',

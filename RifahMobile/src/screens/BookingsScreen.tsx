@@ -613,7 +613,7 @@ export function BookingsScreen({ navigation }: any) {
                                             {booking.status === 'completed' && activeTab === 'history' && (
                                                 reviewedAppointmentIds.has(booking.id) ? (
                                                     <View style={[styles.reviewButton, styles.reviewedButton]}>
-                                                        <AppIcon name="star" size={16} color="#065f46" />
+                                                        <AppIcon name="star" size={16} color={colors.accentDark} />
                                                         <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>
                                                             {language === 'ar' ? 'تم التقييم' : 'Reviewed'}
                                                         </Text>
@@ -623,7 +623,7 @@ export function BookingsScreen({ navigation }: any) {
                                                         style={styles.reviewButton}
                                                         onPress={() => setReviewBooking(booking)}
                                                     >
-                                                        <AppIcon name="star" size={16} color="#FFFFFF" />
+                                                        <AppIcon name="star" size={16} color={colors.textInverse} />
                                                         <Text style={styles.reviewButtonText}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
                                                     </TouchableOpacity>
                                                 )
@@ -700,13 +700,13 @@ export function BookingsScreen({ navigation }: any) {
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'confirmed': return '#10B981'; // Green
-        case 'checked_in': return '#0EA5E9'; // Sky
-        case 'in_service': return '#8B5CF6'; // Purple
-        case 'pending': return '#F59E0B';   // Orange
-        case 'cancelled': return '#EF4444'; // Red
-        case 'completed': return '#3B82F6'; // Blue
-        default: return '#6B7280';          // Gray
+        case 'confirmed': return colors.success;
+        case 'checked_in': return colors.info;
+        case 'in_service': return colors.primary;
+        case 'pending': return colors.warning;
+        case 'cancelled': return colors.error;
+        case 'completed': return colors.info;
+        default: return colors.textSecondary;
     }
 };
 
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.xl,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
     tabsContainer: {
         flexDirection: 'row',
         padding: spacing.md,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         marginBottom: spacing.sm,
     },
     tab: {
@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         shadowColor: '#000',
@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     payButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
@@ -926,11 +926,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
         borderWidth: 1,
-        borderColor: '#EF4444',
+        borderColor: colors.error,
         borderRadius: borderRadius.md,
     },
     cancelButtonText: {
-        color: '#EF4444',
+        color: colors.error,
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rescheduleButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
@@ -959,17 +959,17 @@ const styles = StyleSheet.create({
         gap: spacing.xs,
     },
     reviewButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '600',
     },
     reviewedButton: {
-        backgroundColor: '#ECFDF3',
+        backgroundColor: `${colors.success}1A`,
         borderWidth: 1,
-        borderColor: '#86EFAC',
+        borderColor: colors.accentLight,
     },
     reviewedButtonText: {
-        color: '#166534',
+        color: colors.accentDark,
     },
     emptyContainer: {
         flex: 1,
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
     },
     bookButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontWeight: '600',
     },
     loadingOverlay: {
@@ -1011,7 +1011,7 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         maxHeight: '85%',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
         padding: spacing.lg,
@@ -1037,7 +1037,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.surfaceAlt,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1053,7 +1053,7 @@ const styles = StyleSheet.create({
     rescheduleModalCard: {
         width: '90%',
         alignSelf: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.xl,
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     rescheduleCancelText: {
         color: colors.textSecondary,
@@ -1098,7 +1098,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primary,
     },
     rescheduleSaveText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontWeight: '700',
     },
     modalSectionTitle: {
@@ -1112,14 +1112,14 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
         padding: spacing.md,
         borderRadius: borderRadius.md,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderWidth: 1,
         borderColor: colors.border,
     },
     detailRow: {
         padding: spacing.md,
         borderRadius: borderRadius.md,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.backgroundMuted,
         borderWidth: 1,
         borderColor: colors.border,
     },
@@ -1136,7 +1136,7 @@ const styles = StyleSheet.create({
     notesBlock: {
         padding: spacing.md,
         borderRadius: borderRadius.md,
-        backgroundColor: '#F3E8FF',
+        backgroundColor: `${colors.primary}20`,
     },
     notesText: {
         fontSize: fontSize.sm,
