@@ -247,25 +247,58 @@ export default function TenantGiftCardsPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-5 xl:col-span-1">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">{editingId ? (isArabic ? 'تعديل البطاقة' : 'Edit package') : (isArabic ? 'إضافة بطاقة جديدة' : 'Create package')}</h2>
             <div className="space-y-3">
-              <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
-              <input className="input" placeholder="العنوان (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
-              <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
-              <textarea className="input min-h-20" placeholder="الوصف (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'العنوان (EN)' : 'Title (EN)'}</label>
+                <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'العنوان (AR)' : 'Title (AR)'}</label>
+                <input className="input" placeholder="العنوان (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الوصف (EN)' : 'Description (EN)'}</label>
+                <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الوصف (AR)' : 'Description (AR)'}</label>
+                <textarea className="input min-h-20" placeholder="الوصف (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
+              </div>
               <div className="grid grid-cols-2 gap-2">
-                <input className="input" type="number" placeholder={isArabic ? 'الترتيب' : 'Display order'} value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
-                <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3">
-                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
-                  <span>{isArabic ? 'فعالة' : 'Active'}</span>
-                </label>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'ترتيب العرض' : 'Display order'}</label>
+                  <input className="input" type="number" placeholder={isArabic ? 'الترتيب' : 'Display order'} value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الحالة' : 'Status'}</label>
+                  <label className="flex h-11 items-center gap-2 rounded-xl border border-gray-200 px-3">
+                    <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
+                    <span>{isArabic ? 'فعالة' : 'Active'}</span>
+                  </label>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'السعر' : 'Price'} value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
-                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'الرصيد' : 'Credit'} value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
-                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'البونص' : 'Bonus'} value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'سعر البطاقة (SAR)' : 'Package price (SAR)'}</label>
+                  <input className="input" type="number" step="0.01" placeholder={isArabic ? 'السعر' : 'Price'} value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الرصيد المضاف للمحفظة' : 'Wallet credit amount'}</label>
+                  <input className="input" type="number" step="0.01" placeholder={isArabic ? 'الرصيد' : 'Credit'} value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'البونص الإضافي' : 'Bonus amount'}</label>
+                  <input className="input" type="number" step="0.01" placeholder={isArabic ? 'البونص' : 'Bonus'} value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
-                <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'تاريخ البداية' : 'Start date'}</label>
+                  <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'تاريخ النهاية' : 'End date'}</label>
+                  <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
+                </div>
               </div>
               <div className="flex gap-2">
                 <button className="btn btn-primary flex-1" disabled={saving} onClick={submit}>{saving ? (isArabic ? 'جارٍ الحفظ...' : 'Saving...') : (editingId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إنشاء' : 'Create'))}</button>
