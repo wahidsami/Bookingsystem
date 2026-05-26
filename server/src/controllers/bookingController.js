@@ -33,6 +33,14 @@ const normalizeBookingItemPaymentMethod = (value) => {
     return SERVICE_PAYMENT_METHOD_RULES[normalized] ? normalized : null;
 };
 
+const RESCHEDULE_AUDIT_MARKER = '[RESCHEDULE_AUDIT]';
+
+const appendRescheduleAuditToNotes = (notes, payload) => {
+    const serialized = `${RESCHEDULE_AUDIT_MARKER} ${JSON.stringify(payload)}`;
+    const base = `${notes || ''}`.trim();
+    return base ? `${base}\n${serialized}` : serialized;
+};
+
 /**
  * Search for available slots
  * POST /api/v1/bookings/search
@@ -590,6 +598,9 @@ const rescheduleBooking = async (req, res) => {
         }
 
         const requestedStaffId = staffId || appointment.staffId;
+        const previousStaffId = appointment.staffId;
+        const previousStartTime = appointment.startTime;
+        const previousEndTime = appointment.endTime;
         const assignedStaff = await db.Staff.findOne({
             where: {
                 id: requestedStaffId,
@@ -625,6 +636,16 @@ const rescheduleBooking = async (req, res) => {
         appointment.staffId = requestedStaffId;
         appointment.startTime = requestedStart;
         appointment.endTime = requestedEnd;
+        appointment.notes = appendRescheduleAuditToNotes(appointment.notes, {
+            at: new Date().toISOString(),
+            actor: 'customer',
+            fromStartTime: new Date(previousStartTime).toISOString(),
+            fromEndTime: new Date(previousEndTime).toISOString(),
+            toStartTime: requestedStart.toISOString(),
+            toEndTime: requestedEnd.toISOString(),
+            fromStaffId: previousStaffId || null,
+            toStaffId: requestedStaffId || null
+        });
         appointment.customerReminderSentAt = null;
         appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });

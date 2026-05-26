@@ -195,6 +195,46 @@ function formatDateTime(value: string, locale: string) {
   });
 }
 
+type RescheduleAuditEntry = {
+  at?: string;
+  actor?: string;
+  fromStartTime?: string;
+  fromEndTime?: string;
+  toStartTime?: string;
+  toEndTime?: string;
+};
+
+const RESCHEDULE_AUDIT_MARKER = "[RESCHEDULE_AUDIT]";
+
+function parseRescheduleAuditEntries(notes?: string) {
+  const text = `${notes || ""}`;
+  if (!text.includes(RESCHEDULE_AUDIT_MARKER)) return [] as RescheduleAuditEntry[];
+
+  const entries: RescheduleAuditEntry[] = [];
+  const regex = /\[RESCHEDULE_AUDIT\]\s*(\{.*\})/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed && typeof parsed === "object") entries.push(parsed);
+    } catch {
+      // Ignore malformed marker payload.
+    }
+  }
+
+  return entries;
+}
+
+function stripRescheduleAuditMarkers(notes?: string) {
+  const text = `${notes || ""}`;
+  if (!text) return "";
+  return text
+    .split("\n")
+    .filter((line) => !line.includes(RESCHEDULE_AUDIT_MARKER))
+    .join("\n")
+    .trim();
+}
+
 function getStatusLabel(status: string, locale: string) {
   switch (status) {
     case "pending":
@@ -532,6 +572,17 @@ export function AppointmentDetailsDrawer({
       refundTotal
     };
   }, [customerAppointments, customerTransactions]);
+
+  const latestRescheduleAudit = useMemo(() => {
+    if (!appointment?.notes) return null;
+    const entries = parseRescheduleAuditEntries(appointment.notes);
+    if (!entries.length) return null;
+    return entries[entries.length - 1];
+  }, [appointment?.notes]);
+
+  const cleanAppointmentNotes = useMemo(() => {
+    return stripRescheduleAuditMarkers(appointment?.notes);
+  }, [appointment?.notes]);
 
   const handleReschedule = () => {
     if (!appointment) return;
@@ -1099,6 +1150,13 @@ export function AppointmentDetailsDrawer({
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
                           {getPaymentStatusLabel(resolveEffectivePaymentStatus(appointment), locale)}
                         </span>
+                        {latestRescheduleAudit?.toStartTime ? (
+                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                            {locale === "ar"
+                              ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
+                              : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1171,12 +1229,12 @@ export function AppointmentDetailsDrawer({
                       </div>
                     ) : null}
 
-                    {appointment.notes && (
+                    {cleanAppointmentNotes && (
                       <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                           {locale === "ar" ? "ملاحظات" : "Notes"}
                         </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{appointment.notes}</p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
                       </div>
                     )}
 
