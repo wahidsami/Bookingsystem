@@ -1,48 +1,95 @@
 /**
- * Centralized Theme & Color System for Refah Mobile
- * Change colors here and they'll reflect everywhere!
+ * Refah Mobile Single Source of Truth for App Colors.
+ *
+ * To rebrand or fine-tune visuals, start here first.
+ * Keep compatibility aliases (`primary`, `text`, `border`...) so old screens
+ * continue to work while we migrate to semantic tokens gradually.
  */
+const palette = {
+    brand: {
+        300: '#A78BFA',
+        500: '#8B5CF6',
+        600: '#7C3AED',
+    },
+    pink: {
+        500: '#EC4899',
+        400: '#F472B6',
+        600: '#DB2777',
+    },
+    green: {
+        500: '#10B981',
+        400: '#34D399',
+        600: '#059669',
+    },
+    blue: {
+        500: '#3B82F6',
+    },
+    orange: {
+        500: '#F59E0B',
+    },
+    red: {
+        500: '#EF4444',
+    },
+    slate: {
+        900: '#1F2937',
+        500: '#6B7280',
+        400: '#9CA3AF',
+        300: '#D1D5DB',
+        200: '#E5E7EB',
+        50: '#F9FAFB',
+    },
+    white: '#FFFFFF',
+    black: '#000000',
+};
 
 export const colors = {
-    // Primary Colors
-    primary: '#8B5CF6',        // Refah Purple
-    primaryLight: '#A78BFA',   // Light Purple
-    primaryDark: '#7C3AED',    // Dark Purple
+    // Brand
+    brandPrimary: palette.brand[500],
+    brandPrimaryLight: palette.brand[300],
+    brandPrimaryDark: palette.brand[600],
 
-    // Secondary Colors
-    secondary: '#EC4899',      // Pink
-    secondaryLight: '#F472B6', // Light Pink
-    secondaryDark: '#DB2777',  // Dark Pink
+    // Semantic surface/background
+    background: palette.white,
+    backgroundMuted: palette.slate[50],
+    surface: palette.white,
+    surfaceAlt: palette.slate[50],
 
-    // Accent Colors
-    accent: '#10B981',         // Green (for success)
-    accentLight: '#34D399',    // Light Green
-    accentDark: '#059669',     // Dark Green
+    // Semantic text
+    textPrimary: palette.slate[900],
+    textSecondary: palette.slate[500],
+    textTertiary: palette.slate[400],
+    textInverse: palette.white,
 
-    // Neutral Colors
-    background: '#FFFFFF',     // White background
-    backgroundGray: '#F9FAFB', // Light gray bg
-    surface: '#FFFFFF',        // Card/surface white
+    // Semantic border
+    borderSubtle: palette.slate[200],
+    borderStrong: palette.slate[300],
 
-    // Text Colors
-    text: '#1F2937',          // Primary text (dark gray)
-    textSecondary: '#6B7280',  // Secondary text (medium gray)
-    textTertiary: '#9CA3AF',   // Tertiary text (light gray)
-    textInverse: '#FFFFFF',    // White text (on dark bg)
+    // Status
+    success: palette.green[500],
+    warning: palette.orange[500],
+    error: palette.red[500],
+    info: palette.blue[500],
 
-    // Border Colors
-    border: '#E5E7EB',        // Light border
-    borderDark: '#D1D5DB',    // Medium border
-
-    // Status Colors
-    success: '#10B981',       // Green
-    warning: '#F59E0B',       // Orange
-    error: '#EF4444',         // Red
-    info: '#3B82F6',          // Blue
+    // Accent
+    accent: palette.green[500],
+    accentLight: palette.green[400],
+    accentDark: palette.green[600],
+    secondary: palette.pink[500],
+    secondaryLight: palette.pink[400],
+    secondaryDark: palette.pink[600],
 
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.5)',
     overlayLight: 'rgba(0, 0, 0, 0.3)',
+
+    // Compatibility aliases (legacy usage across screens)
+    primary: palette.brand[500],
+    primaryLight: palette.brand[300],
+    primaryDark: palette.brand[600],
+    backgroundGray: palette.slate[50],
+    text: palette.slate[900],
+    border: palette.slate[200],
+    borderDark: palette.slate[300],
 };
 
 export const spacing = {
