@@ -185,7 +185,7 @@ Status: `Planned`
 ## 9) Implementation Tracking Board
 - Phase 0: `Completed`
 - Phase 1: `Completed`
-- Phase 2: `Planned`
+- Phase 2: `In Progress`
 - Phase 3: `Planned`
 - Phase 4: `Planned`
 - Phase 5: `Planned`
@@ -220,6 +220,9 @@ Status: `Planned`
 7. Phase 2 checkpoint 2 started:
    - Updated `TenantScreen` section tabs to modern pill-based horizontal tabs for better readability on all widths
    - Kept all existing tab visibility logic and section rendering unchanged
+8. Phase 2 checkpoint 3 started:
+   - Updated `BookingFlow` with gradient header, clearer step rail, and elevated cards
+   - Preserved step transitions, slot selection, group guest, and payment logic as-is
 
 ## 11) Immediate Next Step
 Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.

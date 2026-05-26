@@ -10,6 +10,7 @@ import { ar, enUS } from 'date-fns/locale';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { ServiceBookingCartItem, useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface BookingProps {
     route: any;
@@ -217,6 +218,12 @@ export function BookingFlow({ route, navigation }: BookingProps) {
         amountLabel: string;
         icon: 'browse' | 'card' | 'cash';
     }>;
+    const stepIndex = step === 'staff' ? 0 : step === 'datetime' ? 1 : 2;
+    const stepTitles = [
+        language === 'ar' ? 'المتخصص' : 'Specialist',
+        language === 'ar' ? 'الوقت' : 'Date & Time',
+        language === 'ar' ? 'المراجعة' : 'Review',
+    ];
 
     const loadTimeSlots = async () => {
         setLoading(true);
@@ -683,17 +690,38 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
+            <LinearGradient
+                colors={['#F5F0FF', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.lg + topInset }]}
+            >
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                     <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Booking</Text>
+                <View style={styles.headerTitleWrap}>
+                    <Text style={styles.headerTitle}>{language === 'ar' ? 'حجز موعد' : 'Booking'}</Text>
+                    <Text style={styles.headerSubtitle}>{isRTL ? service.name_ar : service.name_en}</Text>
+                </View>
                 <View style={{ width: 40 }} />
-            </View>
+            </LinearGradient>
 
             {/* Progress Bar */}
             <View style={styles.progressContainer}>
                 <View style={[styles.progressBar, { width: step === 'staff' ? '25%' : step === 'datetime' ? '50%' : '100%' }]} />
+            </View>
+            <View style={styles.stepsRail}>
+                {stepTitles.map((title, index) => {
+                    const isActive = index === stepIndex;
+                    const isCompleted = index < stepIndex;
+                    return (
+                        <View key={title} style={[styles.stepChip, (isActive || isCompleted) && styles.stepChipActive]}>
+                            <Text style={[styles.stepChipText, (isActive || isCompleted) && styles.stepChipTextActive]}>
+                                {title}
+                            </Text>
+                        </View>
+                    );
+                })}
             </View>
 
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
@@ -747,6 +775,15 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: colors.text,
     },
+    headerTitleWrap: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerSubtitle: {
+        marginTop: 2,
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+    },
     backButton: {
         padding: spacing.sm,
     },
@@ -758,6 +795,37 @@ const styles = StyleSheet.create({
     progressBar: {
         height: '100%',
         backgroundColor: colors.primary,
+    },
+    stepsRail: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    stepChip: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+        alignItems: 'center',
+    },
+    stepChipActive: {
+        borderColor: colors.primary,
+        backgroundColor: '#F3E8FF',
+    },
+    stepChipText: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
+    stepChipTextActive: {
+        color: colors.primary,
     },
     content: {
         padding: spacing.lg,
@@ -781,6 +849,11 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
         marginBottom: spacing.sm,
         gap: spacing.md,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
     },
     selectedCard: {
         borderColor: colors.primary,
@@ -878,6 +951,11 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         borderWidth: 1,
         borderColor: colors.border,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     summaryRow: {
         flexDirection: 'row',
@@ -916,6 +994,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         gap: spacing.sm,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     noteTitle: {
         fontSize: fontSize.md,
