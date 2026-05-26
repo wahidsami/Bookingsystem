@@ -86,7 +86,7 @@ Status: `Completed`
 3. Login with Google works on Android + iOS preview
 
 ## Phase 2: Core Booking Experience
-Status: `In Progress`
+Status: `Completed`
 
 ### Screens
 1. Home
@@ -107,7 +107,7 @@ Status: `In Progress`
 3. Payment handoff unchanged
 
 ## Phase 3: Appointments + Notifications + Purchases
-Status: `Planned`
+Status: `Completed`
 
 ### Screens
 1. Appointments (upcoming/history)
@@ -125,7 +125,7 @@ Status: `Planned`
 3. Purchases list integrity unchanged
 
 ## Phase 4: Wallet and Gifts Premium Redesign
-Status: `Planned`
+Status: `Completed`
 
 ### Screens
 1. Gifts & Wallet home
@@ -143,7 +143,7 @@ Status: `Planned`
 3. Wallet balances remain correct
 
 ## Phase 5: Performance, Accessibility, and QA Hardening
-Status: `Planned`
+Status: `In Progress`
 
 ### Deliverables
 1. Performance pass (render optimization for large lists)
@@ -185,10 +185,10 @@ Status: `Planned`
 ## 9) Implementation Tracking Board
 - Phase 0: `Completed`
 - Phase 1: `Completed`
-- Phase 2: `In Progress`
-- Phase 3: `Planned`
-- Phase 4: `Planned`
-- Phase 5: `Planned`
+- Phase 2: `Completed`
+- Phase 3: `Completed`
+- Phase 4: `Completed`
+- Phase 5: `In Progress`
 
 ## 10) Milestone Log
 ### 2026-05-26
@@ -233,6 +233,16 @@ Status: `Planned`
 11. Phase 3 checkpoint 1 started:
    - Updated `NotificationsScreen` and `NotificationDetailScreen` header/card visual hierarchy
    - Preserved unread/read behavior, mark-as-read flow, and tenant/service deep-link navigation
+12. Phase 3 checkpoint 2 started:
+   - Updated `BookingsScreen` booking-details modal card/readability surfaces for clearer data scanning
+   - Preserved reschedule/cancel/pay/review actions and data mapping
+13. Phase 4 checkpoint 1 started:
+   - Updated `GiftsScreen` with premium gradient header and elevated wallet/history/package cards
+   - Refined gift action drawer visual hierarchy while preserving purchase/send/claim logic and field behavior
+14. Phase 5 validation checkpoint:
+   - Ran `npm run typecheck` after each major batch of changes
+   - Fixed `AppointmentInviteScreen` token mismatch (`colors.black`) and revalidated successfully
+   - Current customer app UI branch is type-safe with no TypeScript errors
 
 ## 11) Immediate Next Step
-Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.
+Complete Phase 5 manual QA checklist on real devices (RTL visual pass + end-to-end smoke tests), then mark final sign-off.

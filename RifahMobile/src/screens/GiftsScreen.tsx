@@ -6,6 +6,7 @@ import { AppIcon } from '../components/AppIcon';
 import { borderRadius, colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type GiftPackage = {
   id: string;
@@ -243,7 +244,12 @@ export function GiftsScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
+      <LinearGradient
+        colors={['#F5F0FF', '#FFFFFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: topInset + spacing.sm }]}
+      >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <AppIcon name="arrow_back" size={22} color={colors.text} />
         </TouchableOpacity>
@@ -253,7 +259,7 @@ export function GiftsScreen({ navigation, route }: any) {
             : (language === 'ar' ? 'الهدايا' : 'Gifts')}
         </Text>
         <View style={styles.headerSpacer} />
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
@@ -375,11 +381,47 @@ const styles = StyleSheet.create({
   backButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceAlt },
   headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   headerSpacer: { width: 36 },
-  card: { backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
-  summaryCard: { backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2
+  },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2
+  },
   summaryTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 4 },
   summaryBalance: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
-  historyCard: { backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
+  historyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2
+  },
   historyTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   historyRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.surfaceAlt, paddingTop: spacing.sm, marginTop: spacing.xs },
   historyStatus: { fontSize: fontSize.sm, color: colors.text, fontWeight: '600' },
@@ -391,7 +433,15 @@ const styles = StyleSheet.create({
   payText: { color: colors.text, fontSize: fontSize.sm },
   creditText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
-  modalCard: { backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: spacing.lg, gap: spacing.md },
+  modalCard: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   modeRow: { flexDirection: 'row', gap: spacing.sm },
   modeBtn: { flex: 1, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.borderDark, paddingVertical: spacing.sm, alignItems: 'center' },
