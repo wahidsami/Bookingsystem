@@ -351,7 +351,7 @@ export function GiftsScreen({ navigation, route }: any) {
               onPress={mode === 'self' ? handleSelfRecharge : handleSendGift}
               disabled={saving}
             >
-              {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>{language === 'ar' ? 'تأكيد' : 'Confirm'}</Text>}
+              {saving ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitText}>{language === 'ar' ? 'تأكيد' : 'Confirm'}</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -368,39 +368,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB'
+    borderBottomColor: colors.border
   },
-  backButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  backButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceAlt },
   headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   headerSpacer: { width: 36 },
-  card: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' },
-  summaryCard: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' },
+  card: { backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
+  summaryCard: { backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
   summaryTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 4 },
   summaryBalance: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
-  historyCard: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' },
+  historyCard: { backgroundColor: colors.background, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
   historyTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
-  historyRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: spacing.sm, marginTop: spacing.xs },
+  historyRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.surfaceAlt, paddingTop: spacing.sm, marginTop: spacing.xs },
   historyStatus: { fontSize: fontSize.sm, color: colors.text, fontWeight: '600' },
   historyDate: { fontSize: 11, color: colors.textSecondary },
   historyAmount: { fontSize: fontSize.sm, color: colors.primary, fontWeight: '700' },
   cardTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   cardDesc: { marginTop: 4, fontSize: fontSize.sm, color: colors.textSecondary },
   amountRow: { marginTop: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
-  payText: { color: '#374151', fontSize: fontSize.sm },
+  payText: { color: colors.text, fontSize: fontSize.sm },
   creditText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: spacing.lg, gap: spacing.md },
+  modalCard: { backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: spacing.lg, gap: spacing.md },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   modeRow: { flexDirection: 'row', gap: spacing.sm },
-  modeBtn: { flex: 1, borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#D1D5DB', paddingVertical: spacing.sm, alignItems: 'center' },
-  modeBtnActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
-  modeText: { color: '#374151', fontSize: fontSize.sm, fontWeight: '600' },
+  modeBtn: { flex: 1, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.borderDark, paddingVertical: spacing.sm, alignItems: 'center' },
+  modeBtnActive: { borderColor: colors.primary, backgroundColor: `${colors.primary}20` },
+  modeText: { color: colors.text, fontSize: fontSize.sm, fontWeight: '600' },
   modeTextActive: { color: colors.primary },
   paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
   inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: borderRadius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#F9FAFB' },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.backgroundMuted },
   submitBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, alignItems: 'center', paddingVertical: spacing.md },
-  submitText: { color: '#fff', fontWeight: '700', fontSize: fontSize.md }
+  submitText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md }
 });
