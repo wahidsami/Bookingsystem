@@ -230,6 +230,9 @@ Status: `Planned`
 10. Phase 2 checkpoint 5 started:
    - Updated `BookingsScreen` and `PurchasesScreen` with gradient headers and refined card/tabs/buttons surfaces
    - Preserved booking/order data flow, payment actions, cancel/reschedule/review logic
+11. Phase 3 checkpoint 1 started:
+   - Updated `NotificationsScreen` and `NotificationDetailScreen` header/card visual hierarchy
+   - Preserved unread/read behavior, mark-as-read flow, and tenant/service deep-link navigation
 
 ## 11) Immediate Next Step
 Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.

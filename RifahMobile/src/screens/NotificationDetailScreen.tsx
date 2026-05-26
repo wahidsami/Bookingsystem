@@ -14,6 +14,7 @@ import { CustomerNotification, api, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface NotificationDetailScreenProps {
     navigation: any;
@@ -87,13 +88,18 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
+            <LinearGradient
+                colors={['#F5F0FF', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.lg + topInset }]}
+            >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
                     <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{language === 'ar' ? 'تفاصيل الإشعار' : 'Notification Detail'}</Text>
                 <View style={styles.headerButtonSpacer} />
-            </View>
+            </LinearGradient>
 
             {loading ? (
                 <View style={styles.loadingWrap}>
@@ -218,11 +224,16 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primaryLight,
     },
     card: {
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.xl,
         borderWidth: 1,
         borderColor: colors.border,
         padding: spacing.lg,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     title: {
         fontSize: fontSize.xxl,
