@@ -21,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { orderNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export function PurchasesScreen({ navigation }: any) {
     const { t, language } = useLanguage();
@@ -187,7 +188,12 @@ export function PurchasesScreen({ navigation }: any) {
     if (!isAuthenticated && !loading) {
         return (
             <>
-                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                <LinearGradient
+                    colors={['#F5F0FF', '#FFFFFF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+                >
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
@@ -195,7 +201,7 @@ export function PurchasesScreen({ navigation }: any) {
                         <Text style={styles.backButtonText}>←</Text>
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t('myPurchases' as any)}</Text>
-                </View>
+                </LinearGradient>
                 <GuestView
                     type="orders"
                     onLoginPress={showLogin}
@@ -206,7 +212,12 @@ export function PurchasesScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+            <LinearGradient
+                colors={['#F5F0FF', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+            >
                 {/* Back Button */}
                 <TouchableOpacity
                     style={styles.backButton}
@@ -215,7 +226,7 @@ export function PurchasesScreen({ navigation }: any) {
                     <Text style={styles.backButtonText}>←</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('myPurchases')}</Text>
-            </View>
+            </LinearGradient>
 
             {/* List */}
             {orders.length > 0 ? (
@@ -328,11 +339,13 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
         elevation: 2,
         marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -442,7 +455,7 @@ const styles = StyleSheet.create({
         minWidth: 96,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
         borderRadius: borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',

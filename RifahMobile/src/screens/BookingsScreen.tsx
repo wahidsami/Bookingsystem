@@ -25,6 +25,7 @@ import { bookingNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface BookingGroup {
     key: string;
@@ -395,9 +396,14 @@ export function BookingsScreen({ navigation }: any) {
     if (!isAuthenticated && !loading) {
         return (
             <>
-                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                <LinearGradient
+                    colors={['#F5F0FF', '#FFFFFF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+                >
                     <Text style={styles.headerTitle}>{t('bookings')}</Text>
-                </View>
+                </LinearGradient>
                 <GuestView
                     type="bookings"
                     onLoginPress={showLogin}
@@ -408,9 +414,14 @@ export function BookingsScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+            <LinearGradient
+                colors={['#F5F0FF', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+            >
                 <Text style={styles.headerTitle}>{t('bookings')}</Text>
-            </View>
+            </LinearGradient>
 
             {/* Tabs */}
             <View style={styles.tabsContainer}>
@@ -757,16 +768,20 @@ const styles = StyleSheet.create({
         padding: spacing.md,
         backgroundColor: colors.background,
         marginBottom: spacing.sm,
+        gap: spacing.sm,
     },
     tab: {
         flex: 1,
-        paddingVertical: spacing.md,
+        paddingVertical: spacing.sm,
         alignItems: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.surface,
     },
     activeTab: {
-        borderBottomColor: colors.primary,
+        borderColor: colors.primary,
+        backgroundColor: '#F3E8FF',
     },
     tabText: {
         fontSize: fontSize.md,
@@ -782,15 +797,17 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     card: {
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
         elevation: 2,
         marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -907,7 +924,7 @@ const styles = StyleSheet.create({
         minWidth: 120,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
         borderRadius: borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',

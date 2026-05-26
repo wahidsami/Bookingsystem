@@ -227,6 +227,9 @@ Status: `Planned`
    - Updated `TenantScreen` service/product/gift card visual depth and CTA emphasis
    - Unified service/provider modal surfaces to bottom-sheet style presentation
    - Kept service/product/cart logic and navigation unchanged
+10. Phase 2 checkpoint 5 started:
+   - Updated `BookingsScreen` and `PurchasesScreen` with gradient headers and refined card/tabs/buttons surfaces
+   - Preserved booking/order data flow, payment actions, cancel/reschedule/review logic
 
 ## 11) Immediate Next Step
 Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.
