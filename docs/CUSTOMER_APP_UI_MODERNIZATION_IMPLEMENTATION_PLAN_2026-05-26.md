@@ -223,6 +223,10 @@ Status: `Planned`
 8. Phase 2 checkpoint 3 started:
    - Updated `BookingFlow` with gradient header, clearer step rail, and elevated cards
    - Preserved step transitions, slot selection, group guest, and payment logic as-is
+9. Phase 2 checkpoint 4 started:
+   - Updated `TenantScreen` service/product/gift card visual depth and CTA emphasis
+   - Unified service/provider modal surfaces to bottom-sheet style presentation
+   - Kept service/product/cart logic and navigation unchanged
 
 ## 11) Immediate Next Step
 Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.
