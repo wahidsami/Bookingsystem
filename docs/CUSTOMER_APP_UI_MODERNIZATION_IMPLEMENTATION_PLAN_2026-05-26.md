@@ -217,6 +217,9 @@ Status: `Planned`
    - Updated `DashboardScreen` with refined gradient hero header and premium stat card treatment
    - Updated `BrowseScreen` with stronger visual hierarchy, search field affordance, and elevated list card styling
    - Navigation, filtering, booking handoff, and data logic unchanged
+7. Phase 2 checkpoint 2 started:
+   - Updated `TenantScreen` section tabs to modern pill-based horizontal tabs for better readability on all widths
+   - Kept all existing tab visibility logic and section rendering unchanged
 
 ## 11) Immediate Next Step
 Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.

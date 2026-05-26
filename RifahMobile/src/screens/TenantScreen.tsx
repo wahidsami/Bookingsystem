@@ -651,17 +651,23 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
         return (
             <View style={styles.tabContainer}>
-                {availableTabs.map(tab => (
-                    <TouchableOpacity
-                        key={tab}
-                        style={[styles.tab, activeTab === tab && styles.activeTab]}
-                        onPress={() => setActiveTab(tab as any)}
-                    >
-                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                            {t(tab as any) || tab.charAt(0).toUpperCase() + tab.slice(1)}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tabScrollContent}
+                >
+                    {availableTabs.map(tab => (
+                        <TouchableOpacity
+                            key={tab}
+                            style={[styles.tab, activeTab === tab && styles.activeTab]}
+                            onPress={() => setActiveTab(tab as any)}
+                        >
+                            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                                {t(tab as any) || tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
             </View>
         );
     };
@@ -1347,24 +1353,31 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     tabContainer: {
-        flexDirection: 'row',
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+    },
+    tabScrollContent: {
+        gap: spacing.sm,
+        paddingRight: spacing.sm,
     },
     tab: {
-        flex: 1,
-        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
         alignItems: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
     },
     activeTab: {
-        borderBottomColor: colors.primary,
+        borderColor: colors.primary,
+        backgroundColor: '#F3E8FF',
     },
     tabText: {
-        fontSize: fontSize.md,
+        fontSize: fontSize.sm,
         color: colors.textSecondary,
         fontWeight: '600',
     },
