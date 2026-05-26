@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText as Text } from '../components/ThemedText';
 import Swiper from 'react-native-swiper';
 import { useLanguage } from '../contexts/LanguageContext';
+import { colors } from '../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -137,8 +138,8 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
                 loop={false}
                 showsButtons={false}
                 onIndexChanged={setActiveIndex}
-                activeDotColor={'#8B5CF6'} // Brand Purple
-                dotColor={'#E5E7EB'}      // Subtle Gray
+                activeDotColor={colors.primary}
+                dotColor={colors.border}
                 paginationStyle={styles.paginationConfig}
                 scrollEnabled={true}
                 activeDotStyle={styles.activeDot}
@@ -187,7 +188,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     topNav: {
         width: '100%',
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     },
     skipText: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '600',
     },
     slide: {
@@ -241,11 +242,11 @@ const styles = StyleSheet.create({
     },
     textCard: {
         width: '100%',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderRadius: 20,
         paddingHorizontal: clamp(14, SCREEN_WIDTH * 0.05, 22),
         paddingVertical: clamp(12, SCREEN_HEIGHT * 0.016, 18),
-        shadowColor: '#000000',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
         shadowRadius: 14,
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: clamp(20, SCREEN_HEIGHT * 0.024, 26),
         fontWeight: '700',
-        color: '#111111',
+        color: colors.textPrimary,
         textAlign: 'center',
         marginBottom: clamp(8, SCREEN_HEIGHT * 0.012, 12),
         lineHeight: clamp(28, SCREEN_HEIGHT * 0.035, 36),
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: clamp(14, SCREEN_HEIGHT * 0.018, 16),
         fontWeight: '400',
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: clamp(22, SCREEN_HEIGHT * 0.025, 26),
     },
@@ -295,7 +296,7 @@ const styles = StyleSheet.create({
         width: '100%',
         position: 'absolute',
         bottom: 0,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     navButton: {
         height: 44,
@@ -308,24 +309,24 @@ const styles = StyleSheet.create({
     navButtonTextSecondary: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#9CA3AF',
+        color: colors.textTertiary,
     },
     navButtonTextPrimary: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#8B5CF6',
+        color: colors.primary,
     },
     getStartedButton: {
-        backgroundColor: '#8B5CF6',
+        backgroundColor: colors.primary,
         paddingHorizontal: 24,
         borderRadius: 999,
-        shadowColor: '#8B5CF6',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
         elevation: 3,
     },
     getStartedText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
     },
 });

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { colors } from '../theme/colors';
 
 export function SplashScreen({ onFinish }: { onFinish: () => void }) {
     const { bottomInset } = useScreenSafeArea();
@@ -29,7 +30,7 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
             <ActivityIndicator
                 size="large"
-                color="#FFFFFF"
+                color={colors.textInverse}
                 style={styles.loader}
             />
 
@@ -41,7 +42,7 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#8B5CF6', // Refah purple
+        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
     },
     tagline: {
         fontSize: 16,
-        color: '#E0E7FF',
+        color: `${colors.textInverse}DD`,
         marginTop: 8,
         letterSpacing: 1,
     },
@@ -64,7 +65,7 @@ const styles = StyleSheet.create({
     },
     version: {
         position: 'absolute',
-        color: '#E0E7FF',
+        color: `${colors.textInverse}DD`,
         fontSize: 12,
     },
 });

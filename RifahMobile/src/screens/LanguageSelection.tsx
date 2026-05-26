@@ -4,6 +4,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { colors } from '../theme/colors';
 
 interface LanguageSelectionProps {
     onLanguageSelect: (language: 'ar' | 'en') => void;
@@ -61,7 +62,7 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={['#8B5CF6', '#7C3AED']}
+                                colors={[colors.primary, colors.primaryDark]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.gradientFill}
@@ -76,7 +77,7 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={['#EC4899', '#DB2777']}
+                                colors={[colors.secondary, colors.secondaryDark]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.gradientFill}
@@ -95,14 +96,14 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     topHalf: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB', // The dividing line seen in wireframe
+        borderBottomColor: colors.border,
     },
     logo: {
         width: clamp(140, SCREEN_WIDTH * 0.45, 240),
@@ -127,14 +128,14 @@ const styles = StyleSheet.create({
     englishText: {
         fontSize: 18,
         fontWeight: '500', // Medium
-        color: '#111111',
+        color: colors.textPrimary,
         marginBottom: 8,
         textAlign: 'center',
     },
     arabicText: {
         fontSize: 18,
         fontWeight: '700', // Bold/Semi-bold
-        color: '#111111',
+        color: colors.textPrimary,
         textAlign: 'center',
         writingDirection: 'rtl',
     },
@@ -157,10 +158,10 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     englishButtonWrapper: {
-        shadowColor: '#8B5CF6',
+        shadowColor: colors.primary,
     },
     arabicButtonWrapper: {
-        shadowColor: '#EC4899',
+        shadowColor: colors.secondary,
     },
     gradientFill: {
         flex: 1,
@@ -170,7 +171,7 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     buttonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 18,
         fontWeight: '700',
         letterSpacing: 0.5,
