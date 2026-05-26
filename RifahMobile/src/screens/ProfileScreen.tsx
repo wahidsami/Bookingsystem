@@ -106,7 +106,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
                     <View style={styles.avatarSection}>
                         <UserAvatar
                             size={100}
-                            backgroundColor="#E9D5FF"
+                            backgroundColor={`${colors.primary}33`}
                             textColor={colors.primary}
                             style={styles.profileAvatar}
                         />
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.xl,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     avatarSection: {
         alignItems: 'center',
         padding: spacing.xl,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         marginBottom: spacing.md,
     },
     profileAvatar: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     infoSection: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         paddingHorizontal: spacing.lg,
         borderTopWidth: 1,
         borderBottomWidth: 1,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     editProfileText: {
         fontSize: fontSize.md,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.textInverse,
     },
     centerContent: {
         justifyContent: 'center',
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
         maxWidth: 320,
     },
     guestActionCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         marginHorizontal: spacing.lg,
         padding: spacing.lg,
         borderRadius: 16,

@@ -216,7 +216,7 @@ export function PaymentScreen({ route, navigation }: any) {
                         disabled={loading}
                     >
                         {loading ? (
-                            <ActivityIndicator color="#FFFFFF" />
+                            <ActivityIndicator color={colors.textInverse} />
                         ) : (
                             <Text style={styles.payButtonText}>{paymentMethod === 'wallet' ? (isRTL ? 'الدفع بالمحفظة' : 'Pay with Wallet') : t('payNow')}</Text>
                         )}
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.xl,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         gap: spacing.md,
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     testCardButton: {
-        backgroundColor: '#F3E8FF',
+        backgroundColor: `${colors.primary}20`,
         padding: spacing.md,
         borderRadius: borderRadius.md,
         alignItems: 'center',
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     },
     methodOption: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.md,
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     },
     methodOptionActive: {
         borderColor: colors.primary,
-        backgroundColor: '#F3E8FF',
+        backgroundColor: `${colors.primary}20`,
     },
     methodOptionText: {
         fontSize: fontSize.sm,
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
         color: colors.text,
     },
     input: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.md,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
     },
     payButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.lg,
         fontWeight: '600',
     },

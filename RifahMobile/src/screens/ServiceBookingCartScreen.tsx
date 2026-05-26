@@ -269,7 +269,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.primaryButton, loading && styles.disabledButton]} onPress={handleCheckout} disabled={loading}>
                     {loading ? (
-                        <ActivityIndicator color="#FFFFFF" />
+                        <ActivityIndicator color={colors.textInverse} />
                     ) : (
                         <Text style={styles.primaryButtonText}>{language === 'ar' ? 'تأكيد الحجز' : 'Confirm Booking'}</Text>
                     )}
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
     },
     emptyCtaButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontWeight: '700',
         fontSize: fontSize.md,
         textAlign: 'center',
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.md,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -349,14 +349,14 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#F3E8FF',
+        backgroundColor: `${colors.primary}20`,
     },
     scrollContent: {
         padding: spacing.lg,
         gap: spacing.md,
     },
     summaryCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         borderWidth: 1,
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
         color: colors.primary,
     },
     itemCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         borderWidth: 1,
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
         width: 52,
         height: 52,
         borderRadius: 26,
-        backgroundColor: '#F3E8FF',
+        backgroundColor: `${colors.primary}20`,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
         borderRadius: 17,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FEF2F2',
+        backgroundColor: `${colors.error}14`,
     },
     itemDetails: {
         gap: spacing.sm,
@@ -460,8 +460,8 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: borderRadius.full,
         borderWidth: 1,
-        borderColor: '#D9C8FF',
-        backgroundColor: '#F7F2FF',
+        borderColor: `${colors.primary}55`,
+        backgroundColor: `${colors.primary}14`,
     },
     editButtonText: {
         fontSize: fontSize.sm,
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
         paddingHorizontal: spacing.lg,
         paddingTop: spacing.md,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderTopWidth: 1,
         borderTopColor: colors.border,
     },
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     },
     secondaryButton: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
         borderRadius: borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
         borderColor: colors.primary,
     },
     primaryButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontWeight: '700',
         fontSize: fontSize.md,
     },
