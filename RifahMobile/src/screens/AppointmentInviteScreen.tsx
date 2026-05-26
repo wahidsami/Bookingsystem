@@ -160,11 +160,11 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#efedf0',
+        backgroundColor: colors.backgroundGray,
     },
     topBand: {
         height: 195,
-        backgroundColor: '#7e53d3'
+        backgroundColor: colors.primary
     },
     heroTitle: {
         position: 'absolute',
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
         right: 20,
         fontSize: 52 / 2,
         lineHeight: 56 / 2,
-        color: '#fff',
+        color: colors.textInverse,
         fontWeight: '800'
     },
     logoCard: {
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
         width: 152,
         height: 152,
         borderRadius: 36,
-        backgroundColor: '#000',
+        backgroundColor: colors.black,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center'
@@ -196,17 +196,17 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: 42 / 2,
         fontWeight: '800',
-        color: '#0b0b0b'
+        color: colors.text,
     },
     messageLine: {
         marginTop: 8,
         textAlign: 'center',
-        color: '#121212',
+        color: colors.text,
         fontSize: 24 / 2
     },
     messageTenant: {
         textAlign: 'center',
-        color: '#121212',
+        color: colors.text,
         fontSize: 24 / 2,
         fontWeight: '700',
         marginBottom: 16
@@ -214,13 +214,13 @@ const styles = StyleSheet.create({
     detailsCard: {
         height: 164,
         borderRadius: 14,
-        backgroundColor: '#7e53d3',
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         gap: 6
     },
     detailsText: {
-        color: '#fff',
+        color: colors.textInverse,
         fontSize: 20 / 2,
         fontWeight: '500'
     },
@@ -230,19 +230,19 @@ const styles = StyleSheet.create({
         width: 98,
         height: 98,
         borderRadius: 49,
-        backgroundColor: '#000',
+        backgroundColor: colors.black,
         alignItems: 'center',
         justifyContent: 'center'
     },
     providerAvatarText: {
-        color: '#fff',
+        color: colors.textInverse,
         fontWeight: '800',
         fontSize: 26 / 2
     },
     confirmLine: {
         marginTop: 20,
         textAlign: 'center',
-        color: '#0f0f0f',
+        color: colors.text,
         fontSize: 22 / 2,
         marginBottom: 20
     },
@@ -255,12 +255,12 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         borderRadius: 36,
-        backgroundColor: '#111',
+        backgroundColor: colors.black,
         alignItems: 'center',
         justifyContent: 'center'
     },
     logoFallbackText: {
-        color: '#fff',
+        color: colors.textInverse,
         fontSize: 36 / 2,
         fontWeight: '700'
     },
@@ -274,13 +274,13 @@ const styles = StyleSheet.create({
         gap: 14,
     },
     confirmButton: {
-        backgroundColor: '#7e53d3',
+        backgroundColor: colors.primary,
         borderRadius: 14,
         paddingVertical: 18,
         alignItems: 'center',
     },
     declineButton: {
-        borderColor: '#7e53d3',
+        borderColor: colors.primary,
         borderWidth: 2,
         borderRadius: 14,
         paddingVertical: 16,
@@ -288,17 +288,17 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent'
     },
     confirmText: {
-        color: '#fff',
+        color: colors.textInverse,
         fontWeight: '700',
         fontSize: 20 / 2,
     },
     declineText: {
-        color: '#7e53d3',
+        color: colors.primary,
         fontWeight: '700',
         fontSize: 20 / 2,
     },
     errorText: {
-        color: '#ef4444',
+        color: colors.error,
         textAlign: 'center',
         fontSize: fontSize.md,
     },

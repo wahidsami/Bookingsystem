@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   amountRow: { marginTop: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
   payText: { color: colors.text, fontSize: fontSize.sm },
   creditText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
   modalCard: { backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: spacing.lg, gap: spacing.md },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   modeRow: { flexDirection: 'row', gap: spacing.sm },

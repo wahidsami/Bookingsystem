@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
@@ -1000,13 +1000,13 @@ const styles = StyleSheet.create({
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(255,255,255,0.7)',
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(17,24,39,0.55)',
+        backgroundColor: 'rgba(17, 24, 39, 0.55)',
         justifyContent: 'flex-end',
     },
     modalCard: {

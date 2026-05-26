@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
         height: 220,
         borderRadius: borderRadius.xl,
         marginBottom: spacing.lg,
-        backgroundColor: '#ede9fe',
+        backgroundColor: colors.primaryLight,
     },
     card: {
         backgroundColor: colors.background,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     primaryButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.md,
         fontWeight: '700',
     },

@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.lg,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
     },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: colors.border,
