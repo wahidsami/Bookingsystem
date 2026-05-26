@@ -585,7 +585,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             <View style={styles.heroContainer}>
                 <ImageBackground source={{ uri: coverImage }} style={styles.heroImage} resizeMode="cover">
                     <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                        colors={['transparent', 'rgba(0, 0, 0, 0.8)']}
                         style={styles.heroGradient}
                     >
                         <View style={styles.heroContent}>
@@ -626,8 +626,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 </Text>
 
                                 <View style={styles.openStatus}>
-                                    <View style={[styles.statusDot, { backgroundColor: tenant.isAvailable ? '#10B981' : colors.error }]} />
-                                    <Text style={[styles.statusText, { color: tenant.isAvailable ? '#10B981' : colors.error }]}>
+                                    <View style={[styles.statusDot, { backgroundColor: tenant.isAvailable ? colors.success : colors.error }]} />
+                                    <Text style={[styles.statusText, { color: tenant.isAvailable ? colors.success : colors.error }]}>
                                         {tenant.isAvailable ? t('available') : t('closed')}
                                     </Text>
                                 </View>
@@ -812,7 +812,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderReviews = () => (
         <View style={styles.contentSection}>
             <TouchableOpacity style={styles.writeReviewButton} onPress={openTenantReviewPrompt}>
-                <AppIcon name="star" size={16} color="#FFFFFF" />
+                <AppIcon name="star" size={16} color={colors.textInverse} />
                 <Text style={styles.writeReviewButtonText}>{isRTL ? 'أضف تقييمك' : 'Write a Review'}</Text>
             </TouchableOpacity>
             <View style={styles.reviewSummaryCard}>
@@ -1018,7 +1018,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         <View style={styles.galleryPreviewCard}>
                             <Image source={{ uri: galleryPreviewImage }} style={styles.galleryPreviewImage} resizeMode="contain" />
                             <TouchableOpacity style={styles.galleryPreviewCloseButton} onPress={() => setGalleryPreviewImage(null)}>
-                                <AppIcon name="close" size={24} color="#FFFFFF" />
+                                <AppIcon name="close" size={24} color={colors.textInverse} />
                             </TouchableOpacity>
                         </View>
                     ) : null}
@@ -1193,7 +1193,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 ) : null}
                                 <Text style={styles.providerReviewsHeading}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
                                 <TouchableOpacity style={styles.providerWriteReviewButton} onPress={() => openProviderReviewPrompt(selectedProvider.id)}>
-                                    <AppIcon name="star" size={14} color="#FFFFFF" />
+                                    <AppIcon name="star" size={14} color={colors.textInverse} />
                                     <Text style={styles.providerWriteReviewButtonText}>{isRTL ? 'إضافة تقييم' : 'Write Review'}</Text>
                                 </TouchableOpacity>
                                 {providerReviewsLoading ? (
@@ -1279,7 +1279,7 @@ const styles = StyleSheet.create({
     backButton: {
         width: 40,
         height: 40,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: colors.overlayLight,
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
@@ -1291,7 +1291,7 @@ const styles = StyleSheet.create({
     iconButton: {
         width: 40,
         height: 40,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: colors.overlayLight,
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
@@ -1306,7 +1306,7 @@ const styles = StyleSheet.create({
     ratingBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: colors.overlay,
         paddingHorizontal: spacing.sm,
         paddingVertical: 4,
         borderRadius: 12,
@@ -1339,10 +1339,10 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#10B981', // Green for open
+        backgroundColor: colors.success, // Green for open
     },
     statusText: {
-        color: '#10B981',
+        color: colors.success,
         fontSize: fontSize.xs,
         fontWeight: '600',
     },
@@ -1391,7 +1391,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     writeReviewButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '700',
     },
@@ -1450,10 +1450,10 @@ const styles = StyleSheet.create({
     },
     reviewStar: {
         fontSize: fontSize.md,
-        color: '#D1D5DB',
+        color: colors.borderStrong,
     },
     reviewStarActive: {
-        color: '#F59E0B',
+        color: colors.warning,
     },
     reviewComment: {
         marginTop: spacing.sm,
@@ -1468,7 +1468,7 @@ const styles = StyleSheet.create({
     },
     reviewReplyBox: {
         marginTop: spacing.sm,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.backgroundGray,
         borderRadius: borderRadius.md,
         padding: spacing.sm,
         borderWidth: 1,
@@ -1690,7 +1690,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         padding: spacing.md,
         gap: spacing.sm,
     },
@@ -1728,7 +1728,7 @@ const styles = StyleSheet.create({
     variantBookButtonText: {
         fontSize: fontSize.sm,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.textInverse,
     },
     employeeSectionTitle: {
         fontSize: fontSize.lg,
@@ -1742,7 +1742,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
     },
     employeeAvatar: {
         width: 56,
@@ -1759,7 +1759,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primary,
     },
     employeeAvatarText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.lg,
         fontWeight: '700',
     },
@@ -1871,7 +1871,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.sm,
         paddingVertical: 6,
         borderRadius: borderRadius.md,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
     },
     providerSummaryText: {
         fontSize: fontSize.sm,
@@ -1913,7 +1913,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.xs,
     },
     providerWriteReviewButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '700',
     },
@@ -1921,7 +1921,7 @@ const styles = StyleSheet.create({
         maxHeight: 320,
     },
     providerReviewCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.md,
@@ -1943,12 +1943,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     serviceBookButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.md,
         fontWeight: '700',
     },
     giftCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.lg,
@@ -1986,7 +1986,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.sm,
     },
     giftCardButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontWeight: '700',
         fontSize: fontSize.sm,
     },
@@ -2025,7 +2025,7 @@ const styles = StyleSheet.create({
     },
     mapPlaceholder: {
         height: 150,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
         borderRadius: borderRadius.lg,
         overflow: 'hidden',
         marginTop: spacing.sm,
@@ -2050,7 +2050,7 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
     },
     mapOverlayPillText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: fontSize.xs,
         fontWeight: '700',
     },
@@ -2067,11 +2067,11 @@ const styles = StyleSheet.create({
         width: 180,
         height: 120,
         borderRadius: borderRadius.lg,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
     },
     galleryPreviewBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.88)',
+        backgroundColor: 'rgba(0, 0, 0, 0.88)',
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.lg,
@@ -2095,7 +2095,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15,23,42,0.65)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
     },
     hoursRow: {
         flexDirection: 'row',
@@ -2131,7 +2131,7 @@ const styles = StyleSheet.create({
     },
     socialIcon: {
         padding: spacing.sm,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: colors.backgroundGray,
         borderRadius: borderRadius.full,
     },
     badgeContainer: {
