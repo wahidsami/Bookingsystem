@@ -1105,7 +1105,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                                             <View style={styles.employeeHeaderRow}>
                                                                 <Text style={styles.employeeName}>{employee.name}</Text>
                                                                 <View style={styles.employeeRatingBadge}>
-                                                                    <AppIcon name="star" size={12} color="#D97706" />
+                                                                    <AppIcon name="star" size={12} color={colors.warning} />
                                                                     <Text style={styles.employeeRatingText}>{(employee.rating || 0).toFixed(1)}</Text>
                                                                 </View>
                                                             </View>
@@ -1168,7 +1168,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 </View>
                                 <View style={styles.providerSummaryRow}>
                                     <View style={styles.providerSummaryBadge}>
-                                        <AppIcon name="star" size={14} color="#D97706" />
+                                        <AppIcon name="star" size={14} color={colors.warning} />
                                         <Text style={styles.providerSummaryText}>
                                             {providerReviewsSummary.avgRating ? providerReviewsSummary.avgRating.toFixed(1) : (selectedProvider.rating || 0).toFixed(1)}
                                         </Text>
@@ -1326,7 +1326,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     heroSubtitle: {
-        color: 'rgba(255,255,255,0.9)',
+        color: 'rgba(255, 255, 255, 0.9)',
         fontSize: fontSize.sm,
         marginBottom: spacing.sm,
     },
@@ -1550,8 +1550,8 @@ const styles = StyleSheet.create({
         marginLeft: spacing.md,
     },
     serviceBookingBanner: {
-        backgroundColor: 'rgba(124, 77, 255, 0.08)',
-        borderColor: 'rgba(124, 77, 255, 0.18)',
+        backgroundColor: 'rgba(139, 92, 246, 0.08)',
+        borderColor: 'rgba(139, 92, 246, 0.18)',
         borderWidth: 1,
         borderRadius: borderRadius.lg,
         padding: spacing.md,
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 17,
-        backgroundColor: 'rgba(124, 77, 255, 0.12)',
+        backgroundColor: 'rgba(139, 92, 246, 0.12)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1598,7 +1598,7 @@ const styles = StyleSheet.create({
     },
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backgroundColor: colors.overlay,
         justifyContent: 'flex-start',
     },
     serviceModalCard: {
@@ -1622,7 +1622,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.sm,
         paddingVertical: spacing.xs,
         borderRadius: borderRadius.full,
-        backgroundColor: '#EFE8FF',
+        backgroundColor: '#F3E8FF',
     },
     serviceBackText: {
         color: colors.primary,
@@ -1671,7 +1671,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.sm,
         paddingVertical: 6,
         borderRadius: borderRadius.full,
-        backgroundColor: '#F3E8FF',
+        backgroundColor: '#F5EDFF',
     },
     serviceMetaText: {
         fontSize: fontSize.sm,
@@ -1786,12 +1786,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: borderRadius.full,
-        backgroundColor: '#FEF3C7',
+        backgroundColor: '#FFF1D4',
     },
     employeeRatingText: {
         fontSize: fontSize.xs,
         fontWeight: '700',
-        color: '#92400E',
+        color: '#9A3412',
     },
     employeeExperience: {
         fontSize: fontSize.sm,
