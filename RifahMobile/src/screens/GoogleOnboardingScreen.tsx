@@ -170,24 +170,18 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     };
 
     useEffect(() => {
-        const hydrateState = async () => {
-            try {
-                const raw = await AsyncStorage.getItem(GOOGLE_ONBOARDING_STATE_KEY);
-                if (!raw) return;
-                const saved = JSON.parse(raw) as PersistedGoogleOnboardingState;
-                if (!saved?.onboardingToken || !saved?.step) return;
-                setOnboardingToken(saved.onboardingToken);
-                setPhone(saved.phone || '');
-                setEmail(saved.email || '');
-                setFirstName(saved.firstName || '');
-                setLastName(saved.lastName || '');
-                setStep(saved.step);
-            } catch {
-                // Ignore hydration errors and continue with fresh flow
-            }
+        const startFreshGoogleFlow = async () => {
+            // Avoid re-opening stale OTP/phone steps from previous partial attempts.
+            await clearPersistedOnboardingState();
+            setStep('google');
+            setOnboardingToken('');
+            setPhone('');
+            setOtp('');
+            setOtpHint('');
+            setError('');
         };
 
-        hydrateState().catch(() => undefined);
+        startFreshGoogleFlow().catch(() => undefined);
     }, []);
 
     useEffect(() => {
