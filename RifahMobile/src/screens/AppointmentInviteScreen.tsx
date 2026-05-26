@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
         width: 152,
         height: 152,
         borderRadius: 36,
-        backgroundColor: colors.black,
+        backgroundColor: colors.text,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center'
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
         width: 98,
         height: 98,
         borderRadius: 49,
-        backgroundColor: colors.black,
+        backgroundColor: colors.text,
         alignItems: 'center',
         justifyContent: 'center'
     },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         borderRadius: 36,
-        backgroundColor: colors.black,
+        backgroundColor: colors.text,
         alignItems: 'center',
         justifyContent: 'center'
     },
