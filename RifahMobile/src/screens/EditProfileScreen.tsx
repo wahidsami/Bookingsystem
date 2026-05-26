@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.md,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     errorText: {
-        color: '#DC2626',
+        color: colors.error,
         fontSize: fontSize.sm,
     },
     inputGroup: {
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
         fontSize: fontSize.md,
         color: colors.text,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         minHeight: 48,
     },
     rtlInput: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.md,
         paddingVertical: spacing.sm,
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
     },
     genderButtonSelected: {
         backgroundColor: colors.primary,

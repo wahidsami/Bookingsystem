@@ -78,7 +78,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
             </Text>
           ) : null}
           <View style={styles.ratingRow}>
-            <AppIcon name="star" size={14} color="#D97706" />
+            <AppIcon name="star" size={14} color={colors.warning} />
             <Text style={styles.ratingText}>
               {summary.avgRating ? summary.avgRating.toFixed(1) : (provider.rating || 0).toFixed(1)}
             </Text>
@@ -139,9 +139,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB'
+    borderBottomColor: colors.border
   },
   backButton: {
     width: 36,
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F4F6'
+    backgroundColor: colors.backgroundGray
   },
   headerTitle: {
     fontSize: fontSize.lg,
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     padding: spacing.md
   },
   profileCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     alignItems: 'center',
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E5E7EB'
+    backgroundColor: colors.border
   },
   avatarInitial: {
     fontSize: fontSize.xl,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm
   },
   reviewCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm
@@ -258,11 +258,11 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: fontSize.md,
-    color: '#D1D5DB',
+    color: colors.borderStrong,
     marginLeft: 2
   },
   starActive: {
-    color: '#D97706'
+    color: colors.warning
   },
   reviewComment: {
     fontSize: fontSize.sm,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     borderLeftWidth: 2,
     borderLeftColor: colors.primary,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.backgroundGray,
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: borderRadius.sm

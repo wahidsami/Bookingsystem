@@ -353,7 +353,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                             disabled={loading || !request || !canStartGoogle}
                             onPress={() => beginGoogleFlow()}
                         >
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{t('continueWithGoogle')}</Text>}
+                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('continueWithGoogle')}</Text>}
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -374,7 +374,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                         />
 
                         <TouchableOpacity style={[styles.primaryButton, loading && styles.disabledButton]} disabled={loading} onPress={sendOtp}>
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{t('sendOtp')}</Text>}
+                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('sendOtp')}</Text>}
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -395,7 +395,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                         />
 
                         <TouchableOpacity style={[styles.primaryButton, loading && styles.disabledButton]} disabled={loading} onPress={() => completeFlow()}>
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{t('verifyContinue')}</Text>}
+                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('verifyContinue')}</Text>}
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -419,7 +419,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                                 completeFlow();
                             }}
                         >
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{t('finishRegistration')}</Text>}
+                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('finishRegistration')}</Text>}
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -435,31 +435,31 @@ const styles = StyleSheet.create({
     backButtonText: { fontSize: fontSize.md, color: colors.primary, fontWeight: '600' },
     title: { fontSize: fontSize.xxxl, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
     subtitle: { fontSize: fontSize.md, color: colors.textSecondary, marginBottom: spacing.lg },
-    errorContainer: { backgroundColor: '#fee2e2', padding: spacing.md, borderRadius: borderRadius.md, marginBottom: spacing.md },
-    errorText: { color: '#b91c1c', fontSize: fontSize.sm, fontWeight: '600' },
-    card: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.lg, gap: spacing.sm, borderWidth: 1, borderColor: '#ede9fe' },
+    errorContainer: { backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: borderRadius.md, marginBottom: spacing.md },
+    errorText: { color: colors.error, fontSize: fontSize.sm, fontWeight: '600' },
+    card: { backgroundColor: colors.surface, borderRadius: borderRadius.lg, padding: spacing.lg, gap: spacing.sm, borderWidth: 1, borderColor: colors.border },
     label: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
     infoText: { fontSize: fontSize.md, color: colors.text, marginBottom: spacing.xs },
-    hintText: { fontSize: fontSize.sm, color: '#6d28d9', marginBottom: spacing.xs },
+    hintText: { fontSize: fontSize.sm, color: colors.primaryDark, marginBottom: spacing.xs },
     input: {
         borderWidth: 1,
-        borderColor: '#d1d5db',
+        borderColor: colors.borderStrong,
         borderRadius: borderRadius.md,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         fontSize: fontSize.md,
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         color: colors.text,
         marginBottom: spacing.sm,
     },
-    readOnlyInput: { backgroundColor: '#f3f4f6' },
+    readOnlyInput: { backgroundColor: colors.backgroundGray },
     primaryButton: {
-        backgroundColor: '#8B5ADF',
+        backgroundColor: colors.primary,
         borderRadius: borderRadius.md,
         paddingVertical: spacing.md,
         alignItems: 'center',
         marginTop: spacing.xs,
     },
-    primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: fontSize.md },
+    primaryButtonText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md },
     disabledButton: { opacity: 0.6 },
 });

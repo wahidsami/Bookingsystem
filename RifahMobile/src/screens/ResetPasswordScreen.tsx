@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     errorText: {
-        color: '#DC2626',
+        color: colors.error,
         fontSize: fontSize.sm,
     },
     successContainer: {
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     successText: {
-        color: '#166534',
+        color: colors.accentDark,
         fontSize: fontSize.sm,
     },
     inputGroup: {
