@@ -13,6 +13,8 @@ import { api, Tenant, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AppIcon } from '../components/AppIcon';
 
 export function BrowseScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
@@ -53,20 +55,31 @@ export function BrowseScreen({ route, navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+            <LinearGradient
+                colors={['#F5F0FF', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+            >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Text style={styles.backButtonText}>←</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{initialTitle || t('browseSalons')}</Text>
-            </View>
+                <View style={styles.headerTitleWrap}>
+                    <Text style={styles.headerTitle}>{initialTitle || t('browseSalons')}</Text>
+                    <Text style={styles.headerSubtitle}>{t('findSalon')}</Text>
+                </View>
+            </LinearGradient>
 
             <View style={styles.searchContainer}>
-                <TextInput
-                    style={[styles.searchInput, isRTL && styles.rtlInput]}
-                    placeholder={t('searchSalons')}
-                    value={search}
-                    onChangeText={setSearch}
-                />
+                <View style={styles.searchInputWrap}>
+                    <AppIcon name="search" size={18} color={colors.textSecondary} />
+                    <TextInput
+                        style={[styles.searchInput, isRTL && styles.rtlInput]}
+                        placeholder={t('searchSalons')}
+                        value={search}
+                        onChangeText={setSearch}
+                    />
+                </View>
             </View>
 
             {loading ? (
@@ -140,6 +153,9 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
+    headerTitleWrap: {
+        flex: 1,
+    },
     backButton: {
         padding: spacing.xs,
     },
@@ -153,15 +169,26 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: colors.text,
     },
+    headerSubtitle: {
+        marginTop: 2,
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+    },
     searchContainer: {
         padding: spacing.lg,
     },
-    searchInput: {
+    searchInputWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.lg,
         paddingHorizontal: spacing.md,
+    },
+    searchInput: {
+        flex: 1,
         paddingVertical: spacing.md,
         fontSize: fontSize.md,
     },
@@ -184,6 +211,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         marginBottom: spacing.md,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     cardImage: {
         width: '100%',

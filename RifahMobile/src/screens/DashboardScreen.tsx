@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, RefreshControl, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -7,8 +7,7 @@ import { api, User, Booking, bookingNeedsPayment, getImageUrl } from '../api/cli
 import { useNavigation } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
-
-const { width } = Dimensions.get('window');
+import { LinearGradient } from 'expo-linear-gradient';
 
 export function DashboardScreen() {
     const { t, isRTL } = useLanguage();
@@ -64,7 +63,12 @@ export function DashboardScreen() {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+            <LinearGradient
+                colors={['#F5F0FF', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+            >
                 <View>
                     <Text style={styles.greeting}>{getGreeting()},</Text>
                     <Text style={styles.username}>
@@ -86,7 +90,7 @@ export function DashboardScreen() {
                         </View>
                     )}
                 </TouchableOpacity>
-            </View>
+            </LinearGradient>
 
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
@@ -94,16 +98,30 @@ export function DashboardScreen() {
             >
                 {/* Stats Cards */}
                 <View style={styles.statsContainer}>
-                    <View style={styles.statCard}>
+                    <LinearGradient
+                        colors={['#8B5CF6', '#7C3AED']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.statCard}
+                    >
                         <Text style={styles.statLabel}>{t('upcomingBookings')}</Text>
                         <Text style={styles.statValue}>{stats.upcomingCount}</Text>
-                        <AppIcon name="bookings" size={40} color="rgba(255, 255, 255, 0.35)" />
-                    </View>
-                    <View style={[styles.statCard, styles.statCardSecondary]}>
+                        <View style={styles.statIconWrap}>
+                            <AppIcon name="bookings" size={22} color={colors.textInverse} />
+                        </View>
+                    </LinearGradient>
+                    <LinearGradient
+                        colors={['#0EA5E9', '#0284C7']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.statCard}
+                    >
                         <Text style={styles.statLabel}>{t('payments')}</Text>
                         <Text style={styles.statValue}>{stats.pendingPayment}</Text>
-                        <AppIcon name="card" size={40} color="rgba(255, 255, 255, 0.35)" />
-                    </View>
+                        <View style={styles.statIconWrap}>
+                            <AppIcon name="card" size={22} color={colors.textInverse} />
+                        </View>
+                    </LinearGradient>
                 </View>
 
                 {/* Quick Actions */}
@@ -216,6 +234,8 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 25,
+        borderWidth: 2,
+        borderColor: colors.textInverse,
     },
     headerAvatarPlaceholder: {
         width: 50,
@@ -245,9 +265,7 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
         position: 'relative',
         overflow: 'hidden',
-    },
-    statCardSecondary: {
-        backgroundColor: colors.success,
+        minHeight: 124,
     },
     statLabel: {
         color: 'rgba(255, 255, 255, 0.9)',
@@ -260,12 +278,16 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: 'bold',
     },
-    statIcon: {
+    statIconWrap: {
         position: 'absolute',
-        right: -10,
-        bottom: -10,
-        fontSize: 60,
-        opacity: 0.2,
+        right: 12,
+        bottom: 12,
+        width: 38,
+        height: 38,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     sectionTitle: {
         fontSize: fontSize.xl,
@@ -302,9 +324,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 3,
     },
     actionIconContainer: {
         width: 48,

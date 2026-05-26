@@ -86,7 +86,7 @@ Status: `Completed`
 3. Login with Google works on Android + iOS preview
 
 ## Phase 2: Core Booking Experience
-Status: `Planned`
+Status: `In Progress`
 
 ### Screens
 1. Home
@@ -213,6 +213,10 @@ Status: `Planned`
    - Auth-entry visual hierarchy unified across Splash, Onboarding, Welcome, Login, Register, and Google onboarding
    - No authentication logic changes introduced
    - Ready to start Phase 2 core booking UI modernization
+6. Phase 2 checkpoint 1 started:
+   - Updated `DashboardScreen` with refined gradient hero header and premium stat card treatment
+   - Updated `BrowseScreen` with stronger visual hierarchy, search field affordance, and elevated list card styling
+   - Navigation, filtering, booking handoff, and data logic unchanged
 
 ## 11) Immediate Next Step
 Start Phase 2 on `Home`, `Browse`, `Tenant`, and `BookingFlow` with modernized layout/components while preserving booking/payment behavior.
