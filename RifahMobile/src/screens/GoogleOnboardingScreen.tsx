@@ -19,6 +19,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -326,6 +327,12 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
     return (
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <LinearGradient
+                colors={['#FFFFFF', '#F8F2FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: spacing.xl + topInset, paddingBottom: scrollBottomPadding }]}
                 keyboardShouldPersistTaps="handled"
@@ -437,7 +444,19 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: fontSize.md, color: colors.textSecondary, marginBottom: spacing.lg },
     errorContainer: { backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: borderRadius.md, marginBottom: spacing.md },
     errorText: { color: colors.error, fontSize: fontSize.sm, fontWeight: '600' },
-    card: { backgroundColor: colors.surface, borderRadius: borderRadius.lg, padding: spacing.lg, gap: spacing.sm, borderWidth: 1, borderColor: colors.border },
+    card: {
+        backgroundColor: `${colors.surface}D9`,
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        gap: spacing.sm,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 3,
+    },
     label: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
     infoText: { fontSize: fontSize.md, color: colors.text, marginBottom: spacing.xs },
     hintText: { fontSize: fontSize.sm, color: colors.primaryDark, marginBottom: spacing.xs },

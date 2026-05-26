@@ -18,6 +18,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface RegisterScreenProps {
     onRegisterSuccess: () => void;
@@ -159,6 +160,12 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <LinearGradient
+                colors={['#FFFFFF', '#F8F2FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
@@ -181,6 +188,9 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     <Text style={[styles.title, isRTL && styles.rtlText]}>
                         {t('createAccount')}
                     </Text>
+                    <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
+                        {t('welcomeSubtitle')}
+                    </Text>
                 </View>
 
                 {/* Error Message */}
@@ -191,6 +201,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                 ) : null}
 
                 {/* Form */}
+                <View style={styles.formCard}>
                 <View style={styles.form}>
                     {/* Name Fields */}
                     <View style={styles.row}>
@@ -328,6 +339,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                         </TouchableOpacity>
                     </View>
                 </View>
+                </View>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -373,12 +385,24 @@ const styles = StyleSheet.create({
         padding: spacing.md,
         marginBottom: spacing.lg,
     },
+    subtitle: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        textAlign: 'center',
+    },
     errorText: {
         color: colors.error,
         fontSize: fontSize.sm,
     },
     form: {
         flex: 1,
+    },
+    formCard: {
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: `${colors.surface}D9`,
+        padding: spacing.lg,
     },
     row: {
         flexDirection: 'row',

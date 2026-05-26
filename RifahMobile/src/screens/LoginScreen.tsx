@@ -19,6 +19,7 @@ import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
 import AppleIcon from '../../assets/icons/icon_apple_brand.svg';
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface LoginScreenProps {
     onLoginSuccess: () => void;
@@ -97,6 +98,12 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <LinearGradient
+                colors={['#FFFFFF', '#F8F2FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
@@ -119,6 +126,9 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     <Text style={[styles.title, isRTL && styles.rtlText]}>
                         Sign in to your Account
                     </Text>
+                    <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
+                        {t('welcomeSubtitle')}
+                    </Text>
                 </View>
 
                 {/* Error Message */}
@@ -129,6 +139,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                 ) : null}
 
                 {/* Form */}
+                <View style={styles.formCard}>
                 <View style={styles.form}>
                     {/* Email */}
                     <View style={styles.inputGroup}>
@@ -215,6 +226,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                         </TouchableOpacity>
                     </View>
                 </View>
+                </View>
             </ScrollView>
         </KeyboardAvoidingView >
     );
@@ -243,10 +255,15 @@ const styles = StyleSheet.create({
         height: 110,
     },
     title: {
-        fontSize: 40,
+        fontSize: fontSize.xxxl,
         fontWeight: '700',
         color: colors.text,
         marginBottom: spacing.xs,
+        textAlign: 'center',
+    },
+    subtitle: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
         textAlign: 'center',
     },
     rtlText: {
@@ -266,6 +283,13 @@ const styles = StyleSheet.create({
     },
     form: {
         flex: 1,
+    },
+    formCard: {
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: `${colors.surface}D9`,
+        padding: spacing.lg,
     },
     inputGroup: {
         marginBottom: spacing.lg,

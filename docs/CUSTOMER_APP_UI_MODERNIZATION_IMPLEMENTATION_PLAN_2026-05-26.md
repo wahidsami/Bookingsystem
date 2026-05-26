@@ -200,6 +200,11 @@ Status: `Planned`
    - Entry experience visual refresh initiated
    - Updated `SplashScreen` with branded gradient + ambient glow
    - Updated `WelcomeScreen` with elevated hero panel and softer background treatment
+3. Phase 1 checkpoint 2 completed:
+   - Updated `LoginScreen` with gradient backdrop + elevated auth card layout
+   - Updated `RegisterScreen` with matching visual hierarchy and auth surface card
+   - Updated `GoogleOnboardingScreen` with consistent gradient backdrop and elevated card styling
+   - Authentication logic and API flows unchanged
 
 ## 11) Immediate Next Step
 Continue Phase 1 on `Login`, `Register`, and `GoogleOnboarding` visual hierarchy and motion polish while preserving auth logic.
