@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { api } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
@@ -29,6 +29,19 @@ type GiftHistoryItem = {
   tenant?: { name?: string; name_en?: string; name_ar?: string } | null;
 };
 
+type RecipientCheckResult = {
+  exists: boolean;
+  recipient: null | {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    profileImage?: string | null;
+  };
+};
+
 export function GiftsScreen({ navigation, route }: any) {
   const { language, isRTL } = useLanguage();
   const tenantId = route?.params?.tenantId as string | undefined;
@@ -44,6 +57,9 @@ export function GiftsScreen({ navigation, route }: any) {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
+  const [checkingRecipient, setCheckingRecipient] = useState(false);
+  const [recipientCheck, setRecipientCheck] = useState<RecipientCheckResult | null>(null);
+  const [recipientDecision, setRecipientDecision] = useState<'none' | 'send_member' | 'send_email' | 'recharge_self'>('none');
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
@@ -250,6 +266,66 @@ export function GiftsScreen({ navigation, route }: any) {
     }
   };
 
+  const checkRecipient = async () => {
+    const email = recipientEmail.trim();
+    const phone = recipientPhone.trim();
+    if (!email && !phone) {
+      Alert.alert('Recipient required', 'Please enter recipient email or phone.');
+      return;
+    }
+
+    try {
+      setCheckingRecipient(true);
+      setRecipientCheck(null);
+      setRecipientDecision('none');
+      const endpoint = tenantId ? '/users/tenant-gifts/recipient-check' : '/users/gifts/recipient-check';
+      const query = `recipientEmail=${encodeURIComponent(email)}&recipientPhone=${encodeURIComponent(phone)}`;
+      const result = await api.get<{ success: boolean; exists: boolean; recipient: RecipientCheckResult['recipient'] }>(`${endpoint}?${query}`);
+      if (!result.success) {
+        Alert.alert('Error', 'Failed to verify recipient');
+        return;
+      }
+      const next = { exists: !!result.exists, recipient: result.recipient || null };
+      setRecipientCheck(next);
+      if (next.exists) {
+        setRecipientDecision('send_member');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to verify recipient');
+    } finally {
+      setCheckingRecipient(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (mode === 'self') {
+      await handleSelfRecharge();
+      return;
+    }
+    if (!recipientCheck) {
+      Alert.alert('Verify recipient', 'Please check recipient first.');
+      return;
+    }
+    if (recipientCheck.exists) {
+      if (recipientDecision !== 'send_member') {
+        Alert.alert('Confirm recipient', 'Please confirm the recipient first.');
+        return;
+      }
+      await handleSendGift();
+      return;
+    }
+
+    if (recipientDecision === 'recharge_self') {
+      await handleSelfRecharge();
+      return;
+    }
+    if (recipientDecision !== 'send_email') {
+      Alert.alert('Choose action', 'Please choose an action for this recipient.');
+      return;
+    }
+    await handleSendGift();
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -318,11 +394,19 @@ export function GiftsScreen({ navigation, route }: any) {
       )}
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelected(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => {
+          setSelected(null);
+          setRecipientCheck(null);
+          setRecipientDecision('none');
+        }}>
           <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
             <Text style={styles.modalTitle}>{language === 'ar' ? 'اختر الإجراء' : 'Choose action'}</Text>
             <View style={styles.modeRow}>
-              <TouchableOpacity style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]} onPress={() => setMode('self')}>
+              <TouchableOpacity style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]} onPress={() => {
+                setMode('self');
+                setRecipientCheck(null);
+                setRecipientDecision('none');
+              }}>
                 <Text style={[styles.modeText, mode === 'self' && styles.modeTextActive]}>{language === 'ar' ? 'إضافة لمحفظتي' : 'Add to my wallet'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modeBtn, mode === 'send' && styles.modeBtnActive]} onPress={() => setMode('send')}>
@@ -338,9 +422,55 @@ export function GiftsScreen({ navigation, route }: any) {
                 <TextInput style={styles.input} value={recipientPhone} onChangeText={setRecipientPhone} placeholder={language === 'ar' ? 'جوال المستلم' : 'Recipient phone'} keyboardType="phone-pad" />
                 <Text style={styles.inputLabel}>{language === 'ar' ? 'الرسالة (اختياري)' : 'Message (Optional)'}</Text>
                 <TextInput style={styles.input} value={giftMessage} onChangeText={setGiftMessage} placeholder={language === 'ar' ? 'رسالة (اختياري)' : 'Message (optional)'} />
+                <TouchableOpacity style={styles.checkBtn} onPress={checkRecipient} disabled={checkingRecipient}>
+                  {checkingRecipient
+                    ? <ActivityIndicator color={colors.primary} />
+                    : <Text style={styles.checkBtnText}>{language === 'ar' ? 'تحقق من المستلم' : 'Check recipient'}</Text>}
+                </TouchableOpacity>
+
+                {!!recipientCheck && recipientCheck.exists && (
+                  <View style={styles.recipientCard}>
+                    {recipientCheck.recipient?.profileImage ? (
+                      <Image source={{ uri: recipientCheck.recipient.profileImage }} style={styles.recipientAvatar} />
+                    ) : (
+                      <View style={styles.recipientAvatarFallback}>
+                        <Text style={styles.recipientAvatarFallbackText}>
+                          {`${recipientCheck.recipient?.firstName?.[0] || ''}${recipientCheck.recipient?.lastName?.[0] || ''}`.toUpperCase() || 'R'}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.recipientName}>{recipientCheck.recipient?.fullName || 'Refah Member'}</Text>
+                      <Text style={styles.recipientMeta}>{recipientCheck.recipient?.email || recipientCheck.recipient?.phone || ''}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {!!recipientCheck && !recipientCheck.exists && (
+                  <View style={styles.choiceGroup}>
+                    <Text style={styles.choiceTitle}>{language === 'ar' ? 'المستلم غير مسجل. اختر الإجراء:' : 'Recipient is not a Refah member. Choose action:'}</Text>
+                    <View style={styles.choiceRow}>
+                      <TouchableOpacity style={[styles.choiceBtn, recipientDecision === 'send_email' && styles.choiceBtnActive]} onPress={() => setRecipientDecision('send_email')}>
+                        <Text style={[styles.choiceText, recipientDecision === 'send_email' && styles.choiceTextActive]}>{language === 'ar' ? 'إرسال عبر البريد' : 'Send email gift card'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.choiceBtn, recipientDecision === 'recharge_self' && styles.choiceBtnActive]} onPress={() => setRecipientDecision('recharge_self')}>
+                        <Text style={[styles.choiceText, recipientDecision === 'recharge_self' && styles.choiceTextActive]}>{language === 'ar' ? 'شحن لمحفظتي' : 'Recharge myself'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity style={styles.cancelChoiceBtn} onPress={() => {
+                      setRecipientDecision('none');
+                      setRecipientCheck(null);
+                    }}>
+                      <Text style={styles.cancelChoiceText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             ) : null}
 
+            {(mode === 'self' ||
+              (mode === 'send' && recipientCheck?.exists && recipientDecision === 'send_member') ||
+              (mode === 'send' && !recipientCheck?.exists && (recipientDecision === 'send_email' || recipientDecision === 'recharge_self'))) && (
             <View style={{ gap: spacing.sm }}>
               <Text style={styles.paymentTitle}>{language === 'ar' ? 'بيانات الدفع' : 'Payment details'}</Text>
               <Text style={styles.inputLabel}>{language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder Name'}</Text>
@@ -358,10 +488,11 @@ export function GiftsScreen({ navigation, route }: any) {
                 </View>
               </View>
             </View>
+            )}
 
             <TouchableOpacity
               style={[styles.submitBtn, saving && { opacity: 0.7 }]}
-              onPress={mode === 'self' ? handleSelfRecharge : handleSendGift}
+              onPress={handleConfirm}
               disabled={saving}
             >
               {saving ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitText}>{language === 'ar' ? 'تأكيد' : 'Confirm'}</Text>}
@@ -455,6 +586,66 @@ const styles = StyleSheet.create({
   modeBtnActive: { borderColor: colors.primary, backgroundColor: `${colors.primary}20` },
   modeText: { color: colors.text, fontSize: fontSize.sm, fontWeight: '600' },
   modeTextActive: { color: colors.primary },
+  checkBtn: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: `${colors.primary}12`
+  },
+  checkBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
+  recipientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    backgroundColor: colors.surface
+  },
+  recipientAvatar: { width: 40, height: 40, borderRadius: 20 },
+  recipientAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${colors.primary}20`
+  },
+  recipientAvatarFallbackText: { color: colors.primary, fontWeight: '700' },
+  recipientName: { color: colors.text, fontWeight: '700', fontSize: fontSize.sm },
+  recipientMeta: { color: colors.textSecondary, fontSize: 11 },
+  choiceGroup: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: colors.surface
+  },
+  choiceTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  choiceRow: { flexDirection: 'row', gap: spacing.xs },
+  choiceBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center'
+  },
+  choiceBtnActive: { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
+  choiceText: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center', paddingHorizontal: 6 },
+  choiceTextActive: { color: colors.primary },
+  cancelChoiceBtn: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center'
+  },
+  cancelChoiceText: { color: colors.error, fontWeight: '700', fontSize: fontSize.sm },
   paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
   inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   input: {

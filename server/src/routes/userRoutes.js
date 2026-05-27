@@ -46,6 +46,7 @@ router.delete('/payment-methods/:id', authenticateUser, paymentMethodController.
 // Gifts & wallet packages
 router.get('/gifts/packages', authenticateUser, userGiftController.getGiftPackages);
 router.post('/gifts/recharge', authenticateUser, userGiftController.rechargeFromGiftPackage);
+router.get('/gifts/recipient-check', authenticateUser, userGiftController.checkGiftRecipient);
 router.post('/gifts/send', authenticateUser, userGiftController.sendGiftPackage);
 router.post('/gifts/claim', authenticateUser, userGiftController.claimGift);
 router.get('/gifts/history', authenticateUser, userGiftController.listMyGiftTransactions);
@@ -53,6 +54,7 @@ router.get('/gifts/claim/open', userGiftController.openGiftClaimLink);
 
 // Tenant-scoped gifts & wallet
 router.post('/tenant-gifts/purchase', authenticateUser, userTenantGiftController.purchaseForSelf);
+router.get('/tenant-gifts/recipient-check', authenticateUser, userTenantGiftController.checkTenantGiftRecipient);
 router.post('/tenant-gifts/send', authenticateUser, userTenantGiftController.sendGift);
 router.post('/tenant-gifts/claim', authenticateUser, userTenantGiftController.claimGift);
 router.get('/tenant-gifts/history', authenticateUser, userTenantGiftController.listMyTenantGiftTransactions);

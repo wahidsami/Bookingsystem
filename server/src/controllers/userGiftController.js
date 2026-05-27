@@ -85,6 +85,53 @@ const findActivePackage = async (packageId) => {
     });
 };
 
+exports.checkGiftRecipient = async (req, res) => {
+    try {
+        const email = normalize(req.query?.recipientEmail).toLowerCase();
+        const phone = normalizePhone(req.query?.recipientPhone);
+        if (!email && !phone) {
+            return res.status(400).json({ success: false, message: 'recipientEmail or recipientPhone is required' });
+        }
+
+        const recipient = await db.PlatformUser.findOne({
+            where: {
+                [Op.or]: [
+                    ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
+                    ...(phone ? [{ phone }] : [])
+                ]
+            },
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
+        });
+
+        if (!recipient) {
+            return res.json({
+                success: true,
+                exists: false,
+                recipient: null,
+                normalized: { email: email || null, phone: phone || null }
+            });
+        }
+
+        return res.json({
+            success: true,
+            exists: true,
+            recipient: {
+                id: recipient.id,
+                firstName: recipient.firstName,
+                lastName: recipient.lastName,
+                fullName: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim(),
+                email: recipient.email,
+                phone: recipient.phone,
+                profileImage: recipient.profileImage || null
+            },
+            normalized: { email: email || null, phone: phone || null }
+        });
+    } catch (error) {
+        console.error('Check gift recipient error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check recipient' });
+    }
+};
+
 exports.getGiftPackages = async (req, res) => {
     try {
         const now = new Date();
