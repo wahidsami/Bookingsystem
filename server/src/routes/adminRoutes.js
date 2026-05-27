@@ -96,8 +96,8 @@ router.put('/feature-pricing/:key', requirePermission('settings', 'edit'), admin
 // ===== GIFT CARD PACKAGES =====
 router.get('/gift-packages', requirePermission('settings', 'view'), adminGiftCardPackageController.listGiftPackages);
 router.get('/gift-packages/:id', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftPackage);
-router.post('/gift-packages', requirePermission('settings', 'edit'), adminGiftCardPackageController.createGiftPackage);
-router.put('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.updateGiftPackage);
+router.post('/gift-packages', requirePermission('settings', 'edit'), adminGiftCardPackageController.uploadGiftCardImageOptional, adminGiftCardPackageController.createGiftPackage);
+router.put('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.uploadGiftCardImageOptional, adminGiftCardPackageController.updateGiftPackage);
 router.delete('/gift-packages/:id', requirePermission('settings', 'edit'), adminGiftCardPackageController.deleteGiftPackage);
 router.get('/gift-transactions', requirePermission('settings', 'view'), adminGiftCardPackageController.listGiftTransactions);
 router.get('/gift-transactions/report', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftTransactionsReport);

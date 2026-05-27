@@ -2,10 +2,43 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+
+const ensureAdminGiftUploadDir = () => {
+    const dir = path.join(__dirname, '../../uploads/admin-gift-cards');
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+};
+
+const adminGiftStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, ensureAdminGiftUploadDir()),
+    filename: (req, file, cb) => {
+        const stamp = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        cb(null, `gift-card-${stamp}${path.extname(file.originalname || '.png')}`);
+    }
+});
+
+const uploadAdminGiftImage = multer({
+    storage: adminGiftStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+exports.uploadGiftCardImageOptional = uploadAdminGiftImage.single('image');
 
 const toNumber = (value, fallback = 0) => {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toBoolean = (value, fallback = true) => {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === 'boolean') return value;
+    const normalized = `${value}`.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+    return fallback;
 };
 
 const validatePackageInput = (payload = {}) => {
@@ -196,6 +229,8 @@ exports.createGiftPackage = async (req, res) => {
             return res.status(400).json({ success: false, message: 'endsAt must be after startsAt' });
         }
 
+        const uploadedImage = req.file ? `/uploads/admin-gift-cards/${req.file.filename}` : null;
+
         const created = await db.GiftCardPackage.create({
             title_en: `${payload.title_en}`.trim(),
             title_ar: `${payload.title_ar}`.trim(),
@@ -205,10 +240,10 @@ exports.createGiftPackage = async (req, res) => {
             priceAmount: toNumber(payload.priceAmount),
             walletCreditAmount: toNumber(payload.walletCreditAmount),
             bonusAmount: toNumber(payload.bonusAmount, 0),
-            imageUrl: payload.imageUrl || null,
+            imageUrl: uploadedImage || payload.imageUrl || null,
             startsAt,
             endsAt,
-            isActive: payload.isActive !== false,
+            isActive: toBoolean(payload.isActive, true),
             createdByAdminId: req.adminId || null
         });
 
@@ -246,6 +281,8 @@ exports.updateGiftPackage = async (req, res) => {
             return res.status(400).json({ success: false, message: 'endsAt must be after startsAt' });
         }
 
+        const uploadedImage = req.file ? `/uploads/admin-gift-cards/${req.file.filename}` : null;
+
         await item.update({
             ...(payload.title_en !== undefined ? { title_en: `${payload.title_en}`.trim() } : {}),
             ...(payload.title_ar !== undefined ? { title_ar: `${payload.title_ar}`.trim() } : {}),
@@ -255,10 +292,11 @@ exports.updateGiftPackage = async (req, res) => {
             ...(payload.priceAmount !== undefined ? { priceAmount: toNumber(payload.priceAmount) } : {}),
             ...(payload.walletCreditAmount !== undefined ? { walletCreditAmount: toNumber(payload.walletCreditAmount) } : {}),
             ...(payload.bonusAmount !== undefined ? { bonusAmount: toNumber(payload.bonusAmount, 0) } : {}),
+            ...(uploadedImage ? { imageUrl: uploadedImage } : {}),
             ...(payload.imageUrl !== undefined ? { imageUrl: payload.imageUrl || null } : {}),
             ...(payload.startsAt !== undefined ? { startsAt: payload.startsAt ? new Date(payload.startsAt) : null } : {}),
             ...(payload.endsAt !== undefined ? { endsAt: payload.endsAt ? new Date(payload.endsAt) : null } : {}),
-            ...(payload.isActive !== undefined ? { isActive: payload.isActive === true } : {})
+            ...(payload.isActive !== undefined ? { isActive: toBoolean(payload.isActive, item.isActive) } : {})
         });
 
         res.json({ success: true, package: item });

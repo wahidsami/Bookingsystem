@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from '@/components/AdminLayout';
-import { adminApi } from '@/lib/api';
+import { adminApi, getImageUrl } from '@/lib/api';
 import { Currency } from '@/components/Currency';
 
 type GiftPackage = {
@@ -17,6 +17,7 @@ type GiftPackage = {
   bonusAmount: number;
   startsAt?: string | null;
   endsAt?: string | null;
+  imageUrl?: string | null;
   isActive: boolean;
 };
 
@@ -54,6 +55,7 @@ export default function GiftCardsPage() {
   const [transactions, setTransactions] = useState<GiftTransaction[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'transactions'>('packages');
   const [form, setForm] = useState(defaultForm);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -158,6 +160,7 @@ export default function GiftCardsPage() {
 
   const resetForm = () => {
     setForm(defaultForm);
+    setImageFile(null);
     setEditingId(null);
   };
 
@@ -195,9 +198,9 @@ export default function GiftCardsPage() {
       };
 
       if (editingId) {
-        await adminApi.updateGiftPackage(editingId, payload);
+        await adminApi.updateGiftPackage(editingId, payload, imageFile);
       } else {
-        await adminApi.createGiftPackage(payload);
+        await adminApi.createGiftPackage(payload, imageFile);
       }
       await loadData();
       resetForm();
@@ -318,6 +321,16 @@ export default function GiftCardsPage() {
                   <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
                 </div>
               </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-dark-300">Card image</label>
+                <input
+                  className="input"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                />
+                {imageFile ? <p className="mt-1 text-[11px] text-dark-400">Selected: {imageFile.name}</p> : null}
+              </div>
               <div className="flex gap-2 pt-1">
                 <button className="btn btn-primary flex-1" disabled={saving} onClick={submitPackage}>
                   {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
@@ -333,7 +346,13 @@ export default function GiftCardsPage() {
               <div className="divide-y divide-dark-700">
                 {packages.map((pkg) => (
                   <div key={pkg.id} className="px-4 py-4 flex items-start justify-between gap-3">
-                    <div className="space-y-1">
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={getImageUrl(pkg.imageUrl)}
+                        alt={pkg.title_en}
+                        className="h-14 w-20 rounded-lg border border-dark-600 object-cover bg-dark-700"
+                      />
+                      <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <p className="text-white font-semibold">{pkg.title_en}</p>
                         <span className={`text-[11px] px-2 py-0.5 rounded-full ${pkg.isActive ? 'bg-success/20 text-success' : 'bg-dark-600 text-dark-200'}`}>
@@ -344,6 +363,7 @@ export default function GiftCardsPage() {
                       <p className="text-xs text-dark-400">
                         Price: <Currency amount={pkg.priceAmount} /> | Credit: <Currency amount={Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0)} />
                       </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <button className="btn btn-secondary" onClick={() => startEdit(pkg)}>Edit</button>

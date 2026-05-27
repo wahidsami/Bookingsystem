@@ -223,6 +223,34 @@ class AdminApi {
     return this.request<{ success: boolean; tenant: any }>(`/admin/tenants/${id}/approve`, 'POST', { body: { notes } });
   }
 
+  private async requestFormData<T>(
+    endpoint: string,
+    method: Exclude<RequestMethod, 'GET'>,
+    formData: FormData
+  ): Promise<T> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method,
+      headers,
+      body: formData,
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        sessionStorage.removeItem('rifah_admin_token');
+        sessionStorage.removeItem('rifah_admin_refresh_token');
+        window.location.href = '/login';
+      }
+      throw new Error(data.message || 'API request failed');
+    }
+
+    return data;
+  }
+
   async resendTenantPaymentEmail(id: string, billId?: string, ccEmail?: string) {
     return this.request<{ success: boolean; message: string; bill?: any }>(`/admin/tenants/${id}/resend-payment-email`, 'POST', {
       body: {
@@ -516,11 +544,29 @@ class AdminApi {
     return this.request<{ success: boolean; package: any }>(`/admin/gift-packages/${id}`);
   }
 
-  async createGiftPackage(data: any) {
+  async createGiftPackage(data: any, imageFile?: File | null) {
+    if (imageFile) {
+      const formData = new FormData();
+      Object.entries(data || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        formData.append(key, String(value));
+      });
+      formData.append('image', imageFile);
+      return this.requestFormData<{ success: boolean; package: any; message?: string }>('/admin/gift-packages', 'POST', formData);
+    }
     return this.request<{ success: boolean; package: any; message?: string }>('/admin/gift-packages', 'POST', { body: data });
   }
 
-  async updateGiftPackage(id: string, data: any) {
+  async updateGiftPackage(id: string, data: any, imageFile?: File | null) {
+    if (imageFile) {
+      const formData = new FormData();
+      Object.entries(data || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        formData.append(key, String(value));
+      });
+      formData.append('image', imageFile);
+      return this.requestFormData<{ success: boolean; package: any; message?: string }>(`/admin/gift-packages/${id}`, 'PUT', formData);
+    }
     return this.request<{ success: boolean; package: any; message?: string }>(`/admin/gift-packages/${id}`, 'PUT', { body: data });
   }
 
