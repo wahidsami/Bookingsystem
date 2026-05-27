@@ -102,6 +102,7 @@ router.delete('/gift-packages/:id', requirePermission('settings', 'edit'), admin
 router.get('/gift-transactions', requirePermission('settings', 'view'), adminGiftCardPackageController.listGiftTransactions);
 router.get('/gift-transactions/report', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftTransactionsReport);
 router.get('/gift-transactions/report.csv', requirePermission('settings', 'view'), adminGiftCardPackageController.exportGiftTransactionsReportCsv);
+router.get('/gift-redemptions/report', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftRedemptionsReport);
 
 module.exports = router;
 

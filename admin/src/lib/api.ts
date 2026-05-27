@@ -591,6 +591,32 @@ class AdminApi {
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return this.requestBlob(`/admin/gift-transactions/report.csv${suffix}`);
   }
+
+  async getGiftRedemptionsReport(params: { tenantId?: string; startDate?: string; endDate?: string; limit?: number } = {}) {
+    const query = new URLSearchParams();
+    if (params.tenantId) query.append('tenantId', params.tenantId);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.limit !== undefined) query.append('limit', String(params.limit));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{
+      success: boolean;
+      report: {
+        totals: {
+          redemptionsCount: number;
+          totalRedeemedAmount: number;
+          adminGlobalRedeemed: number;
+          tenantScopedRedeemed: number;
+          outstandingAdminLiability: number;
+          outstandingTenantLiability: number;
+        };
+        recentRedemptions: any[];
+        byTenant: any[];
+        tenantOutstandingLiability: any[];
+        tenantPayables: any[];
+      };
+    }>(`/admin/gift-redemptions/report${suffix}`);
+  }
 }
 
 

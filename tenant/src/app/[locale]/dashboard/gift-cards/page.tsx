@@ -38,6 +38,19 @@ type GiftTransaction = {
   settlement?: { status?: string; grossAmount?: number; platformFeeAmount?: number; netTenantPayableAmount?: number } | null;
 };
 
+type GiftRedemption = {
+  id: string;
+  code?: string | null;
+  scopeType?: string | null;
+  redeemedAmount: number;
+  remainingAfter: number;
+  senderName?: string | null;
+  senderEmail?: string | null;
+  appointmentId?: string | null;
+  orderId?: string | null;
+  createdAt: string;
+};
+
 const defaultForm = {
   title_en: '',
   title_ar: '',
@@ -63,6 +76,8 @@ export default function TenantGiftCardsPage() {
   const [transactionsCount, setTransactionsCount] = useState(0);
   const [transactions, setTransactions] = useState<GiftTransaction[]>([]);
   const [summary, setSummary] = useState<any>(null);
+  const [redemptionSummary, setRedemptionSummary] = useState<any>(null);
+  const [redemptions, setRedemptions] = useState<GiftRedemption[]>([]);
   const [form, setForm] = useState(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [createImageFile, setCreateImageFile] = useState<File | null>(null);
@@ -72,15 +87,18 @@ export default function TenantGiftCardsPage() {
     try {
       setLoading(true);
       setError(null);
-      const [packagesRes, summaryRes, txRes] = await Promise.all([
+      const [packagesRes, summaryRes, txRes, redemptionsRes] = await Promise.all([
         tenantApi.getTenantGiftCardPackages(),
         tenantApi.getTenantGiftCardSummary().catch(() => null),
-        tenantApi.getTenantGiftCardTransactions({ limit: 20 }).catch(() => null)
+        tenantApi.getTenantGiftCardTransactions({ limit: 20 }).catch(() => null),
+        tenantApi.getTenantGiftCardRedemptions({ limit: 20 }).catch(() => null)
       ]);
       setPackages(packagesRes?.packages || []);
       setSummary(summaryRes?.summary || null);
       setTransactions(txRes?.transactions || []);
       setTransactionsCount((txRes?.transactions || []).length);
+      setRedemptions(redemptionsRes?.redemptions || []);
+      setRedemptionSummary(redemptionsRes?.summary || null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load gift cards');
     } finally {
@@ -365,8 +383,71 @@ export default function TenantGiftCardsPage() {
       )}
 
       {activeTab === 'reports' && (
-        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-          <div className="border-b border-gray-200 px-4 py-3">
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <p className="text-xs text-gray-500">{isArabic ? 'عمليات الاسترداد' : 'Redemptions'}</p>
+              <p className="text-xl font-semibold text-gray-900">{Number(redemptionSummary?.totalRedemptions || 0)}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <p className="text-xs text-gray-500">{isArabic ? 'إجمالي المسترد' : 'Total redeemed'}</p>
+              <p className="text-xl font-semibold text-gray-900">{Number(redemptionSummary?.totalRedeemedAmount || 0).toFixed(2)} SAR</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <p className="text-xs text-gray-500">{isArabic ? 'استرداد بطاقات رفاه العامة' : 'Admin-global redeemed'}</p>
+              <p className="text-xl font-semibold text-gray-900">{Number(redemptionSummary?.adminGlobalRedemptionsAmount || 0).toFixed(2)} SAR</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <p className="text-xs text-gray-500">{isArabic ? 'استرداد بطاقات المركز' : 'Tenant-scoped redeemed'}</p>
+              <p className="text-xl font-semibold text-gray-900">{Number(redemptionSummary?.tenantScopedRedemptionsAmount || 0).toFixed(2)} SAR</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-800">
+                {isArabic ? 'عمليات الاسترداد الفعلية في المركز' : 'In-center gift card redemptions'}
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'التاريخ' : 'Date'}</th>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'الكود' : 'Code'}</th>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'النوع' : 'Scope'}</th>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'قيمة الاسترداد' : 'Redeemed'}</th>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'المتبقي' : 'Remaining after'}</th>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'المشتري' : 'Purchased by'}</th>
+                    <th className="px-3 py-2 text-left">{isArabic ? 'السياق' : 'Context'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {redemptions.map((row) => (
+                    <tr key={row.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{new Date(row.createdAt).toLocaleString(isArabic ? 'ar-SA' : 'en-US')}</td>
+                      <td className="px-3 py-2 text-gray-800">{row.code || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{row.scopeType === 'tenant_scoped' ? (isArabic ? 'خاصة بالمركز' : 'Tenant scoped') : (isArabic ? 'عامة' : 'Admin global')}</td>
+                      <td className="px-3 py-2 text-emerald-700 whitespace-nowrap">{Number(row.redeemedAmount || 0).toFixed(2)} SAR</td>
+                      <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{Number(row.remainingAfter || 0).toFixed(2)} SAR</td>
+                      <td className="px-3 py-2 text-gray-700">{row.senderName || row.senderEmail || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{row.appointmentId ? (isArabic ? 'حجز' : 'Appointment') : row.orderId ? (isArabic ? 'طلب' : 'Order') : '-'}</td>
+                    </tr>
+                  ))}
+                  {!redemptions.length && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-8 text-center text-gray-500">
+                        {isArabic ? 'لا توجد عمليات استرداد بعد' : 'No redemptions yet'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="border-b border-gray-200 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-800">
               {isArabic ? 'تقرير تفصيلي لحركة بطاقات الهدايا' : 'Detailed Gift Card Transactions'}
             </h3>
@@ -427,6 +508,7 @@ export default function TenantGiftCardsPage() {
                 )}
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       )}

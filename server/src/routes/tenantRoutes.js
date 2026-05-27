@@ -211,6 +211,7 @@ router.post('/gift-cards/packages/:id/image', tenantGiftCardController.uploadGif
 router.get('/gift-cards/reports/summary', tenantGiftCardController.getSummaryReport);
 router.get('/gift-cards/reports/transactions', tenantGiftCardController.getTransactionsReport);
 router.get('/gift-cards/reports/transactions.csv', tenantGiftCardController.exportTransactionsReportCsv);
+router.get('/gift-cards/reports/redemptions', tenantGiftCardController.getRedemptionsReport);
 
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);

@@ -342,3 +342,92 @@ exports.exportTransactionsReportCsv = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to export transactions CSV' });
   }
 };
+
+exports.getRedemptionsReport = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const where = { tenantId };
+    if (req.query.startDate || req.query.endDate) {
+      where.createdAt = {};
+      if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
+      if (req.query.endDate) where.createdAt[Op.lte] = new Date(req.query.endDate);
+    }
+
+    const rows = await db.GiftCardCodeRedemption.findAll({
+      where,
+      include: [
+        {
+          model: db.GiftCardCode,
+          as: 'giftCardCode',
+          required: true,
+          include: [
+            {
+              model: db.GiftCardTransaction,
+              as: 'sourceGiftTransaction',
+              include: [
+                { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false }
+              ],
+              required: false
+            },
+            {
+              model: db.TenantGiftCardTransaction,
+              as: 'sourceTenantGiftTransaction',
+              include: [
+                { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false }
+              ],
+              required: false
+            }
+          ]
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: Number(req.query.limit || 300)
+    });
+
+    const summary = {
+      totalRedemptions: rows.length,
+      totalRedeemedAmount: 0,
+      adminGlobalRedemptionsAmount: 0,
+      tenantScopedRedemptionsAmount: 0
+    };
+
+    const redemptions = rows.map((row) => {
+      const redeemedAmount = Number(row.redeemedAmount || 0);
+      summary.totalRedeemedAmount += redeemedAmount;
+      const scopeType = row.giftCardCode?.scopeType || 'admin_global';
+      if (scopeType === 'tenant_scoped') summary.tenantScopedRedemptionsAmount += redeemedAmount;
+      else summary.adminGlobalRedemptionsAmount += redeemedAmount;
+
+      const sourceTx = row.giftCardCode?.sourceGiftTransaction || row.giftCardCode?.sourceTenantGiftTransaction || null;
+      const sender = sourceTx?.sender || null;
+      const senderName = sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || sender.email : null;
+
+      return {
+        id: row.id,
+        code: row.giftCardCode?.code || null,
+        scopeType,
+        redeemedAmount,
+        remainingAfter: Number(row.remainingAfter || 0),
+        senderName,
+        senderEmail: sender?.email || null,
+        appointmentId: row.appointmentId || null,
+        orderId: row.orderId || null,
+        createdAt: row.createdAt
+      };
+    });
+
+    return res.json({
+      success: true,
+      summary: {
+        totalRedemptions: summary.totalRedemptions,
+        totalRedeemedAmount: Number(summary.totalRedeemedAmount.toFixed(2)),
+        adminGlobalRedemptionsAmount: Number(summary.adminGlobalRedemptionsAmount.toFixed(2)),
+        tenantScopedRedemptionsAmount: Number(summary.tenantScopedRedemptionsAmount.toFixed(2))
+      },
+      redemptions
+    });
+  } catch (error) {
+    console.error('tenant gift redemptions report error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load gift card redemptions report' });
+  }
+};

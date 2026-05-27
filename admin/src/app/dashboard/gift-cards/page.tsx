@@ -90,6 +90,16 @@ export default function GiftCardsPage() {
       creditAmountTotal: number;
     }>;
   } | null>(null);
+  const [redemptionReport, setRedemptionReport] = useState<{
+    totals: {
+      redemptionsCount: number;
+      totalRedeemedAmount: number;
+      adminGlobalRedeemed: number;
+      tenantScopedRedeemed: number;
+      outstandingAdminLiability: number;
+      outstandingTenantLiability: number;
+    };
+  } | null>(null);
 
   const title = useMemo(() => (editingId ? 'Edit Gift Package' : 'Create Gift Package'), [editingId]);
 
@@ -108,8 +118,12 @@ export default function GiftCardsPage() {
       ]);
       setPackages(packagesRes.packages || []);
       setTransactions(txRes.transactions || []);
-      const reportRes = await adminApi.getGiftTransactionsReport(filters);
+      const [reportRes, redemptionRes] = await Promise.all([
+        adminApi.getGiftTransactionsReport(filters),
+        adminApi.getGiftRedemptionsReport({ startDate, endDate, limit: 100 }).catch(() => null)
+      ]);
       setReport(reportRes.report || null);
+      setRedemptionReport(redemptionRes?.report || null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load gift cards data');
     } finally {
@@ -359,6 +373,18 @@ export default function GiftCardsPage() {
               <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
                 <p className="text-xs text-dark-300">Total bonus</p>
                 <p className="text-lg font-semibold text-white"><Currency amount={report?.totals.bonusAmountTotal ?? 0} /></p>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Total redeemed</p>
+                <p className="text-lg font-semibold text-white"><Currency amount={redemptionReport?.totals.totalRedeemedAmount ?? 0} /></p>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Outstanding admin liability</p>
+                <p className="text-lg font-semibold text-white"><Currency amount={redemptionReport?.totals.outstandingAdminLiability ?? 0} /></p>
+              </div>
+              <div className="rounded-xl border border-dark-700 bg-dark-800 px-4 py-3">
+                <p className="text-xs text-dark-300">Outstanding tenant liability</p>
+                <p className="text-lg font-semibold text-white"><Currency amount={redemptionReport?.totals.outstandingTenantLiability ?? 0} /></p>
               </div>
             </div>
 

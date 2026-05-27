@@ -397,3 +397,160 @@ exports.exportGiftTransactionsReportCsv = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to export report CSV' });
     }
 };
+
+exports.getGiftRedemptionsReport = async (req, res) => {
+    try {
+        const where = {};
+        if (req.query.startDate || req.query.endDate) {
+            where.createdAt = {};
+            if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
+            if (req.query.endDate) where.createdAt[Op.lte] = new Date(req.query.endDate);
+        }
+        if (req.query.tenantId) {
+            where.tenantId = req.query.tenantId;
+        }
+
+        const redemptions = await db.GiftCardCodeRedemption.findAll({
+            where,
+            include: [
+                {
+                    model: db.GiftCardCode,
+                    as: 'giftCardCode',
+                    required: true,
+                    include: [
+                        { model: db.GiftCardTransaction, as: 'sourceGiftTransaction', include: [{ model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false }], required: false },
+                        { model: db.TenantGiftCardTransaction, as: 'sourceTenantGiftTransaction', include: [{ model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false }], required: false }
+                    ]
+                },
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'email'], required: false }
+            ],
+            order: [['createdAt', 'DESC']],
+            limit: Math.max(1, Math.min(500, Number(req.query.limit) || 200))
+        });
+
+        const outstandingAdminLiability = await db.GiftCardCode.sum('remainingAmount', {
+            where: {
+                scopeType: 'admin_global',
+                status: { [Op.in]: ['issued', 'partially_redeemed'] }
+            }
+        }) || 0;
+
+        const outstandingTenantLiabilityRows = await db.GiftCardCode.findAll({
+            where: {
+                scopeType: 'tenant_scoped',
+                status: { [Op.in]: ['issued', 'partially_redeemed'] }
+            },
+            attributes: ['tenantId', [db.sequelize.fn('SUM', db.sequelize.col('remainingAmount')), 'remainingAmount']],
+            group: ['tenantId'],
+            raw: true
+        });
+
+        const tenantIds = outstandingTenantLiabilityRows
+            .map((row) => row.tenantId)
+            .filter(Boolean);
+        const tenantMap = new Map();
+        if (tenantIds.length) {
+            const tenants = await db.Tenant.findAll({
+                where: { id: { [Op.in]: tenantIds } },
+                attributes: ['id', 'name', 'email'],
+                raw: true
+            });
+            tenants.forEach((t) => tenantMap.set(t.id, t));
+        }
+
+        const byTenant = new Map();
+        let totalRedeemedAmount = 0;
+        let adminGlobalRedeemed = 0;
+        let tenantScopedRedeemed = 0;
+
+        const mappedRedemptions = redemptions.map((row) => {
+            const amount = toNumber(row.redeemedAmount, 0);
+            totalRedeemedAmount += amount;
+            const scopeType = row.giftCardCode?.scopeType || 'admin_global';
+            if (scopeType === 'tenant_scoped') tenantScopedRedeemed += amount;
+            else adminGlobalRedeemed += amount;
+
+            const tenantId = row.tenantId;
+            const current = byTenant.get(tenantId) || {
+                tenantId,
+                tenantName: row.tenant?.name || 'Unknown',
+                redeemedAmount: 0,
+                redemptionsCount: 0
+            };
+            current.redeemedAmount += amount;
+            current.redemptionsCount += 1;
+            byTenant.set(tenantId, current);
+
+            const sender = row.giftCardCode?.sourceGiftTransaction?.sender
+                || row.giftCardCode?.sourceTenantGiftTransaction?.sender
+                || null;
+
+            return {
+                id: row.id,
+                code: row.giftCardCode?.code || null,
+                scopeType,
+                tenantId: row.tenantId,
+                tenantName: row.tenant?.name || null,
+                redeemedAmount: amount,
+                remainingAfter: toNumber(row.remainingAfter, 0),
+                appointmentId: row.appointmentId || null,
+                orderId: row.orderId || null,
+                senderName: sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || sender.email : null,
+                senderEmail: sender?.email || null,
+                createdAt: row.createdAt
+            };
+        });
+
+        const tenantOutstanding = outstandingTenantLiabilityRows.map((row) => ({
+            tenantId: row.tenantId,
+            tenantName: tenantMap.get(row.tenantId)?.name || 'Unknown',
+            remainingLiability: toNumber(row.remainingAmount, 0)
+        })).sort((a, b) => b.remainingLiability - a.remainingLiability);
+
+        const tenantSettlementRows = await db.TenantGiftCardSettlement.findAll({
+            attributes: [
+                'tenantId',
+                [db.sequelize.fn('SUM', db.sequelize.col('netTenantPayableAmount')), 'netPayable'],
+                [db.sequelize.fn('SUM', db.sequelize.literal(`CASE WHEN status = 'settled' THEN "netTenantPayableAmount" ELSE 0 END`)), 'settledPayable']
+            ],
+            group: ['tenantId'],
+            raw: true
+        });
+
+        const payableByTenant = tenantSettlementRows.map((row) => {
+            const netPayable = toNumber(row.netPayable, 0);
+            const settledPayable = toNumber(row.settledPayable, 0);
+            return {
+                tenantId: row.tenantId,
+                tenantName: tenantMap.get(row.tenantId)?.name || 'Unknown',
+                netPayable,
+                settledPayable,
+                pendingPayable: Number((netPayable - settledPayable).toFixed(2))
+            };
+        }).sort((a, b) => b.pendingPayable - a.pendingPayable);
+
+        return res.json({
+            success: true,
+            report: {
+                totals: {
+                    redemptionsCount: mappedRedemptions.length,
+                    totalRedeemedAmount: Number(totalRedeemedAmount.toFixed(2)),
+                    adminGlobalRedeemed: Number(adminGlobalRedeemed.toFixed(2)),
+                    tenantScopedRedeemed: Number(tenantScopedRedeemed.toFixed(2)),
+                    outstandingAdminLiability: Number(toNumber(outstandingAdminLiability, 0).toFixed(2)),
+                    outstandingTenantLiability: Number(tenantOutstanding.reduce((sum, row) => sum + row.remainingLiability, 0).toFixed(2))
+                },
+                recentRedemptions: mappedRedemptions,
+                byTenant: Array.from(byTenant.values()).map((row) => ({
+                    ...row,
+                    redeemedAmount: Number(row.redeemedAmount.toFixed(2))
+                })).sort((a, b) => b.redeemedAmount - a.redeemedAmount),
+                tenantOutstandingLiability: tenantOutstanding,
+                tenantPayables: payableByTenant
+            }
+        });
+    } catch (error) {
+        console.error('Gift redemptions report error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to load gift redemptions report' });
+    }
+};
