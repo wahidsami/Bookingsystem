@@ -10,6 +10,7 @@ import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { registerCustomerPushNotifications, unregisterCustomerPushNotifications } from '../lib/notifications';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface MoreScreenProps {
     navigation?: any;
@@ -166,7 +167,12 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+            <LinearGradient
+                colors={['#8B5CF6', '#7C3AED']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+            >
                 <View style={styles.userInfo}>
                     <UserAvatar
                         firstName={user?.firstName}
@@ -181,7 +187,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                         <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
                     </View>
                 </View>
-            </View>
+            </LinearGradient>
 
             <ScrollView
                 style={styles.content}
@@ -341,11 +347,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     menuSection: {
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
         marginTop: spacing.md,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
+        marginHorizontal: spacing.md,
+        borderRadius: 16,
+        borderWidth: 1,
         borderColor: colors.border,
+        overflow: 'hidden',
     },
     menuItem: {
         flexDirection: 'row',

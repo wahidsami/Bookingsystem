@@ -17,12 +17,12 @@
 9. `ForgotPasswordScreen.tsx`: `MODERNIZED`
 10. `GiftsScreen.tsx`: `MODERNIZED`
 11. `GoogleOnboardingScreen.tsx`: `MODERNIZED`
-12. `HomeScreen.tsx`: `PENDING`
+12. `HomeScreen.tsx`: `MODERNIZED`
 13. `HotDealDetailScreen.tsx`: `PARTIAL`
 14. `InfoPageScreen.tsx`: `PARTIAL`
-15. `LanguageSelection.tsx`: `PENDING`
+15. `LanguageSelection.tsx`: `MODERNIZED`
 16. `LoginScreen.tsx`: `MODERNIZED`
-17. `MoreScreen.tsx`: `PENDING`
+17. `MoreScreen.tsx`: `MODERNIZED`
 18. `NotificationDetailScreen.tsx`: `MODERNIZED`
 19. `NotificationsScreen.tsx`: `MODERNIZED`
 20. `OnboardingScreens.tsx`: `MODERNIZED`
@@ -40,7 +40,7 @@
 32. `WelcomeScreen.tsx`: `MODERNIZED`
 
 ## Remaining to reach strict 100% screen coverage
-1. `PENDING` screens: `HomeScreen`, `LanguageSelection`, `MoreScreen`
+1. `PENDING` screens: `None`
 2. `PARTIAL` screens:
    - `CartScreen`
    - `HotDealDetailScreen`

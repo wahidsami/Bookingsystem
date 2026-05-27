@@ -9,6 +9,7 @@ import { TenantHorizontalList } from '../components/home/TenantHorizontalList';
 import { CategoriesGrid } from '../components/home/CategoriesGrid';
 import { TopProvidersSection } from '../components/home/TopProvidersSection';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface HomeScreenProps {
     navigation?: any;
@@ -43,6 +44,12 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     />
                 }
             >
+                <LinearGradient
+                    colors={['#F8F4FF', colors.background]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.heroWash}
+                />
                 {/* Section 1: Hot Deals */}
                 <SectionHeader title={t('hotDeals')} />
                 <HotDealsCarousel navigation={navigation} />
@@ -75,5 +82,9 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: spacing.lg,
+    },
+    heroWash: {
+        height: 18,
+        width: '100%',
     },
 });
