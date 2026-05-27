@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { api } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
@@ -157,7 +157,11 @@ export function GiftsScreen({ navigation, route }: any) {
 
   const handleSelfRecharge = async () => {
     if (!selected) return;
-    if (!cardNumber.trim() || !expiryDate.trim() || !cvv.trim() || !cardholderName.trim()) {
+    const normalizedCardNumber = cardNumber.replace(/\s+/g, '').trim();
+    const normalizedExpiry = expiryDate.trim();
+    const normalizedCvv = cvv.trim();
+    const normalizedHolder = cardholderName.trim();
+    if (!normalizedCardNumber || !normalizedExpiry || !normalizedCvv || !normalizedHolder) {
       Alert.alert('Payment required', 'Please enter card details to continue.');
       return;
     }
@@ -167,17 +171,17 @@ export function GiftsScreen({ navigation, route }: any) {
         ? await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/purchase', {
           tenantId,
           packageId: selected.id,
-          cardNumber: cardNumber.trim(),
-          expiryDate: expiryDate.trim(),
-          cvv: cvv.trim(),
-          cardholderName: cardholderName.trim()
+          cardNumber: normalizedCardNumber,
+          expiryDate: normalizedExpiry,
+          cvv: normalizedCvv,
+          cardholderName: normalizedHolder
         })
         : await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/recharge', {
           packageId: selected.id,
-          cardNumber: cardNumber.trim(),
-          expiryDate: expiryDate.trim(),
-          cvv: cvv.trim(),
-          cardholderName: cardholderName.trim()
+          cardNumber: normalizedCardNumber,
+          expiryDate: normalizedExpiry,
+          cvv: normalizedCvv,
+          cardholderName: normalizedHolder
         });
       if (!finalResponse.success) {
         Alert.alert('Error', finalResponse.message || 'Failed to recharge wallet');
@@ -203,7 +207,11 @@ export function GiftsScreen({ navigation, route }: any) {
       Alert.alert('Recipient required', 'Please enter recipient email or phone.');
       return;
     }
-    if (!cardNumber.trim() || !expiryDate.trim() || !cvv.trim() || !cardholderName.trim()) {
+    const normalizedCardNumber = cardNumber.replace(/\s+/g, '').trim();
+    const normalizedExpiry = expiryDate.trim();
+    const normalizedCvv = cvv.trim();
+    const normalizedHolder = cardholderName.trim();
+    if (!normalizedCardNumber || !normalizedExpiry || !normalizedCvv || !normalizedHolder) {
       Alert.alert('Payment required', 'Please enter card details to continue.');
       return;
     }
@@ -217,10 +225,10 @@ export function GiftsScreen({ navigation, route }: any) {
         recipientEmail: recipientEmail.trim() || undefined,
         recipientPhone: recipientPhone.trim() || undefined,
         message: giftMessage.trim() || undefined,
-        cardNumber: cardNumber.trim(),
-        expiryDate: expiryDate.trim(),
-        cvv: cvv.trim(),
-        cardholderName: cardholderName.trim()
+        cardNumber: normalizedCardNumber,
+        expiryDate: normalizedExpiry,
+        cvv: normalizedCvv,
+        cardholderName: normalizedHolder
       });
       if (!response.success) {
         Alert.alert('Error', response.message || 'Failed to send gift');
@@ -310,9 +318,8 @@ export function GiftsScreen({ navigation, route }: any) {
       )}
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
-        <View style={styles.modalBackdrop}>
-          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setSelected(null)} />
-          <View style={styles.modalCard}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setSelected(null)}>
+          <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
             <Text style={styles.modalTitle}>{language === 'ar' ? 'اختر الإجراء' : 'Choose action'}</Text>
             <View style={styles.modeRow}>
               <TouchableOpacity style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]} onPress={() => setMode('self')}>
@@ -326,9 +333,9 @@ export function GiftsScreen({ navigation, route }: any) {
             {mode === 'send' ? (
               <View style={{ gap: spacing.sm }}>
                 <Text style={styles.inputLabel}>{language === 'ar' ? 'البريد الإلكتروني للمستلم' : 'Recipient Email'}</Text>
-                <TextInput style={styles.input} value={recipientEmail} onChangeText={setRecipientEmail} placeholder={language === 'ar' ? 'بريد المستلم' : 'Recipient email'} />
+                <TextInput style={styles.input} value={recipientEmail} onChangeText={setRecipientEmail} placeholder={language === 'ar' ? 'بريد المستلم' : 'Recipient email'} keyboardType="email-address" autoCapitalize="none" />
                 <Text style={styles.inputLabel}>{language === 'ar' ? 'جوال المستلم' : 'Recipient Phone'}</Text>
-                <TextInput style={styles.input} value={recipientPhone} onChangeText={setRecipientPhone} placeholder={language === 'ar' ? 'جوال المستلم' : 'Recipient phone'} />
+                <TextInput style={styles.input} value={recipientPhone} onChangeText={setRecipientPhone} placeholder={language === 'ar' ? 'جوال المستلم' : 'Recipient phone'} keyboardType="phone-pad" />
                 <Text style={styles.inputLabel}>{language === 'ar' ? 'الرسالة (اختياري)' : 'Message (Optional)'}</Text>
                 <TextInput style={styles.input} value={giftMessage} onChangeText={setGiftMessage} placeholder={language === 'ar' ? 'رسالة (اختياري)' : 'Message (optional)'} />
               </View>
@@ -337,9 +344,9 @@ export function GiftsScreen({ navigation, route }: any) {
             <View style={{ gap: spacing.sm }}>
               <Text style={styles.paymentTitle}>{language === 'ar' ? 'بيانات الدفع' : 'Payment details'}</Text>
               <Text style={styles.inputLabel}>{language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder Name'}</Text>
-              <TextInput style={styles.input} value={cardholderName} onChangeText={setCardholderName} placeholder={language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder name'} />
+                <TextInput style={styles.input} value={cardholderName} onChangeText={setCardholderName} placeholder={language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder name'} autoCapitalize="words" />
               <Text style={styles.inputLabel}>{language === 'ar' ? 'رقم البطاقة' : 'Card Number'}</Text>
-              <TextInput style={styles.input} value={cardNumber} onChangeText={setCardNumber} placeholder={language === 'ar' ? 'رقم البطاقة' : 'Card number'} keyboardType="number-pad" />
+                <TextInput style={styles.input} value={cardNumber} onChangeText={setCardNumber} placeholder={language === 'ar' ? 'رقم البطاقة' : 'Card number'} keyboardType="number-pad" />
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                 <View style={{ flex: 1, gap: 6 }}>
                   <Text style={styles.inputLabel}>{language === 'ar' ? 'تاريخ الانتهاء (MM/YY)' : 'Expiry Date (MM/YY)'}</Text>
@@ -359,8 +366,8 @@ export function GiftsScreen({ navigation, route }: any) {
             >
               {saving ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitText}>{language === 'ar' ? 'تأكيد' : 'Confirm'}</Text>}
             </TouchableOpacity>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -450,7 +457,15 @@ const styles = StyleSheet.create({
   modeTextActive: { color: colors.primary },
   paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
   inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.backgroundMuted },
+  input: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.backgroundMuted
+  },
   submitBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, alignItems: 'center', paddingVertical: spacing.md },
   submitText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md }
 });
