@@ -9,6 +9,10 @@ const {
     loadTenantNotificationSettingsMap,
     normalizeAppointmentNotificationSettings
 } = require('../services/appointmentAutomationService');
+const {
+    createAppointmentTransaction,
+    createOrderTransaction
+} = require('../services/paymentTransactionLedgerService');
 
 const POS_QUEUE_LIMIT = 100;
 const POS_TRANSACTION_LIMIT = 100;
@@ -262,6 +266,277 @@ const mapAppointmentQueueItem = (appointment) => ({
     dueAmount: getAppointmentDueAmount(appointment),
     detailPath: `/dashboard/appointments/${appointment.id}`
 });
+
+const normalizeGiftCardCode = (value) => `${value || ''}`.trim().toUpperCase();
+
+const computeEntityDueAmount = (entityType, entity) => {
+    if (entityType === 'appointment') {
+        return getAppointmentDueAmount(entity);
+    }
+    const totalAmount = parseFloat(entity?.totalAmount || 0);
+    return Number.isFinite(totalAmount) && totalAmount > 0 ? parseFloat(totalAmount.toFixed(2)) : 0;
+};
+
+const loadPosEntityForRedeem = async (tenantId, entityType, entityId, transaction) => {
+    if (entityType === 'appointment') {
+        const appointment = await db.Appointment.findByPk(entityId, { transaction });
+        if (!appointment || appointment.tenantId !== tenantId) {
+            return null;
+        }
+        return { entityType, entity: appointment };
+    }
+
+    if (entityType === 'order') {
+        const order = await db.Order.findByPk(entityId, { transaction });
+        if (!order || order.tenantId !== tenantId) {
+            return null;
+        }
+        return { entityType, entity: order };
+    }
+
+    return null;
+};
+
+const isGiftCodeRedeemable = (giftCode, tenantId) => {
+    if (!giftCode) return { ok: false, reason: 'Gift card code not found' };
+
+    if (giftCode.scopeType === 'tenant_scoped' && giftCode.tenantId !== tenantId) {
+        return { ok: false, reason: 'This gift card can only be used in the issuing center' };
+    }
+
+    if (giftCode.status === 'cancelled') {
+        return { ok: false, reason: 'Gift card is cancelled' };
+    }
+    if (giftCode.status === 'redeemed') {
+        return { ok: false, reason: 'Gift card is already redeemed' };
+    }
+    if (giftCode.status === 'expired') {
+        return { ok: false, reason: 'Gift card is expired' };
+    }
+    if (giftCode.expiresAt && new Date(giftCode.expiresAt).getTime() < Date.now()) {
+        return { ok: false, reason: 'Gift card is expired' };
+    }
+
+    const remainingAmount = parseFloat(giftCode.remainingAmount || 0);
+    if (!Number.isFinite(remainingAmount) || remainingAmount <= 0) {
+        return { ok: false, reason: 'Gift card has no remaining balance' };
+    }
+
+    return { ok: true, reason: null };
+};
+
+exports.validateGiftCardForPos = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const code = normalizeGiftCardCode(req.query.code);
+        const entityType = `${req.query.entityType || ''}`.trim();
+        const entityId = `${req.query.entityId || ''}`.trim();
+
+        if (!code) {
+            return res.status(400).json({ success: false, message: 'Gift card code is required' });
+        }
+        if (!['appointment', 'order'].includes(entityType) || !UUID_REGEX.test(entityId)) {
+            return res.status(400).json({ success: false, message: 'Valid entityType and entityId are required' });
+        }
+
+        const giftCode = await db.GiftCardCode.findOne({ where: { code } });
+        const validity = isGiftCodeRedeemable(giftCode, tenantId);
+        if (!validity.ok) {
+            return res.status(400).json({ success: false, message: validity.reason });
+        }
+
+        const entityScope = await loadPosEntityForRedeem(tenantId, entityType, entityId);
+        if (!entityScope?.entity) {
+            return res.status(404).json({ success: false, message: 'POS item not found for this tenant' });
+        }
+
+        const dueAmount = computeEntityDueAmount(entityType, entityScope.entity);
+        const remainingAmount = parseFloat(giftCode.remainingAmount || 0);
+        const maxRedeemableAmount = parseFloat(Math.min(dueAmount, remainingAmount).toFixed(2));
+
+        return res.json({
+            success: true,
+            data: {
+                code: giftCode.code,
+                scopeType: giftCode.scopeType,
+                remainingAmount,
+                dueAmount,
+                maxRedeemableAmount,
+                currency: giftCode.currency || 'SAR',
+                status: giftCode.status
+            }
+        });
+    } catch (error) {
+        console.error('Validate POS gift card error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to validate gift card', error: error.message });
+    }
+};
+
+exports.redeemGiftCardForPos = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        const code = normalizeGiftCardCode(req.body?.code);
+        const entityType = `${req.body?.entityType || ''}`.trim();
+        const entityId = `${req.body?.entityId || ''}`.trim();
+        const requestedAmount = Number(req.body?.amount || 0);
+        const notes = `${req.body?.notes || ''}`.trim() || null;
+        const transactionRef = `${req.body?.transactionRef || ''}`.trim() || null;
+
+        if (!code) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Gift card code is required' });
+        }
+        if (!['appointment', 'order'].includes(entityType) || !UUID_REGEX.test(entityId)) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Valid entityType and entityId are required' });
+        }
+
+        const giftCode = await db.GiftCardCode.findOne({
+            where: { code },
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        });
+        const validity = isGiftCodeRedeemable(giftCode, tenantId);
+        if (!validity.ok) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: validity.reason });
+        }
+
+        const entityScope = await loadPosEntityForRedeem(tenantId, entityType, entityId, transaction);
+        if (!entityScope?.entity) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'POS item not found for this tenant' });
+        }
+
+        const dueAmount = computeEntityDueAmount(entityType, entityScope.entity);
+        if (dueAmount <= 0) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'No due amount to redeem' });
+        }
+
+        const remainingAmount = parseFloat(giftCode.remainingAmount || 0);
+        const maxRedeemableAmount = parseFloat(Math.min(dueAmount, remainingAmount).toFixed(2));
+        const redeemAmount = requestedAmount > 0
+            ? parseFloat(Math.min(requestedAmount, maxRedeemableAmount).toFixed(2))
+            : maxRedeemableAmount;
+
+        if (redeemAmount <= 0) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Redeem amount must be greater than 0' });
+        }
+
+        const nextRemainingAmount = parseFloat((remainingAmount - redeemAmount).toFixed(2));
+        giftCode.remainingAmount = nextRemainingAmount;
+        giftCode.status = nextRemainingAmount <= 0 ? 'redeemed' : 'partially_redeemed';
+        await giftCode.save({ transaction });
+
+        if (giftCode.sourceGiftCardTransactionId) {
+            const sourceTx = await db.GiftCardTransaction.findByPk(giftCode.sourceGiftCardTransactionId, { transaction });
+            if (sourceTx) {
+                sourceTx.status = nextRemainingAmount <= 0 ? 'redeemed' : 'partially_redeemed';
+                await sourceTx.save({ transaction });
+            }
+        }
+
+        if (giftCode.sourceTenantGiftCardTransactionId) {
+            const sourceTx = await db.TenantGiftCardTransaction.findByPk(giftCode.sourceTenantGiftCardTransactionId, { transaction });
+            if (sourceTx) {
+                sourceTx.status = nextRemainingAmount <= 0 ? 'redeemed' : 'partially_redeemed';
+                await sourceTx.save({ transaction });
+            }
+        }
+
+        if (entityType === 'appointment') {
+            const appointment = entityScope.entity;
+            const totalPrice = parseFloat(appointment.price || 0);
+            const previousPaid = parseFloat(appointment.totalPaid || 0);
+            const nextPaid = parseFloat((previousPaid + redeemAmount).toFixed(2));
+            const isFullyPaid = nextPaid >= totalPrice;
+
+            appointment.totalPaid = Math.min(nextPaid, totalPrice);
+            appointment.paymentMethod = 'wallet';
+            appointment.depositPaid = appointment.totalPaid > 0;
+            appointment.remainderAmount = parseFloat(Math.max(totalPrice - appointment.totalPaid, 0).toFixed(2));
+            appointment.remainderPaid = appointment.remainderAmount <= 0;
+            appointment.paymentStatus = isFullyPaid ? APPOINTMENT_PAYMENT_STATUS.FULLY_PAID : APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
+            if (isFullyPaid) appointment.paidAt = new Date();
+            if (appointment.status === 'pending') appointment.status = 'confirmed';
+            await appointment.save({ transaction });
+
+            await createAppointmentTransaction({
+                appointmentId: appointment.id,
+                type: isFullyPaid && previousPaid > 0 ? 'remainder' : 'full',
+                amount: redeemAmount,
+                paymentMethod: 'wallet',
+                status: 'completed',
+                transactionRef: transactionRef || `GFT-POS-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+                processedBy: null,
+                processedAt: new Date(),
+                notes: notes || `Paid using gift card ${giftCode.code}`,
+                metadata: {
+                    source: 'pos_gift_card_redeem',
+                    giftCardCode: giftCode.code,
+                    giftCardCodeId: giftCode.id
+                }
+            }, { transaction });
+        } else {
+            const order = entityScope.entity;
+            order.paymentStatus = 'paid';
+            order.paymentMethod = 'pay_on_visit';
+            await order.save({ transaction });
+
+            await createOrderTransaction({
+                orderId: order.id,
+                type: 'full',
+                amount: redeemAmount,
+                paymentMethod: 'wallet',
+                status: 'completed',
+                transactionRef: transactionRef || `GFT-POS-ORD-${order.orderNumber || order.id.slice(0, 8).toUpperCase()}`,
+                processedBy: null,
+                processedAt: new Date(),
+                notes: notes || `Paid using gift card ${giftCode.code}`,
+                metadata: {
+                    source: 'pos_gift_card_redeem',
+                    giftCardCode: giftCode.code,
+                    giftCardCodeId: giftCode.id
+                }
+            }, { transaction });
+        }
+
+        await db.GiftCardCodeRedemption.create({
+            giftCardCodeId: giftCode.id,
+            tenantId,
+            appointmentId: entityType === 'appointment' ? entityId : null,
+            orderId: entityType === 'order' ? entityId : null,
+            posInvoiceId: null,
+            redeemedAmount: redeemAmount,
+            remainingAfter: nextRemainingAmount,
+            redeemedByStaffId: null,
+            metadata: {
+                source: 'tenant_pos',
+                code: giftCode.code
+            }
+        }, { transaction });
+
+        await transaction.commit();
+        return res.json({
+            success: true,
+            message: 'Gift card redeemed successfully',
+            data: {
+                code: giftCode.code,
+                redeemedAmount: redeemAmount,
+                remainingAmount: nextRemainingAmount,
+                entityType,
+                entityId
+            }
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Redeem POS gift card error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to redeem gift card', error: error.message });
+    }
+};
 
 const mapOrderQueueItem = (order) => ({
     id: `order-${order.id}`,

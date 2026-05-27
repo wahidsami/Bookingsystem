@@ -176,6 +176,8 @@ router.get('/pos/transactions', tenantPosController.getTransactions);
 router.get('/pos/transactions/:id/receipt-pdf', tenantPosController.downloadTransactionReceiptPdf);
 router.get('/pos/closing', tenantPosController.getClosingSummary);
 router.get('/pos/closing/export', tenantPosController.exportClosingSummaryCsv);
+router.get('/pos/gift-cards/validate', tenantPosController.validateGiftCardForPos);
+router.post('/pos/gift-cards/redeem', tenantPosController.redeemGiftCardForPos);
 
 // Messaging
 router.get('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.getMessages);

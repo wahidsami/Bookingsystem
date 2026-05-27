@@ -1308,6 +1308,29 @@ class TenantApiClient {
     return this.requestBlob(`/tenant/pos/closing/export${query ? `?${query}` : ''}`);
   }
 
+  async validatePosGiftCard(data: {
+    code: string;
+    entityType: 'appointment' | 'order';
+    entityId: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('code', data.code);
+    queryParams.append('entityType', data.entityType);
+    queryParams.append('entityId', data.entityId);
+    return this.get(`/tenant/pos/gift-cards/validate?${queryParams.toString()}`);
+  }
+
+  async redeemPosGiftCard(data: {
+    code: string;
+    entityType: 'appointment' | 'order';
+    entityId: string;
+    amount?: number;
+    transactionRef?: string;
+    notes?: string;
+  }): Promise<any> {
+    return this.post('/tenant/pos/gift-cards/redeem', data);
+  }
+
   /**
    * Reschedule an appointment (same 24h rule as customer).
    */

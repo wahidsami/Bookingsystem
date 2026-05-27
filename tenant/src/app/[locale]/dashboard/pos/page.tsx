@@ -167,6 +167,14 @@ export default function TenantPosPage() {
   const [collectionMethod, setCollectionMethod] = useState("cash");
   const [transactionRef, setTransactionRef] = useState("");
   const [collectionNotes, setCollectionNotes] = useState("");
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [giftCardInfo, setGiftCardInfo] = useState<null | {
+    remainingAmount: number;
+    dueAmount: number;
+    maxRedeemableAmount: number;
+    currency: string;
+  }>(null);
+  const [validatingGiftCard, setValidatingGiftCard] = useState(false);
 
   const copy = useMemo(() => ({
     title: locale === "ar" ? "نقطة البيع / التحصيل" : "POS / Collections",
@@ -319,6 +327,27 @@ export default function TenantPosPage() {
     setCollectionMethod(normalizeCollectionMethod(item.paymentMethod));
     setTransactionRef("");
     setCollectionNotes("");
+    setGiftCardCode("");
+    setGiftCardInfo(null);
+  };
+
+  const handleValidateGiftCard = async () => {
+    if (!selectedItem || !giftCardCode.trim()) return;
+    setValidatingGiftCard(true);
+    setError("");
+    try {
+      const response = await tenantApi.validatePosGiftCard({
+        code: giftCardCode.trim(),
+        entityType: selectedItem.entityType,
+        entityId: selectedItem.entityId
+      });
+      setGiftCardInfo(response?.data || null);
+    } catch (err: any) {
+      setGiftCardInfo(null);
+      setError(err.message || (locale === "ar" ? "تعذر التحقق من بطاقة الهدية" : "Failed to validate gift card"));
+    } finally {
+      setValidatingGiftCard(false);
+    }
   };
 
   const handleCollectPayment = async () => {
@@ -328,7 +357,16 @@ export default function TenantPosPage() {
     setError("");
     try {
       if (selectedItem.entityType === "appointment") {
-        if (selectedItem.paymentStatus === "deposit_paid") {
+        if (collectionMethod === "gift_card") {
+          await tenantApi.redeemPosGiftCard({
+            code: giftCardCode.trim(),
+            entityType: selectedItem.entityType,
+            entityId: selectedItem.entityId,
+            amount: selectedItem.dueAmount,
+            transactionRef: transactionRef || undefined,
+            notes: collectionNotes || undefined
+          });
+        } else if (selectedItem.paymentStatus === "deposit_paid") {
           await tenantApi.recordRemainderPayment(selectedItem.entityId, {
             amount: selectedItem.dueAmount,
             paymentMethod: collectionMethod,
@@ -347,11 +385,22 @@ export default function TenantPosPage() {
           );
         }
       } else {
-        await tenantApi.updateOrderPaymentStatus(selectedItem.entityId, "paid", {
-          paymentMethod: collectionMethod,
-          transactionRef: transactionRef || undefined,
-          notes: collectionNotes || undefined,
-        });
+        if (collectionMethod === "gift_card") {
+          await tenantApi.redeemPosGiftCard({
+            code: giftCardCode.trim(),
+            entityType: selectedItem.entityType,
+            entityId: selectedItem.entityId,
+            amount: selectedItem.dueAmount,
+            transactionRef: transactionRef || undefined,
+            notes: collectionNotes || undefined
+          });
+        } else {
+          await tenantApi.updateOrderPaymentStatus(selectedItem.entityId, "paid", {
+            paymentMethod: collectionMethod,
+            transactionRef: transactionRef || undefined,
+            notes: collectionNotes || undefined,
+          });
+        }
       }
 
       setSelectedItem(null);
@@ -705,8 +754,42 @@ export default function TenantPosPage() {
                   <option value="card_pos">{locale === "ar" ? "بطاقة / مدى" : "Card POS"}</option>
                   <option value="wallet">{locale === "ar" ? "محفظة" : "Wallet"}</option>
                   <option value="bank_transfer">{locale === "ar" ? "تحويل بنكي" : "Bank transfer"}</option>
+                  <option value="gift_card">{locale === "ar" ? "بطاقة هدية" : "Gift Card"}</option>
                 </select>
               </div>
+
+              {collectionMethod === "gift_card" && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    {locale === "ar" ? "رمز بطاقة الهدية" : "Gift card code"}
+                  </label>
+                  <div className={`mt-2 flex gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                    <input
+                      value={giftCardCode}
+                      onChange={(event) => setGiftCardCode(event.target.value.toUpperCase())}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                      placeholder={locale === "ar" ? "أدخل رمز البطاقة" : "Enter card code"}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleValidateGiftCard}
+                      disabled={validatingGiftCard || !giftCardCode.trim()}
+                      className="rounded-xl border border-primary/30 bg-white px-4 py-3 text-sm font-semibold text-primary disabled:opacity-60"
+                    >
+                      {validatingGiftCard
+                        ? (locale === "ar" ? "جاري التحقق..." : "Validating...")
+                        : (locale === "ar" ? "تحقق" : "Validate")}
+                    </button>
+                  </div>
+
+                  {giftCardInfo && (
+                    <div className="mt-3 text-xs text-gray-700">
+                      <p>{locale === "ar" ? "الرصيد المتبقي" : "Remaining"}: <span className="font-bold"><Currency amount={giftCardInfo.remainingAmount} /></span></p>
+                      <p>{locale === "ar" ? "الحد الأقصى للاستخدام" : "Max redeemable"}: <span className="font-bold"><Currency amount={giftCardInfo.maxRedeemableAmount} /></span></p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700">{copy.transactionReference}</label>
@@ -731,7 +814,7 @@ export default function TenantPosPage() {
             <div className={`mt-6 flex gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
               <button
                 onClick={handleCollectPayment}
-                disabled={collecting}
+                disabled={collecting || (collectionMethod === "gift_card" && !giftCardCode.trim())}
                 className="flex-1 rounded-xl bg-primary px-5 py-3 font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
               >
                 {collecting ? (locale === "ar" ? "جاري الحفظ..." : "Saving...") : copy.confirmCollection}
