@@ -70,6 +70,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showAboutTab, setShowAboutTab] = useState(true);
     const [showGiftsTab, setShowGiftsTab] = useState(false);
     const [giftPackages, setGiftPackages] = useState<TenantGiftPackage[]>([]);
+    const [giftImageErrors, setGiftImageErrors] = useState<Record<string, boolean>>({});
     const [reviews, setReviews] = useState<TenantReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
@@ -681,11 +682,30 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             ) : (
                 giftPackages.map((pkg) => {
                     const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                    const hasImage = !!pkg.imageUrl && !giftImageErrors[pkg.id];
                     return (
                         <View key={pkg.id} style={styles.giftCard}>
-                            {pkg.imageUrl ? (
-                                <Image source={{ uri: getImageUrl(pkg.imageUrl) }} style={styles.giftCardImage} />
-                            ) : null}
+                            {hasImage ? (
+                                <Image
+                                    source={{ uri: getImageUrl(pkg.imageUrl) }}
+                                    style={styles.giftCardImage}
+                                    onError={() => setGiftImageErrors((prev) => ({ ...prev, [pkg.id]: true }))}
+                                />
+                            ) : (
+                                <LinearGradient
+                                    colors={['#8B5CF6', '#A78BFA']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.giftCardImageFallback}
+                                >
+                                    <Text style={styles.giftCardImageFallbackTitle}>
+                                        {isRTL ? pkg.title_ar : pkg.title_en}
+                                    </Text>
+                                    <Text style={styles.giftCardImageFallbackSub}>
+                                        {isRTL ? 'بطاقة هدية' : 'Gift Card'}
+                                    </Text>
+                                </LinearGradient>
+                            )}
                             <Text style={styles.giftCardTitle}>{isRTL ? pkg.title_ar : pkg.title_en}</Text>
                             {!!(isRTL ? pkg.description_ar : pkg.description_en) && (
                                 <Text style={styles.giftCardDesc} numberOfLines={2}>
@@ -2052,6 +2072,26 @@ const styles = StyleSheet.create({
         height: 140,
         borderRadius: borderRadius.md,
         marginBottom: spacing.sm,
+    },
+    giftCardImageFallback: {
+        width: '100%',
+        height: 140,
+        borderRadius: borderRadius.md,
+        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        justifyContent: 'flex-end',
+    },
+    giftCardImageFallbackTitle: {
+        color: colors.textInverse,
+        fontSize: fontSize.md,
+        fontWeight: '700',
+    },
+    giftCardImageFallbackSub: {
+        marginTop: 2,
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: fontSize.xs,
+        fontWeight: '600',
     },
     giftCardTitle: {
         fontSize: fontSize.md,
