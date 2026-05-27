@@ -161,17 +161,6 @@ export default function TenantGiftCardsPage() {
     }
   };
 
-  const onUploadImage = async (id: string, file?: File | null) => {
-    if (!file) return;
-    try {
-      setError(null);
-      await tenantApi.uploadTenantGiftCardPackageImage(id, file);
-      await loadData();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to upload image');
-    }
-  };
-
   const toggleActive = async (pkg: GiftPackage) => {
     try {
       await tenantApi.setTenantGiftCardPackageActive(pkg.id, !pkg.isActive);
@@ -339,7 +328,7 @@ export default function TenantGiftCardsPage() {
                   <p className="mt-1 text-xs text-gray-500">{isArabic ? 'الملف المحدد:' : 'Selected file:'} {createImageFile.name}</p>
                 ) : null}
                 {editingId ? (
-                  <p className="mt-1 text-xs text-gray-400">{isArabic ? 'لتغيير صورة بطاقة موجودة استخدم زر "رفع صورة" من القائمة.' : 'To change an existing card image, use "Upload image" in the package list.'}</p>
+                  <p className="mt-1 text-xs text-gray-400">{isArabic ? 'يمكنك تغيير صورة البطاقة مباشرة من هذا النموذج.' : 'You can update the package image directly from this form.'}</p>
                 ) : null}
               </div>
               <div className="flex gap-2">
@@ -357,21 +346,41 @@ export default function TenantGiftCardsPage() {
               <div className="divide-y divide-gray-100">
                 {packages.map((pkg) => (
                   <div key={pkg.id} className="p-4">
-                    <div className="flex flex-wrap items-center gap-4">
-                      <img src={getImageUrl(pkg.imageUrl)} alt={pkg.title_en} className="h-16 w-28 rounded-lg border border-gray-200 object-cover" />
-                      <div className="min-w-52 flex-1">
-                        <p className="font-semibold text-gray-900">{isArabic ? pkg.title_ar : pkg.title_en}</p>
-                        <p className="text-xs text-gray-500">
-                          {Number(pkg.priceAmount).toFixed(2)} SAR {'->'} {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR
-                        </p>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+                      <div className="flex flex-wrap items-start gap-4">
+                        <img
+                          src={getImageUrl(pkg.imageUrl)}
+                          alt={pkg.title_en}
+                          className="h-20 w-32 rounded-lg border border-gray-200 bg-white object-cover"
+                        />
+                        <div className="min-w-56 flex-1">
+                          <p className="text-base font-semibold text-gray-900">{isArabic ? pkg.title_ar : pkg.title_en}</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {isArabic ? 'العنوان الإنجليزي:' : 'English title:'} {pkg.title_en || '-'}
+                          </p>
+                          <div className="mt-3 grid gap-2 text-xs text-gray-600 sm:grid-cols-3">
+                            <p>{isArabic ? 'السعر:' : 'Price:'} <span className="font-semibold text-gray-900">{Number(pkg.priceAmount).toFixed(2)} SAR</span></p>
+                            <p>{isArabic ? 'الرصيد:' : 'Credit:'} <span className="font-semibold text-emerald-700">{Number(pkg.walletCreditAmount).toFixed(2)} SAR</span></p>
+                            <p>{isArabic ? 'البونص:' : 'Bonus:'} <span className="font-semibold text-indigo-700">{Number(pkg.bonusAmount).toFixed(2)} SAR</span></p>
+                          </div>
+                          <p className="mt-2 text-xs font-medium text-gray-700">
+                            {isArabic ? 'إجمالي الرصيد:' : 'Total credited:'} {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR
+                          </p>
+                        </div>
+                        <div className="ml-auto flex min-w-[220px] flex-col items-end gap-2">
+                          <span className={`rounded-full px-2 py-1 text-xs ${pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                            {pkg.isActive ? (isArabic ? 'فعالة' : 'Active') : (isArabic ? 'متوقفة' : 'Inactive')}
+                          </span>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button className="btn btn-secondary" onClick={() => startEdit(pkg)}>
+                              {isArabic ? 'تعديل' : 'Edit'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => toggleActive(pkg)}>
+                              {pkg.isActive ? (isArabic ? 'إيقاف' : 'Deactivate') : (isArabic ? 'تفعيل' : 'Activate')}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <span className={`rounded-full px-2 py-1 text-xs ${pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>{pkg.isActive ? (isArabic ? 'فعالة' : 'Active') : (isArabic ? 'متوقفة' : 'Inactive')}</span>
-                      <button className="btn btn-secondary" onClick={() => startEdit(pkg)}>{isArabic ? 'تعديل' : 'Edit'}</button>
-                      <button className="btn btn-secondary" onClick={() => toggleActive(pkg)}>{pkg.isActive ? (isArabic ? 'إيقاف' : 'Deactivate') : (isArabic ? 'تفعيل' : 'Activate')}</button>
-                      <label className="btn btn-secondary cursor-pointer">
-                        {isArabic ? 'رفع صورة' : 'Upload image'}
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => onUploadImage(pkg.id, e.target.files?.[0])} />
-                      </label>
                     </div>
                   </div>
                 ))}
