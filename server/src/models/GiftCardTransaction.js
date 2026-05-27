@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'recipientPlatformUserId',
                 as: 'recipient'
             });
+            GiftCardTransaction.hasOne(models.GiftCardCode, {
+                foreignKey: 'sourceGiftCardTransactionId',
+                as: 'giftCode'
+            });
         }
     }
 
@@ -67,7 +71,10 @@ module.exports = (sequelize, DataTypes) => {
                 'purchased',
                 'sent_pending_claim',
                 'sent_completed',
+                'sent_completed_auto_wallet',
+                'sent_pending_external_redeem',
                 'redeemed',
+                'partially_redeemed',
                 'cancelled',
                 'expired'
             ),
@@ -95,6 +102,18 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.JSONB,
             allowNull: false,
             defaultValue: {}
+        },
+        deliveryMode: {
+            type: DataTypes.ENUM('auto_wallet', 'external_code'),
+            allowNull: true
+        },
+        giftCardCodeId: {
+            type: DataTypes.UUID,
+            allowNull: true
+        },
+        recipientResolvedPlatformUserId: {
+            type: DataTypes.UUID,
+            allowNull: true
         }
     }, {
         sequelize,
@@ -106,10 +125,11 @@ module.exports = (sequelize, DataTypes) => {
             { fields: ['recipientPlatformUserId'] },
             { fields: ['status'] },
             { fields: ['claimToken'] },
+            { fields: ['giftCardCodeId'] },
+            { fields: ['recipientResolvedPlatformUserId'] },
             { fields: ['createdAt'] }
         ]
     });
 
     return GiftCardTransaction;
 };
-
