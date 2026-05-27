@@ -760,13 +760,42 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         onPress={() => openServiceDetails(service)}
                                         activeOpacity={0.85}
                                     >
-                                    <View style={styles.serviceInfo}>
-                                        <Text style={styles.serviceName}>{isRTL ? service.name_ar : service.name_en}</Text>
-                                        <Text style={styles.serviceDuration}>{service.duration} mins</Text>
-                                        <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
+                                    <View style={[styles.serviceContentRow, isRTL ? { flexDirection: 'row-reverse' } : null]}>
+                                        {(service as any).image ? (
+                                            <Image
+                                                source={{ uri: getImageUrl((service as any).image) }}
+                                                style={styles.serviceThumbnail}
+                                            />
+                                        ) : (
+                                            <LinearGradient
+                                                colors={['#8B5CF6', '#A78BFA']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 1 }}
+                                                style={styles.serviceThumbnailFallback}
+                                            >
+                                                <Text style={styles.serviceThumbnailFallbackText}>
+                                                    {((isRTL ? service.name_ar : service.name_en) || 'S').charAt(0).toUpperCase()}
+                                                </Text>
+                                            </LinearGradient>
+                                        )}
+                                        <View style={styles.serviceInfo}>
+                                            <Text style={styles.serviceName} numberOfLines={2}>
+                                                {isRTL ? service.name_ar : service.name_en}
+                                            </Text>
+                                            <View style={styles.serviceCardMetaRow}>
+                                                <View style={styles.serviceCardMetaPill}>
+                                                    <AppIcon name="clock" size={12} color={colors.textSecondary} />
+                                                    <Text style={styles.serviceDuration}>{service.duration} mins</Text>
+                                                </View>
+                                                <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
+                                            </View>
+                                        </View>
                                     </View>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.addButton} onPress={() => handleBookService(service)}>
+                                    <TouchableOpacity
+                                        style={[styles.addButton, isRTL ? { marginRight: spacing.md, marginLeft: 0 } : null]}
+                                        onPress={() => handleBookService(service)}
+                                    >
                                         <AppIcon name="plus" size={24} color={colors.primary} />
                                     </TouchableOpacity>
                                 </View>
@@ -1536,6 +1565,29 @@ const styles = StyleSheet.create({
     serviceMainAction: {
         flex: 1,
     },
+    serviceContentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+    serviceThumbnail: {
+        width: 62,
+        height: 62,
+        borderRadius: borderRadius.md,
+        backgroundColor: colors.backgroundGray,
+    },
+    serviceThumbnailFallback: {
+        width: 62,
+        height: 62,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    serviceThumbnailFallbackText: {
+        color: colors.textInverse,
+        fontSize: fontSize.lg,
+        fontWeight: '700',
+    },
     serviceInfo: {
         flex: 1,
     },
@@ -1548,7 +1600,22 @@ const styles = StyleSheet.create({
     serviceDuration: {
         fontSize: fontSize.xs,
         color: colors.textSecondary,
-        marginBottom: 2,
+    },
+    serviceCardMetaRow: {
+        marginTop: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+    serviceCardMetaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: colors.backgroundGray,
+        borderRadius: borderRadius.full,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
     },
     servicePrice: {
         fontSize: fontSize.sm,
