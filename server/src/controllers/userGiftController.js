@@ -12,6 +12,11 @@ const { getServerPublicUrl } = require('../utils/url');
 const CLAIM_EXPIRY_HOURS = 24 * 30; // 30 days
 
 const normalize = (value) => `${value || ''}`.trim();
+const normalizePhone = (value) => normalize(value).replace(/\s+/g, '');
+const generateGiftCode = (prefix = 'RFH') => {
+    const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
+    return `${prefix}-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+};
 
 const validateGiftPaymentPayload = (payload = {}) => {
     const cardNumber = normalize(payload.cardNumber).replace(/[\s-]/g, '');
@@ -175,7 +180,7 @@ exports.sendGiftPackage = async (req, res) => {
         const { packageId, recipientEmail, recipientPhone, message } = req.body || {};
         const paymentPayload = validateGiftPaymentPayload(req.body || {});
         const email = normalize(recipientEmail).toLowerCase();
-        const phone = normalize(recipientPhone);
+        const phone = normalizePhone(recipientPhone);
 
         if (!email && !phone) {
             await transaction.rollback();
@@ -200,7 +205,7 @@ exports.sendGiftPackage = async (req, res) => {
         const recipient = await db.PlatformUser.findOne({
             where: {
                 [Op.or]: [
-                    ...(email ? [{ email }] : []),
+                    ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
                     ...(phone ? [{ phone }] : [])
                 ]
             },
@@ -223,6 +228,41 @@ exports.sendGiftPackage = async (req, res) => {
             transaction
         });
 
+        const isRecipientRegistered = !!recipient?.id;
+        let createdGiftCode = null;
+        if (!isRecipientRegistered) {
+            // Collision-safe gift code generation
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                const candidate = generateGiftCode('RFH');
+                const exists = await db.GiftCardCode.findOne({ where: { code: candidate }, transaction });
+                if (!exists) {
+                    createdGiftCode = await db.GiftCardCode.create({
+                        code: candidate,
+                        scopeType: 'admin_global',
+                        tenantId: null,
+                        sourceGiftCardTransactionId: null,
+                        sourceTenantGiftCardTransactionId: null,
+                        initialAmount: totalCredit,
+                        remainingAmount: totalCredit,
+                        currency: 'SAR',
+                        recipientEmail: email || null,
+                        recipientPhone: phone || null,
+                        status: 'issued',
+                        expiresAt,
+                        metadata: {
+                            packageId: giftPackage.id,
+                            packageTitle: giftPackage.title_en,
+                            senderPlatformUserId: senderId
+                        }
+                    }, { transaction });
+                    break;
+                }
+            }
+            if (!createdGiftCode) {
+                throw new Error('Failed to generate unique gift code');
+            }
+        }
+
         const giftTx = await db.GiftCardTransaction.create({
             senderPlatformUserId: senderId,
             recipientPlatformUserId: recipient?.id || null,
@@ -233,16 +273,28 @@ exports.sendGiftPackage = async (req, res) => {
             creditAmount: giftPackage.walletCreditAmount,
             bonusAmount: giftPackage.bonusAmount,
             totalCreditAmount: totalCredit,
-            status: recipient ? 'sent_completed' : 'sent_pending_claim',
-            deliveryChannel: recipient ? 'in_app' : 'email',
-            claimToken: recipient ? null : claimToken,
-            claimedAt: recipient ? new Date() : null,
+            status: isRecipientRegistered ? 'sent_completed_auto_wallet' : 'sent_pending_external_redeem',
+            deliveryChannel: isRecipientRegistered ? 'in_app' : 'email',
+            claimToken: isRecipientRegistered ? null : claimToken,
+            claimedAt: isRecipientRegistered ? new Date() : null,
             expiresAt,
-            metadata: { senderMessage: normalize(message) || null, paymentTransactionId: paymentTransaction.id }
+            deliveryMode: isRecipientRegistered ? 'auto_wallet' : 'external_code',
+            giftCardCodeId: createdGiftCode?.id || null,
+            recipientResolvedPlatformUserId: recipient?.id || null,
+            metadata: {
+                senderMessage: normalize(message) || null,
+                paymentTransactionId: paymentTransaction.id,
+                externalRedeemCode: createdGiftCode?.code || null
+            }
         }, { transaction });
 
+        if (createdGiftCode?.id) {
+            createdGiftCode.sourceGiftCardTransactionId = giftTx.id;
+            await createdGiftCode.save({ transaction });
+        }
+
         let walletResult = null;
-        if (recipient?.id) {
+        if (isRecipientRegistered) {
             walletResult = await walletService.creditWallet({
                 platformUserId: recipient.id,
                 amount: totalCredit,
@@ -260,7 +312,7 @@ exports.sendGiftPackage = async (req, res) => {
         await transaction.commit();
 
         const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Someone';
-        if (recipient?.id) {
+        if (isRecipientRegistered) {
             await notificationOrchestrator.notifyCustomer({
                 tenantId: null,
                 platformUserId: recipient.id,
@@ -274,6 +326,7 @@ exports.sendGiftPackage = async (req, res) => {
                 }
             }).catch(() => undefined);
         } else if (email) {
+            const code = createdGiftCode?.code || '';
             const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
             await sendEmail({
                 to: email,
@@ -282,7 +335,7 @@ exports.sendGiftPackage = async (req, res) => {
                 data: {
                     customerName: 'Dear customer',
                     tenantName: 'Refah',
-                    serviceName: `Gift card ${totalCredit.toFixed(2)} SAR`,
+                    serviceName: `Gift card ${totalCredit.toFixed(2)} SAR - Code: ${code}`,
                     appointmentDate: new Date().toLocaleString('en-US'),
                     reviewLink: claimLink,
                     googleReviewUrl: ''
@@ -292,9 +345,12 @@ exports.sendGiftPackage = async (req, res) => {
 
         res.json({
             success: true,
-            message: recipient ? 'Gift sent and credited successfully' : 'Gift sent. Recipient can claim after registering.',
+            message: isRecipientRegistered
+                ? 'Gift sent and credited successfully'
+                : 'Gift sent to recipient email with redeem code.',
             transaction: giftTx,
-            recipientWalletBalance: walletResult?.balanceAfter || null
+            recipientWalletBalance: walletResult?.balanceAfter || null,
+            externalRedeemCode: createdGiftCode?.code || null
         });
     } catch (error) {
         await transaction.rollback();
@@ -314,7 +370,12 @@ exports.claimGift = async (req, res) => {
         }
 
         const giftTx = await db.GiftCardTransaction.findOne({
-            where: { claimToken: token, status: 'sent_pending_claim' },
+            where: {
+                claimToken: token,
+                status: {
+                    [Op.in]: ['sent_pending_claim', 'sent_pending_external_redeem']
+                }
+            },
             transaction,
             lock: transaction.LOCK.UPDATE
         });
