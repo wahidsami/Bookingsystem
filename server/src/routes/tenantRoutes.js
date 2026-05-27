@@ -28,6 +28,7 @@ const tenantGiftCardController = require('../controllers/tenantGiftCardControlle
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const aiController = require('../controllers/tenant/aiController');
 const { authenticateTenant, checkTenantFeature, rateLimitTenant } = require('../middleware/authTenant');
+const { createLimiter } = require('../middleware/rateLimiter');
 const {
     requireActiveSubscription,
     checkResourceLimit
@@ -62,6 +63,8 @@ const notificationImageStorage = multer.diskStorage({
     }
 });
 const notificationImageUpload = multer({ storage: notificationImageStorage });
+const giftCardValidateLimiter = createLimiter(40, 15 * 60 * 1000);
+const giftCardRedeemLimiter = createLimiter(20, 15 * 60 * 1000);
 
 // All routes require authentication
 router.use(authenticateTenant);
@@ -176,8 +179,8 @@ router.get('/pos/transactions', tenantPosController.getTransactions);
 router.get('/pos/transactions/:id/receipt-pdf', tenantPosController.downloadTransactionReceiptPdf);
 router.get('/pos/closing', tenantPosController.getClosingSummary);
 router.get('/pos/closing/export', tenantPosController.exportClosingSummaryCsv);
-router.get('/pos/gift-cards/validate', tenantPosController.validateGiftCardForPos);
-router.post('/pos/gift-cards/redeem', tenantPosController.redeemGiftCardForPos);
+router.get('/pos/gift-cards/validate', giftCardValidateLimiter, tenantPosController.validateGiftCardForPos);
+router.post('/pos/gift-cards/redeem', giftCardRedeemLimiter, tenantPosController.redeemGiftCardForPos);
 
 // Messaging
 router.get('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.getMessages);

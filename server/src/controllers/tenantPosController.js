@@ -22,6 +22,7 @@ const RESCHEDULE_ALERT_LOOKBACK_DAYS = 7;
 const RESCHEDULE_AUDIT_MARKER = '[RESCHEDULE_AUDIT]';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
+const GIFT_CARD_AUDIT_ENABLED = process.env.GIFT_CARD_AUDIT_LOGS !== '0';
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
 const logoFallbackPath = path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
 
@@ -267,6 +268,19 @@ const mapAppointmentQueueItem = (appointment) => ({
     detailPath: `/dashboard/appointments/${appointment.id}`
 });
 
+const logGiftCardAudit = (event, payload = {}) => {
+    if (!GIFT_CARD_AUDIT_ENABLED) return;
+    try {
+        console.info('[gift-card-pos-audit]', JSON.stringify({
+            event,
+            at: new Date().toISOString(),
+            ...payload
+        }));
+    } catch (_err) {
+        console.info('[gift-card-pos-audit]', event, payload);
+    }
+};
+
 const normalizeGiftCardCode = (value) => `${value || ''}`.trim().toUpperCase();
 
 const computeEntityDueAmount = (entityType, entity) => {
@@ -333,20 +347,24 @@ exports.validateGiftCardForPos = async (req, res) => {
         const entityId = `${req.query.entityId || ''}`.trim();
 
         if (!code) {
+            logGiftCardAudit('validate_rejected', { tenantId, reason: 'missing_code' });
             return res.status(400).json({ success: false, message: 'Gift card code is required' });
         }
         if (!['appointment', 'order'].includes(entityType) || !UUID_REGEX.test(entityId)) {
+            logGiftCardAudit('validate_rejected', { tenantId, code, entityType, entityId, reason: 'invalid_entity' });
             return res.status(400).json({ success: false, message: 'Valid entityType and entityId are required' });
         }
 
         const giftCode = await db.GiftCardCode.findOne({ where: { code } });
         const validity = isGiftCodeRedeemable(giftCode, tenantId);
         if (!validity.ok) {
+            logGiftCardAudit('validate_failed', { tenantId, code, entityType, entityId, reason: validity.reason });
             return res.status(400).json({ success: false, message: validity.reason });
         }
 
         const entityScope = await loadPosEntityForRedeem(tenantId, entityType, entityId);
         if (!entityScope?.entity) {
+            logGiftCardAudit('validate_failed', { tenantId, code, entityType, entityId, reason: 'entity_not_found' });
             return res.status(404).json({ success: false, message: 'POS item not found for this tenant' });
         }
 
@@ -354,6 +372,15 @@ exports.validateGiftCardForPos = async (req, res) => {
         const remainingAmount = parseFloat(giftCode.remainingAmount || 0);
         const maxRedeemableAmount = parseFloat(Math.min(dueAmount, remainingAmount).toFixed(2));
 
+        logGiftCardAudit('validate_success', {
+            tenantId,
+            code,
+            entityType,
+            entityId,
+            dueAmount,
+            remainingAmount,
+            maxRedeemableAmount
+        });
         return res.json({
             success: true,
             data: {
@@ -368,6 +395,7 @@ exports.validateGiftCardForPos = async (req, res) => {
         });
     } catch (error) {
         console.error('Validate POS gift card error:', error);
+        logGiftCardAudit('validate_error', { tenantId: req.tenantId, code: normalizeGiftCardCode(req.query?.code), message: error.message });
         return res.status(500).json({ success: false, message: 'Failed to validate gift card', error: error.message });
     }
 };
@@ -385,10 +413,12 @@ exports.redeemGiftCardForPos = async (req, res) => {
 
         if (!code) {
             await transaction.rollback();
+            logGiftCardAudit('redeem_rejected', { tenantId, reason: 'missing_code' });
             return res.status(400).json({ success: false, message: 'Gift card code is required' });
         }
         if (!['appointment', 'order'].includes(entityType) || !UUID_REGEX.test(entityId)) {
             await transaction.rollback();
+            logGiftCardAudit('redeem_rejected', { tenantId, code, entityType, entityId, reason: 'invalid_entity' });
             return res.status(400).json({ success: false, message: 'Valid entityType and entityId are required' });
         }
 
@@ -400,18 +430,21 @@ exports.redeemGiftCardForPos = async (req, res) => {
         const validity = isGiftCodeRedeemable(giftCode, tenantId);
         if (!validity.ok) {
             await transaction.rollback();
+            logGiftCardAudit('redeem_failed', { tenantId, code, entityType, entityId, reason: validity.reason });
             return res.status(400).json({ success: false, message: validity.reason });
         }
 
         const entityScope = await loadPosEntityForRedeem(tenantId, entityType, entityId, transaction);
         if (!entityScope?.entity) {
             await transaction.rollback();
+            logGiftCardAudit('redeem_failed', { tenantId, code, entityType, entityId, reason: 'entity_not_found' });
             return res.status(404).json({ success: false, message: 'POS item not found for this tenant' });
         }
 
         const dueAmount = computeEntityDueAmount(entityType, entityScope.entity);
         if (dueAmount <= 0) {
             await transaction.rollback();
+            logGiftCardAudit('redeem_failed', { tenantId, code, entityType, entityId, reason: 'no_due_amount' });
             return res.status(400).json({ success: false, message: 'No due amount to redeem' });
         }
 
@@ -423,6 +456,7 @@ exports.redeemGiftCardForPos = async (req, res) => {
 
         if (redeemAmount <= 0) {
             await transaction.rollback();
+            logGiftCardAudit('redeem_failed', { tenantId, code, entityType, entityId, reason: 'invalid_redeem_amount' });
             return res.status(400).json({ success: false, message: 'Redeem amount must be greater than 0' });
         }
 
@@ -520,6 +554,14 @@ exports.redeemGiftCardForPos = async (req, res) => {
         }, { transaction });
 
         await transaction.commit();
+        logGiftCardAudit('redeem_success', {
+            tenantId,
+            code,
+            entityType,
+            entityId,
+            redeemAmount,
+            remainingAmountAfter: nextRemainingAmount
+        });
         return res.json({
             success: true,
             message: 'Gift card redeemed successfully',
@@ -534,6 +576,7 @@ exports.redeemGiftCardForPos = async (req, res) => {
     } catch (error) {
         await transaction.rollback();
         console.error('Redeem POS gift card error:', error);
+        logGiftCardAudit('redeem_error', { tenantId: req.tenantId, code: normalizeGiftCardCode(req.body?.code), message: error.message });
         return res.status(500).json({ success: false, message: 'Failed to redeem gift card', error: error.message });
     }
 };
