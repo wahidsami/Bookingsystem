@@ -403,7 +403,7 @@ exports.listMyTenantGiftTransactions = async (req, res) => {
             },
             include: [
                 { model: db.TenantGiftCardPackage, as: 'package', required: false },
-                { model: db.Tenant, as: 'tenant', attributes: ['id', 'businessName', 'businessNameAr'], required: false }
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar'], required: false }
             ],
             order: [['createdAt', 'DESC']]
         });
