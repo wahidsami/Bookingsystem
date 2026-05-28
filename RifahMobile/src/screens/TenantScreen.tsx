@@ -82,9 +82,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [reviews, setReviews] = useState<TenantReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
-    const [selectedService, setSelectedService] = useState<Service | null>(null);
-    const [selectedServiceDetails, setSelectedServiceDetails] = useState<(Service & { employees?: Staff[]; variants?: ServiceVariant[] }) | null>(null);
-    const [selectedServiceLoading, setSelectedServiceLoading] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<Staff | null>(null);
     const [galleryPreviewImage, setGalleryPreviewImage] = useState<string | null>(null);
     const [reviewTargetBooking, setReviewTargetBooking] = useState<Booking | null>(null);
@@ -122,7 +119,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         const matchedService = services.find((service) => service.id === selectedServiceId);
         if (matchedService) {
             setActiveTab('services');
-            setSelectedService(matchedService);
+            openServiceDetails(matchedService);
         }
     }, [selectedServiceId, services]);
 
@@ -491,40 +488,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         || service.description_ar
         || '';
 
-    const closeServiceDetails = () => {
-        setSelectedService(null);
-        setSelectedServiceDetails(null);
-        setSelectedServiceLoading(false);
-    };
-
-    const openServiceDetails = async (service: Service) => {
-        setSelectedService(service);
-        setSelectedServiceDetails(null);
-        setSelectedServiceLoading(true);
-
-        try {
-            const serviceRes = await api.get<{ success: boolean; service: Service & { employees?: Staff[]; variants?: ServiceVariant[] } }>(
-                `/public/tenant/${tenant?.id || tenantId}/services/${service.id}`
-            );
-
-            if (serviceRes.success && serviceRes.service) {
-                const normalizedEmployees = Array.isArray(serviceRes.service.employees)
-                    ? serviceRes.service.employees.map((employee) => normalizeStaff(employee))
-                    : [];
-
-                setSelectedServiceDetails({
-                    ...normalizeService(serviceRes.service),
-                    employees: normalizedEmployees,
-                });
-                return;
-            }
-        } catch (error) {
-            console.warn('Failed to load service details:', error);
-        } finally {
-            setSelectedServiceLoading(false);
-        }
-
-        setSelectedServiceDetails(service);
+    const openServiceDetails = (service: Service) => {
+        navigation.navigate('ServiceDetails', {
+            tenant,
+            tenantId: tenant?.id || tenantId,
+            service,
+        });
     };
 
     const openProviderProfile = (provider: Staff) => {
@@ -557,60 +526,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     };
     const mapPreviewImage = buildMapPreviewImage(mapUrl);
 
-    const handleBookService = (service: Service, staff?: Staff | null, variant?: ServiceVariant | null) => {
-        closeServiceDetails();
-        navigation.navigate('Booking', {
-            service,
-            tenant,
-            selectedStaff: staff || undefined,
-            selectedVariant: variant || undefined,
-        });
-    };
-
-    const renderServiceVariants = (service: Service & { variants?: ServiceVariant[] }) => {
-        const activeVariants = Array.isArray(service.variants)
-            ? service.variants.filter((variant) => variant?.isActive !== false)
-            : [];
-
-        if (activeVariants.length === 0) {
-            return null;
-        }
-
-        return (
-            <View style={styles.variantSection}>
-                <Text style={styles.employeeSectionTitle}>
-                    {isRTL ? 'النسخ المتاحة' : 'Available Variants'}
-                </Text>
-                {activeVariants.map((variant) => {
-                    const variantPrice = getServicePrice(service, variant);
-
-                    return (
-                        <View key={variant.id} style={styles.variantCard}>
-                            <View style={styles.variantHeaderRow}>
-                                <View style={styles.variantTitleWrap}>
-                                    <Text style={styles.variantTitle}>
-                                        {variant.description || (isRTL ? 'متغير' : 'Variant')}
-                                    </Text>
-                                    <Text style={styles.variantMeta}>
-                                        {(variant.duration || service.duration)} mins
-                                    </Text>
-                                </View>
-                                <Text style={styles.variantPrice}>{variantPrice.toFixed(2)} SAR</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.variantBookButton}
-                                onPress={() => handleBookService(service, undefined, variant)}
-                            >
-                                <Text style={styles.variantBookButtonText}>
-                                    {isRTL ? 'احجز هذه النسخة' : 'Book this Variant'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    );
-                })}
-            </View>
-        );
-    };
 
     const renderHero = () => {
         if (!tenant) return null;
@@ -1205,130 +1120,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 <AppIcon name="close" size={24} color={colors.textInverse} />
                             </TouchableOpacity>
                         </View>
-                    ) : null}
-                </View>
-            </Modal>
-
-            <Modal
-                visible={!!selectedService}
-                transparent
-                animationType="slide"
-                onRequestClose={closeServiceDetails}
-            >
-                <View style={styles.modalBackdrop}>
-                    {selectedService ? (
-                        selectedServiceLoading ? (
-                            <View style={styles.serviceModalCard}>
-                                <ActivityIndicator color={colors.primary} />
-                            </View>
-                        ) : (
-                            <View style={styles.serviceModalCard}>
-                                <View style={styles.serviceModalHeader}>
-                                    <TouchableOpacity onPress={closeServiceDetails} style={styles.serviceBackButton}>
-                                        <AppIcon name="arrow_back" size={20} color={colors.primary} />
-                                        <Text style={styles.serviceBackText}>{isRTL ? 'العودة للخدمات' : 'Back to Services'}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <ScrollView
-                                    style={styles.serviceDetailScroll}
-                                    contentContainerStyle={styles.serviceDetailScrollContent}
-                                    showsVerticalScrollIndicator={true}
-                                >
-                                    <View style={styles.serviceModalTitleWrap}>
-                                        <Text style={styles.serviceModalCategory}>{selectedServiceDetails?.category || selectedService.category}</Text>
-                                        <Text style={styles.serviceModalTitle}>{isRTL ? (selectedServiceDetails?.name_ar || selectedService.name_ar) : (selectedServiceDetails?.name_en || selectedService.name_en)}</Text>
-                                    </View>
-
-                                    <View style={styles.serviceMetaRow}>
-                                        <View style={styles.serviceMetaBadge}>
-                                            <AppIcon name="clock" size={16} color={colors.primary} />
-                                            <Text style={styles.serviceMetaText}>{(selectedServiceDetails?.duration || selectedService.duration)} mins</Text>
-                                        </View>
-                                        <View style={styles.serviceMetaBadge}>
-                                            <AppIcon name="cash" size={16} color={colors.primary} />
-                                            <Text style={styles.serviceMetaText}>{getServicePrice(selectedServiceDetails || selectedService).toFixed(2)} SAR</Text>
-                                        </View>
-                                        {(selectedServiceDetails?.employees || []).length > 0 ? (
-                                            <View style={styles.serviceMetaBadge}>
-                                                <AppIcon name="star" size={16} color={colors.primary} />
-                                                <Text style={styles.serviceMetaText}>
-                                                    {(selectedServiceDetails!.employees!.reduce((sum, member) => sum + (member.rating || 0), 0) / selectedServiceDetails!.employees!.length).toFixed(1)} ⭐
-                                                </Text>
-                                            </View>
-                                        ) : null}
-                                    </View>
-
-                                    <Text style={styles.serviceModalDescription}>
-                                        {getServiceDescription(selectedServiceDetails || selectedService) || 'Service details will appear here soon.'}
-                                    </Text>
-
-                                    {renderServiceVariants(selectedServiceDetails || selectedService)}
-
-                                    {(selectedServiceDetails?.employees || []).length > 0 ? (
-                                        <View style={styles.employeeSection}>
-                                            <Text style={styles.employeeSectionTitle}>
-                                                {isRTL ? 'المتخصصون المتاحون' : 'Available Professionals'}
-                                            </Text>
-                                            {(selectedServiceDetails?.employees || []).map((employee) => {
-                                                const avatarUrl = getImageUrl(employee.avatar || employee.image);
-                                                const initials = employee.name?.charAt(0)?.toUpperCase() || '?';
-                                                const experienceLabel = employee.experience
-                                                    ? (isRTL ? `الخبرة: ${employee.experience}` : `Experience: ${employee.experience}`)
-                                                    : (isRTL ? 'الخبرة غير متاحة' : 'Experience not listed');
-
-                                                return (
-                                                    <View key={employee.id} style={styles.employeeCard}>
-                                                        {avatarUrl ? (
-                                                            <Image source={{ uri: avatarUrl }} style={styles.employeeAvatar} />
-                                                        ) : (
-                                                            <View style={styles.employeeAvatarPlaceholder}>
-                                                                <Text style={styles.employeeAvatarText}>{initials}</Text>
-                                                            </View>
-                                                        )}
-                                                        <View style={styles.employeeContent}>
-                                                            <View style={styles.employeeHeaderRow}>
-                                                                <Text style={styles.employeeName}>{employee.name}</Text>
-                                                                <View style={styles.employeeRatingBadge}>
-                                                                    <AppIcon name="star" size={12} color={colors.warning} />
-                                                                    <Text style={styles.employeeRatingText}>{(employee.rating || 0).toFixed(1)}</Text>
-                                                                </View>
-                                                            </View>
-                                                            <Text style={styles.employeeExperience}>{experienceLabel}</Text>
-                                                            {employee.bio ? (
-                                                                <Text style={styles.employeeBio} numberOfLines={3}>
-                                                                    {employee.bio}
-                                                                </Text>
-                                                            ) : null}
-                                                            {Array.isArray(employee.skills) && employee.skills.length > 0 ? (
-                                                                <Text style={styles.employeeSkills} numberOfLines={1}>
-                                                                    {employee.skills.join(' • ')}
-                                                                </Text>
-                                                            ) : null}
-                                                            <View style={styles.employeeActionsRow}>
-                                                                <TouchableOpacity style={styles.employeeProfileButton} onPress={() => openProviderProfile(employee)}>
-                                                                    <Text style={styles.employeeProfileButtonText}>
-                                                                        {isRTL ? 'عرض الملف' : 'View Profile'}
-                                                                    </Text>
-                                                                </TouchableOpacity>
-                                                                <TouchableOpacity style={styles.employeeBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService, employee)}>
-                                                                    <Text style={styles.employeeBookButtonText}>
-                                                                        {isRTL ? 'احجز مع هذا المتخصص' : 'Book with this Professional'}
-                                                                    </Text>
-                                                                </TouchableOpacity>
-                                                            </View>
-                                                        </View>
-                                                    </View>
-                                                );
-                                            })}
-                                        </View>
-                                    ) : null}
-
-                                    <TouchableOpacity style={styles.serviceBookButton} onPress={() => handleBookService(selectedServiceDetails || selectedService)}>
-                                        <Text style={styles.serviceBookButtonText}>{isRTL ? 'احجز هذه الخدمة' : 'Book This Service'}</Text>
-                                    </TouchableOpacity>
-                                </ScrollView>
-                            </View>
-                        )
                     ) : null}
                 </View>
             </Modal>
