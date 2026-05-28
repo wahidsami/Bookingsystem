@@ -956,19 +956,36 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const renderReviews = () => (
         <View style={styles.contentSection}>
-            <TouchableOpacity style={styles.writeReviewButton} onPress={openTenantReviewPrompt}>
-                <AppIcon name="star" size={16} color={colors.textInverse} />
-                <Text style={styles.writeReviewButtonText}>{isRTL ? 'أضف تقييمك' : 'Write a Review'}</Text>
-            </TouchableOpacity>
-            <View style={styles.reviewSummaryCard}>
-                <View style={styles.reviewSummaryMetric}>
-                    <Text style={styles.reviewSummaryValue}>{reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : '-'}</Text>
-                    <Text style={styles.reviewSummaryLabel}>{isRTL ? 'المتوسط' : 'Average'}</Text>
+            <View style={styles.reviewsHero}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.reviewsHeroTitle}>{isRTL ? 'التقييمات' : 'Reviews'}</Text>
+                    <Text style={styles.reviewsHeroSubtitle}>
+                        {isRTL ? 'آراء العملاء وتجاربهم مع خدمات المركز.' : 'See what customers are saying about this center.'}
+                    </Text>
                 </View>
-                <View style={styles.reviewSummaryDivider} />
-                <View style={styles.reviewSummaryMetric}>
-                    <Text style={styles.reviewSummaryValue}>{reviewsSummary.total}</Text>
-                    <Text style={styles.reviewSummaryLabel}>{isRTL ? 'عدد التقييمات' : 'Reviews'}</Text>
+                <TouchableOpacity style={styles.writeReviewButton} onPress={openTenantReviewPrompt}>
+                    <AppIcon name="star" size={16} color={colors.textInverse} />
+                    <Text style={styles.writeReviewButtonText}>{isRTL ? 'أضف تقييمك' : 'Write a Review'}</Text>
+                </TouchableOpacity>
+            </View>
+
+            <View style={styles.reviewSummaryPremiumCard}>
+                <View style={styles.reviewSummaryScoreBlock}>
+                    <Text style={styles.reviewSummaryScoreValue}>{reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : '-'}</Text>
+                    <View style={styles.reviewSummaryStarsRow}>
+                        {Array.from({ length: 5 }).map((_, index) => (
+                            <Text key={`summary-star-${index}`} style={[styles.reviewStar, index < Math.round(Number(reviewsSummary.avgRating || 0)) ? styles.reviewStarActive : null]}>
+                                ★
+                            </Text>
+                        ))}
+                    </View>
+                    <Text style={styles.reviewSummaryScoreLabel}>{isRTL ? 'متوسط التقييم' : 'Average rating'}</Text>
+                </View>
+                <View style={styles.reviewSummaryVerticalDivider} />
+                <View style={styles.reviewSummaryStatsBlock}>
+                    <Text style={styles.reviewSummaryStatNumber}>{reviewsSummary.total}</Text>
+                    <Text style={styles.reviewSummaryStatLabel}>{isRTL ? 'إجمالي التقييمات' : 'Total reviews'}</Text>
+                    <Text style={styles.reviewSummaryStatHint}>{isRTL ? 'آراء موثقة من العملاء' : 'Verified customer feedback'}</Text>
                 </View>
             </View>
 
@@ -977,33 +994,43 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             ) : reviews.length === 0 ? (
                 renderEmptyState(isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.')
             ) : (
-                reviews.map((review) => (
-                    <View key={review.id} style={styles.reviewCard}>
-                        <View style={styles.reviewHeader}>
-                            <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
-                            <View style={styles.reviewStarsRow}>
-                                {Array.from({ length: 5 }).map((_, index) => (
-                                    <Text key={`${review.id}-star-${index}`} style={[styles.reviewStar, index < Number(review.rating || 0) ? styles.reviewStarActive : null]}>
-                                        ★
-                                    </Text>
-                                ))}
-                            </View>
-                        </View>
+                reviews.map((review) => {
+                    const reviewDate = review.createdAt ? new Date(review.createdAt) : null;
+                    const dateLabel = reviewDate && !Number.isNaN(reviewDate.getTime())
+                        ? reviewDate.toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')
+                        : '';
 
-                        {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
-                        {review.staff?.name ? (
-                            <Text style={styles.reviewStaffName}>
-                                {isRTL ? `مقدم الخدمة: ${review.staff.name}` : `Provider: ${review.staff.name}`}
-                            </Text>
-                        ) : null}
-                        {review.staffReply ? (
-                            <View style={styles.reviewReplyBox}>
-                                <Text style={styles.reviewReplyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
-                                <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
+                    return (
+                        <View key={review.id} style={styles.reviewCardPremium}>
+                            <View style={styles.reviewHeader}>
+                                <View style={styles.reviewAuthorBlock}>
+                                    <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
+                                    {dateLabel ? <Text style={styles.reviewDateText}>{dateLabel}</Text> : null}
+                                </View>
+                                <View style={styles.reviewStarsRow}>
+                                    {Array.from({ length: 5 }).map((_, index) => (
+                                        <Text key={`${review.id}-star-${index}`} style={[styles.reviewStar, index < Number(review.rating || 0) ? styles.reviewStarActive : null]}>
+                                            ★
+                                        </Text>
+                                    ))}
+                                </View>
                             </View>
-                        ) : null}
-                    </View>
-                ))
+
+                            {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                            {review.staff?.name ? (
+                                <Text style={styles.reviewStaffName}>
+                                    {isRTL ? `مقدم الخدمة: ${review.staff.name}` : `Provider: ${review.staff.name}`}
+                                </Text>
+                            ) : null}
+                            {review.staffReply ? (
+                                <View style={styles.reviewReplyBox}>
+                                    <Text style={styles.reviewReplyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
+                                    <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
+                                </View>
+                            ) : null}
+                        </View>
+                    );
+                })
             )}
         </View>
     );
@@ -1514,6 +1541,99 @@ const styles = StyleSheet.create({
         color: colors.textInverse,
         fontSize: fontSize.sm,
         fontWeight: '700',
+    },
+    reviewsHero: {
+        marginBottom: spacing.sm,
+        gap: spacing.sm,
+    },
+    reviewsHeroTitle: {
+        fontSize: 36,
+        color: '#12133A',
+        fontWeight: '800',
+    },
+    reviewsHeroSubtitle: {
+        marginTop: 4,
+        fontSize: 17,
+        color: '#626A89',
+        lineHeight: 25,
+    },
+    reviewSummaryPremiumCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#EDE7FC',
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    reviewSummaryScoreBlock: {
+        width: 140,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewSummaryScoreValue: {
+        fontSize: 38,
+        fontWeight: '800',
+        color: '#2A2166',
+    },
+    reviewSummaryStarsRow: {
+        flexDirection: 'row',
+        marginTop: 4,
+        gap: 1,
+    },
+    reviewSummaryScoreLabel: {
+        marginTop: 5,
+        fontSize: 12,
+        color: '#7A80A2',
+        fontWeight: '600',
+    },
+    reviewSummaryVerticalDivider: {
+        width: 1,
+        alignSelf: 'stretch',
+        backgroundColor: '#E7E1F6',
+        marginHorizontal: 12,
+    },
+    reviewSummaryStatsBlock: {
+        flex: 1,
+    },
+    reviewSummaryStatNumber: {
+        fontSize: 30,
+        fontWeight: '800',
+        color: '#1A1B43',
+    },
+    reviewSummaryStatLabel: {
+        marginTop: 2,
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#535C82',
+    },
+    reviewSummaryStatHint: {
+        marginTop: 4,
+        fontSize: 12,
+        color: '#8A91AC',
+    },
+    reviewAuthorBlock: {
+        flex: 1,
+    },
+    reviewDateText: {
+        marginTop: 2,
+        fontSize: 12,
+        color: '#8A91AC',
+        fontWeight: '600',
+    },
+    reviewCardPremium: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#EDE9FA',
+        borderRadius: 18,
+        padding: spacing.md,
+        marginBottom: spacing.sm,
+        shadowColor: '#1B1540',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        elevation: 2,
     },
     reviewSummaryCard: {
         backgroundColor: colors.surface,
