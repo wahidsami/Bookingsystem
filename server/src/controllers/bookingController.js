@@ -48,6 +48,34 @@ const appendCancellationAuditToNotes = (notes, payload) => {
     return base ? `${base}\n${serialized}` : serialized;
 };
 
+const createAppointmentEventSafe = async ({
+    appointmentId,
+    tenantId,
+    platformUserId,
+    actorType,
+    actorId,
+    eventType,
+    payload,
+    occurredAt,
+    transaction
+}) => {
+    try {
+        if (!db.AppointmentEvent || !appointmentId || !tenantId || !eventType) return;
+        await db.AppointmentEvent.create({
+            appointmentId,
+            tenantId,
+            platformUserId: platformUserId || null,
+            actorType: actorType || 'customer',
+            actorId: actorId || null,
+            eventType,
+            payload: payload || {},
+            occurredAt: occurredAt || new Date()
+        }, transaction ? { transaction } : undefined);
+    } catch (error) {
+        console.warn('Appointment event logging warning:', error.message);
+    }
+};
+
 /**
  * Search for available slots
  * POST /api/v1/bookings/search
@@ -433,6 +461,20 @@ const cancelBooking = async (req, res) => {
             }
             : undefined);
 
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId: appointment.tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'customer',
+            actorId: platformUserId,
+            eventType: 'customer_cancelled',
+            payload: {
+                reasonCode: cancellationAudit?.reasonCode || null,
+                reasonText: cancellationAudit?.reasonText || null
+            },
+            occurredAt: new Date()
+        });
+
         res.json({
             success: true,
             message: 'Booking cancelled successfully',
@@ -671,6 +713,24 @@ const rescheduleBooking = async (req, res) => {
         });
         appointment.customerReminderSentAt = null;
         appointment.noShowMarkedAt = null;
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId: appointment.tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'customer',
+            actorId: platformUserId,
+            eventType: 'customer_rescheduled',
+            payload: {
+                fromStartTime: new Date(previousStartTime).toISOString(),
+                fromEndTime: new Date(previousEndTime).toISOString(),
+                toStartTime: requestedStart.toISOString(),
+                toEndTime: requestedEnd.toISOString(),
+                fromStaffId: previousStaffId || null,
+                toStaffId: requestedStaffId || null
+            },
+            occurredAt: new Date(),
+            transaction
+        });
         await appointment.save({ transaction });
         await transaction.commit();
 

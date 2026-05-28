@@ -180,6 +180,8 @@ router.get('/bills/:id/receipt-pdf', tenantBillsController.getReceiptPdf);
 // POS / Collections
 router.get('/pos/queue', tenantPosController.getCollectionQueue);
 router.get('/pos/alerts', tenantPosController.getOperationalAlerts);
+router.post('/pos/alerts/:alertKey/read', tenantPosController.markOperationalAlertRead);
+router.post('/pos/alerts/read-all', tenantPosController.markAllOperationalAlertsRead);
 router.get('/pos/transactions', tenantPosController.getTransactions);
 router.get('/pos/transactions/:id/receipt-pdf', tenantPosController.downloadTransactionReceiptPdf);
 router.get('/pos/closing', tenantPosController.getClosingSummary);

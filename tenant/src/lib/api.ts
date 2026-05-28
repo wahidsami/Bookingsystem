@@ -1269,6 +1269,14 @@ class TenantApiClient {
     return this.get(`/tenant/pos/alerts${query ? `?${query}` : ''}`);
   }
 
+  async markPosAlertRead(alertKey: string): Promise<any> {
+    return this.post(`/tenant/pos/alerts/${encodeURIComponent(alertKey)}/read`, {});
+  }
+
+  async markAllPosAlertsRead(): Promise<any> {
+    return this.post('/tenant/pos/alerts/read-all', {});
+  }
+
   async getPosTransactions(params?: {
     search?: string;
     startDate?: string;

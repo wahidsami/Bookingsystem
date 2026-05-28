@@ -21,6 +21,7 @@ const REVIEW_ALERT_LOOKBACK_DAYS = 14;
 const RESCHEDULE_ALERT_LOOKBACK_DAYS = 7;
 const RESCHEDULE_AUDIT_MARKER = '[RESCHEDULE_AUDIT]';
 const CANCELLATION_AUDIT_MARKER = '[CANCELLATION_AUDIT]';
+const OPERATIONAL_ALERT_READ_ALL_KEY = '__all__';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
 const GIFT_CARD_AUDIT_ENABLED = process.env.GIFT_CARD_AUDIT_LOGS !== '0';
@@ -88,6 +89,31 @@ const formatDateTimeLabel = (value) => {
 const toTimestamp = (value) => {
     const parsed = value ? new Date(value) : null;
     return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+};
+
+const getOperationalAlertReaderId = (req) => req.tenantAccountId || req.userId || req.tenantId;
+
+const getOperationalAlertsReadState = async (tenantId, readerId, alerts) => {
+    if (!db.TenantOperationalAlertRead || !tenantId || !readerId || !Array.isArray(alerts) || alerts.length === 0) {
+        return { readKeys: new Set(), readAllAt: null };
+    }
+
+    const alertKeys = alerts.map((alert) => `${alert.id || ''}`).filter(Boolean);
+    const rows = await db.TenantOperationalAlertRead.findAll({
+        where: {
+            tenantId,
+            readerId,
+            alertKey: { [Op.in]: [OPERATIONAL_ALERT_READ_ALL_KEY, ...alertKeys] }
+        },
+        attributes: ['alertKey', 'readAt'],
+        raw: true
+    });
+
+    const readKeys = new Set(rows.filter((row) => row.alertKey !== OPERATIONAL_ALERT_READ_ALL_KEY).map((row) => row.alertKey));
+    const readAllRow = rows.find((row) => row.alertKey === OPERATIONAL_ALERT_READ_ALL_KEY);
+    const readAllAt = readAllRow?.readAt ? new Date(readAllRow.readAt) : null;
+
+    return { readKeys, readAllAt };
 };
 
 const getAppointmentDueAmount = (appointment) => {
@@ -875,42 +901,45 @@ const fetchRecentCustomerRescheduleAlerts = async (tenantId, limit = POS_ALERT_L
     const lookbackDate = new Date();
     lookbackDate.setDate(lookbackDate.getDate() - RESCHEDULE_ALERT_LOOKBACK_DAYS);
 
-    const appointments = await db.Appointment.findAll({
+    const events = await db.AppointmentEvent.findAll({
         where: {
             tenantId,
-            updatedAt: { [Op.gte]: lookbackDate },
-            notes: { [Op.iLike]: `%${RESCHEDULE_AUDIT_MARKER}%` }
+            eventType: 'customer_rescheduled',
+            occurredAt: { [Op.gte]: lookbackDate }
         },
         include: [
             {
-                model: db.Service,
-                as: 'service',
-                attributes: ['id', 'name_en', 'name_ar'],
-                required: false
-            },
-            {
-                model: db.PlatformUser,
-                as: 'user',
-                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                required: false
+                model: db.Appointment,
+                as: 'appointment',
+                required: false,
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        attributes: ['id', 'name_en', 'name_ar'],
+                        required: false
+                    },
+                    {
+                        model: db.PlatformUser,
+                        as: 'user',
+                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                        required: false
+                    }
+                ]
             }
         ],
-        order: [['updatedAt', 'DESC']],
+        order: [['occurredAt', 'DESC']],
         limit: Math.max(limit * 3, limit)
     });
 
-    const alerts = appointments
-        .map((appointment) => {
-            const entries = extractRescheduleAuditEntries(appointment.notes);
-            if (!entries.length) return null;
-            const latest = entries[entries.length - 1];
-            if (`${latest?.actor || ''}`.toLowerCase() !== 'customer') {
-                return null;
-            }
-
-            const at = new Date(latest.at || appointment.updatedAt);
-            const fromStart = latest.fromStartTime ? new Date(latest.fromStartTime) : null;
-            const toStart = latest.toStartTime ? new Date(latest.toStartTime) : null;
+    const alerts = events
+        .map((event) => {
+            const appointment = event.appointment;
+            if (!appointment) return null;
+            const payload = event.payload || {};
+            const at = new Date(event.occurredAt || event.createdAt);
+            const fromStart = payload.fromStartTime ? new Date(payload.fromStartTime) : null;
+            const toStart = payload.toStartTime ? new Date(payload.toStartTime) : null;
             const customerName = getCustomerName(appointment.user);
             const serviceName = getServiceName(appointment.service);
             const reference = appointment.bookingNumber || appointment.id;
@@ -945,46 +974,48 @@ const fetchRecentCustomerCancellationAlerts = async (tenantId, limit = POS_ALERT
     const lookbackDate = new Date();
     lookbackDate.setDate(lookbackDate.getDate() - RESCHEDULE_ALERT_LOOKBACK_DAYS);
 
-    const appointments = await db.Appointment.findAll({
+    const events = await db.AppointmentEvent.findAll({
         where: {
             tenantId,
-            status: 'cancelled',
-            updatedAt: { [Op.gte]: lookbackDate },
-            notes: { [Op.iLike]: `%${CANCELLATION_AUDIT_MARKER}%` }
+            eventType: 'customer_cancelled',
+            occurredAt: { [Op.gte]: lookbackDate }
         },
         include: [
             {
-                model: db.Service,
-                as: 'service',
-                attributes: ['id', 'name_en', 'name_ar'],
-                required: false
-            },
-            {
-                model: db.PlatformUser,
-                as: 'user',
-                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                required: false
+                model: db.Appointment,
+                as: 'appointment',
+                required: false,
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        attributes: ['id', 'name_en', 'name_ar'],
+                        required: false
+                    },
+                    {
+                        model: db.PlatformUser,
+                        as: 'user',
+                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                        required: false
+                    }
+                ]
             }
         ],
-        order: [['updatedAt', 'DESC']],
+        order: [['occurredAt', 'DESC']],
         limit: Math.max(limit * 3, limit)
     });
 
-    const alerts = appointments
-        .map((appointment) => {
-            const entries = extractCancellationAuditEntries(appointment.notes);
-            if (!entries.length) return null;
-            const latest = entries[entries.length - 1];
-            if (`${latest?.source || ''}`.toLowerCase() !== 'customer_app') {
-                return null;
-            }
-
-            const at = new Date(latest.at || appointment.updatedAt);
+    const alerts = events
+        .map((event) => {
+            const appointment = event.appointment;
+            if (!appointment) return null;
+            const payload = event.payload || {};
+            const at = new Date(event.occurredAt || event.createdAt);
             const customerName = getCustomerName(appointment.user);
             const serviceName = getServiceName(appointment.service);
             const reference = appointment.bookingNumber || appointment.id;
-            const reasonCode = `${latest.reasonCode || ''}`.trim();
-            const reasonText = `${latest.reasonText || ''}`.trim();
+            const reasonCode = `${payload.reasonCode || ''}`.trim();
+            const reasonText = `${payload.reasonText || ''}`.trim();
 
             const reasonLabel = reasonText || reasonCode || 'Not specified';
             const reasonLabelAr = reasonText || reasonCode || 'غير محدد';
@@ -1532,6 +1563,7 @@ exports.getCollectionQueue = async (req, res) => {
 exports.getOperationalAlerts = async (req, res) => {
     try {
         const tenantId = req.tenantId;
+        const readerId = getOperationalAlertReaderId(req);
         const limit = Math.min(parseInt(req.query.limit || POS_ALERT_LIMIT, 10), POS_ALERT_LIMIT);
         const [queueResult, appointmentResult, reviewResult, rescheduleResult, cancellationResult] = await Promise.all([
             fetchQueueData(tenantId, '', POS_QUEUE_LIMIT),
@@ -1555,6 +1587,20 @@ exports.getOperationalAlerts = async (req, res) => {
             .sort((left, right) => toTimestamp(right.scheduledAt) - toTimestamp(left.scheduledAt))
             .slice(0, limit);
 
+        const { readKeys, readAllAt } = await getOperationalAlertsReadState(tenantId, readerId, alerts);
+        const alertsWithReadState = alerts.map((alert) => {
+            const alertKey = `${alert.id || ''}`;
+            const alertTimestamp = toTimestamp(alert.scheduledAt);
+            const isReadByKey = readKeys.has(alertKey);
+            const isReadByReadAll = !!(readAllAt && alertTimestamp > 0 && alertTimestamp <= readAllAt.getTime());
+            return {
+                ...alert,
+                alertKey,
+                isRead: isReadByKey || isReadByReadAll
+            };
+        });
+        const unreadCount = alertsWithReadState.filter((alert) => !alert.isRead).length;
+
         const summary = {
             ...queueResult.summary,
             ...appointmentResult.summary,
@@ -1566,8 +1612,9 @@ exports.getOperationalAlerts = async (req, res) => {
 
         res.json({
             success: true,
-            alerts,
-            summary
+            alerts: alertsWithReadState,
+            summary,
+            unreadCount
         });
     } catch (error) {
         console.error('Get POS operational alerts error:', error);
@@ -1576,6 +1623,49 @@ exports.getOperationalAlerts = async (req, res) => {
             message: 'Failed to load POS alerts',
             error: error.message
         });
+    }
+};
+
+exports.markOperationalAlertRead = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const readerId = getOperationalAlertReaderId(req);
+        const alertKey = `${req.params.alertKey || ''}`.trim();
+
+        if (!alertKey) {
+            return res.status(400).json({ success: false, message: 'alertKey is required' });
+        }
+
+        await db.TenantOperationalAlertRead.upsert({
+            tenantId,
+            readerId,
+            alertKey,
+            readAt: new Date()
+        });
+
+        return res.json({ success: true, message: 'Alert marked as read' });
+    } catch (error) {
+        console.error('Mark operational alert read error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to mark alert as read', error: error.message });
+    }
+};
+
+exports.markAllOperationalAlertsRead = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const readerId = getOperationalAlertReaderId(req);
+
+        await db.TenantOperationalAlertRead.upsert({
+            tenantId,
+            readerId,
+            alertKey: OPERATIONAL_ALERT_READ_ALL_KEY,
+            readAt: new Date()
+        });
+
+        return res.json({ success: true, message: 'All operational alerts marked as read' });
+    } catch (error) {
+        console.error('Mark all operational alerts read error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to mark all alerts as read', error: error.message });
     }
 };
 

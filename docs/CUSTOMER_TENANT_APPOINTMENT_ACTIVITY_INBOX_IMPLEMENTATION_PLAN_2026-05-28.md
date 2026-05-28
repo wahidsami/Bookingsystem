@@ -85,7 +85,7 @@ Make cancel/reschedule behavior impossible to miss across:
 - Move from notes markers to dedicated `appointment_events` table.
 - Add filters in tenant notifications: `Appointments > Customer Changes`.
 - Add mark-read persistence per alert record (server-side) instead of local-seen timestamp.
-- Status: `pending`
+- Status: `completed (foundation)`
 
 ## QA Checklist (Execution)
 - Customer books appointment at 5:00 PM -> second customer cannot book same slot/staff.
@@ -104,3 +104,4 @@ Make cancel/reschedule behavior impossible to miss across:
 - 2026-05-28: Phase 1 implemented in tenant operational alerts feed.
 - 2026-05-28: Phase 2 implemented in customer appointment details timeline.
 - 2026-05-28: Phase 3 hardening completed (safe timestamp sorting for tenant alerts + safe timeline date rendering fallback + dedicated QA execution checklist document).
+- 2026-05-28: Phase 4 foundation implemented: dedicated `appointment_events` model/table wiring for customer cancel/reschedule, server-side tenant operational alert read-state endpoints (`read`, `read-all`), tenant notification badge now driven by server `isRead`.

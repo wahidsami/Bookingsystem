@@ -100,7 +100,6 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [expandedNavGroups, setExpandedNavGroups] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState(() => new Date());
-  const [notificationSeenAt, setNotificationSeenAt] = useState(0);
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
   const [notificationPanelPosition, setNotificationPanelPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
   const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
@@ -130,6 +129,11 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
 
   const dismissPosAlert = (alertId: string) => {
     setPosAlerts((current) => current.filter((alert) => alert.id !== alertId));
+    const currentAlert = posAlerts.find((alert) => alert.id === alertId);
+    const alertKey = currentAlert?.alertKey || alertId;
+    tenantApi.markPosAlertRead(alertKey).catch((error) => {
+      console.error('Failed to mark POS alert as read:', error);
+    });
   };
 
   const canEvaluateEntitlements = entitlementsLoaded && !entitlementsLoadFailed && entitlements !== null;
@@ -177,14 +181,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   }, [locale, now, tenantTimeZone]);
   const notificationCount = useMemo(() => {
     const unreadUsageCount = usageAlerts.length;
-    const unreadOperationalCount = posAlerts.filter((alert) => {
-      const timestamp = alert?.scheduledAt || alert?.createdAt;
-      const parsed = timestamp ? new Date(timestamp) : null;
-      return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() > notificationSeenAt : true;
-    }).length;
+    const unreadOperationalCount = posAlerts.filter((alert) => !alert?.isRead).length;
 
     return unreadUsageCount + unreadOperationalCount;
-  }, [notificationSeenAt, posAlerts, usageAlerts]);
+  }, [posAlerts, usageAlerts]);
   const notificationFeed = useMemo(() => {
     const toTimestamp = (value: any) => {
       const parsed = value ? new Date(value) : null;
@@ -213,10 +213,16 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         severity: alert.priority === 'high' || alert.priority === 'critical' ? 'high' : 'medium'
       }))
     ]
-      .filter((item) => (item.kind !== 'pos' && item.kind !== 'appointment' && item.kind !== 'review') || item.timestamp > notificationSeenAt)
+      .filter((item) => {
+        if (item.kind !== 'pos' && item.kind !== 'appointment' && item.kind !== 'review') {
+          return true;
+        }
+        const source = posAlerts.find((alert) => `pos-${alert.id}` === item.key || `${alert.id}` === item.originalId);
+        return !source?.isRead;
+      })
       .sort((left, right) => right.timestamp - left.timestamp)
       .slice(0, 6);
-  }, [locale, posAlerts, usageAlerts, notificationSeenAt]);
+  }, [locale, posAlerts, usageAlerts]);
   const notificationBadgeCount = notificationCount;
   const handleDismissNotification = (item: { kind: 'pos' | 'appointment' | 'review' | 'usage'; originalId: string }) => {
     if (item.kind === 'pos' || item.kind === 'appointment' || item.kind === 'review') {
@@ -327,12 +333,9 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     setMarkingNotificationsRead(true);
     try {
       await Promise.all(usageAlerts.map((alert) => tenantApi.acknowledgeSubscriptionAlert(alert.id).catch(() => null)));
+      await tenantApi.markAllPosAlertsRead().catch(() => null);
       setUsageAlerts([]);
-      const timestamp = Date.now();
-      setNotificationSeenAt(timestamp);
-      if (typeof window !== 'undefined' && user?.id) {
-        window.localStorage.setItem(`rifah_tenant_notification_seen_at:${user.id}`, String(timestamp));
-      }
+      setPosAlerts((current) => current.map((alert) => ({ ...alert, isRead: true })));
     } finally {
       setMarkingNotificationsRead(false);
     }
@@ -559,17 +562,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   }, [pathname, router, user?.status, locale]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!user?.id) {
-      setNotificationSeenAt(0);
       announcedAppointmentAlertIdsRef.current = new Set();
       hasLoadedAppointmentAlertsRef.current = false;
-      return;
     }
-
-    const storedValue = window.localStorage.getItem(`rifah_tenant_notification_seen_at:${user.id}`);
-    const parsedValue = storedValue ? Number(storedValue) : 0;
-    setNotificationSeenAt(Number.isFinite(parsedValue) ? parsedValue : 0);
   }, [user?.id]);
 
   useEffect(() => {

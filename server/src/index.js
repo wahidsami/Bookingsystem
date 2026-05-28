@@ -673,6 +673,8 @@ const startServer = async () => {
             console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
         }
         await db.Appointment.sync({ force: false });
+        await db.AppointmentEvent.sync({ force: false }); // Appointment lifecycle events (cancel/reschedule timeline)
+        await db.TenantOperationalAlertRead.sync({ force: false }); // Server-side unread tracking for tenant operational alerts
         await ensureAppointmentSchema();
         await db.Review.sync({ force: false }); // Customer reviews
         await db.CustomerInsight.sync({ force: false });
