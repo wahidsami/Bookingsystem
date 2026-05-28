@@ -232,7 +232,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     centerContent: {
         justifyContent: 'center',
@@ -244,9 +244,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.md,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 0,
     },
     headerBack: {
         width: 40,
@@ -282,6 +281,11 @@ const styles = StyleSheet.create({
     },
     inputGroup: {
         marginBottom: spacing.md,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
     },
     label: {
         fontSize: fontSize.md,
@@ -291,13 +295,13 @@ const styles = StyleSheet.create({
     },
     input: {
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E9DDFD',
+        borderRadius: 14,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: fontSize.md,
         color: colors.text,
-        backgroundColor: colors.surface,
+        backgroundColor: '#FAFAFF',
         minHeight: 48,
     },
     rtlInput: {
@@ -310,11 +314,11 @@ const styles = StyleSheet.create({
     genderButton: {
         flex: 1,
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#DDD6FE',
+        borderRadius: 14,
         paddingVertical: spacing.sm,
         alignItems: 'center',
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
     },
     genderButtonSelected: {
         backgroundColor: colors.primary,
@@ -329,7 +333,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     saveButton: {
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
         borderRadius: borderRadius.lg,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',

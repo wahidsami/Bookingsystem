@@ -110,7 +110,7 @@ Targets:
 - Phase 2: `100%`
 - Phase 3: `100%` (CartScreen + PaymentScreen + PaymentSimulatorScreen + GiftsScreen drawers premium shell completed)
 - Phase 4: `75%` (Bookings + Purchases + Notifications screens premium shell upgraded)
-- Phase 5: `0%`
+- Phase 5: `100%` (More + Profile + EditProfile + Settings premium shell completed)
 - Phase 6: `0%`
 
 ## Current Step

@@ -124,7 +124,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     header: {
         flexDirection: 'row',
@@ -132,9 +132,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.lg,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 0,
     },
     backText: {
         fontSize: fontSize.xl,
@@ -149,13 +148,18 @@ const styles = StyleSheet.create({
         width: 24,
     },
     card: {
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
         margin: spacing.lg,
         borderRadius: 20,
         padding: spacing.lg,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#E9DDFD',
         gap: spacing.sm,
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 1,
     },
     cardTitle: {
         fontSize: fontSize.lg,
@@ -180,9 +184,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     actionButton: {
-        backgroundColor: colors.primary,
-        borderRadius: 12,
+        backgroundColor: '#7C3AED',
+        borderRadius: 14,
         paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
         alignItems: 'center',
         marginTop: 0,
     },

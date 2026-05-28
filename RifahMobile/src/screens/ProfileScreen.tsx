@@ -200,13 +200,12 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     header: {
         padding: spacing.xl,
-        backgroundColor: colors.background,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 0,
     },
     headerTitle: {
         fontSize: fontSize.xxl,
@@ -219,8 +218,13 @@ const styles = StyleSheet.create({
     avatarSection: {
         alignItems: 'center',
         padding: spacing.xl,
-        backgroundColor: colors.background,
+        backgroundColor: '#FFFFFF',
         marginBottom: spacing.md,
+        borderRadius: 20,
+        marginHorizontal: spacing.md,
+        marginTop: spacing.md,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
     },
     profileAvatar: {
         marginBottom: spacing.md,
@@ -235,16 +239,17 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     infoSection: {
-        backgroundColor: colors.background,
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: spacing.lg,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: colors.border,
+        borderRadius: 20,
+        marginHorizontal: spacing.md,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
     },
     infoItem: {
         paddingVertical: spacing.lg,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#F3E8FF',
     },
     infoLabel: {
         fontSize: fontSize.sm,
@@ -257,11 +262,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     editProfileButton: {
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
         marginHorizontal: spacing.lg,
         marginTop: spacing.xl,
         padding: spacing.lg,
-        borderRadius: 12,
+        borderRadius: 16,
         alignItems: 'center',
     },
     editProfileText: {
@@ -296,13 +301,13 @@ const styles = StyleSheet.create({
         maxWidth: 320,
     },
     guestActionCard: {
-        backgroundColor: colors.background,
+        backgroundColor: '#FFFFFF',
         marginHorizontal: spacing.lg,
         padding: spacing.lg,
-        borderRadius: 16,
+        borderRadius: 20,
         gap: spacing.md,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#E9DDFD',
     },
     secondaryActionButton: {
         borderWidth: 1,
