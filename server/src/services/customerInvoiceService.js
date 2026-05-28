@@ -9,6 +9,23 @@ function formatAmount(value) {
     return Number(n.toFixed(2));
 }
 
+function normalizeInvoiceAmounts(totalInput, vatInput) {
+    const totalAmount = formatAmount(totalInput);
+    let vatAmount = formatAmount(vatInput);
+
+    // Keep VAT within a valid range so subtotal math is always consistent.
+    if (vatAmount < 0) vatAmount = 0;
+    if (vatAmount > totalAmount) vatAmount = totalAmount;
+
+    const subtotalAmount = formatAmount(totalAmount - vatAmount);
+
+    return {
+        subtotalAmount,
+        vatAmount,
+        totalAmount
+    };
+}
+
 async function generateInvoiceNumber(transaction) {
     const now = new Date();
     const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -61,9 +78,11 @@ async function ensureOrderInvoice(orderId, options = {}) {
         throw new Error('Order not found while ensuring invoice');
     }
 
-    const totalAmount = formatAmount(order.totalAmount);
-    const taxAmount = formatAmount(order.taxAmount);
-    const subtotalAmount = formatAmount(totalAmount - taxAmount);
+    const {
+        subtotalAmount,
+        vatAmount,
+        totalAmount
+    } = normalizeInvoiceAmounts(order.totalAmount, order.taxAmount);
 
     let invoice = await db.CustomerInvoice.findOne({
         where: { entityType: 'order', entityId: order.id },
@@ -80,7 +99,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
             status: order.paymentStatus === 'paid' ? 'PAID' : 'UNPAID',
             currency: 'SAR',
             subtotalAmount,
-            vatAmount: taxAmount,
+            vatAmount,
             totalAmount,
             paidAmount: order.paymentStatus === 'paid' ? totalAmount : 0,
             dueAmount: order.paymentStatus === 'paid' ? 0 : totalAmount,
@@ -134,7 +153,7 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
         invoice = await ensureOrderInvoice(orderId, { transaction, triggerSource });
     }
 
-    const totalAmount = formatAmount(order.totalAmount);
+    const { totalAmount } = normalizeInvoiceAmounts(order.totalAmount, order.taxAmount);
     let nextStatus = 'UNPAID';
     let paidAmount = 0;
     let dueAmount = totalAmount;
@@ -187,9 +206,11 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
         throw new Error('Appointment not found while ensuring invoice');
     }
 
-    const totalAmount = formatAmount(appointment.price);
-    const vatAmount = formatAmount(appointment.taxAmount);
-    const subtotalAmount = formatAmount(appointment.rawPrice || (totalAmount - vatAmount));
+    const {
+        subtotalAmount,
+        vatAmount,
+        totalAmount
+    } = normalizeInvoiceAmounts(appointment.price, appointment.taxAmount);
     const paidAmount = formatAmount(appointment.totalPaid);
     const dueAmount = formatAmount(Math.max(0, totalAmount - paidAmount));
 
