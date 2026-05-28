@@ -591,6 +591,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               <Text style={styles.secondaryBtnText}>{rescheduleSlotsLoading ? (language === 'ar' ? 'جارٍ التحميل...' : 'Loading...') : (language === 'ar' ? 'عرض المواعيد المتاحة' : 'Load Available Slots')}</Text>
             </TouchableOpacity>
             <View style={{ height: spacing.sm }} />
+            {!rescheduleKeepProvider ? (
+              <Text style={styles.modalHint}>
+                {language === 'ar' ? 'اختر الوقت ومقدم الخدمة المناسب.' : 'Pick the best time and provider.'}
+              </Text>
+            ) : null}
             <View style={styles.reasonRow}>
               {rescheduleSlots.map((slot) => {
                 const label = format(new Date(slot.startTime), 'h:mm a', { locale: language === 'ar' ? ar : enUS });
@@ -598,6 +603,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 return (
                   <TouchableOpacity key={slot.startTime} style={[styles.reasonChip, selected && styles.reasonChipActive]} onPress={() => setRescheduleSelectedSlot(slot)}>
                     <Text style={[styles.reasonChipText, selected && styles.reasonChipTextActive]}>{label}</Text>
+                    {!rescheduleKeepProvider && !!slot.staffName ? (
+                      <Text style={[styles.reasonChipMeta, selected && styles.reasonChipMetaActive]} numberOfLines={1}>
+                        {slot.staffName}
+                      </Text>
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}
@@ -778,10 +788,12 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   modalHint: { color: colors.textSecondary, fontSize: 10, marginBottom: spacing.sm },
   reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  reasonChip: { borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF' },
+  reasonChip: { borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF', minWidth: 96 },
   reasonChipActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
   reasonChipText: { color: colors.text, fontSize: 10, fontWeight: '600' },
   reasonChipTextActive: { color: colors.primary },
+  reasonChipMeta: { marginTop: 2, color: colors.textSecondary, fontSize: 9, fontWeight: '600' },
+  reasonChipMetaActive: { color: colors.primary },
   modalInput: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginBottom: spacing.sm },
   modalDatePickerButton: {
     minHeight: 46,
