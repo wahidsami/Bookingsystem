@@ -27,7 +27,14 @@ export function OnboardingNavigator({
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Language">
-        {() => <LanguageSelection onLanguageSelect={onLanguageSelected} />}
+        {({ navigation }) => (
+          <LanguageSelection
+            onLanguageSelect={async (language) => {
+              await onLanguageSelected(language);
+              navigation.replace('Onboarding');
+            }}
+          />
+        )}
       </Stack.Screen>
       <Stack.Screen name="Onboarding">
         {({ navigation }) => (

@@ -7,7 +7,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 import { colors } from '../theme/colors';
 
 interface LanguageSelectionProps {
-    onLanguageSelect: (language: 'ar' | 'en') => void;
+    onLanguageSelect: (language: 'ar' | 'en') => Promise<void> | void;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -21,7 +21,7 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
     const [isSelecting, setIsSelecting] = useState(false);
     const { bottomInset } = useScreenSafeArea();
 
-    const handleSelect = (lang: 'ar' | 'en') => {
+    const handleSelect = async (lang: 'ar' | 'en') => {
         if (isSelecting) return;
 
         setIsSelecting(true);
@@ -29,7 +29,11 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
 
-        onLanguageSelect(lang);
+        try {
+            await onLanguageSelect(lang);
+        } finally {
+            setIsSelecting(false);
+        }
     };
 
     return (
