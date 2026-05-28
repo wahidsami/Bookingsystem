@@ -446,7 +446,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 
     const renderStaffSelection = () => (
         <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Specialist</Text>
+            <Text style={styles.stepTitle}>{language === 'ar' ? 'اختيار المتخصص' : 'Select Specialist'}</Text>
             <TouchableOpacity
                 style={[styles.staffCard, selectedStaff === null && styles.selectedCard]}
                 onPress={() => setSelectedStaff(null)}
@@ -455,8 +455,8 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     <AppIcon name="user" size={24} color={colors.primary} />
                 </View>
                 <View>
-                    <Text style={styles.staffName}>Any Professional</Text>
-                    <Text style={styles.staffRole}>Maximum Availability</Text>
+                    <Text style={styles.staffName}>{language === 'ar' ? 'أي متخصص' : 'Any Professional'}</Text>
+                    <Text style={styles.staffRole}>{language === 'ar' ? 'أفضل توفر للمواعيد' : 'Maximum Availability'}</Text>
                 </View>
                 {selectedStaff === null && <AppIcon name="star" size={24} color={colors.primary} />}
             </TouchableOpacity>
@@ -492,7 +492,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 
         return (
             <View style={styles.stepContainer}>
-                <Text style={styles.stepTitle}>Select Date & Time</Text>
+                <Text style={styles.stepTitle}>{language === 'ar' ? 'اختيار التاريخ والوقت' : 'Select Date & Time'}</Text>
 
                 {/* Horizontal Date Picker */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datePicker}>
@@ -521,7 +521,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 <Text style={styles.subTitle}>Available Slots</Text>
                 <View style={styles.slotsGrid}>
                     {availableSlots.length === 0 && !loading && (
-                        <Text style={styles.summaryLabel}>No available slots for this date.</Text>
+                        <Text style={styles.summaryLabel}>{language === 'ar' ? 'لا توجد مواعيد متاحة لهذا اليوم.' : 'No available slots for this date.'}</Text>
                     )}
                     {availableSlots.map(slot => {
                         const label = format(new Date(slot.startTime), 'hh:mm a');
@@ -545,7 +545,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 
     const renderReview = () => (
         <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Review Booking</Text>
+            <Text style={styles.stepTitle}>{language === 'ar' ? 'مراجعة الحجز' : 'Review Booking'}</Text>
 
             <View style={styles.summaryCard}>
                 <View style={styles.summaryRow}>
@@ -560,7 +560,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 ) : null}
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Specialist</Text>
-                    <Text style={styles.summaryValue}>{selectedStaff ? selectedStaff.name : (selectedTime?.staffName || 'Any Professional')}</Text>
+                    <Text style={styles.summaryValue}>{selectedStaff ? selectedStaff.name : (selectedTime?.staffName || (language === 'ar' ? 'أي متخصص' : 'Any Professional'))}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Date</Text>
@@ -759,7 +759,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F6FB',
     },
     header: {
         flexDirection: 'row',
@@ -767,13 +767,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: spacing.lg,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
     },
     headerTitle: {
-        fontSize: fontSize.lg,
-        fontWeight: 'bold',
-        color: colors.text,
+        fontSize: 30,
+        fontWeight: '800',
+        color: '#14153C',
     },
     headerTitleWrap: {
         flex: 1,
@@ -781,20 +779,28 @@ const styles = StyleSheet.create({
     },
     headerSubtitle: {
         marginTop: 2,
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
+        fontSize: 13,
+        color: '#656C8C',
     },
     backButton: {
-        padding: spacing.sm,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
     },
     progressContainer: {
-        height: 4,
-        backgroundColor: colors.border,
+        height: 6,
+        backgroundColor: '#E7E2F7',
         width: '100%',
     },
     progressBar: {
         height: '100%',
         backgroundColor: colors.primary,
+        borderRadius: 999,
     },
     stepsRail: {
         flexDirection: 'row',
@@ -803,21 +809,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.sm,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
     },
     stepChip: {
         flex: 1,
         paddingVertical: 8,
-        borderRadius: borderRadius.full,
+        borderRadius: 999,
         borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
+        borderColor: '#E8E1FA',
+        backgroundColor: '#FFFFFF',
         alignItems: 'center',
     },
     stepChipActive: {
-        borderColor: colors.primary,
-        backgroundColor: '#F3E8FF',
+        borderColor: '#BDA1F8',
+        backgroundColor: '#F4EEFF',
     },
     stepChipText: {
         fontSize: fontSize.xs,
@@ -834,36 +838,36 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     stepTitle: {
-        fontSize: fontSize.xl,
-        fontWeight: 'bold',
-        color: colors.text,
+        fontSize: 30,
+        fontWeight: '800',
+        color: '#171840',
         marginBottom: spacing.md,
     },
     staffCard: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.md,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#ECE7FA',
         marginBottom: spacing.sm,
         gap: spacing.md,
-        shadowColor: '#000000',
+        shadowColor: '#1A1440',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
         elevation: 2,
     },
     selectedCard: {
-        borderColor: colors.primary,
-        backgroundColor: '#F3E8FF',
+        borderColor: '#C6AEFB',
+        backgroundColor: '#F8F3FF',
     },
     avatarPlaceholder: {
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: colors.backgroundGray,
+        backgroundColor: '#F0EBFF',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -874,13 +878,13 @@ const styles = StyleSheet.create({
         backgroundColor: colors.backgroundGray,
     },
     staffName: {
-        fontSize: fontSize.md,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1A1A44',
     },
     staffRole: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 13,
+        color: '#71789A',
     },
     datePicker: {
         marginBottom: spacing.lg,
@@ -890,11 +894,11 @@ const styles = StyleSheet.create({
         height: 80,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: borderRadius.lg,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#E9E2FA',
         marginRight: spacing.md,
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
     },
     selectedDateCard: {
         backgroundColor: colors.primary,
@@ -927,10 +931,10 @@ const styles = StyleSheet.create({
     slot: {
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.sm,
-        borderRadius: borderRadius.md,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
+        borderColor: '#E9E2FA',
+        backgroundColor: '#FFFFFF',
         minWidth: '30%',
         alignItems: 'center',
     },
@@ -946,15 +950,15 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     summaryCard: {
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
         padding: spacing.lg,
-        borderRadius: borderRadius.lg,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: colors.border,
-        shadowColor: '#000000',
+        borderColor: '#ECE7FA',
+        shadowColor: '#1A1440',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
         elevation: 2,
     },
     summaryRow: {
@@ -963,13 +967,13 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     summaryLabel: {
-        color: colors.textSecondary,
-        fontSize: fontSize.md,
+        color: '#6D7395',
+        fontSize: 15,
     },
     summaryValue: {
-        color: colors.text,
-        fontSize: fontSize.md,
-        fontWeight: '500',
+        color: '#1D1E49',
+        fontSize: 15,
+        fontWeight: '700',
     },
     totalRow: {
         marginTop: spacing.sm,
@@ -988,16 +992,16 @@ const styles = StyleSheet.create({
         color: colors.primary,
     },
     noteCard: {
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
         padding: spacing.lg,
-        borderRadius: borderRadius.lg,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#ECE7FA',
         gap: spacing.sm,
-        shadowColor: '#000000',
+        shadowColor: '#1A1440',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
         elevation: 2,
     },
     noteTitle: {
@@ -1013,12 +1017,12 @@ const styles = StyleSheet.create({
     noteInput: {
         minHeight: 120,
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E8E1FA',
+        borderRadius: 14,
         padding: spacing.md,
         fontSize: fontSize.md,
         color: colors.text,
-        backgroundColor: colors.background,
+        backgroundColor: '#FBFAFE',
     },
     noteCounter: {
         alignSelf: 'flex-end',
@@ -1047,10 +1051,10 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         gap: spacing.md,
         padding: spacing.md,
-        borderRadius: borderRadius.md,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
+        borderColor: '#E8E1FA',
+        backgroundColor: '#FFFFFF',
     },
     selectedPaymentOptionCard: {
         borderColor: colors.primary,
@@ -1093,27 +1097,31 @@ const styles = StyleSheet.create({
     },
     footer: {
         padding: spacing.lg,
-        backgroundColor: colors.surface,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         flexDirection: 'row',
         gap: spacing.sm,
+        shadowColor: '#1A1340',
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 8,
     },
     primaryButton: {
         flex: 1,
         backgroundColor: colors.primary,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
+        paddingVertical: 15,
+        borderRadius: 16,
         alignItems: 'center',
     },
     secondaryButton: {
         flex: 1,
-        backgroundColor: colors.surface,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 15,
+        borderRadius: 16,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: colors.primary,
+        borderColor: '#C5AEFB',
     },
     secondaryButtonText: {
         color: colors.primary,
