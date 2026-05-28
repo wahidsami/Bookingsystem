@@ -53,7 +53,7 @@ Replace the current appointment details drawer/modal in customer app with a full
 - Hero with back/share actions.
 - Title/subtitle block.
 - Booking summary card with number + status pills + center/date basics.
-- Status: `pending`
+- Status: `completed`
 
 ## Phase 3 — Metrics and Services
 - Metrics 2x2 block (services/total/payable/first time).
@@ -95,3 +95,4 @@ Replace the current appointment details drawer/modal in customer app with a full
 - 2026-05-28: Enforced extra code-level single-tenant safeguards (update + checkout guard).
 - 2026-05-28: Added `AppointmentDetails` screen and wired appointment cards to open full page.
 - 2026-05-28: Removed legacy appointment details drawer from `BookingsScreen`.
+- 2026-05-28: Completed premium header/summary hero pass in `AppointmentDetails` with tenant image fallback to Refah gradient.

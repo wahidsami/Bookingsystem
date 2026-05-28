@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ImageBackground, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { Booking, bookingNeedsPayment, getBookingOutstandingAmount } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -9,6 +9,8 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { api } from '../api/client';
+import { getImageUrl } from '../api/client';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type BookingGroup = {
   key: string;
@@ -82,6 +84,12 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
   const representative = group?.items?.[0];
   const guest = useMemo(() => parseGroupGuestFromNotes(representative?.notes), [representative?.notes]);
+  const tenantHeroUri = useMemo(() => {
+    if (!group?.tenant) return null;
+    const candidate = (group.tenant as any).coverImage || (group.tenant as any).bannerImage || (group.tenant as any).image || (group.tenant as any).logo;
+    if (!candidate) return null;
+    return getImageUrl(candidate);
+  }, [group?.tenant]);
 
   const getBookingNumber = (booking: Booking) =>
     booking.bookingNumber || booking.bookingReference || booking.id.slice(0, 8).toUpperCase();
@@ -191,18 +199,23 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <AppIcon name="arrow_back" size={22} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}</Text>
-        <TouchableOpacity style={styles.backButton}>
-          <AppIcon name="share" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
+        <ImageBackground source={tenantHeroUri ? { uri: tenantHeroUri } : undefined} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
+          <LinearGradient colors={tenantHeroUri ? ['rgba(38,12,89,0.82)', 'rgba(93,47,153,0.35)'] : ['#3B0E74', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+          <View style={styles.heroTopBar}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.heroButton}>
+              <AppIcon name="arrow_back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.heroButton}>
+              <AppIcon name="share" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.heroTitle}>{language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}</Text>
+          <Text style={styles.heroSubTitle}>{language === 'ar' ? 'تجربتك الصحية القادمة بانتظارك' : 'Your wellness experience awaits'}</Text>
+        </ImageBackground>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: scrollBottomPadding + spacing.lg }}>
-        <View style={styles.summaryCard}>
+        <View style={styles.contentWrap}>
+          <View style={styles.summaryCard}>
           <Text style={styles.label}>{language === 'ar' ? 'رقم الحجز' : 'Booking No.'}</Text>
           <Text style={styles.bookingNumber} numberOfLines={1}>{getBookingNumber(representative)}</Text>
           <View style={styles.pillsRow}>
@@ -213,26 +226,26 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
           <Text style={styles.metaText}>
             {format(new Date(group.startTime), 'eeee, d MMMM yyyy, h:mm a', { locale: language === 'ar' ? ar : enUS })}
           </Text>
-        </View>
+          </View>
 
-        <View style={styles.metricsGrid}>
+          <View style={styles.metricsGrid}>
           <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text><Text style={styles.metricValue}>{group.items.length}</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue}>{group.totalPrice.toFixed(2)} SAR</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue}>{group.payableNowTotal.toFixed(2)} SAR</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'أول موعد' : 'First Appt.'}</Text><Text style={styles.metricValueSmall}>{format(new Date(group.startTime), 'd MMM, h:mm a', { locale: language === 'ar' ? ar : enUS })}</Text></View>
-        </View>
+          </View>
 
-        {guest ? (
-          <View style={styles.guestCard}>
+          {guest ? (
+            <View style={styles.guestCard}>
             <Text style={styles.sectionTitle}>{language === 'ar' ? 'بيانات الضيف' : 'Guest Information'}</Text>
             <Text style={styles.guestName}>{guest.fullName}</Text>
             {!!guest.phone && <Text style={styles.guestPhone}>{guest.phone}</Text>}
-          </View>
-        ) : null}
+            </View>
+          ) : null}
 
-        <Text style={styles.sectionTitle}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text>
-        {group.items.map((booking, index) => (
-          <View key={booking.id} style={styles.serviceCard}>
+          <Text style={styles.sectionTitle}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text>
+          {group.items.map((booking, index) => (
+            <View key={booking.id} style={styles.serviceCard}>
             <Text style={styles.serviceIndex}>{language === 'ar' ? `الخدمة ${index + 1}` : `Service ${index + 1}`}</Text>
             <Text style={styles.serviceName} numberOfLines={2}>{getServiceName(booking)}</Text>
             {!!booking.serviceVariantName && <Text style={styles.serviceVariant} numberOfLines={1}>{booking.serviceVariantName}</Text>}
@@ -274,8 +287,9 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
-        ))}
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
       <Modal visible={!!rescheduleBooking} transparent animationType="fade" onRequestClose={() => !rescheduleSubmitting && setRescheduleBooking(null)}>
@@ -301,9 +315,22 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAF8FC' },
-  header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.text },
+  hero: { minHeight: 240, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between', backgroundColor: '#5B21B6' },
+  heroImage: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  heroTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  heroTitle: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },
+  heroSubTitle: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.9)' },
+  contentWrap: { paddingHorizontal: spacing.md, marginTop: -38 },
   summaryCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
   label: { color: colors.textSecondary, fontSize: 12 },
   bookingNumber: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 4 },
