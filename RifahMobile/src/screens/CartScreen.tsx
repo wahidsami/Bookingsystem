@@ -38,6 +38,18 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
     const [paymentMethod, setPaymentMethod] = useState<'cash-on-delivery' | 'online'>('online');
 
+    const labels = {
+        cartTitle: isRTL ? 'سلة الشراء' : 'Shopping Cart',
+        orderItems: isRTL ? 'عناصر الطلب' : 'Order Items',
+        personalInfo: isRTL ? 'المعلومات الشخصية' : 'Personal Information',
+        shippingAddress: isRTL ? 'عنوان التوصيل' : 'Shipping Address',
+        deliveryMethod: isRTL ? 'طريقة التوصيل' : 'Delivery Method',
+        paymentMethod: isRTL ? 'طريقة الدفع' : 'Payment Method',
+        orderSummary: isRTL ? 'ملخص الطلب' : 'Order Summary',
+        continueShopping: isRTL ? 'متابعة التسوق' : 'Continue Shopping',
+        placeOrder: isRTL ? 'إتمام الطلب' : 'Place Order',
+    };
+
     useEffect(() => {
         let isMounted = true;
 
@@ -181,13 +193,13 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Shopping Cart</Text>
+                <Text style={styles.headerTitle}>{labels.cartTitle}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Order Items</Text>
+                    <Text style={styles.sectionTitle}>{labels.orderItems}</Text>
                     {cartItems.map(item => (
                         <View key={item.product.id} style={styles.cartItem}>
                             <Image
@@ -215,24 +227,30 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Personal Information</Text>
+                    <Text style={styles.sectionTitle}>{labels.personalInfo}</Text>
+                    <Text style={styles.fieldLabel}>{isRTL ? 'الاسم الكامل *' : 'Full Name *'}</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="Full Name *"
+                        placeholder={isRTL ? 'ادخل الاسم الكامل' : 'Enter full name'}
+                        placeholderTextColor={colors.textSecondary}
                         value={customerName}
                         onChangeText={setCustomerName}
                     />
+                    <Text style={styles.fieldLabel}>{isRTL ? 'البريد الإلكتروني *' : 'Email Address *'}</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="Email Address *"
+                        placeholder={isRTL ? 'ادخل البريد الإلكتروني' : 'Enter email address'}
+                        placeholderTextColor={colors.textSecondary}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         value={customerEmail}
                         onChangeText={setCustomerEmail}
                     />
+                    <Text style={styles.fieldLabel}>{isRTL ? 'رقم الجوال *' : 'Phone Number *'}</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="Phone Number *"
+                        placeholder={isRTL ? 'ادخل رقم الجوال' : 'Enter phone number'}
+                        placeholderTextColor={colors.textSecondary}
                         keyboardType="phone-pad"
                         value={customerPhone}
                         onChangeText={setCustomerPhone}
@@ -240,17 +258,49 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Shipping Address</Text>
+                    <Text style={styles.sectionTitle}>{labels.shippingAddress}</Text>
                     <View style={styles.row}>
-                        <TextInput style={[styles.input, { flex: 1, marginRight: spacing.sm }]} placeholder="City *" value={city} onChangeText={setCity} />
-                        <TextInput style={[styles.input, { flex: 1 }]} placeholder="District *" value={district} onChangeText={setDistrict} />
+                        <View style={[styles.flexField, { marginRight: spacing.sm }]}>
+                            <Text style={styles.fieldLabel}>{isRTL ? 'المدينة *' : 'City *'}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={isRTL ? 'المدينة' : 'City'}
+                                placeholderTextColor={colors.textSecondary}
+                                value={city}
+                                onChangeText={setCity}
+                            />
+                        </View>
+                        <View style={styles.flexField}>
+                            <Text style={styles.fieldLabel}>{isRTL ? 'الحي *' : 'District *'}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={isRTL ? 'الحي' : 'District'}
+                                placeholderTextColor={colors.textSecondary}
+                                value={district}
+                                onChangeText={setDistrict}
+                            />
+                        </View>
                     </View>
-                    <TextInput style={styles.input} placeholder="Street Name *" value={street} onChangeText={setStreet} />
-                    <TextInput style={styles.input} placeholder="Building/Apartment" value={building} onChangeText={setBuilding} />
+                    <Text style={styles.fieldLabel}>{isRTL ? 'اسم الشارع *' : 'Street Name *'}</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder={isRTL ? 'الشارع' : 'Street name'}
+                        placeholderTextColor={colors.textSecondary}
+                        value={street}
+                        onChangeText={setStreet}
+                    />
+                    <Text style={styles.fieldLabel}>{isRTL ? 'المبنى / الشقة' : 'Building / Apartment'}</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder={isRTL ? 'المبنى أو الشقة' : 'Building or apartment'}
+                        placeholderTextColor={colors.textSecondary}
+                        value={building}
+                        onChangeText={setBuilding}
+                    />
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Delivery Method</Text>
+                    <Text style={styles.sectionTitle}>{labels.deliveryMethod}</Text>
                     <View style={styles.methodOptions}>
                         <TouchableOpacity
                             style={[styles.methodOption, deliveryMethod === 'standard' && styles.methodOptionActive]}
@@ -272,7 +322,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Payment Method</Text>
+                    <Text style={styles.sectionTitle}>{labels.paymentMethod}</Text>
                     <View style={styles.methodOptions}>
                         <TouchableOpacity
                             style={[styles.methodOption, paymentMethod === 'online' && styles.methodOptionActive]}
@@ -292,7 +342,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 </View>
 
                 <View style={[styles.section, styles.summarySection]}>
-                    <Text style={styles.sectionTitle}>Order Summary</Text>
+                    <Text style={styles.sectionTitle}>{labels.orderSummary}</Text>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Subtotal</Text>
                         <Text style={styles.summaryValue}>{cartTotal.toFixed(2)} SAR</Text>
@@ -317,7 +367,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text style={styles.checkoutBtnText}>Place Order • {finalTotal.toFixed(2)} SAR</Text>
+                        <Text style={styles.checkoutBtnText}>{labels.placeOrder} • {finalTotal.toFixed(2)} SAR</Text>
                     )}
                 </TouchableOpacity>
             </View>
@@ -328,7 +378,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     centerAll: {
         justifyContent: 'center',
@@ -365,9 +415,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingBottom: spacing.md,
         paddingHorizontal: spacing.md,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 0,
     },
     backButton: {
         padding: spacing.sm,
@@ -381,21 +430,32 @@ const styles = StyleSheet.create({
         padding: spacing.md,
     },
     section: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
         padding: spacing.lg,
         marginBottom: spacing.md,
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 2,
     },
     sectionTitle: {
         fontSize: fontSize.lg,
-        fontWeight: 'bold',
-        color: colors.text,
+        fontWeight: '700',
+        color: '#111827',
         marginBottom: spacing.md,
+    },
+    fieldLabel: {
+        fontSize: fontSize.sm,
+        color: '#4B5563',
+        marginBottom: spacing.xs,
+        fontWeight: '600',
     },
     cartItem: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#EDE9FE',
         paddingVertical: spacing.md,
     },
     itemImage: {
@@ -424,8 +484,8 @@ const styles = StyleSheet.create({
     qtyControls: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.backgroundGray,
-        borderRadius: borderRadius.sm,
+        backgroundColor: '#F3F0FF',
+        borderRadius: 12,
         alignSelf: 'flex-start',
     },
     qtyBtn: {
@@ -441,12 +501,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     input: {
-        backgroundColor: colors.backgroundGray,
+        backgroundColor: '#FAFAFF',
         padding: spacing.md,
-        borderRadius: borderRadius.md,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
         marginBottom: spacing.md,
         color: colors.text,
         fontFamily: Platform.OS === 'ios' ? 'Cairo-Regular' : undefined,
+    },
+    flexField: {
+        flex: 1,
     },
     row: {
         flexDirection: 'row',
@@ -458,14 +523,15 @@ const styles = StyleSheet.create({
     methodOption: {
         flex: 1,
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#DDD6FE',
+        borderRadius: 14,
         padding: spacing.md,
         alignItems: 'center',
+        backgroundColor: '#FFFFFF',
     },
     methodOptionActive: {
         borderColor: colors.primary,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#F3E8FF',
     },
     methodLabel: {
         fontSize: fontSize.sm,
@@ -514,15 +580,14 @@ const styles = StyleSheet.create({
         color: colors.primary,
     },
     footer: {
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
         padding: spacing.lg,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
+        borderTopWidth: 0,
     },
     checkoutBtn: {
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
         padding: spacing.md,
-        borderRadius: borderRadius.md,
+        borderRadius: 16,
         alignItems: 'center',
     },
     checkoutBtnText: {

@@ -108,10 +108,10 @@ Targets:
 - Phase 0: `100%`
 - Phase 1: `70%` (Home + Browse + BookingFlow premium shell upgraded)
 - Phase 2: `100%`
-- Phase 3: `0%`
+- Phase 3: `25%` (CartScreen premium shell + labeled checkout form completed)
 - Phase 4: `75%` (Bookings + Purchases + Notifications screens premium shell upgraded)
 - Phase 5: `0%`
 - Phase 6: `0%`
 
 ## Current Step
-Start Phase 1 with `HomeScreen` premium shell upgrade, then proceed to `BrowseScreen`, then `BookingFlow`.
+Continue Phase 3 with `PaymentScreen`, then `PaymentSimulatorScreen`, then `GiftsScreen` drawers.
