@@ -31,16 +31,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: spacing.lg,
         marginTop: spacing.lg,
-        marginBottom: spacing.md,
+        marginBottom: spacing.sm,
     },
     title: {
-        fontSize: fontSize.xl,
-        fontWeight: '700',
-        color: colors.text,
+        fontSize: 30,
+        fontWeight: '800',
+        color: '#15163E',
     },
     seeAll: {
-        fontSize: fontSize.sm,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: colors.primary,
     },
 });
