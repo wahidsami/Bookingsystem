@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
     },
     headerTitle: {
-        fontSize: 34,
+        fontSize: 32,
         fontWeight: '800',
         color: '#14153C',
     },
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
         borderColor: '#C8DDFE',
     },
     rescheduledRibbonText: {
-        fontSize: 11,
+        fontSize: 9,
         color: '#2E5FA8',
         fontWeight: '700',
     },
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     salonName: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: '700',
         color: '#1A1A44',
     },
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     statusText: {
-        fontSize: 11,
+        fontSize: 9,
         fontWeight: '700',
     },
     cardBody: {
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.8,
     },
     serviceName: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '800',
         color: '#171840',
         marginBottom: spacing.sm,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     dateTimeText: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#6E7596',
     },
     staffRow: {
@@ -716,11 +716,11 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
     },
     staffLabel: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#6E7596',
     },
     staffName: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#1F204D',
         fontWeight: '700',
     },
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     price: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '800',
         color: colors.primary,
     },
@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     dueNowText: {
-        fontSize: 13,
+        fontSize: 11,
         color: '#6E7596',
         fontWeight: '600',
     },

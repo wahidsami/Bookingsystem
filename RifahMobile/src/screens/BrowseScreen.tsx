@@ -34,10 +34,10 @@ export function BrowseScreen({ route, navigation }: any) {
     const initialCategory = route.params?.category as string | undefined;
     const initialTitle = route.params?.title as string | undefined;
     const isCompact = width < 390;
-    const heroTitleSize = isCompact ? 34 : 38;
-    const heroTitleLineHeight = isCompact ? 38 : 42;
-    const heroSubtitleSize = isCompact ? 14 : 15;
-    const heroSubtitleLineHeight = isCompact ? 20 : 22;
+    const heroTitleSize = isCompact ? 32 : 36;
+    const heroTitleLineHeight = isCompact ? 36 : 40;
+    const heroSubtitleSize = isCompact ? 12 : 13;
+    const heroSubtitleLineHeight = isCompact ? 18 : 20;
     const cardImageHeight = isCompact ? 160 : 176;
 
     const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 14,
         color: '#3A3F62',
         paddingVertical: 0,
     },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
         borderColor: '#E8DDFB',
     },
     chipText: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '700',
     },
     chipTextActive: {
@@ -401,14 +401,14 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md + 2,
     },
     featuredTitle: {
-        fontSize: 32,
-        lineHeight: 36,
+        fontSize: 30,
+        lineHeight: 34,
         color: '#15153E',
         fontWeight: '800',
     },
     featuredSubtitle: {
         marginTop: 6,
-        fontSize: 15,
+        fontSize: 13,
         color: '#66708F',
     },
     tenantCard: {
@@ -479,8 +479,8 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     tenantName: {
-        fontSize: 20,
-        lineHeight: 24,
+        fontSize: 18,
+        lineHeight: 22,
         color: '#171742',
         fontWeight: '800',
     },
@@ -495,12 +495,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row-reverse',
     },
     metaText: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#65708F',
         fontWeight: '600',
     },
     metaDivider: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#A5A8BA',
     },
     typePill: {
@@ -513,13 +513,13 @@ const styles = StyleSheet.create({
     },
     typePillText: {
         color: '#5D33B6',
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '700',
     },
     tenantDescription: {
         marginTop: 8,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 12,
+        lineHeight: 18,
         color: '#61698A',
     },
     tenantCardFooter: {
@@ -559,14 +559,14 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     trustItemTitle: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#2D2854',
         fontWeight: '800',
     },
     trustItemSubtitle: {
-        fontSize: 12,
+        fontSize: 10,
         color: '#666C89',
-        lineHeight: 17,
+        lineHeight: 15,
     },
     centerState: {
         flex: 1,
