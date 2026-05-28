@@ -25,6 +25,17 @@ export function ServiceBookingCartScreen({ navigation }: any) {
             return;
         }
 
+        const uniqueTenantIds = Array.from(new Set(items.map((item) => item.tenantId).filter(Boolean)));
+        if (uniqueTenantIds.length > 1) {
+            Alert.alert(
+                language === 'ar' ? 'خطأ في السلة' : 'Cart Error',
+                language === 'ar'
+                    ? 'لا يمكن دمج خدمات من مراكز مختلفة في نفس الحجز.'
+                    : 'You cannot combine services from different centers in one booking.'
+            );
+            return;
+        }
+
         const user = await api.getUser();
         if (!user) {
             Alert.alert(t('guestTitle'), t('loginToOrderBookings'), [

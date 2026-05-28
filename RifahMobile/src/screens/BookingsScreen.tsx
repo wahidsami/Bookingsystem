@@ -9,7 +9,6 @@ import {
     Image,
     Alert,
     Modal,
-    ScrollView,
     TextInput,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
@@ -21,7 +20,6 @@ import { ar, enUS } from 'date-fns/locale';
 import { GuestView } from '../components/GuestView';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { bookingNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
@@ -53,7 +51,6 @@ export function BookingsScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-    const [selectedBookingGroup, setSelectedBookingGroup] = useState<BookingGroup | null>(null);
     const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
     const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
     const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
@@ -239,46 +236,6 @@ export function BookingsScreen({ navigation }: any) {
         return language === 'ar' ? `النوع: ${variantName}` : `Variant: ${variantName}`;
     };
 
-    const getStaffName = (booking: Booking) =>
-        booking.Staff?.name || booking.staff?.name || '-';
-
-    const getPaymentStatusText = (booking: Booking) => {
-        const paymentStatus = booking.paymentStatus;
-        const outstandingAmount = getBookingOutstandingAmount(booking);
-        const normalizedPaymentStatus = (() => {
-            const raw = `${paymentStatus || ''}`.trim().toLowerCase();
-            if ((raw === 'fully_paid' || raw === 'paid') && outstandingAmount > 0.009) {
-                return 'deposit_paid';
-            }
-            if (raw === 'deposit_paid' && outstandingAmount <= 0.009) {
-                return 'fully_paid';
-            }
-            return raw || 'pending';
-        })();
-
-        if (language === 'ar') {
-            switch (normalizedPaymentStatus) {
-                case 'pending': return 'بانتظار الدفع';
-                case 'deposit_paid': return 'عربون مدفوع';
-                case 'fully_paid':
-                case 'paid': return 'مدفوع بالكامل';
-                case 'refunded': return 'مسترد';
-                case 'partially_refunded': return 'مسترد جزئياً';
-                default: return paymentStatus || '-';
-            }
-        }
-
-        switch (normalizedPaymentStatus) {
-            case 'pending': return 'Pending';
-            case 'deposit_paid': return 'Deposit Paid';
-            case 'fully_paid':
-            case 'paid': return 'Fully Paid';
-            case 'refunded': return 'Refunded';
-            case 'partially_refunded': return 'Partially Refunded';
-            default: return paymentStatus || '-';
-        }
-    };
-
     const renderBookingCard = ({ item }: { item: BookingGroup }) => {
         const isArabic = language === 'ar';
         const representative = item.items[0];
@@ -290,7 +247,7 @@ export function BookingsScreen({ navigation }: any) {
             <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.9}
-                onPress={() => setSelectedBookingGroup(item)}
+                onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}
             >
                 {/* Header: Salon Info */}
                 <View style={styles.cardHeader}>
@@ -383,7 +340,7 @@ export function BookingsScreen({ navigation }: any) {
                     <View style={styles.actions}>
                         <TouchableOpacity
                             style={styles.payButton}
-                            onPress={() => setSelectedBookingGroup(item)}
+                            onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}
                         >
                             <Text style={styles.payButtonText}>{language === 'ar' ? 'عرض التفاصيل' : 'View Details'}</Text>
                         </TouchableOpacity>
@@ -477,176 +434,6 @@ export function BookingsScreen({ navigation }: any) {
                 </View>
             )}
 
-            <Modal
-                visible={!!selectedBookingGroup}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setSelectedBookingGroup(null)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
-                        >
-                            <View style={styles.modalHeader}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.modalTitle}>
-                                        {language === 'ar' ? 'تفاصيل الحجز' : 'Booking Details'}
-                                    </Text>
-                                    {selectedBookingGroup && (
-                                        <Text style={styles.modalReference}>
-                                            {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(selectedBookingGroup.items[0])}
-                                        </Text>
-                                    )}
-                                </View>
-                                <TouchableOpacity
-                                    style={styles.modalCloseButton}
-                                    onPress={() => setSelectedBookingGroup(null)}
-                                >
-                                    <Text style={styles.modalCloseText}>×</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {selectedBookingGroup && (
-                                <View style={styles.modalBody}>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'المركز' : 'Center'}</Text>
-                                        <Text style={styles.detailValue}>{selectedBookingGroup.tenant?.name || '-'}</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'عدد الخدمات' : 'Services'}</Text>
-                                        <Text style={styles.detailValue}>{selectedBookingGroup.items.length}</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الموعد الأول' : 'First time'}</Text>
-                                        <Text style={styles.detailValue}>
-                                            {format(new Date(selectedBookingGroup.startTime), 'eeee, d MMMM yyyy', {
-                                                locale: language === 'ar' ? ar : enUS,
-                                            })}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text>
-                                        <Text style={styles.detailValue}>{selectedBookingGroup.totalPrice.toFixed(2)} SAR</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>{language === 'ar' ? 'يدفع الآن' : 'Due now'}</Text>
-                                        <Text style={styles.detailValue}>{selectedBookingGroup.payableNowTotal.toFixed(2)} SAR</Text>
-                                    </View>
-
-                                    <Text style={styles.modalSectionTitle}>{language === 'ar' ? 'العناصر' : 'Items'}</Text>
-                                    {selectedBookingGroup.items.map((booking) => (
-                                        <View key={booking.id} style={styles.groupItemCard}>
-                                            <View style={styles.detailRow}>
-                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الخدمة' : 'Service'}</Text>
-                                                <Text style={styles.detailValue}>{getServiceName(booking)}</Text>
-                                            </View>
-                                            {booking.serviceVariantName && (
-                                                <View style={styles.detailRow}>
-                                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'النوع' : 'Variant'}</Text>
-                                                    <Text style={styles.detailValue}>{booking.serviceVariantName}</Text>
-                                                </View>
-                                            )}
-                                            <View style={styles.detailRow}>
-                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الوقت' : 'Time'}</Text>
-                                                <Text style={styles.detailValue}>
-                                                    {format(new Date(booking.startTime), 'PPP p', {
-                                                        locale: language === 'ar' ? ar : enUS,
-                                                    })}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.detailRow}>
-                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الموظف' : 'Employee'}</Text>
-                                                <Text style={styles.detailValue}>{getStaffName(booking)}</Text>
-                                            </View>
-                                            <View style={styles.detailRow}>
-                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'الحالة' : 'Status'}</Text>
-                                                <Text style={styles.detailValue}>{getStatusText(booking.status, t, language)}</Text>
-                                            </View>
-                                            <View style={styles.detailRow}>
-                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'حالة الدفع' : 'Payment Status'}</Text>
-                                                <Text style={styles.detailValue}>{getPaymentStatusText(booking)}</Text>
-                                            </View>
-                                            <View style={styles.detailRow}>
-                                                <Text style={styles.detailLabel}>{language === 'ar' ? 'السعر' : 'Amount'}</Text>
-                                                <Text style={styles.detailValue}>{Number(booking.price || 0).toFixed(2)} SAR</Text>
-                                            </View>
-                                            {booking.paymentMethod && (
-                                                <View style={styles.detailRow}>
-                                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'طريقة الدفع' : 'Payment Method'}</Text>
-                                                    <Text style={styles.detailValue}>{booking.paymentMethod}</Text>
-                                                </View>
-                                            )}
-                                            {booking.notes && (
-                                                <View style={styles.notesBlock}>
-                                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Text>
-                                                    <Text style={styles.notesText}>{booking.notes}</Text>
-                                                </View>
-                                            )}
-
-                                            {bookingNeedsPayment(booking.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(booking.status) && activeTab === 'upcoming' && (
-                                                <TouchableOpacity
-                                                    style={styles.payButton}
-                                                    onPress={() => (navigation as any).navigate('Payment', {
-                                                        appointmentId: booking.id,
-                                                        amount: getBookingOutstandingAmount(booking),
-                                                        tenantId: booking.tenantId || booking.tenant?.id,
-                                                        paymentChoice: booking.paymentStatus === 'pending' && booking.paymentMethod === 'booking-fee'
-                                                            ? 'booking-fee'
-                                                            : undefined,
-                                                    })}
-                                                >
-                                                    <Text style={styles.payButtonText}>{t('payNow')}</Text>
-                                                </TouchableOpacity>
-                                            )}
-
-                                            {['confirmed', 'pending'].includes(booking.status) && activeTab === 'upcoming' && (
-                                                <>
-                                                    {(booking.Service?.allowReschedule || booking.service?.allowReschedule) ? (
-                                                        <TouchableOpacity
-                                                            style={styles.rescheduleButton}
-                                                            onPress={() => openReschedule(booking)}
-                                                        >
-                                                            <Text style={styles.rescheduleButtonText}>
-                                                                {language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    ) : null}
-                                                    <TouchableOpacity
-                                                        style={styles.cancelButton}
-                                                        onPress={() => handleCancel(booking.id)}
-                                                    >
-                                                        <Text style={styles.cancelButtonText}>{t('cancel' as any)}</Text>
-                                                    </TouchableOpacity>
-                                                </>
-                                            )}
-                                            {booking.status === 'completed' && activeTab === 'history' && (
-                                                reviewedAppointmentIds.has(booking.id) ? (
-                                                    <View style={[styles.reviewButton, styles.reviewedButton]}>
-                                                        <AppIcon name="star" size={16} color={colors.accentDark} />
-                                                        <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>
-                                                            {language === 'ar' ? 'تم التقييم' : 'Reviewed'}
-                                                        </Text>
-                                                    </View>
-                                                ) : (
-                                                    <TouchableOpacity
-                                                        style={styles.reviewButton}
-                                                        onPress={() => setReviewBooking(booking)}
-                                                    >
-                                                        <AppIcon name="star" size={16} color={colors.textInverse} />
-                                                        <Text style={styles.reviewButtonText}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
-                                                    </TouchableOpacity>
-                                                )
-                                            )}
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-                        </ScrollView>
-                    </View>
-                </View>
-            </Modal>
             <ReviewPromptModal
                 visible={!!reviewBooking}
                 appointment={reviewBooking}
@@ -1025,48 +812,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(17, 24, 39, 0.55)',
         justifyContent: 'flex-end',
     },
-    modalCard: {
-        maxHeight: '85%',
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        padding: spacing.lg,
-        borderWidth: 1,
-        borderColor: '#ECE7FA',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: spacing.md,
-    },
     modalTitle: {
         fontSize: fontSize.xl,
         fontWeight: '700',
         color: colors.text,
-    },
-    modalReference: {
-        marginTop: 4,
-        fontSize: fontSize.sm,
-        fontWeight: '700',
-        color: colors.primary,
-    },
-    modalCloseButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#F4EEFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    modalCloseText: {
-        fontSize: 28,
-        lineHeight: 30,
-        color: colors.text,
-    },
-    modalBody: {
-        gap: spacing.md,
-        paddingBottom: spacing.xl,
     },
     rescheduleModalCard: {
         width: '90%',
@@ -1118,47 +867,5 @@ const styles = StyleSheet.create({
     rescheduleSaveText: {
         color: colors.textInverse,
         fontWeight: '700',
-    },
-    modalSectionTitle: {
-        fontSize: fontSize.md,
-        fontWeight: '700',
-        color: colors.text,
-        marginTop: spacing.sm,
-        marginBottom: spacing.xs,
-    },
-    groupItemCard: {
-        gap: spacing.sm,
-        padding: spacing.md,
-        borderRadius: borderRadius.md,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    detailRow: {
-        padding: spacing.md,
-        borderRadius: borderRadius.md,
-        backgroundColor: colors.backgroundGray,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    detailLabel: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
-        marginBottom: 4,
-    },
-    detailValue: {
-        fontSize: fontSize.md,
-        fontWeight: '600',
-        color: colors.text,
-    },
-    notesBlock: {
-        padding: spacing.md,
-        borderRadius: borderRadius.md,
-        backgroundColor: `${colors.primary}20`,
-    },
-    notesText: {
-        fontSize: fontSize.sm,
-        color: colors.text,
-        lineHeight: 20,
     },
 });

@@ -95,6 +95,10 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
 
     const updateItem = (id: string, updates: Partial<ServiceBookingCartItem>) => {
         setItems((prev) => {
+            const original = prev.find((item) => item.id === id);
+            if (original && updates.tenantId && updates.tenantId !== original.tenantId) {
+                return prev;
+            }
             const nextItems = prev.map((item) => (
                 item.id === id ? { ...item, ...updates, id: item.id } : item
             ));

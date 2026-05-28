@@ -21,6 +21,9 @@ import { ReviewScreen } from '../screens/ReviewScreen';
 import { GiftsScreen } from '../screens/GiftsScreen';
 import { ServiceDetailsScreen } from '../screens/ServiceDetailsScreen';
 import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
+import { WalletBalanceDetailsScreen } from '../screens/WalletBalanceDetailsScreen';
+import { CentersBalanceScreen } from '../screens/CentersBalanceScreen';
+import { AppointmentDetailsScreen } from '../screens/AppointmentDetailsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -53,6 +56,9 @@ export function RootNavigator() {
             <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
             <Stack.Screen name="Review" component={ReviewScreen} />
             <Stack.Screen name="Gifts" component={GiftsScreen} />
+            <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
+            <Stack.Screen name="WalletBalanceDetails" component={WalletBalanceDetailsScreen} />
+            <Stack.Screen name="CentersBalance" component={CentersBalanceScreen} />
         </Stack.Navigator>
     );
 }
