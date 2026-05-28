@@ -1037,34 +1037,41 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const renderAbout = () => (
         <View style={styles.contentSection}>
+            <View style={styles.aboutHeroBlock}>
+                <Text style={styles.aboutHeroTitle}>{isRTL ? 'عن المركز' : 'About'}</Text>
+                <Text style={styles.aboutHeroSubtitle}>
+                    {isRTL ? 'تعرّف على قصة المركز، رسالته، ومعلومات التواصل.' : 'Discover the center story, mission, and key details.'}
+                </Text>
+            </View>
+
             {aboutStory ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('about')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('about')}</Text>
                     <Text style={styles.aboutText}>{aboutStory}</Text>
                 </View>
             ) : null}
 
             {missions.length > 0 ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('mission')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('mission')}</Text>
                     {missions.map((item, index) => (
-                        <Text key={`mission-${index}`} style={styles.listItemText}>• {item}</Text>
+                        <Text key={`mission-${index}`} style={styles.aboutListItem}>• {item}</Text>
                     ))}
                 </View>
             ) : null}
 
             {visions.length > 0 ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('vision')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('vision')}</Text>
                     {visions.map((item, index) => (
-                        <Text key={`vision-${index}`} style={styles.listItemText}>• {item}</Text>
+                        <Text key={`vision-${index}`} style={styles.aboutListItem}>• {item}</Text>
                     ))}
                 </View>
             ) : null}
 
             {facilitiesImages.length > 0 ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{isRTL ? 'صور المركز' : 'Center Gallery'}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{isRTL ? 'صور المركز' : 'Center Gallery'}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
                         {facilitiesImages.map((imageUri: string, index: number) => (
                             <TouchableOpacity key={`gallery-${index}`} activeOpacity={0.9} onPress={() => setGalleryPreviewImage(imageUri)}>
@@ -1079,8 +1086,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             ) : null}
 
             {locationLine || mapUrl ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('location')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('location')}</Text>
                     {locationLine ? <Text style={styles.addressText}>{locationLine}</Text> : null}
                     {mapUrl ? (
                         <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(mapUrl)}>
@@ -1101,8 +1108,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             ) : null}
 
             {tenant?.workingHours ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('workingHours')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('workingHours')}</Text>
                     <View style={styles.hoursContainer}>
                         {Object.entries(tenant.workingHours).map(([day, hours]: [string, any]) => (
                             <View key={day} style={styles.hoursRow}>
@@ -1117,8 +1124,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             ) : null}
 
             {pageSetup?.phone || tenant?.phone || tenant?.mobile || pageSetup?.email || tenant?.email || pageSetup?.website || tenant?.website ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('contact')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('contact')}</Text>
                     {pageSetup?.phone || tenant?.phone || tenant?.mobile ? (
                         <View style={styles.contactRow}>
                             <AppIcon name="phone" size={20} color={colors.primary} />
@@ -1141,8 +1148,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             ) : null}
 
             {socialLinks.length > 0 ? (
-                <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{t('followUs')}</Text>
+                <View style={styles.aboutCard}>
+                    <Text style={styles.aboutCardTitle}>{t('followUs')}</Text>
                     <View style={styles.socialRow}>
                         {socialLinks.map((item) => (
                             <TouchableOpacity key={item.key} style={styles.socialIcon} onPress={() => openExternalUrl(item.url)}>
@@ -2494,6 +2501,45 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         color: colors.textSecondary,
         lineHeight: 24,
+    },
+    aboutHeroBlock: {
+        marginBottom: spacing.md,
+    },
+    aboutHeroTitle: {
+        fontSize: 36,
+        color: '#12133A',
+        fontWeight: '800',
+    },
+    aboutHeroSubtitle: {
+        marginTop: 4,
+        fontSize: 17,
+        color: '#626A89',
+        lineHeight: 25,
+    },
+    aboutCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: '#EEE8FB',
+        padding: spacing.md,
+        marginBottom: spacing.md,
+        shadowColor: '#211547',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        elevation: 2,
+    },
+    aboutCardTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#15163D',
+        marginBottom: spacing.sm,
+    },
+    aboutListItem: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        lineHeight: 24,
+        marginBottom: spacing.xs,
     },
     listItemText: {
         fontSize: fontSize.md,
