@@ -505,59 +505,58 @@ export function GiftsScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F7F4FF' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 0
   },
-  backButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceAlt },
+  backButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3E8FF' },
   headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   headerSpacer: { width: 36 },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000000',
+    borderColor: '#E9DDFD',
+    shadowColor: '#2E1065',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 2
   },
   summaryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000000',
+    borderColor: '#E9DDFD',
+    shadowColor: '#2E1065',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 2
   },
   summaryTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 4 },
   summaryBalance: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
   historyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000000',
+    borderColor: '#E9DDFD',
+    shadowColor: '#2E1065',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 2
   },
   historyTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
@@ -570,29 +569,29 @@ const styles = StyleSheet.create({
   amountRow: { marginTop: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
   payText: { color: colors.text, fontSize: fontSize.sm },
   creditText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(16, 8, 32, 0.42)' },
   modalCard: {
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: '#E9DDFD'
   },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   modeRow: { flexDirection: 'row', gap: spacing.sm },
-  modeBtn: { flex: 1, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.borderDark, paddingVertical: spacing.sm, alignItems: 'center' },
-  modeBtnActive: { borderColor: colors.primary, backgroundColor: `${colors.primary}20` },
+  modeBtn: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: '#D8C7FA', paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  modeBtnActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
   modeText: { color: colors.text, fontSize: fontSize.sm, fontWeight: '600' },
   modeTextActive: { color: colors.primary },
   checkBtn: {
     borderWidth: 1,
     borderColor: colors.primary,
-    borderRadius: borderRadius.md,
+    borderRadius: 14,
     paddingVertical: spacing.sm,
     alignItems: 'center',
-    backgroundColor: `${colors.primary}12`
+    backgroundColor: '#F5F3FF'
   },
   checkBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
   recipientCard: {
@@ -600,10 +599,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    borderColor: '#E9DDFD',
+    borderRadius: 14,
     padding: spacing.sm,
-    backgroundColor: colors.surface
+    backgroundColor: '#FAFAFF'
   },
   recipientAvatar: { width: 40, height: 40, borderRadius: 20 },
   recipientAvatarFallback: {
@@ -619,29 +618,29 @@ const styles = StyleSheet.create({
   recipientMeta: { color: colors.textSecondary, fontSize: 11 },
   choiceGroup: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    borderColor: '#E9DDFD',
+    borderRadius: 14,
     padding: spacing.sm,
     gap: spacing.sm,
-    backgroundColor: colors.surface
+    backgroundColor: '#FAFAFF'
   },
   choiceTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   choiceRow: { flexDirection: 'row', gap: spacing.xs },
   choiceBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.borderDark,
-    borderRadius: borderRadius.md,
+    borderColor: '#D8C7FA',
+    borderRadius: 14,
     paddingVertical: spacing.sm,
     alignItems: 'center'
   },
-  choiceBtnActive: { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
+  choiceBtnActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
   choiceText: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center', paddingHorizontal: 6 },
   choiceTextActive: { color: colors.primary },
   cancelChoiceBtn: {
     borderWidth: 1,
     borderColor: colors.error,
-    borderRadius: borderRadius.md,
+    borderRadius: 14,
     paddingVertical: spacing.sm,
     alignItems: 'center'
   },
@@ -651,12 +650,13 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 46,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    borderColor: '#E9DDFD',
+    borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.backgroundMuted
+    backgroundColor: '#FAFAFF',
+    color: colors.text
   },
-  submitBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, alignItems: 'center', paddingVertical: spacing.md },
+  submitBtn: { backgroundColor: '#7C3AED', borderRadius: 16, alignItems: 'center', paddingVertical: spacing.md },
   submitText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md }
 });
