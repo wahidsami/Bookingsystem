@@ -20,6 +20,7 @@ import { EmployeeProfileScreen } from '../screens/EmployeeProfileScreen';
 import { ReviewScreen } from '../screens/ReviewScreen';
 import { GiftsScreen } from '../screens/GiftsScreen';
 import { ServiceDetailsScreen } from '../screens/ServiceDetailsScreen';
+import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -49,6 +50,7 @@ export function RootNavigator() {
             <Stack.Screen name="AppointmentInvite" component={AppointmentInviteScreen} />
             <Stack.Screen name="EmployeeProfile" component={EmployeeProfileScreen} />
             <Stack.Screen name="ServiceDetails" component={ServiceDetailsScreen} />
+            <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
             <Stack.Screen name="Review" component={ReviewScreen} />
             <Stack.Screen name="Gifts" component={GiftsScreen} />
         </Stack.Navigator>

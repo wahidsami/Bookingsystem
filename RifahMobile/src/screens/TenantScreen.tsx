@@ -940,7 +940,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             const productDescription = (isRTL ? product.description_ar : product.description_en) || (isRTL ? product.description_en : product.description_ar) || '';
 
                             return (
-                                <View key={product.id} style={styles.productCard}>
+                                <TouchableOpacity
+                                    key={product.id}
+                                    style={styles.productCard}
+                                    activeOpacity={0.95}
+                                    onPress={() => navigation.navigate('ProductDetails', { product, tenant })}
+                                >
                                     <Image
                                         source={{ uri: imageUri }}
                                         style={styles.productImage}
@@ -969,7 +974,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         <Text style={styles.addToCartText}>{t('addToCart' as any) || 'Add'}</Text>
                                         <AppIcon name="cart" size={18} color="white" />
                                     </TouchableOpacity>
-                                </View>
+                                </TouchableOpacity>
                             );
                         })}
                     </View>
