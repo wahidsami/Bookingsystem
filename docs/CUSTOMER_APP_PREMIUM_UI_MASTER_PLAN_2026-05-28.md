@@ -109,7 +109,7 @@ Targets:
 - Phase 1: `70%` (Home + Browse + BookingFlow premium shell upgraded)
 - Phase 2: `100%`
 - Phase 3: `0%`
-- Phase 4: `45%` (Bookings + Purchases screens premium shell upgraded)
+- Phase 4: `75%` (Bookings + Purchases + Notifications screens premium shell upgraded)
 - Phase 5: `0%`
 - Phase 6: `0%`
 
