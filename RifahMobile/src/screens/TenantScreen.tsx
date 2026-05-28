@@ -920,9 +920,15 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderProducts = () => {
         return (
             <View style={styles.contentSection}>
+                <View style={styles.productsHeaderBlock}>
+                    <Text style={styles.productsHeaderTitle}>{isRTL ? 'المنتجات' : 'Products'}</Text>
+                    <Text style={styles.productsHeaderSubtitle}>
+                        {isRTL ? 'منتجات مختارة للعناية اليومية والجمال.' : 'Curated beauty and wellness products for your routine.'}
+                    </Text>
+                </View>
                 {products.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>No products available yet.</Text>
+                        <Text style={styles.emptyText}>{isRTL ? 'لا توجد منتجات متاحة حالياً.' : 'No products available yet.'}</Text>
                     </View>
                 ) : (
                     <View style={styles.productGrid}>
@@ -930,6 +936,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             const imageUri = product.images && product.images.length > 0
                                 ? getImageUrl(product.images[0])
                                 : 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=600&auto=format&fit=crop';
+                            const productName = isRTL ? product.name_ar : product.name_en;
+                            const productDescription = (isRTL ? product.description_ar : product.description_en) || (isRTL ? product.description_en : product.description_ar) || '';
 
                             return (
                                 <View key={product.id} style={styles.productCard}>
@@ -938,10 +946,26 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         style={styles.productImage}
                                     />
                                     <View style={styles.productInfo}>
-                                        <Text style={styles.productName} numberOfLines={2}>{isRTL ? product.name_ar : product.name_en}</Text>
-                                        <Text style={styles.productPrice}>{product.price.toFixed(2)} SAR</Text>
+                                        <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
+                                        {productDescription ? (
+                                            <Text style={styles.productDescription} numberOfLines={2}>{productDescription}</Text>
+                                        ) : null}
+                                        <View style={styles.productMetaRow}>
+                                            <Text style={styles.productPrice}>{product.price.toFixed(2)} SAR</Text>
+                                            <View style={styles.productStockPill}>
+                                                <Text style={styles.productStockText}>
+                                                    {product.stock > 0
+                                                        ? (isRTL ? `متوفر (${product.stock})` : `In stock (${product.stock})`)
+                                                        : (isRTL ? 'غير متوفر' : 'Out of stock')}
+                                                </Text>
+                                            </View>
+                                        </View>
                                     </View>
-                                    <TouchableOpacity style={styles.addToCartButton} onPress={() => handleAddProduct(product)}>
+                                    <TouchableOpacity
+                                        style={[styles.addToCartButton, product.stock <= 0 ? styles.addToCartButtonDisabled : null]}
+                                        onPress={() => handleAddProduct(product)}
+                                        disabled={product.stock <= 0}
+                                    >
                                         <Text style={styles.addToCartText}>{t('addToCart' as any) || 'Add'}</Text>
                                         <AppIcon name="cart" size={18} color="white" />
                                     </TouchableOpacity>
@@ -2696,62 +2720,85 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: 'bold',
     },
+    productsHeaderBlock: {
+        marginBottom: spacing.md,
+    },
+    productsHeaderTitle: {
+        fontSize: 36,
+        color: '#12133A',
+        fontWeight: '800',
+    },
+    productsHeaderSubtitle: {
+        marginTop: 4,
+        fontSize: 17,
+        color: '#626A89',
+        lineHeight: 25,
+    },
     productGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
+        gap: spacing.md,
     },
     productCard: {
-        width: (width - spacing.lg * 2 - spacing.md) / 2, // 2 columns with padding and gap
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        marginBottom: spacing.md,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#EDE9FA',
         overflow: 'hidden',
-        shadowColor: '#000000',
+        shadowColor: '#1B1540',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.06,
         shadowRadius: 12,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 2,
-            },
-            android: {
-                elevation: 1,
-            },
-        }),
+        elevation: 2,
     },
     productImage: {
         width: '100%',
         height: 120,
     },
     productInfo: {
-        padding: spacing.sm,
+        padding: spacing.md,
     },
     productName: {
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-        color: colors.text,
-        marginBottom: 4,
-        height: 40,
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#171843',
+    },
+    productDescription: {
+        marginTop: 5,
+        fontSize: 15,
+        color: '#5D6585',
+        lineHeight: 22,
+    },
+    productMetaRow: {
+        marginTop: spacing.sm,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     productPrice: {
-        fontSize: fontSize.sm,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontWeight: '800',
         color: colors.primary,
-        marginBottom: spacing.sm,
+    },
+    productStockPill: {
+        backgroundColor: '#EFF8F2',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+    },
+    productStockText: {
+        color: '#1A8B4A',
+        fontSize: 12,
+        fontWeight: '700',
     },
     addToCartButton: {
-        backgroundColor: '#7C3AED',
+        backgroundColor: '#6D31D9',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: spacing.sm,
+        paddingVertical: 14,
         gap: spacing.xs,
+    },
+    addToCartButtonDisabled: {
+        backgroundColor: '#B9A8DF',
     },
     addToCartText: {
         color: 'white',
