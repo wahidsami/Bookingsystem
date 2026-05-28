@@ -78,9 +78,17 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
   const activeTab = (route?.params?.activeTab as 'upcoming' | 'history' | undefined) || 'upcoming';
   const [group] = useState<BookingGroup | null>(initialGroup || null);
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
+  const [cancelBookingTarget, setCancelBookingTarget] = useState<Booking | null>(null);
+  const [cancelReasonCode, setCancelReasonCode] = useState<string>('time_conflict');
+  const [cancelReasonText, setCancelReasonText] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState('');
-  const [rescheduleTime, setRescheduleTime] = useState('');
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const [rescheduleChoiceOpen, setRescheduleChoiceOpen] = useState(false);
+  const [rescheduleKeepProvider, setRescheduleKeepProvider] = useState(true);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduleSlots, setRescheduleSlots] = useState<SlotItem[]>([]);
+  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState<SlotItem | null>(null);
 
   const representative = group?.items?.[0];
   const guest = useMemo(() => parseGroupGuestFromNotes(representative?.notes), [representative?.notes]);
@@ -156,49 +164,83 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     return paymentMethod || '-';
   };
 
-  const handleCancel = async (id: string) => {
-    Alert.alert(
-      language === 'ar' ? 'إلغاء الموعد' : 'Cancel booking',
-      language === 'ar' ? 'هل تريد إلغاء هذا الموعد؟' : 'Do you want to cancel this booking?',
-      [
-        { text: language === 'ar' ? 'لا' : 'No', style: 'cancel' },
-        {
-          text: language === 'ar' ? 'نعم' : 'Yes',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.cancelBooking(id);
-              Alert.alert(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تم إلغاء الموعد.' : 'Booking cancelled.');
-              navigation.goBack();
-            } catch (error: any) {
-              Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error?.message || 'Failed to cancel');
-            }
-          },
-        },
-      ]
-    );
+  const handleCancelSubmit = async () => {
+    if (!cancelBookingTarget || cancelSubmitting) return;
+    if (cancelReasonCode === 'other' && !cancelReasonText.trim()) {
+      Alert.alert(language === 'ar' ? 'سبب مطلوب' : 'Reason required', language === 'ar' ? 'يرجى كتابة سبب الإلغاء.' : 'Please write cancellation reason.');
+      return;
+    }
+    try {
+      setCancelSubmitting(true);
+      await api.cancelBooking(cancelBookingTarget.id);
+      setCancelBookingTarget(null);
+      setCancelReasonText('');
+      Alert.alert(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تم إلغاء الموعد.' : 'Booking cancelled.');
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error?.message || 'Failed to cancel');
+    } finally {
+      setCancelSubmitting(false);
+    }
   };
 
-  const openReschedule = (booking: Booking) => {
+  const openRescheduleChoice = (booking: Booking) => {
     const baseDate = new Date(booking.startTime);
     const yyyy = baseDate.getFullYear();
     const mm = String(baseDate.getMonth() + 1).padStart(2, '0');
     const dd = String(baseDate.getDate()).padStart(2, '0');
-    const hh = String(baseDate.getHours()).padStart(2, '0');
-    const min = String(baseDate.getMinutes()).padStart(2, '0');
     setRescheduleDate(`${yyyy}-${mm}-${dd}`);
-    setRescheduleTime(`${hh}:${min}`);
+    setRescheduleSlots([]);
+    setRescheduleSelectedSlot(null);
     setRescheduleBooking(booking);
+    setRescheduleChoiceOpen(true);
+  };
+
+  const loadRescheduleSlots = async (booking: Booking, keepProvider: boolean, dateValue: string) => {
+    const tenantId = booking.tenantId || booking.tenant?.id || group?.tenant?.id;
+    const serviceId = booking.serviceId || booking.service?.id || booking.Service?.id;
+    if (!tenantId || !serviceId || !dateValue) return;
+    try {
+      setRescheduleSlotsLoading(true);
+      setRescheduleSelectedSlot(null);
+      const response = await api.post<{ slots: SlotItem[] }>('/bookings/search', {
+        tenantId,
+        serviceId,
+        date: dateValue,
+        staffId: keepProvider ? (booking.staffId || booking.Staff?.id || booking.staff?.id) : undefined,
+        variantId: booking.serviceVariantId || undefined,
+      });
+      const available = (response.slots || []).filter((slot) => !!slot?.available);
+      setRescheduleSlots(available);
+    } catch (error: any) {
+      Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error?.message || (language === 'ar' ? 'تعذر تحميل المواعيد المتاحة.' : 'Could not load available slots.'));
+    } finally {
+      setRescheduleSlotsLoading(false);
+    }
+  };
+
+  const navigateToRescheduleFlow = async (useSameProvider: boolean) => {
+    if (!rescheduleBooking) return;
+    setRescheduleKeepProvider(useSameProvider);
+    setRescheduleChoiceOpen(false);
+    await loadRescheduleSlots(rescheduleBooking, useSameProvider, rescheduleDate);
   };
 
   const submitReschedule = async () => {
-    if (!rescheduleBooking || !rescheduleDate || !rescheduleTime || rescheduleSubmitting) return;
+    if (!rescheduleBooking || !rescheduleSelectedSlot?.startTime || rescheduleSubmitting) return;
     try {
       setRescheduleSubmitting(true);
-      const dateTime = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
+      const dateTime = new Date(rescheduleSelectedSlot.startTime);
       if (Number.isNaN(dateTime.getTime())) throw new Error(language === 'ar' ? 'تاريخ/وقت غير صالح' : 'Invalid date/time');
-      await api.rescheduleBooking(rescheduleBooking.id, { startTime: dateTime.toISOString(), staffId: rescheduleBooking.staffId });
+      await api.rescheduleBooking(rescheduleBooking.id, {
+        startTime: dateTime.toISOString(),
+        staffId: rescheduleKeepProvider
+          ? (rescheduleBooking.staffId || rescheduleBooking.Staff?.id || rescheduleBooking.staff?.id)
+          : (rescheduleSelectedSlot.staffId || rescheduleBooking.staffId),
+      });
       setRescheduleBooking(null);
+      setRescheduleSlots([]);
+      setRescheduleSelectedSlot(null);
       Alert.alert(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تمت إعادة الجدولة بنجاح.' : 'Appointment rescheduled successfully');
       navigation.goBack();
     } catch (error: any) {
@@ -315,11 +357,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               {['confirmed', 'pending'].includes(booking.status) && activeTab === 'upcoming' && (
                 <View style={styles.secondaryActions}>
                   {(booking.Service?.allowReschedule || booking.service?.allowReschedule) ? (
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => openReschedule(booking)}>
+                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => openRescheduleChoice(booking)}>
                       <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
                     </TouchableOpacity>
                   ) : null}
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(booking.id)}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelBookingTarget(booking)}>
                     <Text style={styles.cancelBtnText} numberOfLines={1}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
                   </TouchableOpacity>
                 </View>
@@ -357,7 +399,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               {(representative.Service?.allowReschedule || representative.service?.allowReschedule) &&
               ['confirmed', 'pending'].includes(representative.status) &&
               activeTab === 'upcoming' ? (
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => openReschedule(representative)}>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => openRescheduleChoice(representative)}>
                   <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
                 </TouchableOpacity>
               ) : (
@@ -365,7 +407,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               )}
 
               {['confirmed', 'pending'].includes(representative.status) && activeTab === 'upcoming' ? (
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(representative.id)}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelBookingTarget(representative)}>
                   <Text style={styles.cancelBtnText} numberOfLines={1}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
                 </TouchableOpacity>
               ) : (
@@ -397,18 +439,97 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
         </View>
       </ScrollView>
 
-      <Modal visible={!!rescheduleBooking} transparent animationType="fade" onRequestClose={() => !rescheduleSubmitting && setRescheduleBooking(null)}>
+      <Modal visible={!!rescheduleBooking && !rescheduleChoiceOpen} transparent animationType="fade" onRequestClose={() => !rescheduleSubmitting && setRescheduleBooking(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{language === 'ar' ? 'إعادة جدولة الموعد' : 'Reschedule Booking'}</Text>
+            <Text style={styles.modalTitle}>{language === 'ar' ? 'اختر موعداً جديداً' : 'Choose New Slot'}</Text>
             <TextInput value={rescheduleDate} onChangeText={setRescheduleDate} placeholder="YYYY-MM-DD" autoCapitalize="none" style={styles.modalInput} />
-            <TextInput value={rescheduleTime} onChangeText={setRescheduleTime} placeholder="HH:MM" autoCapitalize="none" style={styles.modalInput} />
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => rescheduleBooking && loadRescheduleSlots(rescheduleBooking, rescheduleKeepProvider, rescheduleDate)}
+              disabled={rescheduleSlotsLoading}
+            >
+              <Text style={styles.secondaryBtnText}>{rescheduleSlotsLoading ? (language === 'ar' ? 'جارٍ التحميل...' : 'Loading...') : (language === 'ar' ? 'عرض المواعيد المتاحة' : 'Load Available Slots')}</Text>
+            </TouchableOpacity>
+            <View style={{ height: spacing.sm }} />
+            <View style={styles.reasonRow}>
+              {rescheduleSlots.map((slot) => {
+                const label = format(new Date(slot.startTime), 'h:mm a', { locale: language === 'ar' ? ar : enUS });
+                const selected = rescheduleSelectedSlot?.startTime === slot.startTime;
+                return (
+                  <TouchableOpacity key={slot.startTime} style={[styles.reasonChip, selected && styles.reasonChipActive]} onPress={() => setRescheduleSelectedSlot(slot)}>
+                    <Text style={[styles.reasonChipText, selected && styles.reasonChipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {!rescheduleSlotsLoading && rescheduleSlots.length === 0 && (
+                <Text style={styles.modalHint}>{language === 'ar' ? 'لا توجد مواعيد متاحة لهذا اليوم.' : 'No available slots for this date.'}</Text>
+              )}
+            </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setRescheduleBooking(null)} disabled={rescheduleSubmitting}>
                 <Text style={styles.modalCancelText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSave} onPress={submitReschedule} disabled={rescheduleSubmitting}>
-                <Text style={styles.modalSaveText}>{rescheduleSubmitting ? (language === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ' : 'Save')}</Text>
+              <TouchableOpacity style={styles.modalSave} onPress={submitReschedule} disabled={rescheduleSubmitting || !rescheduleSelectedSlot}>
+                <Text style={styles.modalSaveText}>{rescheduleSubmitting ? (language === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (language === 'ar' ? 'تأكيد' : 'Confirm')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!cancelBookingTarget} transparent animationType="fade" onRequestClose={() => !cancelSubmitting && setCancelBookingTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{language === 'ar' ? 'سبب الإلغاء' : 'Cancellation Reason'}</Text>
+            <View style={styles.reasonRow}>
+              {[
+                { id: 'time_conflict', en: 'Time conflict', ar: 'تعارض وقت' },
+                { id: 'changed_mind', en: 'Changed mind', ar: 'تغيير رأي' },
+                { id: 'provider_pref', en: 'Provider preference', ar: 'تفضيل مقدم الخدمة' },
+                { id: 'other', en: 'Other', ar: 'أخرى' },
+              ].map((r) => (
+                <TouchableOpacity key={r.id} style={[styles.reasonChip, cancelReasonCode === r.id && styles.reasonChipActive]} onPress={() => setCancelReasonCode(r.id)}>
+                  <Text style={[styles.reasonChipText, cancelReasonCode === r.id && styles.reasonChipTextActive]}>{language === 'ar' ? r.ar : r.en}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {cancelReasonCode === 'other' && (
+              <TextInput
+                value={cancelReasonText}
+                onChangeText={setCancelReasonText}
+                placeholder={language === 'ar' ? 'اكتب سبب الإلغاء' : 'Write cancellation reason'}
+                style={styles.modalInput}
+                multiline
+              />
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setCancelBookingTarget(null)} disabled={cancelSubmitting}>
+                <Text style={styles.modalCancelText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={handleCancelSubmit} disabled={cancelSubmitting}>
+                <Text style={styles.modalSaveText}>{cancelSubmitting ? (language === 'ar' ? 'جارٍ الإلغاء...' : 'Cancelling...') : (language === 'ar' ? 'تأكيد الإلغاء' : 'Confirm Cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={rescheduleChoiceOpen} transparent animationType="fade" onRequestClose={() => setRescheduleChoiceOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{language === 'ar' ? 'إعادة الجدولة' : 'Reschedule Options'}</Text>
+            <Text style={styles.modalHint}>{language === 'ar' ? 'اختر طريقة إعادة الجدولة لعرض المواعيد المتاحة الفعلية.' : 'Choose how to reschedule to view real available slots.'}</Text>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigateToRescheduleFlow(true)}>
+              <Text style={styles.secondaryBtnText}>{language === 'ar' ? 'نفس مقدم الخدمة' : 'Keep same provider'}</Text>
+            </TouchableOpacity>
+            <View style={{ height: spacing.sm }} />
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigateToRescheduleFlow(false)}>
+              <Text style={styles.secondaryBtnText}>{language === 'ar' ? 'تغيير مقدم الخدمة' : 'Change provider'}</Text>
+            </TouchableOpacity>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setRescheduleChoiceOpen(false)}>
+                <Text style={styles.modalCancelText}>{language === 'ar' ? 'إغلاق' : 'Close'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -486,6 +607,12 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.5)', justifyContent: 'center' },
   modalCard: { marginHorizontal: spacing.lg, borderRadius: borderRadius.md, backgroundColor: '#FFFFFF', padding: spacing.md },
   modalTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  modalHint: { color: colors.textSecondary, fontSize: 12, marginBottom: spacing.sm },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+  reasonChip: { borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF' },
+  reasonChipActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
+  reasonChipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  reasonChipTextActive: { color: colors.primary },
   modalInput: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginBottom: spacing.sm },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   modalCancel: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
