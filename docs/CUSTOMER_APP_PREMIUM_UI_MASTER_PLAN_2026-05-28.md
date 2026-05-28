@@ -108,7 +108,7 @@ Targets:
 - Phase 0: `100%`
 - Phase 1: `70%` (Home + Browse + BookingFlow premium shell upgraded)
 - Phase 2: `100%`
-- Phase 3: `50%` (CartScreen + PaymentScreen premium shell completed)
+- Phase 3: `75%` (CartScreen + PaymentScreen + PaymentSimulatorScreen premium shell completed)
 - Phase 4: `75%` (Bookings + Purchases + Notifications screens premium shell upgraded)
 - Phase 5: `0%`
 - Phase 6: `0%`
