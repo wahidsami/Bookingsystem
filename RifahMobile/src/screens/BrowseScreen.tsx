@@ -62,7 +62,7 @@ export function BrowseScreen({ route, navigation }: any) {
                 style={[styles.header, { paddingTop: spacing.xl + topInset }]}
             >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
+                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
                 </TouchableOpacity>
                 <View style={styles.headerTitleWrap}>
                     <Text style={styles.headerTitle}>{initialTitle || t('browseSalons')}</Text>
@@ -108,6 +108,7 @@ export function BrowseScreen({ route, navigation }: any) {
                             <TouchableOpacity
                                 style={styles.card}
                                 onPress={() => navigation.navigate('Tenant', { tenantId: item.id, slug: item.slug, tenant: item })}
+                                activeOpacity={0.92}
                             >
                                 {logoUrl ? (
                                     <Image source={{ uri: logoUrl }} style={styles.cardImage} />
@@ -118,11 +119,20 @@ export function BrowseScreen({ route, navigation }: any) {
                                 )}
 
                                 <View style={styles.cardContent}>
-                                    <Text style={styles.cardTitle}>{displayName}</Text>
-                                    <Text style={styles.cardMeta}>
-                                        {businessTypes.map((type) => type.replace(/_/g, ' ')).join(' • ')}
-                                    </Text>
-                                    <Text style={styles.cardMeta}>{item.city || ''}</Text>
+                                    <Text style={styles.cardTitle} numberOfLines={1}>{displayName}</Text>
+                                    {businessTypes.length > 0 ? (
+                                        <View style={styles.businessTypePill}>
+                                            <Text style={styles.businessTypePillText}>
+                                                {businessTypes.map((type) => type.replace(/_/g, ' ')).join(' • ')}
+                                            </Text>
+                                        </View>
+                                    ) : null}
+                                    <View style={styles.cardFooterRow}>
+                                        <Text style={styles.cardMeta} numberOfLines={1}>{item.city || (isRTL ? 'الموقع غير محدد' : 'Location not specified')}</Text>
+                                        <View style={styles.cardArrowCircle}>
+                                            <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={16} color={colors.primary} />
+                                        </View>
+                                    </View>
                                 </View>
                             </TouchableOpacity>
                         );
@@ -148,49 +158,56 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: spacing.md,
         paddingHorizontal: spacing.xl,
-        paddingBottom: spacing.lg,
+        paddingBottom: spacing.md,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
     },
     headerTitleWrap: {
         flex: 1,
     },
     backButton: {
-        padding: spacing.xs,
-    },
-    backButtonText: {
-        fontSize: fontSize.xl,
-        fontWeight: '700',
-        color: colors.text,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E9E2FA',
     },
     headerTitle: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
-        color: colors.text,
+        fontSize: 30,
+        fontWeight: '800',
+        color: '#15163E',
     },
     headerSubtitle: {
         marginTop: 2,
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#68708F',
     },
     searchContainer: {
-        padding: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.md,
     },
     searchInputWrap: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.sm,
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.lg,
+        borderColor: '#E8E1FA',
+        borderRadius: 18,
         paddingHorizontal: spacing.md,
+        shadowColor: '#1A1440',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        elevation: 1,
     },
     searchInput: {
         flex: 1,
         paddingVertical: spacing.md,
-        fontSize: fontSize.md,
+        fontSize: 16,
     },
     rtlInput: {
         textAlign: 'right',
@@ -205,16 +222,16 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.xl,
     },
     card: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#ECE7FA',
         marginBottom: spacing.md,
-        shadowColor: '#000000',
+        shadowColor: '#1B1540',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
         elevation: 2,
     },
     cardImage: {
@@ -233,16 +250,43 @@ const styles = StyleSheet.create({
     },
     cardContent: {
         padding: spacing.md,
-        gap: 4,
+        gap: 8,
     },
     cardTitle: {
-        fontSize: fontSize.lg,
+        fontSize: 23,
+        fontWeight: '800',
+        color: '#171742',
+    },
+    businessTypePill: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#F3EEFF',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    businessTypePillText: {
+        color: '#514972',
+        fontSize: 12,
         fontWeight: '700',
-        color: colors.text,
+    },
+    cardFooterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     cardMeta: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#66708F',
+        flex: 1,
+    },
+    cardArrowCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F2EDFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: spacing.sm,
     },
     centerState: {
         flex: 1,

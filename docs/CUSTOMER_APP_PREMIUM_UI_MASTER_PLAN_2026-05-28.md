@@ -106,7 +106,7 @@ Targets:
 
 ## Progress Tracker
 - Phase 0: `100%`
-- Phase 1: `25%` (Home shell + header hierarchy upgraded)
+- Phase 1: `45%` (Home + Browse premium shell upgraded)
 - Phase 2: `100%`
 - Phase 3: `0%`
 - Phase 4: `0%`
