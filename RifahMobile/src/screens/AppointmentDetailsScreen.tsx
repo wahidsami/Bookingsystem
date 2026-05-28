@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ImageBackground, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ImageBackground, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { Booking, SlotItem, bookingNeedsPayment, getBookingOutstandingAmount } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -11,6 +11,7 @@ import { ar, enUS } from 'date-fns/locale';
 import { api } from '../api/client';
 import { getImageUrl } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 type BookingGroup = {
   key: string;
@@ -124,6 +125,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
   const [rescheduleSlots, setRescheduleSlots] = useState<SlotItem[]>([]);
   const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState<SlotItem | null>(null);
   const [rescheduleError, setRescheduleError] = useState('');
+  const [reschedulePickerVisible, setReschedulePickerVisible] = useState(false);
   const [feedback, setFeedback] = useState<{ visible: boolean; title: string; message: string }>({
     visible: false,
     title: '',
@@ -279,6 +281,23 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     setRescheduleError('');
     setRescheduleBooking(booking);
     setRescheduleChoiceOpen(true);
+  };
+
+  const parseRescheduleDate = (value: string) => {
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return new Date();
+    return parsed;
+  };
+
+  const handleRescheduleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setReschedulePickerVisible(false);
+    }
+    if (event.type === 'dismissed' || !selectedDate) return;
+    const yyyy = selectedDate.getFullYear();
+    const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(selectedDate.getDate()).padStart(2, '0');
+    setRescheduleDate(`${yyyy}-${mm}-${dd}`);
   };
 
   const loadRescheduleSlots = async (booking: Booking, keepProvider: boolean, dateValue: string) => {
@@ -548,9 +567,22 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
       <Modal visible={!!rescheduleBooking && !rescheduleChoiceOpen} transparent animationType="fade" onRequestClose={() => !rescheduleSubmitting && setRescheduleBooking(null)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, styles.modalCardLarge]}>
+            <ScrollView contentContainerStyle={styles.modalScrollContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{language === 'ar' ? 'اختر موعداً جديداً' : 'Choose New Slot'}</Text>
-            <TextInput value={rescheduleDate} onChangeText={setRescheduleDate} placeholder="YYYY-MM-DD" autoCapitalize="none" style={styles.modalInput} />
+            <TouchableOpacity style={styles.modalDatePickerButton} onPress={() => setReschedulePickerVisible(true)} activeOpacity={0.9}>
+              <Text style={styles.modalDatePickerText}>{rescheduleDate || (language === 'ar' ? 'اختر التاريخ' : 'Pick a date')}</Text>
+              <AppIcon name="event" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            {reschedulePickerVisible && (
+              <DateTimePicker
+                value={parseRescheduleDate(rescheduleDate)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleRescheduleDateChange}
+                minimumDate={new Date()}
+              />
+            )}
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={() => rescheduleBooking && loadRescheduleSlots(rescheduleBooking, rescheduleKeepProvider, rescheduleDate)}
@@ -582,6 +614,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 <Text style={styles.modalSaveText}>{rescheduleSubmitting ? (language === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (language === 'ar' ? 'تأكيد' : 'Confirm')}</Text>
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -626,7 +659,8 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
       <Modal visible={rescheduleChoiceOpen} transparent animationType="fade" onRequestClose={() => setRescheduleChoiceOpen(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, styles.modalCardLarge]}>
+            <ScrollView contentContainerStyle={styles.modalScrollContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{language === 'ar' ? 'إعادة الجدولة' : 'Reschedule Options'}</Text>
             <Text style={styles.modalHint}>{language === 'ar' ? 'اختر طريقة إعادة الجدولة لعرض المواعيد المتاحة الفعلية.' : 'Choose how to reschedule to view real available slots.'}</Text>
             <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigateToRescheduleFlow(true)}>
@@ -641,6 +675,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 <Text style={styles.modalCancelText}>{language === 'ar' ? 'إغلاق' : 'Close'}</Text>
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -677,50 +712,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
   },
-  heroTitle: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },
-  heroSubTitle: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.9)' },
+  heroTitle: { fontSize: 32, fontWeight: '800', color: '#FFFFFF' },
+  heroSubTitle: { fontSize: 12, color: 'rgba(255,255,255,0.9)' },
   contentWrap: { paddingHorizontal: spacing.md, marginTop: -38, gap: spacing.md },
   summaryCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
-  label: { color: colors.textSecondary, fontSize: 12 },
-  bookingNumber: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 4 },
+  label: { color: colors.textSecondary, fontSize: 10 },
+  bookingNumber: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 4 },
   pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm, marginBottom: spacing.sm },
   pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   statusPill: { backgroundColor: '#E7F6ED' },
-  statusPillText: { color: '#1D7E49', fontSize: 12, fontWeight: '700' },
+  statusPillText: { color: '#1D7E49', fontSize: 10, fontWeight: '700' },
   paymentPill: { backgroundColor: '#EFE7FF' },
-  paymentPillText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  metaText: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+  paymentPillText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  metaText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   metricsGrid: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', flexWrap: 'wrap' },
   metricCell: { width: '50%', paddingVertical: spacing.sm, paddingRight: spacing.sm, minHeight: 56, justifyContent: 'center' },
-  metricLabel: { fontSize: 12, color: colors.textSecondary },
-  metricValue: { marginTop: 3, fontSize: 15, fontWeight: '800', color: colors.text },
-  metricValueSmall: { marginTop: 3, fontSize: 13, fontWeight: '700', color: colors.text },
-  sectionTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.xs },
+  metricLabel: { fontSize: 10, color: colors.textSecondary },
+  metricValue: { marginTop: 3, fontSize: 13, fontWeight: '800', color: colors.text },
+  metricValueSmall: { marginTop: 3, fontSize: 11, fontWeight: '700', color: colors.text },
+  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.xs },
   guestCard: { borderRadius: 20, backgroundColor: '#F4EEFF', borderWidth: 1, borderColor: '#E6DAFD', padding: spacing.md, marginBottom: spacing.md },
-  guestName: { fontSize: 16, color: colors.text, fontWeight: '700' },
-  guestPhone: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  guestName: { fontSize: 14, color: colors.text, fontWeight: '700' },
+  guestPhone: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
   paymentSummaryCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
-  paymentLabel: { color: colors.textSecondary, fontSize: 13 },
-  paymentValue: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  paymentDueLabel: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  paymentDueValue: { color: colors.primary, fontSize: 16, fontWeight: '800' },
-  paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 12 },
+  paymentLabel: { color: colors.textSecondary, fontSize: 11 },
+  paymentValue: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  paymentDueLabel: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  paymentDueValue: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 10 },
   timelineCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
   timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: '#F2ECFC' },
   timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
   timelineDotPrimary: { backgroundColor: colors.primary },
   timelineDotDanger: { backgroundColor: colors.error },
   timelineBody: { flex: 1 },
-  timelineTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  timelineSub: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  timelineTime: { color: '#7B7F98', fontSize: 11, marginTop: 2 },
+  timelineTitle: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  timelineSub: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
+  timelineTime: { color: '#7B7F98', fontSize: 9, marginTop: 2 },
   serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
-  serviceIndex: { fontSize: 12, color: colors.primary, fontWeight: '700' },
-  serviceName: { marginTop: 2, fontSize: 18, fontWeight: '800', color: colors.text },
-  serviceVariant: { marginTop: 2, fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
-  rowText: { marginTop: 3, fontSize: 13, color: '#4B5072', flexShrink: 1 },
-  priceText: { marginTop: spacing.sm, fontSize: 18, color: colors.primary, fontWeight: '800' },
+  serviceIndex: { fontSize: 10, color: colors.primary, fontWeight: '700' },
+  serviceName: { marginTop: 2, fontSize: 16, fontWeight: '800', color: colors.text },
+  serviceVariant: { marginTop: 2, fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
+  rowText: { marginTop: 3, fontSize: 11, color: '#4B5072', flexShrink: 1 },
+  priceText: { marginTop: spacing.sm, fontSize: 16, color: colors.primary, fontWeight: '800' },
   actionsWrap: { marginTop: spacing.sm, gap: spacing.sm },
   primaryBtn: { minHeight: 48, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   primaryBtnText: { color: '#FFFFFF', fontWeight: '700' },
@@ -734,19 +769,39 @@ const styles = StyleSheet.create({
   contactBtn: { minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#D7DAEA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   contactBtnText: { color: '#4B5072', fontWeight: '700' },
   policyNote: { marginBottom: spacing.md, borderRadius: 14, borderWidth: 1, borderColor: '#E8EAF4', backgroundColor: '#FFFFFF', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  policyText: { flex: 1, color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  policyText: { flex: 1, color: colors.textSecondary, fontSize: 10, lineHeight: 16 },
   emptyText: { color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.5)', justifyContent: 'center' },
   modalCard: { marginHorizontal: spacing.lg, borderRadius: borderRadius.md, backgroundColor: '#FFFFFF', padding: spacing.md },
-  modalTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
-  modalHint: { color: colors.textSecondary, fontSize: 12, marginBottom: spacing.sm },
+  modalCardLarge: { maxHeight: '72%' },
+  modalScrollContent: { paddingBottom: spacing.sm },
+  modalTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  modalHint: { color: colors.textSecondary, fontSize: 10, marginBottom: spacing.sm },
   reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   reasonChip: { borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF' },
   reasonChipActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
-  reasonChipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  reasonChipText: { color: colors.text, fontSize: 10, fontWeight: '600' },
   reasonChipTextActive: { color: colors.primary },
   modalInput: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginBottom: spacing.sm },
-  modalErrorText: { color: colors.error, fontSize: 12, marginBottom: spacing.sm, fontWeight: '600' },
+  modalDatePickerButton: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: '#E7DFFA',
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: '#FAFAFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalDatePickerText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalErrorText: { color: colors.error, fontSize: 10, marginBottom: spacing.sm, fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   modalCancel: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   modalCancelText: { color: colors.textSecondary, fontWeight: '600' },
