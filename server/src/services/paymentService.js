@@ -21,6 +21,7 @@ const {
     ensureAppointmentInvoice,
     syncOrderInvoiceStatus
 } = require('./customerInvoiceService');
+const { sendCustomerInvoiceLifecycleEmail } = require('./customerInvoiceEmailService');
 
 class PaymentService {
     async processWalletPayment(paymentData) {
@@ -35,16 +36,28 @@ class PaymentService {
         }
 
         if (orderId) {
-            return this.processProductWalletPayment({ platformUserId, orderId, amount });
+            const result = await this.processProductWalletPayment({ platformUserId, orderId, amount });
+            if (result?.invoiceId) {
+                sendCustomerInvoiceLifecycleEmail(result.invoiceId).catch((error) => {
+                    console.warn('Wallet order invoice email warning:', error.message);
+                });
+            }
+            return result;
         }
 
-        return this.processAppointmentWalletPayment({
+        const result = await this.processAppointmentWalletPayment({
             platformUserId,
             appointmentId,
             amount,
             tenantId,
             paymentChoice
         });
+        if (result?.invoiceId) {
+            sendCustomerInvoiceLifecycleEmail(result.invoiceId).catch((error) => {
+                console.warn('Wallet appointment invoice email warning:', error.message);
+            });
+        }
+        return result;
     }
 
     async processAppointmentWalletPayment({ platformUserId, appointmentId, amount, tenantId, paymentChoice }) {
@@ -178,12 +191,12 @@ class PaymentService {
                 }
             }
 
-            await ensureAppointmentInvoice(appointment.id, {
+            const appointmentInvoice = await ensureAppointmentInvoice(appointment.id, {
                 transaction,
                 triggerSource: 'customer_wallet_payment'
             });
 
-            return { transaction: tx, paymentMethodId: null };
+            return { transaction: tx, paymentMethodId: null, invoiceId: appointmentInvoice?.id || null };
         });
     }
 
@@ -249,12 +262,12 @@ class PaymentService {
                 });
             }
 
-            await syncOrderInvoiceStatus(order.id, {
+            const orderInvoice = await syncOrderInvoiceStatus(order.id, {
                 transaction,
                 triggerSource: 'customer_wallet_payment'
             });
 
-            return { transaction: tx, paymentMethodId: null, order };
+            return { transaction: tx, paymentMethodId: null, order, invoiceId: orderInvoice?.id || null };
         });
     }
 
@@ -559,9 +572,15 @@ class PaymentService {
             }
         }
 
-        await ensureAppointmentInvoice(appointment.id, {
+        const appointmentInvoice = await ensureAppointmentInvoice(appointment.id, {
             triggerSource: 'customer_card_payment'
         });
+
+        if (appointmentInvoice?.id) {
+            sendCustomerInvoiceLifecycleEmail(appointmentInvoice.id).catch((error) => {
+                console.warn('Card appointment invoice email warning:', error.message);
+            });
+        }
 
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'booking';
@@ -737,9 +756,15 @@ class PaymentService {
             paidAt: new Date()
         });
 
-        await syncOrderInvoiceStatus(order.id, {
+        const orderInvoice = await syncOrderInvoiceStatus(order.id, {
             triggerSource: 'customer_card_payment'
         });
+
+        if (orderInvoice?.id) {
+            sendCustomerInvoiceLifecycleEmail(orderInvoice.id).catch((error) => {
+                console.warn('Card order invoice email warning:', error.message);
+            });
+        }
 
         if (!wasPaid) {
             await db.PlatformUser.increment('totalSpent', {

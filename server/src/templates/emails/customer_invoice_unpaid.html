@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Invoice</title></head>
+<body style="font-family:Arial,sans-serif;background:#f7f5ff;padding:24px;">
+  <div style="max-width:680px;margin:0 auto;background:#fff;border-radius:14px;padding:24px;">
+    <h2 style="margin:0 0 12px;color:#4a2bbf;">Invoice Issued</h2>
+    <p>Hello {{customerName}},</p>
+    <p>Your invoice has been created at <strong>{{tenantName}}</strong>.</p>
+    <p><strong>Invoice #:</strong> {{invoiceNumber}}</p>
+    <p><strong>Status:</strong> {{invoiceStatus}}</p>
+    <p><strong>Issued at:</strong> {{issuedAtText}}</p>
+    <hr style="border:none;border-top:1px solid #ece7ff;margin:14px 0;">
+    <p><strong>Subtotal:</strong> {{subtotalAmountText}}</p>
+    <p><strong>VAT:</strong> {{vatAmountText}}</p>
+    <p><strong>Total:</strong> {{totalAmountText}}</p>
+    <p><strong>Paid:</strong> {{paidAmountText}}</p>
+    <p><strong>Due:</strong> {{dueAmountText}}</p>
+    <p style="margin-top:18px;">You can complete payment from your Refah flow or at center based on selected payment option.</p>
+  </div>
+</body>
+</html>

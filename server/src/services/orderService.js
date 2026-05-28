@@ -14,6 +14,7 @@ const {
     ensureOrderInvoice,
     syncOrderInvoiceStatus
 } = require('./customerInvoiceService');
+const { sendCustomerInvoiceLifecycleEmail } = require('./customerInvoiceEmailService');
 
 class OrderService {
     _calculateShippingFee(deliveryType, shippingFee = null, deliveryMethod = 'standard') {
@@ -220,6 +221,17 @@ class OrderService {
                 console.warn('Order creation notification warning:', notificationError.message);
             }
 
+            try {
+                const invoice = await db.CustomerInvoice.findOne({
+                    where: { entityType: 'order', entityId: order.id }
+                });
+                if (invoice) {
+                    await sendCustomerInvoiceLifecycleEmail(invoice.id);
+                }
+            } catch (invoiceMailError) {
+                console.warn('Order invoice email warning:', invoiceMailError.message);
+            }
+
             return fullOrder || order;
 
         } catch (error) {
@@ -359,6 +371,19 @@ class OrderService {
                 });
             } catch (notificationError) {
                 console.warn('Order payment notification warning:', notificationError.message);
+            }
+
+            if (previousPaymentStatus !== paymentStatus) {
+                try {
+                    const invoice = await db.CustomerInvoice.findOne({
+                        where: { entityType: 'order', entityId: order.id }
+                    });
+                    if (invoice) {
+                        await sendCustomerInvoiceLifecycleEmail(invoice.id);
+                    }
+                } catch (invoiceMailError) {
+                    console.warn('Order invoice lifecycle email warning:', invoiceMailError.message);
+                }
             }
 
             return order;
