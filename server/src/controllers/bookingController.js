@@ -34,9 +34,16 @@ const normalizeBookingItemPaymentMethod = (value) => {
 };
 
 const RESCHEDULE_AUDIT_MARKER = '[RESCHEDULE_AUDIT]';
+const CANCELLATION_AUDIT_MARKER = '[CANCELLATION_AUDIT]';
 
 const appendRescheduleAuditToNotes = (notes, payload) => {
     const serialized = `${RESCHEDULE_AUDIT_MARKER} ${JSON.stringify(payload)}`;
+    const base = `${notes || ''}`.trim();
+    return base ? `${base}\n${serialized}` : serialized;
+};
+
+const appendCancellationAuditToNotes = (notes, payload) => {
+    const serialized = `${CANCELLATION_AUDIT_MARKER} ${JSON.stringify(payload)}`;
     const base = `${notes || ''}`.trim();
     return base ? `${base}\n${serialized}` : serialized;
 };
@@ -407,8 +414,24 @@ const cancelBooking = async (req, res) => {
     try {
         const { id } = req.params;
         const platformUserId = req.userId; // From auth middleware
+        const { reasonCode, reasonText } = req.body || {};
 
-        const appointment = await bookingService.cancelAppointment(id, platformUserId);
+        const normalizedReasonCode = typeof reasonCode === 'string' ? reasonCode.trim().toLowerCase() : '';
+        const normalizedReasonText = typeof reasonText === 'string' ? reasonText.trim() : '';
+        const cancellationAudit = (normalizedReasonCode || normalizedReasonText)
+            ? {
+                reasonCode: normalizedReasonCode || null,
+                reasonText: normalizedReasonText || null,
+                source: 'customer_app',
+                at: new Date().toISOString()
+            }
+            : null;
+
+        const appointment = await bookingService.cancelAppointment(id, platformUserId, cancellationAudit
+            ? {
+                noteTransform: (existingNotes) => appendCancellationAuditToNotes(existingNotes, cancellationAudit)
+            }
+            : undefined);
 
         res.json({
             success: true,

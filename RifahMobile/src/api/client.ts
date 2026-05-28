@@ -1384,9 +1384,16 @@ class ApiClient {
     /**
      * Cancel a booking
      */
-    async cancelBooking(id: string): Promise<boolean> {
+    async cancelBooking(
+        id: string,
+        payload?: {
+            reasonCode?: string;
+            reasonText?: string;
+        }
+    ): Promise<boolean> {
         const response = await this.patch<{ success: boolean; message: string }>(
-            `/bookings/${id}/cancel`
+            `/bookings/${id}/cancel`,
+            payload
         );
         return response.success;
     }

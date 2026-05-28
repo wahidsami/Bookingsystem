@@ -975,7 +975,7 @@ class BookingService {
         }
     }
 
-    async cancelAppointment(appointmentId, platformUserId = null) {
+    async cancelAppointment(appointmentId, platformUserId = null, options = {}) {
         const appointment = await db.Appointment.findByPk(appointmentId, {
             include: [
                 { model: db.Service, as: 'service', required: false },
@@ -997,7 +997,12 @@ class BookingService {
             throw new Error('Appointment already cancelled');
         }
 
-        await appointment.update({ status: 'cancelled' });
+        const noteTransform = typeof options.noteTransform === 'function' ? options.noteTransform : null;
+        const nextNotes = noteTransform ? noteTransform(appointment.notes) : appointment.notes;
+        await appointment.update({
+            status: 'cancelled',
+            notes: nextNotes
+        });
 
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';

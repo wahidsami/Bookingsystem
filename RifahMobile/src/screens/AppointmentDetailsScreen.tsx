@@ -172,7 +172,10 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     }
     try {
       setCancelSubmitting(true);
-      await api.cancelBooking(cancelBookingTarget.id);
+      await api.cancelBooking(cancelBookingTarget.id, {
+        reasonCode: cancelReasonCode || undefined,
+        reasonText: cancelReasonText.trim() || undefined,
+      });
       setCancelBookingTarget(null);
       setCancelReasonText('');
       Alert.alert(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تم إلغاء الموعد.' : 'Booking cancelled.');

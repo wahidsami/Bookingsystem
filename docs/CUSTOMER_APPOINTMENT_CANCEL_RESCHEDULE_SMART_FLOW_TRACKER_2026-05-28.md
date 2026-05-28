@@ -48,7 +48,7 @@ Upgrade appointment actions in customer app to:
 ## Phase C — Backend Metadata Extension (Optional but Recommended)
 - Extend cancel endpoint payload with reason code/text.
 - Persist cancellation reason for tenant/admin visibility.
-- Status: `pending`
+- Status: `completed`
 
 ## Phase D — QA and Edge Cases
 - Validate no overflows in EN/AR.
@@ -61,3 +61,4 @@ Upgrade appointment actions in customer app to:
 - 2026-05-28: Implemented premium cancel reason popup in `AppointmentDetailsScreen`.
 - 2026-05-28: Implemented premium reschedule options popup and start of routing into booking flow.
 - 2026-05-28: Replaced free-text reschedule with real slot picker based on `/bookings/search` and confirmed via `rescheduleBooking`.
+- 2026-05-28: Added cancellation reason payload support (`reasonCode`, `reasonText`) from mobile API to backend and persisted reason metadata in appointment notes via structured `[CANCELLATION_AUDIT]` marker for tenant/admin traceability.
