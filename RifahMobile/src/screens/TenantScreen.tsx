@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking, Modal } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking, Modal, Animated, Easing } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -51,11 +51,19 @@ type TenantGiftPackage = {
 };
 
 const { width } = Dimensions.get('window');
+const TENANT_PAGE_UI = {
+    minBottomSafePadding: 120,
+    fallbackCoverImage: 'https://images.unsplash.com/photo-1560066984-12186d305d4d?q=80&w=2574&auto=format&fit=crop',
+};
 
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const { tenantId, slug, selectedServiceId } = route.params; // Expect tenantId or slug from navigation
     const { t, isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const effectiveBottomPadding = useMemo(
+        () => Math.max(scrollBottomPadding, TENANT_PAGE_UI.minBottomSafePadding),
+        [scrollBottomPadding]
+    );
 
     const [tenant, setTenant] = useState<Tenant | null>(null);
     const [pageData, setPageData] = useState<any>(null);
@@ -85,12 +93,22 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [providerReviews, setProviderReviews] = useState<StaffReview[]>([]);
     const [providerReviewsLoading, setProviderReviewsLoading] = useState(false);
     const [providerReviewsSummary, setProviderReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
+    const pageEnterAnim = useMemo(() => new Animated.Value(0), []);
     const { itemCount, addToCart, clearCart } = useCart();
     const { itemCount: serviceBookingItemCount } = useServiceBookingCart();
 
     useEffect(() => {
         loadTenantDetails();
     }, [tenantId, slug]);
+
+    useEffect(() => {
+        Animated.timing(pageEnterAnim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [pageEnterAnim]);
 
     useEffect(() => {
         loadReviewEligibility();
@@ -111,7 +129,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     useEffect(() => {
         const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
         if (showServicesTab) availableTabs.push('services');
-        if (showProductsTab) availableTabs.push('products');
         if (showGiftsTab) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
         if (showAboutTab) availableTabs.push('about');
@@ -312,6 +329,24 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             Alert.alert('Error', 'Unable to open this link right now.');
         }
     };
+
+    const getTenantCoverUri = () =>
+        getImageUrl(tenant?.coverImage || tenant?.logo) || TENANT_PAGE_UI.fallbackCoverImage;
+    const getTenantLogoUri = () =>
+        getImageUrl(tenant?.logo || tenant?.coverImage) || TENANT_PAGE_UI.fallbackCoverImage;
+
+    const renderEmptyState = (message: string) => (
+        <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>{message}</Text>
+        </View>
+    );
+
+    const renderLoadingBlock = (message?: string) => (
+        <View style={styles.emptyState}>
+            <ActivityIndicator color={colors.primary} />
+            {message ? <Text style={styles.emptyText}>{message}</Text> : null}
+        </View>
+    );
 
     const handleShareTenant = async () => {
         if (!tenant) {
@@ -580,62 +615,119 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderHero = () => {
         if (!tenant) return null;
 
-        const coverImage = getImageUrl(tenant.coverImage || tenant.logo) || 'https://images.unsplash.com/photo-1560066984-12186d305d4d?q=80&w=2574&auto=format&fit=crop';
+        const coverImage = getTenantCoverUri();
+        const logoImage = getTenantLogoUri();
+        const locationLabel = [tenant.city, tenant.country].filter(Boolean).join(', ');
+        const ratingValue = reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : null;
+        const businessLabel = getBusinessTypeLabel();
+        const heroChips = [
+            {
+                key: 'status',
+                icon: tenant.isAvailable ? 'check' : 'close',
+                label: tenant.isAvailable
+                    ? (isRTL ? 'مفتوح الآن' : 'Open now')
+                    : (isRTL ? 'مغلق الآن' : 'Closed now'),
+                isStatus: true
+            },
+            businessLabel ? { key: 'business', icon: 'sparkles', label: businessLabel, isStatus: false } : null,
+            { key: 'care', icon: 'star', label: isRTL ? 'عناية مميزة' : 'Premium care', isStatus: false },
+        ].filter(Boolean).slice(0, 3) as Array<{ key: string; icon: any; label: string; isStatus: boolean }>;
 
         return (
             <View style={styles.heroContainer}>
                 <ImageBackground source={{ uri: coverImage }} style={styles.heroImage} resizeMode="cover">
                     <LinearGradient
-                        colors={['transparent', 'rgba(0, 0, 0, 0.8)']}
+                        colors={['rgba(17, 24, 39, 0.12)', 'rgba(17, 24, 39, 0.48)']}
                         style={styles.heroGradient}
                     >
-                        <View style={styles.heroContent}>
-                            <View style={[styles.heroHeader, { marginTop: topInset }]}>
-                                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color="white" />
+                        <View style={[styles.heroHeaderRow, { marginTop: topInset }]}>
+                            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                                <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={22} color={colors.text} />
+                            </TouchableOpacity>
+                            <View style={styles.heroActions}>
+                                <TouchableOpacity style={styles.iconButton} onPress={handleShareTenant}>
+                                    <AppIcon name="share" size={20} color={colors.text} />
                                 </TouchableOpacity>
-                                <View style={styles.heroActions}>
-                                    <TouchableOpacity style={styles.iconButton} onPress={handleShareTenant}>
-                                        <AppIcon name="share" size={24} color="white" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.iconButton}
-                                        onPress={() => navigation.navigate('ServiceBookingCart')}
-                                    >
-                                        <AppIcon name="bookings" size={24} color="white" />
-                                        {serviceBookingItemCount > 0 && (
-                                            <View style={styles.badgeContainer}>
-                                                <Text style={styles.badgeText}>{serviceBookingItemCount}</Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Cart', { tenant })}>
-                                        <AppIcon name="cart" size={24} color="white" />
-                                        {itemCount > 0 && (
-                                            <View style={styles.badgeContainer}>
-                                                <Text style={styles.badgeText}>{itemCount}</Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <View style={styles.heroInfo}>
-                                <Text style={styles.heroTitle}>{tenant.name}</Text>
-                                <Text style={styles.heroSubtitle}>
-                                    {[getBusinessTypeLabel(), tenant.city].filter(Boolean).join(' • ') || tenant.slug}
-                                </Text>
-
-                                <View style={styles.openStatus}>
-                                    <View style={[styles.statusDot, { backgroundColor: tenant.isAvailable ? colors.success : colors.error }]} />
-                                    <Text style={[styles.statusText, { color: tenant.isAvailable ? colors.success : colors.error }]}>
-                                        {tenant.isAvailable ? t('available') : t('closed')}
-                                    </Text>
-                                </View>
+                                <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Cart', { tenant })}>
+                                    <AppIcon name="cart" size={20} color={colors.text} />
+                                    {itemCount > 0 && (
+                                        <View style={styles.badgeContainer}>
+                                            <Text style={styles.badgeText}>{itemCount}</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.iconButton}
+                                    onPress={() => navigation.navigate('ServiceBookingCart')}
+                                >
+                                    <AppIcon name="bookings" size={20} color={colors.text} />
+                                    {serviceBookingItemCount > 0 && (
+                                        <View style={styles.badgeContainer}>
+                                            <Text style={styles.badgeText}>{serviceBookingItemCount}</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </LinearGradient>
                 </ImageBackground>
+
+                <View style={styles.heroInfoCardWrap}>
+                    <View style={styles.tenantLogoWrap}>
+                        <Image source={{ uri: logoImage }} style={styles.tenantLogoImage} />
+                    </View>
+                    <View style={styles.heroInfoCard}>
+                        <Text style={styles.heroTitle} numberOfLines={1}>{tenant.name}</Text>
+                        <Text style={styles.heroSubtitle} numberOfLines={2}>
+                            {getLocalizedText(tenant.description_en || null, tenant.description_ar || tenant.descriptionAr || null, '')}
+                        </Text>
+
+                        <View style={styles.heroMetaRow}>
+                            {ratingValue ? (
+                                <View style={styles.heroMetaItem}>
+                                    <AppIcon name="star" size={14} color="#F59E0B" />
+                                    <Text style={styles.heroMetaText}>
+                                        {ratingValue} {reviewsSummary.total > 0 ? `(${reviewsSummary.total})` : ''}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {locationLabel ? (
+                                <View style={styles.heroMetaItem}>
+                                    <AppIcon name="location" size={14} color={colors.primary} />
+                                    <Text style={styles.heroMetaText} numberOfLines={1}>{locationLabel}</Text>
+                                </View>
+                            ) : null}
+                        </View>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.heroChipsRow}
+                        >
+                            {heroChips.map((chip) => (
+                                <View
+                                    key={chip.key}
+                                    style={[
+                                        styles.heroChip,
+                                        chip.isStatus ? styles.heroChipStatus : styles.heroChipDefault,
+                                    ]}
+                                >
+                                    <AppIcon
+                                        name={chip.icon}
+                                        size={13}
+                                        color={chip.isStatus ? colors.success : colors.primary}
+                                    />
+                                    <Text style={[
+                                        styles.heroChipText,
+                                        chip.isStatus ? styles.heroChipStatusText : styles.heroChipDefaultText,
+                                    ]}>
+                                        {chip.label}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
             </View>
         );
     };
@@ -643,7 +735,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderTabs = () => {
         const availableTabs: string[] = [];
         if (showServicesTab) availableTabs.push('services');
-        if (showProductsTab) availableTabs.push('products');
         if (showGiftsTab) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
         if (showAboutTab) availableTabs.push('about');
@@ -660,12 +751,13 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     {availableTabs.map(tab => (
                         <TouchableOpacity
                             key={tab}
-                            style={[styles.tab, activeTab === tab && styles.activeTab]}
+                            style={styles.tab}
                             onPress={() => setActiveTab(tab as any)}
                         >
                             <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
                                 {t(tab as any) || tab.charAt(0).toUpperCase() + tab.slice(1)}
                             </Text>
+                            {activeTab === tab ? <View style={styles.activeTabIndicator} /> : null}
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
@@ -676,9 +768,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderGifts = () => (
         <View style={styles.contentSection}>
             {giftPackages.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>{isRTL ? 'لا توجد بطاقات هدايا حالياً.' : 'No gift cards available right now.'}</Text>
-                </View>
+                renderEmptyState(isRTL ? 'لا توجد بطاقات هدايا حالياً.' : 'No gift cards available right now.')
             ) : (
                 giftPackages.map((pkg) => {
                     const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
@@ -739,6 +829,22 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
         return (
             <View style={styles.contentSection}>
+                <View style={styles.servicesHeaderRow}>
+                    <View style={styles.servicesHeaderCopy}>
+                        <Text style={styles.servicesHeaderTitle}>{isRTL ? 'خدماتنا' : 'Our Services'}</Text>
+                        <Text style={styles.servicesHeaderSubtitle}>
+                            {isRTL ? 'اختر من خدماتنا المميزة' : 'Choose from our premium services'}
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.servicesFilterButton}
+                        onPress={() => Alert.alert(isRTL ? 'قريباً' : 'Coming soon', isRTL ? 'التصفية ستكون متاحة قريباً.' : 'Service filtering will be available soon.')}
+                    >
+                        <AppIcon name="settings" size={16} color={colors.primary} />
+                        <Text style={styles.servicesFilterButtonText}>{isRTL ? 'تصفية' : 'Filter'}</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {serviceBookingItemCount > 0 && (
                     <View style={styles.serviceBookingBanner}>
                         <View style={styles.serviceBookingBannerLeft}>
@@ -766,60 +872,63 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     </View>
                 )}
                 {services.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>No services available yet.</Text>
-                    </View>
+                    renderEmptyState('No services available yet.')
                 ) : (
                     categories.map(category => (
                         <View key={category} style={styles.categorySection}>
                             <Text style={styles.categoryTitle}>{category}</Text>
-                            {services.filter(s => (s.category || 'General') === category).map(service => (
-                                <View key={service.id} style={styles.serviceCard}>
+                            {services.filter(s => (s.category || 'General') === category).map(service => {
+                                const serviceName = isRTL ? service.name_ar : service.name_en;
+                                const serviceDesc = getServiceDescription(service);
+                                return (
                                     <TouchableOpacity
-                                        style={styles.serviceMainAction}
+                                        key={service.id}
+                                        style={styles.serviceCard}
                                         onPress={() => openServiceDetails(service)}
-                                        activeOpacity={0.85}
+                                        activeOpacity={0.92}
                                     >
-                                    <View style={[styles.serviceContentRow, isRTL ? { flexDirection: 'row-reverse' } : null]}>
-                                        {(service as any).image ? (
-                                            <Image
-                                                source={{ uri: getImageUrl((service as any).image) }}
-                                                style={styles.serviceThumbnail}
-                                            />
-                                        ) : (
-                                            <LinearGradient
-                                                colors={['#8B5CF6', '#A78BFA']}
-                                                start={{ x: 0, y: 0 }}
-                                                end={{ x: 1, y: 1 }}
-                                                style={styles.serviceThumbnailFallback}
-                                            >
-                                                <Text style={styles.serviceThumbnailFallbackText}>
-                                                    {((isRTL ? service.name_ar : service.name_en) || 'S').charAt(0).toUpperCase()}
+                                        <View style={[styles.serviceContentRow, isRTL ? { flexDirection: 'row-reverse' } : null]}>
+                                            {(service as any).image ? (
+                                                <Image
+                                                    source={{ uri: getImageUrl((service as any).image) }}
+                                                    style={styles.serviceThumbnail}
+                                                />
+                                            ) : (
+                                                <LinearGradient
+                                                    colors={['#8B5CF6', '#A78BFA']}
+                                                    start={{ x: 0, y: 0 }}
+                                                    end={{ x: 1, y: 1 }}
+                                                    style={styles.serviceThumbnailFallback}
+                                                >
+                                                    <Text style={styles.serviceThumbnailFallbackText}>
+                                                        {(serviceName || 'S').charAt(0).toUpperCase()}
+                                                    </Text>
+                                                </LinearGradient>
+                                            )}
+                                            <View style={styles.serviceInfo}>
+                                                <Text style={styles.serviceName} numberOfLines={1}>
+                                                    {serviceName}
                                                 </Text>
-                                            </LinearGradient>
-                                        )}
-                                        <View style={styles.serviceInfo}>
-                                            <Text style={styles.serviceName} numberOfLines={2}>
-                                                {isRTL ? service.name_ar : service.name_en}
-                                            </Text>
-                                            <View style={styles.serviceCardMetaRow}>
-                                                <View style={styles.serviceCardMetaPill}>
-                                                    <AppIcon name="clock" size={12} color={colors.textSecondary} />
-                                                    <Text style={styles.serviceDuration}>{service.duration} mins</Text>
+                                                {serviceDesc ? (
+                                                    <Text style={styles.serviceDescription} numberOfLines={2}>
+                                                        {serviceDesc}
+                                                    </Text>
+                                                ) : null}
+                                                <View style={styles.serviceCardMetaRow}>
+                                                    <View style={styles.serviceCardMetaPill}>
+                                                        <AppIcon name="clock" size={12} color={colors.textSecondary} />
+                                                        <Text style={styles.serviceDuration}>{service.duration} {isRTL ? 'دقيقة' : 'min'}</Text>
+                                                    </View>
+                                                    <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
                                                 </View>
-                                                <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
+                                            </View>
+                                            <View style={styles.serviceArrowButton}>
+                                                <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={18} color={colors.primary} />
                                             </View>
                                         </View>
-                                    </View>
                                     </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.addButton, isRTL ? { marginRight: spacing.md, marginLeft: 0 } : null]}
-                                        onPress={() => handleBookService(service)}
-                                    >
-                                        <AppIcon name="plus" size={24} color={colors.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </View>
                     ))
                 )}
@@ -883,9 +992,9 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             </View>
 
             {reviewsLoading ? (
-                <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
+                renderLoadingBlock()
             ) : reviews.length === 0 ? (
-                <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
+                renderEmptyState(isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.')
             ) : (
                 reviews.map((review) => (
                     <View key={review.id} style={styles.reviewCard}>
@@ -1046,19 +1155,39 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         );
     }
 
+    const hasVisibleTabs = showServicesTab || showGiftsTab || showReviewsTab || showAboutTab;
+
     return (
         <View style={styles.container}>
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+                contentContainerStyle={{ paddingBottom: effectiveBottomPadding }}
+                stickyHeaderIndices={hasVisibleTabs ? [1] : undefined}
             >
                 {renderHero()}
                 {renderTabs()}
-                {activeTab === 'services' && renderServices()}
-                {activeTab === 'products' && renderProducts()}
-                {activeTab === 'gifts' && renderGifts()}
-                {activeTab === 'reviews' && renderReviews()}
-                {activeTab === 'about' && renderAbout()}
+                <Animated.View
+                    style={[
+                        styles.tabContentAnimated,
+                        {
+                            opacity: pageEnterAnim,
+                            transform: [
+                                {
+                                    translateY: pageEnterAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [12, 0],
+                                    }),
+                                },
+                            ],
+                        },
+                    ]}
+                >
+                    {activeTab === 'services' && renderServices()}
+                    {activeTab === 'products' && renderProducts()}
+                    {activeTab === 'gifts' && renderGifts()}
+                    {activeTab === 'reviews' && renderReviews()}
+                    {activeTab === 'about' && renderAbout()}
+                </Animated.View>
             </ScrollView>
 
             <Modal
@@ -1315,91 +1444,154 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     heroContainer: {
-        height: 300,
-        width: '100%',
+        marginBottom: spacing.lg,
     },
     heroImage: {
         width: '100%',
-        height: '100%',
+        height: 260,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
+        overflow: 'hidden',
     },
     heroGradient: {
         flex: 1,
-        justifyContent: 'space-between',
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
     },
-    heroHeader: {
+    heroHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
     },
     backButton: {
-        width: 40,
-        height: 40,
-        backgroundColor: colors.overlayLight,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 4,
     },
     heroActions: {
         flexDirection: 'row',
         gap: spacing.sm,
     },
     iconButton: {
-        width: 40,
-        height: 40,
-        backgroundColor: colors.overlayLight,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 4,
     },
-    heroContent: {
-        flex: 1,
-        justifyContent: 'space-between',
-    },
-    heroInfo: {
-        marginBottom: spacing.md,
-    },
-    ratingBadge: {
-        flexDirection: 'row',
+    heroInfoCardWrap: {
+        marginTop: -44,
+        paddingHorizontal: spacing.md,
         alignItems: 'center',
-        backgroundColor: colors.overlay,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: 12,
-        alignSelf: 'flex-start',
-        marginBottom: spacing.xs,
-        gap: 4,
+        zIndex: 2,
     },
-    ratingText: {
-        color: 'white',
-        fontSize: fontSize.xs,
-        fontWeight: 'bold',
+    tenantLogoWrap: {
+        width: 96,
+        height: 96,
+        borderRadius: 28,
+        overflow: 'hidden',
+        borderWidth: 3,
+        borderColor: colors.surface,
+        backgroundColor: colors.surface,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    tenantLogoImage: {
+        width: '100%',
+        height: '100%',
+    },
+    heroInfoCard: {
+        width: '100%',
+        marginTop: -12,
+        borderRadius: 28,
+        backgroundColor: colors.surface,
+        paddingHorizontal: spacing.lg,
+        paddingTop: 20,
+        paddingBottom: spacing.md,
+        alignItems: 'center',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        elevation: 5,
     },
     heroTitle: {
-        color: 'white',
-        fontSize: fontSize.xxl,
-        fontWeight: 'bold',
-        marginBottom: 4,
+        color: colors.text,
+        fontSize: fontSize.xxxl,
+        fontWeight: '700',
+        marginBottom: 6,
+        textAlign: 'center',
     },
     heroSubtitle: {
-        color: 'rgba(255, 255, 255, 0.9)',
+        color: colors.textSecondary,
         fontSize: fontSize.sm,
+        textAlign: 'center',
+        marginBottom: spacing.sm,
+        lineHeight: 20,
+    },
+    heroMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        gap: spacing.md,
         marginBottom: spacing.sm,
     },
-    openStatus: {
+    heroMetaItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+        maxWidth: '90%',
     },
-    statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: colors.success, // Green for open
-    },
-    statusText: {
-        color: colors.success,
+    heroMetaText: {
+        color: colors.textSecondary,
         fontSize: fontSize.xs,
         fontWeight: '600',
+    },
+    heroChipsRow: {
+        gap: spacing.sm,
+        paddingHorizontal: 2,
+    },
+    heroChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+        gap: 6,
+    },
+    heroChipDefault: {
+        backgroundColor: '#F3E8FF',
+    },
+    heroChipStatus: {
+        backgroundColor: '#E8F8EE',
+    },
+    heroChipText: {
+        fontSize: fontSize.xs,
+        fontWeight: '700',
+    },
+    heroChipDefaultText: {
+        color: colors.primary,
+    },
+    heroChipStatusText: {
+        color: colors.success,
     },
     tabContainer: {
         backgroundColor: colors.surface,
@@ -1407,31 +1599,40 @@ const styles = StyleSheet.create({
         borderBottomColor: colors.border,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        elevation: 3,
     },
     tabScrollContent: {
-        gap: spacing.sm,
+        gap: spacing.md,
         paddingRight: spacing.sm,
     },
     tab: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.xs,
+        paddingVertical: 6,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
-    },
-    activeTab: {
-        borderColor: colors.primary,
-        backgroundColor: '#F3E8FF',
+        justifyContent: 'center',
     },
     tabText: {
-        fontSize: fontSize.sm,
+        fontSize: fontSize.md,
         color: colors.textSecondary,
         fontWeight: '600',
     },
     activeTabText: {
         color: colors.primary,
+        fontWeight: '700',
+    },
+    activeTabIndicator: {
+        marginTop: 8,
+        height: 3,
+        width: '100%',
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.primary,
+    },
+    tabContentAnimated: {
+        width: '100%',
     },
     contentSection: {
         padding: spacing.lg,
@@ -1458,16 +1659,21 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     reviewSummaryCard: {
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: borderRadius.lg,
+        borderRadius: 24,
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.lg,
         marginBottom: spacing.md,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     reviewSummaryMetric: {
         flex: 1,
@@ -1490,12 +1696,17 @@ const styles = StyleSheet.create({
         marginTop: spacing.xs,
     },
     reviewCard: {
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: borderRadius.lg,
+        borderRadius: 24,
         padding: spacing.md,
         marginBottom: spacing.sm,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     reviewHeader: {
         flexDirection: 'row',
@@ -1550,6 +1761,42 @@ const styles = StyleSheet.create({
     categorySection: {
         marginBottom: spacing.lg,
     },
+    servicesHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: spacing.md,
+        gap: spacing.sm,
+    },
+    servicesHeaderCopy: {
+        flex: 1,
+        gap: 4,
+    },
+    servicesHeaderTitle: {
+        fontSize: fontSize.xxl,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    servicesHeaderSubtitle: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+    },
+    servicesFilterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#D8B4FE',
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.surface,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 10,
+    },
+    servicesFilterButtonText: {
+        color: colors.primary,
+        fontWeight: '700',
+        fontSize: fontSize.sm,
+    },
     categoryTitle: {
         fontSize: fontSize.lg,
         fontWeight: '700',
@@ -1561,8 +1808,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: colors.surface,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
+        padding: 12,
+        borderRadius: 24,
         marginBottom: spacing.md,
         borderWidth: 1,
         borderColor: colors.border,
@@ -1587,19 +1834,19 @@ const styles = StyleSheet.create({
     },
     serviceContentRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
+        alignItems: 'stretch',
+        gap: spacing.md,
     },
     serviceThumbnail: {
-        width: 62,
-        height: 62,
-        borderRadius: borderRadius.md,
+        width: 120,
+        height: 120,
+        borderRadius: 20,
         backgroundColor: colors.backgroundGray,
     },
     serviceThumbnailFallback: {
-        width: 62,
-        height: 62,
-        borderRadius: borderRadius.md,
+        width: 120,
+        height: 120,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1612,17 +1859,22 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     serviceName: {
-        fontSize: fontSize.md,
-        fontWeight: '600',
+        fontSize: fontSize.xl,
+        fontWeight: '700',
         color: colors.text,
-        marginBottom: 4,
+        marginBottom: 6,
+    },
+    serviceDescription: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        lineHeight: 24,
     },
     serviceDuration: {
         fontSize: fontSize.xs,
         color: colors.textSecondary,
     },
     serviceCardMetaRow: {
-        marginTop: 6,
+        marginTop: spacing.sm,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -1638,9 +1890,18 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     servicePrice: {
-        fontSize: fontSize.sm,
+        fontSize: fontSize.lg,
         fontWeight: '700',
         color: colors.primary,
+    },
+    serviceArrowButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F3E8FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
     },
     addButton: {
         width: 32,
@@ -2058,7 +2319,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: borderRadius.lg,
+        borderRadius: 24,
         padding: spacing.md,
         marginBottom: spacing.md,
         shadowColor: '#000000',
@@ -2142,10 +2403,17 @@ const styles = StyleSheet.create({
         marginBottom: spacing.xs,
     },
     sectionBlock: {
-        marginBottom: spacing.xl,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        paddingBottom: spacing.lg,
+        marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 24,
+        backgroundColor: colors.surface,
+        padding: spacing.md,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
     },
     addressText: {
         fontSize: fontSize.md,
