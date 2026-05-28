@@ -3,6 +3,8 @@ const { Op } = require('sequelize');
 const userService = require('./userService');
 const notificationOrchestrator = require('./notificationOrchestratorService');
 const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const { ensureAppointmentInvoice } = require('./customerInvoiceService');
+const { sendCustomerInvoiceLifecycleEmail } = require('./customerInvoiceEmailService');
 const {
     getTenantPaymentSettings,
     assertServicePaymentMethodAllowed,
@@ -273,6 +275,11 @@ class BookingService {
                 totalPaid: 0
             }, { transaction: finalTransaction });
 
+            const invoice = await ensureAppointmentInvoice(appointment.id, {
+                transaction: finalTransaction,
+                triggerSource: 'booking_created'
+            });
+
             // ========== UPDATE RELATED RECORDS ==========
             // Update staff stats
             await db.Staff.increment('totalBookings', {
@@ -313,6 +320,12 @@ class BookingService {
 
             if (shouldCommit) {
                 try {
+                    if (invoice?.id) {
+                        sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
+                            console.warn('Booking created invoice email warning:', error.message);
+                        });
+                    }
+
                     const serviceName = service.name_en || service.name_ar || 'service';
                     const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
                     const appointmentDate = formatNotificationDate(start);
