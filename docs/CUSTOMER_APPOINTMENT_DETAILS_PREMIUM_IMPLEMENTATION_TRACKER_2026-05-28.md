@@ -66,7 +66,7 @@ Replace the current appointment details drawer/modal in customer app with a full
 - Payment summary block.
 - Action area: pay now, reschedule, cancel.
 - Optional contact center button as placeholder until target action is available.
-- Status: `pending`
+- Status: `completed`
 
 ## Phase 5 — Robustness and Polish
 - Empty/error/loading states.
@@ -97,3 +97,4 @@ Replace the current appointment details drawer/modal in customer app with a full
 - 2026-05-28: Removed legacy appointment details drawer from `BookingsScreen`.
 - 2026-05-28: Completed premium header/summary hero pass in `AppointmentDetails` with tenant image fallback to Refah gradient.
 - 2026-05-28: Completed metrics/services compact pass with overflow hardening in `AppointmentDetails`.
+- 2026-05-28: Completed guest/payment/actions pass including contact-center placeholder action.

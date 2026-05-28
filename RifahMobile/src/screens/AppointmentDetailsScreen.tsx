@@ -84,6 +84,14 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
   const representative = group?.items?.[0];
   const guest = useMemo(() => parseGroupGuestFromNotes(representative?.notes), [representative?.notes]);
+  const subtotalAmount = useMemo(
+    () => group?.items?.reduce((sum, item) => sum + Number(item.price || 0), 0) || 0,
+    [group?.items]
+  );
+  const paidAmount = useMemo(
+    () => Math.max(0, subtotalAmount - Number(group?.payableNowTotal || 0)),
+    [subtotalAmount, group?.payableNowTotal]
+  );
   const tenantHeroUri = useMemo(() => {
     if (!group?.tenant) return null;
     const candidate = (group.tenant as any).coverImage || (group.tenant as any).bannerImage || (group.tenant as any).image || (group.tenant as any).logo;
@@ -132,6 +140,20 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
       case 'partially_refunded': return 'Partially Refunded';
       default: return paymentStatus || '-';
     }
+  };
+
+  const getPaymentMethodLabel = (paymentMethod?: string | null) => {
+    const key = `${paymentMethod || ''}`.trim().toLowerCase();
+    if (language === 'ar') {
+      if (key === 'at-center') return 'الدفع عند المركز';
+      if (key === 'online-full') return 'الدفع عبر الإنترنت';
+      if (key === 'booking-fee') return 'عربون الحجز';
+      return paymentMethod || '-';
+    }
+    if (key === 'at-center') return 'Pay at center';
+    if (key === 'online-full') return 'Pay online';
+    if (key === 'booking-fee') return 'Booking fee';
+    return paymentMethod || '-';
   };
 
   const handleCancel = async (id: string) => {
@@ -243,6 +265,27 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             </View>
           ) : null}
 
+          <View style={styles.paymentSummaryCard}>
+            <Text style={styles.sectionTitle}>{language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}</Text>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentLabel}>{language === 'ar' ? 'الإجمالي' : 'Subtotal'}</Text>
+              <Text style={styles.paymentValue}>{subtotalAmount.toFixed(2)} SAR</Text>
+            </View>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentLabel}>{language === 'ar' ? 'المدفوع' : 'Paid'}</Text>
+              <Text style={styles.paymentValue}>- {paidAmount.toFixed(2)} SAR</Text>
+            </View>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentDueLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text>
+              <Text style={styles.paymentDueValue}>{Number(group.payableNowTotal || 0).toFixed(2)} SAR</Text>
+            </View>
+            {!!representative.paymentMethod && (
+              <Text style={styles.paymentMethodHint}>
+                {language === 'ar' ? 'طريقة الدفع' : 'Payment method'}: {getPaymentMethodLabel(representative.paymentMethod)}
+              </Text>
+            )}
+          </View>
+
           <Text style={styles.sectionTitle}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text>
           {group.items.map((booking, index) => (
             <View key={booking.id} style={styles.serviceCard}>
@@ -289,6 +332,59 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             </View>
             </View>
           ))}
+
+          <View style={styles.primaryActionCard}>
+            {Number(group.payableNowTotal || 0) > 0.009 && activeTab === 'upcoming' && (
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() =>
+                  navigation.navigate('Payment', {
+                    appointmentId: representative.id,
+                    amount: Number(group.payableNowTotal || 0),
+                    tenantId: representative.tenantId || representative.tenant?.id,
+                    paymentChoice:
+                      representative.paymentStatus === 'pending' && representative.paymentMethod === 'booking-fee'
+                        ? 'booking-fee'
+                        : undefined,
+                  })
+                }
+              >
+                <Text style={styles.primaryBtnText}>{language === 'ar' ? 'ادفع الآن' : 'Pay Now'}</Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.secondaryActions}>
+              {(representative.Service?.allowReschedule || representative.service?.allowReschedule) &&
+              ['confirmed', 'pending'].includes(representative.status) &&
+              activeTab === 'upcoming' ? (
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => openReschedule(representative)}>
+                  <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.secondaryBtnPlaceholder} />
+              )}
+
+              {['confirmed', 'pending'].includes(representative.status) && activeTab === 'upcoming' ? (
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(representative.id)}>
+                  <Text style={styles.cancelBtnText} numberOfLines={1}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.secondaryBtnPlaceholder} />
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={styles.contactBtn}
+              onPress={() =>
+                Alert.alert(
+                  language === 'ar' ? 'قريباً' : 'Coming soon',
+                  language === 'ar' ? 'التواصل مع المركز سيكون متاحاً قريباً.' : 'Contact center action will be available soon.'
+                )
+              }
+            >
+              <Text style={styles.contactBtnText}>{language === 'ar' ? 'التواصل مع المركز' : 'Contact Center'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
@@ -350,6 +446,13 @@ const styles = StyleSheet.create({
   guestCard: { borderRadius: 20, backgroundColor: '#F4EEFF', borderWidth: 1, borderColor: '#E6DAFD', padding: spacing.md, marginBottom: spacing.md },
   guestName: { fontSize: 16, color: colors.text, fontWeight: '700' },
   guestPhone: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  paymentSummaryCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
+  paymentLabel: { color: colors.textSecondary, fontSize: 13 },
+  paymentValue: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  paymentDueLabel: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  paymentDueValue: { color: colors.primary, fontSize: 16, fontWeight: '800' },
+  paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 12 },
   serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
   serviceIndex: { fontSize: 12, color: colors.primary, fontWeight: '700' },
   serviceName: { marginTop: 2, fontSize: 18, fontWeight: '800', color: colors.text },
@@ -364,6 +467,10 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: colors.primary, fontWeight: '700' },
   cancelBtn: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: colors.error, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   cancelBtnText: { color: colors.error, fontWeight: '700' },
+  primaryActionCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+  secondaryBtnPlaceholder: { flex: 1 },
+  contactBtn: { minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#D7DAEA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  contactBtnText: { color: '#4B5072', fontWeight: '700' },
   emptyText: { color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.5)', justifyContent: 'center' },
   modalCard: { marginHorizontal: spacing.lg, borderRadius: borderRadius.md, backgroundColor: '#FFFFFF', padding: spacing.md },
