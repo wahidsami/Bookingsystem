@@ -85,6 +85,11 @@ const formatDateTimeLabel = (value) => {
     });
 };
 
+const toTimestamp = (value) => {
+    const parsed = value ? new Date(value) : null;
+    return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+};
+
 const getAppointmentDueAmount = (appointment) => {
     if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
         const remainder = parseFloat(appointment.remainderAmount || 0);
@@ -1240,7 +1245,7 @@ const fetchQueueData = async (tenantId, search = '', limit = POS_QUEUE_LIMIT) =>
         ...orders.map(mapOrderQueueItem)
     ]
         .filter((item) => item.dueAmount > 0)
-        .sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime())
+        .sort((left, right) => toTimestamp(left.scheduledAt) - toTimestamp(right.scheduledAt))
         .slice(0, limit);
 
     const totalDueAmount = queue.reduce((sum, item) => sum + item.dueAmount, 0);
@@ -1547,7 +1552,7 @@ exports.getOperationalAlerts = async (req, res) => {
             ...cancellationResult.alerts,
             ...completedDueResult.alerts
         ]
-            .sort((left, right) => new Date(right.scheduledAt).getTime() - new Date(left.scheduledAt).getTime())
+            .sort((left, right) => toTimestamp(right.scheduledAt) - toTimestamp(left.scheduledAt))
             .slice(0, limit);
 
         const summary = {

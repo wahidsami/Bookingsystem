@@ -71,6 +71,14 @@ const extractAuditJsonEntries = (notes: string | null | undefined, marker: strin
   return entries;
 };
 
+const formatTimelineDateTime = (value: string, language: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return language === 'ar' ? 'وقت غير متوفر' : 'Time unavailable';
+  }
+  return format(parsed, 'PPP p', { locale: language === 'ar' ? ar : enUS });
+};
+
 const getStatusText = (status: string, language?: string) => {
   if (language === 'ar') {
     switch (status) {
@@ -466,7 +474,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                     <Text style={styles.timelineTitle}>{event.title}</Text>
                     <Text style={styles.timelineSub}>{event.subtitle}</Text>
                     <Text style={styles.timelineTime}>
-                      {format(new Date(event.at), 'PPP p', { locale: language === 'ar' ? ar : enUS })}
+                      {formatTimelineDateTime(event.at, language)}
                     </Text>
                   </View>
                 </View>

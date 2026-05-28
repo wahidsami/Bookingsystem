@@ -79,7 +79,7 @@ Make cancel/reschedule behavior impossible to miss across:
 - Validate board behavior:
   - cancel -> removed from active board
   - reschedule -> appears at new slot
-- Status: `pending`
+- Status: `completed`
 
 ## Phase 4 — Optional Solidification
 - Move from notes markers to dedicated `appointment_events` table.
@@ -103,3 +103,4 @@ Make cancel/reschedule behavior impossible to miss across:
 - 2026-05-28: Plan created.
 - 2026-05-28: Phase 1 implemented in tenant operational alerts feed.
 - 2026-05-28: Phase 2 implemented in customer appointment details timeline.
+- 2026-05-28: Phase 3 hardening completed (safe timestamp sorting for tenant alerts + safe timeline date rendering fallback + dedicated QA execution checklist document).
