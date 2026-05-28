@@ -750,22 +750,21 @@ const getStatusText = (status: string, _t: any, language?: string) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F6FB',
     },
     header: {
         padding: spacing.xl,
         backgroundColor: colors.background,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
     },
     headerTitle: {
-        fontSize: fontSize.xxl,
-        fontWeight: '700',
-        color: colors.text,
+        fontSize: 34,
+        fontWeight: '800',
+        color: '#14153C',
     },
     tabsContainer: {
         flexDirection: 'row',
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.sm,
         backgroundColor: colors.background,
         marginBottom: spacing.sm,
         gap: spacing.sm,
@@ -775,13 +774,13 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.sm,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.full,
-        backgroundColor: colors.surface,
+        borderColor: '#E7DFFA',
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
     },
     activeTab: {
-        borderColor: colors.primary,
-        backgroundColor: '#F3E8FF',
+        borderColor: '#C4ABFB',
+        backgroundColor: '#F5EEFF',
     },
     tabText: {
         fontSize: fontSize.md,
@@ -797,17 +796,17 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     card: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
         padding: spacing.lg,
-        shadowColor: '#000000',
+        shadowColor: '#1A1440',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
         elevation: 2,
         marginBottom: spacing.md,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#ECE7FA',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -816,7 +815,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         paddingBottom: spacing.sm,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#EDE8FA',
     },
     salonInfo: {
         flexDirection: 'row',
@@ -824,9 +823,9 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
     },
     salonLogo: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
     },
     placeholderLogo: {
         backgroundColor: colors.primary + '20',
@@ -838,9 +837,9 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     salonName: {
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1A1A44',
     },
     statusBadge: {
         paddingHorizontal: spacing.sm,
@@ -848,7 +847,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     statusText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
     },
     cardBody: {
@@ -862,9 +861,9 @@ const styles = StyleSheet.create({
         letterSpacing: 0.8,
     },
     serviceName: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
-        color: colors.text,
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#171840',
         marginBottom: spacing.sm,
     },
     variantLabel: {
@@ -883,21 +882,21 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     dateTimeText: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#6E7596',
     },
     staffRow: {
         flexDirection: 'row',
         marginTop: spacing.sm,
     },
     staffLabel: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#6E7596',
     },
     staffName: {
-        fontSize: fontSize.sm,
-        color: colors.text,
-        fontWeight: '500',
+        fontSize: 14,
+        color: '#1F204D',
+        fontWeight: '700',
     },
     cardFooter: {
         flexDirection: 'row',
@@ -911,8 +910,8 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     price: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '800',
         color: colors.primary,
     },
     actions: {
@@ -924,8 +923,8 @@ const styles = StyleSheet.create({
         minWidth: 120,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#7C3AED',
-        borderRadius: borderRadius.md,
+        backgroundColor: '#6D31D9',
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -935,8 +934,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     dueNowText: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 13,
+        color: '#6E7596',
         fontWeight: '600',
     },
     cancelButton: {
@@ -944,7 +943,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.xs,
         borderWidth: 1,
         borderColor: colors.error,
-        borderRadius: borderRadius.md,
+        borderRadius: 12,
     },
     cancelButtonText: {
         color: colors.error,
@@ -954,7 +953,7 @@ const styles = StyleSheet.create({
     rescheduleButton: {
         marginTop: spacing.sm,
         backgroundColor: colors.primary,
-        borderRadius: borderRadius.md,
+        borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
         alignItems: 'center',
@@ -967,7 +966,7 @@ const styles = StyleSheet.create({
     reviewButton: {
         marginTop: spacing.sm,
         backgroundColor: colors.primary,
-        borderRadius: borderRadius.md,
+        borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
         alignItems: 'center',
@@ -999,9 +998,9 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     emptyText: {
-        fontSize: fontSize.lg,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A44',
         marginBottom: spacing.xs,
     },
     bookButton: {
@@ -1028,12 +1027,12 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         maxHeight: '85%',
-        backgroundColor: colors.surface,
+        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
         padding: spacing.lg,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#ECE7FA',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -1056,7 +1055,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: colors.surfaceAlt,
+        backgroundColor: '#F4EEFF',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1072,8 +1071,8 @@ const styles = StyleSheet.create({
     rescheduleModalCard: {
         width: '90%',
         alignSelf: 'center',
-        backgroundColor: colors.background,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
         padding: spacing.lg,
         marginBottom: spacing.xl,
     },
@@ -1084,8 +1083,8 @@ const styles = StyleSheet.create({
     },
     rescheduleInput: {
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E7DFFA',
+        borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         color: colors.text,
@@ -1100,18 +1099,18 @@ const styles = StyleSheet.create({
     },
     rescheduleCancelBtn: {
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E7DFFA',
+        borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: colors.background,
+        backgroundColor: '#FFFFFF',
     },
     rescheduleCancelText: {
         color: colors.textSecondary,
         fontWeight: '600',
     },
     rescheduleSaveBtn: {
-        borderRadius: borderRadius.md,
+        borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         backgroundColor: colors.primary,

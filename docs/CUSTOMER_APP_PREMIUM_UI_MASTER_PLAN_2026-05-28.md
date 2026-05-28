@@ -59,7 +59,7 @@ Targets:
 - Improve form usability and trust cues
 
 ### Phase 4: Post-Purchase and Retention
-Status: `Pending`
+Status: `In Progress`
 Scope:
 - `BookingsScreen`
 - `PurchasesScreen`
@@ -109,7 +109,7 @@ Targets:
 - Phase 1: `70%` (Home + Browse + BookingFlow premium shell upgraded)
 - Phase 2: `100%`
 - Phase 3: `0%`
-- Phase 4: `0%`
+- Phase 4: `20%` (Bookings screen premium shell upgraded)
 - Phase 5: `0%`
 - Phase 6: `0%`
 
