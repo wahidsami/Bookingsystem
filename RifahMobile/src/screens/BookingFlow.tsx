@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Image, Modal } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, Service, Staff, SlotItem, getServicePrice, normalizeStaff } from '../api/client';
+import { api, Service, Staff, SlotItem, getImageUrl, getServicePrice, normalizeStaff } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -50,6 +50,23 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const { addItem, updateItem } = useServiceBookingCart();
     const [step, setStep] = useState<BookingStep>('staff');
     const [loading, setLoading] = useState(false);
+    const [bookingSuccessDialog, setBookingSuccessDialog] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        payLaterLabel: string;
+        payNowLabel?: string;
+        onPayLater: (() => void) | null;
+        onPayNow: (() => void) | null;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        payLaterLabel: '',
+        payNowLabel: undefined,
+        onPayLater: null,
+        onPayNow: null,
+    });
 
     // Selection State
     const [selectedStaff, setSelectedStaff] = useState<Staff | null>(
@@ -340,26 +357,28 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 : (language === 'ar' ? 'الدفع الآن' : 'Pay Now');
             const viewBookingsLabel = language === 'ar' ? 'عرض حجوزاتي' : 'View My Bookings';
 
-            const successActions: Array<{ text: string; onPress: () => void }> = [
-                {
-                    text: selectedPaymentMethod === 'at-center' ? viewBookingsLabel : payLaterLabel,
-                    onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
+            setBookingSuccessDialog({
+                visible: true,
+                title: successTitle,
+                message: successMessage,
+                payLaterLabel: selectedPaymentMethod === 'at-center' ? viewBookingsLabel : payLaterLabel,
+                payNowLabel: appointmentId && selectedPaymentMethod !== 'at-center' ? payNowLabel : undefined,
+                onPayLater: () => {
+                    setBookingSuccessDialog((prev) => ({ ...prev, visible: false }));
+                    navigation.navigate('Tabs', { screen: 'Appointments' });
                 },
-            ];
-
-            if (appointmentId && selectedPaymentMethod !== 'at-center') {
-                successActions.push({
-                    text: payNowLabel,
-                    onPress: () => navigation.navigate('Payment', {
-                        appointmentId,
-                        amount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : bookingAmount,
-                        tenantId: tenant.id,
-                        paymentChoice: selectedPaymentMethod === 'booking-fee' ? 'booking-fee' : 'online-full',
-                    }),
-                });
-            }
-
-            Alert.alert(successTitle, successMessage, successActions);
+                onPayNow: appointmentId && selectedPaymentMethod !== 'at-center'
+                    ? () => {
+                        setBookingSuccessDialog((prev) => ({ ...prev, visible: false }));
+                        navigation.navigate('Payment', {
+                            appointmentId,
+                            amount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : bookingAmount,
+                            tenantId: tenant.id,
+                            paymentChoice: selectedPaymentMethod === 'booking-fee' ? 'booking-fee' : 'online-full',
+                        });
+                    }
+                    : null,
+            });
         } catch (error: any) {
             const msg = error.message || 'Failed to create booking';
             // Surface meaningful server errors to the user
@@ -467,9 +486,9 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     style={[styles.staffCard, selectedStaff?.id === staff.id && styles.selectedCard]}
                     onPress={() => setSelectedStaff(staff)}
                 >
-                    {staff.avatar || staff.image ? (
+                    {getImageUrl(staff.avatar || staff.image) ? (
                         <Image
-                            source={{ uri: (staff.avatar || staff.image)! }}
+                            source={{ uri: getImageUrl(staff.avatar || staff.image)! }}
                             style={styles.staffAvatar}
                         />
                     ) : (
@@ -752,6 +771,36 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     </TouchableOpacity>
                 )}
             </View>
+
+            <Modal
+                visible={bookingSuccessDialog.visible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setBookingSuccessDialog((prev) => ({ ...prev, visible: false }))}
+            >
+                <View style={styles.successModalBackdrop}>
+                    <View style={styles.successModalCard}>
+                        <Text style={styles.successModalTitle}>{bookingSuccessDialog.title}</Text>
+                        <Text style={styles.successModalMessage}>{bookingSuccessDialog.message}</Text>
+                        <View style={styles.successModalActions}>
+                            <TouchableOpacity
+                                style={[styles.successModalBtn, styles.successModalBtnSecondary]}
+                                onPress={() => bookingSuccessDialog.onPayLater?.()}
+                            >
+                                <Text style={styles.successModalBtnSecondaryText}>{bookingSuccessDialog.payLaterLabel}</Text>
+                            </TouchableOpacity>
+                            {bookingSuccessDialog.payNowLabel ? (
+                                <TouchableOpacity
+                                    style={[styles.successModalBtn, styles.successModalBtnPrimary]}
+                                    onPress={() => bookingSuccessDialog.onPayNow?.()}
+                                >
+                                    <Text style={styles.successModalBtnPrimaryText}>{bookingSuccessDialog.payNowLabel}</Text>
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -1132,6 +1181,58 @@ const styles = StyleSheet.create({
         color: colors.textInverse,
         fontSize: fontSize.md,
         fontWeight: 'bold',
+    },
+    successModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(17, 24, 39, 0.45)',
+        justifyContent: 'center',
+        padding: spacing.lg,
+    },
+    successModalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.xl,
+        borderWidth: 1,
+        borderColor: '#EADDFE',
+        padding: spacing.lg,
+        gap: spacing.md,
+    },
+    successModalTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: '800',
+        color: colors.primaryDark,
+    },
+    successModalMessage: {
+        fontSize: fontSize.md,
+        lineHeight: 22,
+        color: colors.textSecondary,
+    },
+    successModalActions: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    successModalBtn: {
+        flex: 1,
+        borderRadius: borderRadius.full,
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+    },
+    successModalBtnSecondary: {
+        borderWidth: 1,
+        borderColor: '#D9C4FF',
+        backgroundColor: '#F6F1FF',
+    },
+    successModalBtnPrimary: {
+        backgroundColor: colors.primary,
+    },
+    successModalBtnSecondaryText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.primaryDark,
+    },
+    successModalBtnPrimaryText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
 });
 

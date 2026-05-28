@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, View, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
+import { Linking, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { UserAvatar } from '../components/UserAvatar';
@@ -9,7 +9,6 @@ import { api, PublicAppContent, User } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
-import { registerCustomerPushNotifications, unregisterCustomerPushNotifications } from '../lib/notifications';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface MoreScreenProps {
@@ -23,8 +22,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     const [user, setUser] = useState<User | null>(null);
     const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
-    const [pushEnabled, setPushEnabled] = useState(true);
-    const [pushLoading, setPushLoading] = useState(false);
 
     useEffect(() => {
         api.getUser().then(setUser).catch(() => setUser(null));
@@ -35,7 +32,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
             api.getProfile()
                 .then(async (profile) => {
                     setUser(profile);
-                    setPushEnabled(profile.notificationPreferences?.push !== false);
                     await api.setUser(profile);
                 })
                 .catch(() => {
@@ -138,32 +134,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
         showLogin();
     };
 
-    const handlePushToggle = async (value: boolean) => {
-        if (pushLoading || !isAuthenticated) return;
-        const previous = pushEnabled;
-        setPushEnabled(value);
-        setPushLoading(true);
-        try {
-            await api.updateProfile({
-                notificationPreferences: {
-                    email: user?.notificationPreferences?.email !== false,
-                    sms: user?.notificationPreferences?.sms !== false,
-                    push: value,
-                    whatsapp: user?.notificationPreferences?.whatsapp === true,
-                },
-            });
-            if (value) {
-                await registerCustomerPushNotifications();
-            } else {
-                await unregisterCustomerPushNotifications();
-            }
-        } catch (error) {
-            setPushEnabled(previous);
-        } finally {
-            setPushLoading(false);
-        }
-    };
-
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -260,26 +230,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             <Text style={styles.menuArrow}>›</Text>
                         </TouchableOpacity>
                     ))}
-                    <View style={styles.menuItem}>
-                        <View style={styles.menuItemLeft}>
-                            <AppIcon name="bell" size={22} color={colors.primary} />
-                            <View>
-                                <Text style={styles.menuLabel}>{t('pushNotifications')}</Text>
-                                <Text style={styles.menuSubLabel}>{t('pushNotificationsDescription')}</Text>
-                            </View>
-                        </View>
-                        {pushLoading ? (
-                            <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                            <Switch
-                                value={pushEnabled}
-                                onValueChange={handlePushToggle}
-                                disabled={!isAuthenticated}
-                                trackColor={{ false: colors.borderDark, true: `${colors.primary}66` }}
-                                thumbColor={pushEnabled ? colors.primary : colors.textTertiary}
-                            />
-                        )}
-                    </View>
                 </View>
 
                 <View style={styles.sectionHeaderWrap}>

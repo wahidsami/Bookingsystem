@@ -126,6 +126,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     useEffect(() => {
         const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
         if (showServicesTab) availableTabs.push('services');
+        if (showProductsTab) availableTabs.push('products');
         if (showGiftsTab) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
         if (showAboutTab) availableTabs.push('about');
@@ -650,6 +651,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const renderTabs = () => {
         const availableTabs: string[] = [];
         if (showServicesTab) availableTabs.push('services');
+        if (showProductsTab) availableTabs.push('products');
         if (showGiftsTab) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
         if (showAboutTab) availableTabs.push('about');

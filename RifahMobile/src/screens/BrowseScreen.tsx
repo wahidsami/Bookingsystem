@@ -4,7 +4,6 @@ import {
     FlatList,
     Image,
     ImageBackground,
-    Platform,
     StyleSheet,
     TextInput,
     TouchableOpacity,
@@ -39,7 +38,7 @@ export function BrowseScreen({ route, navigation }: any) {
     const heroTitleLineHeight = isCompact ? 46 : 52;
     const heroSubtitleSize = isCompact ? 18 : 20;
     const heroSubtitleLineHeight = isCompact ? 26 : 30;
-    const cardImageHeight = isCompact ? 200 : 220;
+    const cardImageHeight = isCompact ? 160 : 176;
 
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [categories, setCategories] = useState<ServiceCategory[]>([]);
@@ -202,9 +201,6 @@ export function BrowseScreen({ route, navigation }: any) {
                         value={search}
                         onChangeText={setSearch}
                     />
-                    <View style={styles.filterIconCircle}>
-                        <AppIcon name="settings" size={18} color={colors.primary} />
-                    </View>
                 </View>
             </View>
 
@@ -281,18 +277,6 @@ export function BrowseScreen({ route, navigation }: any) {
                 />
             )}
 
-            <View
-                style={[
-                    styles.bottomFloatNav,
-                    Platform.OS === 'ios' ? styles.bottomFloatNavIOS : styles.bottomFloatNavAndroid,
-                    { paddingBottom: Math.max(scrollBottomPadding - 8, 10) }
-                ]}
-            >
-                <NavItem label={isRTL ? 'الرئيسية' : 'Home'} icon="home" active onPress={() => navigation.navigate('Tabs', { screen: 'Home' })} />
-                <NavItem label={isRTL ? 'المواعيد' : 'Appointments'} icon="bookings" onPress={() => navigation.navigate('Tabs', { screen: 'Appointments' })} />
-                <NavItem label={isRTL ? 'المشتريات' : 'Purchases'} icon="purchases" onPress={() => navigation.navigate('Tabs', { screen: 'Purchases' })} />
-                <NavItem label={isRTL ? 'حسابي' : 'Me'} icon="profile" onPress={() => navigation.navigate('Tabs', { screen: 'Me' })} />
-            </View>
         </View>
     );
 }
@@ -304,15 +288,6 @@ function TrustItem({ icon, title, subtitle }: { icon: any; title: string; subtit
             <Text style={styles.trustItemTitle}>{title}</Text>
             <Text style={styles.trustItemSubtitle}>{subtitle}</Text>
         </View>
-    );
-}
-
-function NavItem({ label, icon, active, onPress }: { label: string; icon: any; active?: boolean; onPress: () => void }) {
-    return (
-        <TouchableOpacity style={styles.navItem} onPress={onPress} activeOpacity={0.8}>
-            <AppIcon name={icon} size={20} color={active ? colors.primary : '#6D7290'} />
-            <Text style={[styles.navLabel, active ? styles.navLabelActive : null]}>{label}</Text>
-        </TouchableOpacity>
     );
 }
 
@@ -386,14 +361,6 @@ const styles = StyleSheet.create({
     rtlInput: {
         textAlign: 'right',
     },
-    filterIconCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F1EAFE',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     chipsSection: {
         marginTop: spacing.lg,
     },
@@ -466,7 +433,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row-reverse',
     },
     tenantImageWrap: {
-        width: '38%',
+        width: 132,
+        height: 176,
         borderRadius: 24,
         overflow: 'hidden',
         backgroundColor: '#EFEAFD',
@@ -621,39 +589,5 @@ const styles = StyleSheet.create({
     clearFiltersText: {
         color: colors.primary,
         fontWeight: '700',
-    },
-    bottomFloatNav: {
-        position: 'absolute',
-        left: spacing.lg,
-        right: spacing.lg,
-        bottom: 8,
-        borderRadius: 28,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#ECE6FA',
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingTop: 10,
-    },
-    bottomFloatNavIOS: {
-        shadowColor: '#1B1540',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
-    },
-    bottomFloatNavAndroid: {
-        elevation: 8,
-    },
-    navItem: {
-        alignItems: 'center',
-        gap: 4,
-    },
-    navLabel: {
-        fontSize: 12,
-        color: '#6D7290',
-        fontWeight: '600',
-    },
-    navLabelActive: {
-        color: colors.primary,
     },
 });
