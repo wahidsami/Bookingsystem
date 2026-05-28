@@ -198,7 +198,7 @@ export function PurchasesScreen({ navigation }: any) {
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Text style={styles.backButtonText}>←</Text>
+                        <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t('myPurchases' as any)}</Text>
                 </LinearGradient>
@@ -223,7 +223,7 @@ export function PurchasesScreen({ navigation }: any) {
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Text style={styles.backButtonText}>←</Text>
+                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('myPurchases')}</Text>
             </LinearGradient>
@@ -306,46 +306,46 @@ const getStatusText = (status: string, language: 'ar' | 'en') => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F6FB',
     },
     header: {
         padding: spacing.xl,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
     },
     backButton: {
-        padding: spacing.xs,
-    },
-    backButtonText: {
-        fontSize: fontSize.xl,
-        color: colors.text,
-        fontWeight: '700',
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
-        color: colors.text,
+        fontSize: 32,
+        fontWeight: '800',
+        color: '#14153C',
     },
     listContent: {
         padding: spacing.lg,
         gap: spacing.md,
     },
     card: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
         padding: spacing.lg,
-        shadowColor: '#000000',
+        shadowColor: '#1A1440',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
         elevation: 2,
         marginBottom: spacing.md,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#ECE7FA',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         paddingBottom: spacing.sm,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#ECE7FA',
     },
     salonInfo: {
         flexDirection: 'row',
@@ -362,9 +362,9 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
     },
     salonLogo: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
     },
     placeholderLogo: {
         backgroundColor: colors.primary + '20',
@@ -376,9 +376,9 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     salonName: {
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1A1A44',
     },
     statusBadge: {
         paddingHorizontal: spacing.sm,
@@ -386,14 +386,14 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     statusText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
     },
     cardBody: {
         marginBottom: spacing.md,
     },
     orderId: {
-        fontSize: fontSize.sm,
+        fontSize: 15,
         fontWeight: '700',
         color: colors.primary,
         marginBottom: spacing.xs,
@@ -408,20 +408,20 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     dateTimeText: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#6E7596',
     },
     itemsContainer: {
         marginTop: spacing.xs,
     },
     itemText: {
-        fontSize: fontSize.sm,
-        color: colors.text,
+        fontSize: 14,
+        color: '#1D1E49',
         marginBottom: 2,
     },
     moreItemsText: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
+        fontSize: 12,
+        color: '#6E7596',
         fontStyle: 'italic',
         marginTop: 2,
     },
@@ -440,8 +440,8 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     price: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '800',
         color: colors.primary,
     },
     actions: {
@@ -455,8 +455,8 @@ const styles = StyleSheet.create({
         minWidth: 96,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#7C3AED',
-        borderRadius: borderRadius.md,
+        backgroundColor: '#6D31D9',
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.sm,
         borderWidth: 1,
         borderColor: colors.error,
-        borderRadius: borderRadius.md,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -481,8 +481,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     totalHint: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 13,
+        color: '#6E7596',
         fontWeight: '600',
     },
     emptyContainer: {
@@ -496,9 +496,9 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     emptyText: {
-        fontSize: fontSize.lg,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A44',
         marginBottom: spacing.xs,
     },
     bookButton: {
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.md,
         backgroundColor: colors.primary,
-        borderRadius: borderRadius.md,
+        borderRadius: 12,
     },
     bookButtonText: {
         color: colors.textInverse,
