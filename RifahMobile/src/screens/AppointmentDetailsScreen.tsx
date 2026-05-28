@@ -29,6 +29,14 @@ type GroupGuestMeta = {
   phone?: string | null;
 };
 
+type AppointmentAuditEvent = {
+  id: string;
+  type: 'rescheduled' | 'cancelled';
+  at: string;
+  title: string;
+  subtitle: string;
+};
+
 const parseGroupGuestFromNotes = (notes?: string | null): GroupGuestMeta | null => {
   if (!notes) return null;
   const markerPrefix = '[GROUP_GUEST]';
@@ -44,6 +52,23 @@ const parseGroupGuestFromNotes = (notes?: string | null): GroupGuestMeta | null 
   } catch {
     return null;
   }
+};
+
+const extractAuditJsonEntries = (notes: string | null | undefined, marker: string): any[] => {
+  const text = `${notes || ''}`;
+  if (!text.includes(marker)) return [];
+  const pattern = new RegExp(`\\${marker}\\s*(\\{.*\\})`, 'g');
+  const entries: any[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed && typeof parsed === 'object') entries.push(parsed);
+    } catch {
+      // ignore malformed entries
+    }
+  }
+  return entries;
 };
 
 const getStatusText = (status: string, language?: string) => {
@@ -113,6 +138,42 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     if (!candidate) return null;
     return getImageUrl(candidate);
   }, [group?.tenant]);
+  const appointmentTimeline = useMemo<AppointmentAuditEvent[]>(() => {
+    const events: AppointmentAuditEvent[] = [];
+    for (const booking of group?.items || []) {
+      const notes = booking.notes || '';
+      const rescheduleEntries = extractAuditJsonEntries(notes, '[RESCHEDULE_AUDIT]');
+      for (const entry of rescheduleEntries) {
+        const at = `${entry?.at || (booking as any)?.updatedAt || booking.startTime || ''}`;
+        const from = entry?.fromStartTime ? format(new Date(entry.fromStartTime), 'PPP p', { locale: language === 'ar' ? ar : enUS }) : '-';
+        const to = entry?.toStartTime ? format(new Date(entry.toStartTime), 'PPP p', { locale: language === 'ar' ? ar : enUS }) : '-';
+        events.push({
+          id: `rescheduled-${booking.id}-${at}-${from}-${to}`,
+          type: 'rescheduled',
+          at,
+          title: language === 'ar' ? 'تمت إعادة الجدولة' : 'Rescheduled',
+          subtitle: language === 'ar' ? `من ${from} إلى ${to}` : `From ${from} to ${to}`,
+        });
+      }
+
+      const cancelEntries = extractAuditJsonEntries(notes, '[CANCELLATION_AUDIT]');
+      for (const entry of cancelEntries) {
+        const at = `${entry?.at || (booking as any)?.updatedAt || booking.startTime || ''}`;
+        const reason = `${entry?.reasonText || entry?.reasonCode || ''}`.trim();
+        events.push({
+          id: `cancelled-${booking.id}-${at}-${reason}`,
+          type: 'cancelled',
+          at,
+          title: language === 'ar' ? 'تم إلغاء الموعد' : 'Cancelled',
+          subtitle: reason
+            ? (language === 'ar' ? `السبب: ${reason}` : `Reason: ${reason}`)
+            : (language === 'ar' ? 'بدون سبب' : 'No reason provided'),
+        });
+      }
+    }
+
+    return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  }, [group?.items, language]);
 
   const getBookingNumber = (booking: Booking) =>
     booking.bookingNumber || booking.bookingReference || booking.id.slice(0, 8).toUpperCase();
@@ -395,6 +456,24 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             </View>
           ))}
 
+          {appointmentTimeline.length > 0 && (
+            <View style={styles.timelineCard}>
+              <Text style={styles.sectionTitle}>{language === 'ar' ? 'سجل التغييرات' : 'Activity Timeline'}</Text>
+              {appointmentTimeline.slice(0, 8).map((event) => (
+                <View key={event.id} style={styles.timelineRow}>
+                  <View style={[styles.timelineDot, event.type === 'cancelled' ? styles.timelineDotDanger : styles.timelineDotPrimary]} />
+                  <View style={styles.timelineBody}>
+                    <Text style={styles.timelineTitle}>{event.title}</Text>
+                    <Text style={styles.timelineSub}>{event.subtitle}</Text>
+                    <Text style={styles.timelineTime}>
+                      {format(new Date(event.at), 'PPP p', { locale: language === 'ar' ? ar : enUS })}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={styles.primaryActionCard}>
             {Number(group.payableNowTotal || 0) > 0.009 && activeTab === 'upcoming' && (
               <TouchableOpacity
@@ -619,6 +698,15 @@ const styles = StyleSheet.create({
   paymentDueLabel: { color: colors.primary, fontSize: 14, fontWeight: '800' },
   paymentDueValue: { color: colors.primary, fontSize: 16, fontWeight: '800' },
   paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 12 },
+  timelineCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: '#F2ECFC' },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
+  timelineDotPrimary: { backgroundColor: colors.primary },
+  timelineDotDanger: { backgroundColor: colors.error },
+  timelineBody: { flex: 1 },
+  timelineTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  timelineSub: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+  timelineTime: { color: '#7B7F98', fontSize: 11, marginTop: 2 },
   serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
   serviceIndex: { fontSize: 12, color: colors.primary, fontWeight: '700' },
   serviceName: { marginTop: 2, fontSize: 18, fontWeight: '800', color: colors.text },

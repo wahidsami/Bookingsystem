@@ -20,6 +20,7 @@ const POS_ALERT_LIMIT = 10;
 const REVIEW_ALERT_LOOKBACK_DAYS = 14;
 const RESCHEDULE_ALERT_LOOKBACK_DAYS = 7;
 const RESCHEDULE_AUDIT_MARKER = '[RESCHEDULE_AUDIT]';
+const CANCELLATION_AUDIT_MARKER = '[CANCELLATION_AUDIT]';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
 const GIFT_CARD_AUDIT_ENABLED = process.env.GIFT_CARD_AUDIT_LOGS !== '0';
@@ -842,6 +843,29 @@ const extractRescheduleAuditEntries = (notes) => {
     return entries;
 };
 
+const extractCancellationAuditEntries = (notes) => {
+    const text = `${notes || ''}`;
+    if (!text.includes(CANCELLATION_AUDIT_MARKER)) {
+        return [];
+    }
+
+    const entries = [];
+    const regex = /\[CANCELLATION_AUDIT\]\s*(\{.*\})/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        try {
+            const parsed = JSON.parse(match[1]);
+            if (parsed && typeof parsed === 'object') {
+                entries.push(parsed);
+            }
+        } catch (_error) {
+            // Ignore malformed entries and continue.
+        }
+    }
+
+    return entries;
+};
+
 const fetchRecentCustomerRescheduleAlerts = async (tenantId, limit = POS_ALERT_LIMIT) => {
     const lookbackDate = new Date();
     lookbackDate.setDate(lookbackDate.getDate() - RESCHEDULE_ALERT_LOOKBACK_DAYS);
@@ -908,6 +932,80 @@ const fetchRecentCustomerRescheduleAlerts = async (tenantId, limit = POS_ALERT_L
         alerts,
         summary: {
             customerRescheduledCount: alerts.length
+        }
+    };
+};
+
+const fetchRecentCustomerCancellationAlerts = async (tenantId, limit = POS_ALERT_LIMIT) => {
+    const lookbackDate = new Date();
+    lookbackDate.setDate(lookbackDate.getDate() - RESCHEDULE_ALERT_LOOKBACK_DAYS);
+
+    const appointments = await db.Appointment.findAll({
+        where: {
+            tenantId,
+            status: 'cancelled',
+            updatedAt: { [Op.gte]: lookbackDate },
+            notes: { [Op.iLike]: `%${CANCELLATION_AUDIT_MARKER}%` }
+        },
+        include: [
+            {
+                model: db.Service,
+                as: 'service',
+                attributes: ['id', 'name_en', 'name_ar'],
+                required: false
+            },
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            }
+        ],
+        order: [['updatedAt', 'DESC']],
+        limit: Math.max(limit * 3, limit)
+    });
+
+    const alerts = appointments
+        .map((appointment) => {
+            const entries = extractCancellationAuditEntries(appointment.notes);
+            if (!entries.length) return null;
+            const latest = entries[entries.length - 1];
+            if (`${latest?.source || ''}`.toLowerCase() !== 'customer_app') {
+                return null;
+            }
+
+            const at = new Date(latest.at || appointment.updatedAt);
+            const customerName = getCustomerName(appointment.user);
+            const serviceName = getServiceName(appointment.service);
+            const reference = appointment.bookingNumber || appointment.id;
+            const reasonCode = `${latest.reasonCode || ''}`.trim();
+            const reasonText = `${latest.reasonText || ''}`.trim();
+
+            const reasonLabel = reasonText || reasonCode || 'Not specified';
+            const reasonLabelAr = reasonText || reasonCode || 'غير محدد';
+
+            return {
+                id: `appointment-cancelled-${appointment.id}-${at.getTime()}`,
+                kind: 'appointment',
+                entityType: 'appointment',
+                entityId: appointment.id,
+                reference,
+                severity: 'high',
+                title: `Customer cancelled booking ${reference}`,
+                title_ar: `العميل ألغى الحجز ${reference}`,
+                message: `${customerName} cancelled ${serviceName}. Reason: ${reasonLabel}.`,
+                message_ar: `${customerName} قام بإلغاء ${serviceName}. السبب: ${reasonLabelAr}.`,
+                scheduledAt: at.toISOString(),
+                detailPath: appointment.id ? `/dashboard/appointments/${appointment.id}` : null
+            };
+        })
+        .filter(Boolean)
+        .slice(0, limit);
+
+    return {
+        alerts,
+        summary: {
+            customerCancelledCount: alerts.length
         }
     };
 };
@@ -1430,11 +1528,12 @@ exports.getOperationalAlerts = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const limit = Math.min(parseInt(req.query.limit || POS_ALERT_LIMIT, 10), POS_ALERT_LIMIT);
-        const [queueResult, appointmentResult, reviewResult, rescheduleResult] = await Promise.all([
+        const [queueResult, appointmentResult, reviewResult, rescheduleResult, cancellationResult] = await Promise.all([
             fetchQueueData(tenantId, '', POS_QUEUE_LIMIT),
             fetchAppointmentAttentionAlerts(tenantId, limit),
             fetchReviewAttentionAlerts(tenantId, limit),
-            fetchRecentCustomerRescheduleAlerts(tenantId, limit)
+            fetchRecentCustomerRescheduleAlerts(tenantId, limit),
+            fetchRecentCustomerCancellationAlerts(tenantId, limit)
         ]);
         const completedDueResult = await fetchCompletedPaymentDueAlerts(tenantId, limit);
         const alerts = [
@@ -1445,6 +1544,7 @@ exports.getOperationalAlerts = async (req, res) => {
             ...appointmentResult.alerts,
             ...reviewResult.alerts,
             ...rescheduleResult.alerts,
+            ...cancellationResult.alerts,
             ...completedDueResult.alerts
         ]
             .sort((left, right) => new Date(right.scheduledAt).getTime() - new Date(left.scheduledAt).getTime())
@@ -1455,6 +1555,7 @@ exports.getOperationalAlerts = async (req, res) => {
             ...appointmentResult.summary,
             ...reviewResult.summary,
             ...rescheduleResult.summary,
+            ...cancellationResult.summary,
             ...completedDueResult.summary
         };
 
