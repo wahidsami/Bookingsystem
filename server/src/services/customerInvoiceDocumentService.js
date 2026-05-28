@@ -1,0 +1,156 @@
+const fs = require('fs');
+const path = require('path');
+const PDFDocument = require('pdfkit');
+const db = require('../models');
+
+const uploadsRoot = path.resolve(__dirname, '../../uploads');
+const invoicesRoot = path.join(uploadsRoot, 'customer-invoices');
+
+function ensureDirectory(directoryPath) {
+    fs.mkdirSync(directoryPath, { recursive: true });
+}
+
+function normalizeRelativeUploadPath(relativePath) {
+    if (!relativePath) return null;
+    return relativePath
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .replace(/^uploads\//, '');
+}
+
+function resolveUploadPath(relativePath) {
+    const normalizedRelativePath = normalizeRelativeUploadPath(relativePath);
+    if (!normalizedRelativePath) return null;
+    const absolutePath = path.resolve(uploadsRoot, normalizedRelativePath);
+    if (!absolutePath.startsWith(uploadsRoot)) return null;
+    return absolutePath;
+}
+
+function formatMoney(value, currency = 'SAR') {
+    const amount = Number(value || 0);
+    const safe = Number.isFinite(amount) ? amount : 0;
+    return `${safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function formatDateTime(value) {
+    if (!value) return '-';
+    return new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function getDocumentPaths(invoice, kind) {
+    const tenantId = invoice.tenantId || 'shared';
+    const safeNumber = `${invoice.invoiceNumber || invoice.id}`.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const fileName = `${kind}-${safeNumber}.pdf`;
+    const relativePath = `/uploads/customer-invoices/${tenantId}/${fileName}`;
+    const absolutePath = path.join(invoicesRoot, tenantId, fileName);
+    return { relativePath, absolutePath };
+}
+
+async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
+    const invoice = invoiceRecord?.toJSON ? invoiceRecord : invoiceRecord;
+    const { relativePath, absolutePath } = getDocumentPaths(invoice, kind);
+    ensureDirectory(path.dirname(absolutePath));
+
+    const loadedInvoice = await db.CustomerInvoice.findByPk(invoice.id, {
+        include: [
+            { model: db.CustomerInvoiceItem, as: 'items', required: false },
+            { model: db.PlatformUser, as: 'platformUser', required: false },
+            { model: db.Tenant, as: 'tenant', required: false }
+        ]
+    });
+
+    const rows = loadedInvoice?.items || [];
+    const tenantName = loadedInvoice?.tenant?.name || loadedInvoice?.tenant?.name_en || loadedInvoice?.tenant?.name_ar || '-';
+    const customerName = `${loadedInvoice?.platformUser?.firstName || ''} ${loadedInvoice?.platformUser?.lastName || ''}`.trim() || '-';
+    const currency = loadedInvoice?.currency || 'SAR';
+
+    await new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const output = fs.createWriteStream(absolutePath);
+        doc.pipe(output);
+        output.on('finish', resolve);
+        output.on('error', reject);
+        doc.on('error', reject);
+
+        doc.fontSize(20).fillColor('#4a2bbf').text(kind === 'receipt' ? 'Payment Receipt' : 'Invoice');
+        doc.moveDown(0.5);
+        doc.fontSize(10).fillColor('#111827');
+        doc.text(`Invoice #: ${loadedInvoice.invoiceNumber}`);
+        doc.text(`Status: ${loadedInvoice.status}`);
+        doc.text(`Tenant: ${tenantName}`);
+        doc.text(`Customer: ${customerName}`);
+        doc.text(`Issued at: ${formatDateTime(loadedInvoice.issuedAt)}`);
+        doc.text(`Paid at: ${formatDateTime(loadedInvoice.paidAt)}`);
+        doc.moveDown(1);
+
+        doc.fontSize(11).fillColor('#111827').text('Items', { underline: true });
+        doc.moveDown(0.3);
+
+        if (rows.length === 0) {
+            doc.fontSize(10).text('No line items');
+        } else {
+            rows.forEach((item, index) => {
+                const name = item.nameEn || item.nameAr || `Item ${index + 1}`;
+                const qty = Number(item.quantity || 1);
+                const unit = formatMoney(item.unitPrice, currency);
+                const total = formatMoney(item.lineTotal, currency);
+                doc.fontSize(10).text(`${index + 1}. ${name}`);
+                doc.fontSize(9).fillColor('#4b5563').text(`Qty: ${qty} | Unit: ${unit} | Line total: ${total}`);
+                doc.fillColor('#111827');
+            });
+        }
+
+        doc.moveDown(1);
+        doc.fontSize(10).text(`Subtotal: ${formatMoney(loadedInvoice.subtotalAmount, currency)}`);
+        doc.text(`VAT: ${formatMoney(loadedInvoice.vatAmount, currency)}`);
+        doc.text(`Total: ${formatMoney(loadedInvoice.totalAmount, currency)}`);
+        doc.text(`Paid: ${formatMoney(loadedInvoice.paidAmount, currency)}`);
+        doc.text(`Due: ${formatMoney(loadedInvoice.dueAmount, currency)}`);
+
+        doc.moveDown(1.5);
+        doc.fontSize(9).fillColor('#6b7280').text('Generated by Refah platform');
+        doc.end();
+    });
+
+    if (kind === 'receipt') {
+        await db.CustomerInvoice.update({ receiptPdfPath: relativePath }, { where: { id: invoice.id } });
+    } else {
+        await db.CustomerInvoice.update({ invoicePdfPath: relativePath }, { where: { id: invoice.id } });
+    }
+
+    return { relativePath, absolutePath };
+}
+
+async function ensureCustomerInvoicePdf(invoiceRecord) {
+    const invoice = invoiceRecord?.toJSON ? invoiceRecord : await db.CustomerInvoice.findByPk(invoiceRecord?.id || invoiceRecord);
+    if (!invoice) return null;
+
+    const existingPath = resolveUploadPath(invoice.invoicePdfPath);
+    if (existingPath && fs.existsSync(existingPath)) {
+        return { relativePath: invoice.invoicePdfPath, absolutePath: existingPath };
+    }
+    return renderCustomerInvoicePdf(invoice, 'invoice');
+}
+
+async function ensureCustomerReceiptPdf(invoiceRecord) {
+    const invoice = invoiceRecord?.toJSON ? invoiceRecord : await db.CustomerInvoice.findByPk(invoiceRecord?.id || invoiceRecord);
+    if (!invoice) return null;
+
+    if (!['PAID', 'PARTIALLY_PAID', 'REFUNDED'].includes(invoice.status)) {
+        return null;
+    }
+
+    const existingPath = resolveUploadPath(invoice.receiptPdfPath);
+    if (existingPath && fs.existsSync(existingPath)) {
+        return { relativePath: invoice.receiptPdfPath, absolutePath: existingPath };
+    }
+    return renderCustomerInvoicePdf(invoice, 'receipt');
+}
+
+module.exports = {
+    ensureCustomerInvoicePdf,
+    ensureCustomerReceiptPdf,
+    renderCustomerInvoicePdf,
+    resolveUploadPath
+};
+

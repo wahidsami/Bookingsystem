@@ -1,7 +1,11 @@
 const fs = require('fs');
-const path = require('path');
 const { Op } = require('sequelize');
 const db = require('../models');
+const {
+    ensureCustomerInvoicePdf,
+    ensureCustomerReceiptPdf,
+    resolveUploadPath
+} = require('../services/customerInvoiceDocumentService');
 
 function parsePagination(query = {}) {
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
@@ -16,11 +20,6 @@ function buildDateFilter(startDate, endDate) {
     if (startDate) where[Op.gte] = new Date(startDate);
     if (endDate) where[Op.lte] = new Date(endDate);
     return where;
-}
-
-function resolveDocumentPath(relativePath) {
-    if (!relativePath) return null;
-    return path.resolve(__dirname, '../../', relativePath.replace(/^\/+/, ''));
 }
 
 async function listInvoices(where, query = {}) {
@@ -210,7 +209,14 @@ async function serveInvoiceDocument(req, res, { scope, type }) {
         return res.status(404).json({ success: false, message: 'Invoice not found' });
     }
 
-    const absolutePath = resolveDocumentPath(invoice[field]);
+    let absolutePath = resolveUploadPath(invoice[field]);
+    if ((!absolutePath || !fs.existsSync(absolutePath))) {
+        const generated = type === 'receipt'
+            ? await ensureCustomerReceiptPdf(invoice)
+            : await ensureCustomerInvoicePdf(invoice);
+        absolutePath = generated?.absolutePath || null;
+    }
+
     if (!absolutePath || !fs.existsSync(absolutePath)) {
         return res.status(404).json({ success: false, message: `${type} PDF not generated yet` });
     }

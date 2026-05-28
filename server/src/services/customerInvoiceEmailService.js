@@ -1,6 +1,11 @@
+const fs = require('fs');
 const db = require('../models');
 const { sendEmail } = require('../utils/emailService');
 const { getTenantDashboardLoginUrl } = require('../utils/url');
+const {
+    ensureCustomerInvoicePdf,
+    ensureCustomerReceiptPdf
+} = require('./customerInvoiceDocumentService');
 
 function formatMoney(amount, currency = 'SAR', locale = 'en') {
     const numeric = Number(amount || 0);
@@ -143,10 +148,27 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
             : `Refah - ${invoice.status === 'PAID' ? 'Payment receipt' : 'Invoice'} ${invoice.invoiceNumber}`;
 
         const portalUrl = getTenantDashboardLoginUrl(locale);
+        const generatedInvoicePdf = await ensureCustomerInvoicePdf(invoice);
+        const generatedReceiptPdf = await ensureCustomerReceiptPdf(invoice);
+        const emailAttachments = [];
+        if (generatedInvoicePdf?.absolutePath) {
+            emailAttachments.push({
+                filename: `invoice-${invoice.invoiceNumber}.pdf`,
+                content: fs.readFileSync(generatedInvoicePdf.absolutePath).toString('base64')
+            });
+        }
+        if (generatedReceiptPdf?.absolutePath && invoice.status !== 'UNPAID') {
+            emailAttachments.push({
+                filename: `receipt-${invoice.invoiceNumber}.pdf`,
+                content: fs.readFileSync(generatedReceiptPdf.absolutePath).toString('base64')
+            });
+        }
+
         const result = await sendEmail({
             to: user.email,
             subject,
             template,
+            attachments: emailAttachments,
             data: {
                 customerName: fullName,
                 tenantName,

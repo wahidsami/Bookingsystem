@@ -38,7 +38,7 @@ const getResendClient = () => {
  */
 const sendEmail = async (options) => {
     try {
-        const { to, cc, subject, template, data } = options;
+        const { to, cc, subject, template, data, attachments: extraAttachments } = options;
 
         const client = getResendClient();
         if (!client) {
@@ -79,6 +79,10 @@ const sendEmail = async (options) => {
                 content: logoBuffer.toString('base64'),
                 inlineContentId: 'logo'
             });
+        }
+
+        if (Array.isArray(extraAttachments) && extraAttachments.length > 0) {
+            attachments.push(...extraAttachments);
         }
 
         const payload = {
