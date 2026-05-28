@@ -761,33 +761,33 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         </LinearGradient>
                                     )}
                                     {badgeLabel ? (
-                                        <View style={styles.giftBadge}>
+                                        <View style={[styles.giftBadge, isRTL ? styles.giftBadgeRtl : null]}>
                                             <Text style={styles.giftBadgeText}>{badgeLabel}</Text>
                                         </View>
                                     ) : null}
                                 </View>
 
-                                <View style={styles.giftCardContent}>
-                                    <Text style={styles.giftCardTitle} numberOfLines={1}>{localizedTitle}</Text>
+                                <View style={[styles.giftCardContent, isRTL ? styles.giftCardContentRtl : null]}>
+                                    <Text style={[styles.giftCardTitle, isRTL ? styles.giftCardTitleRtl : null]} numberOfLines={1}>{localizedTitle}</Text>
                                     {localizedDescription ? (
-                                        <Text style={styles.giftCardDesc} numberOfLines={2}>
+                                        <Text style={[styles.giftCardDesc, isRTL ? styles.giftCardDescRtl : null]} numberOfLines={2}>
                                             {localizedDescription}
                                         </Text>
                                     ) : null}
 
-                                    <View style={styles.giftValueBlock}>
-                                        <View style={styles.giftValueColumn}>
-                                            <Text style={styles.giftValueLabel}>{isRTL ? 'أنت تدفع' : 'You Pay'}</Text>
-                                            <Text style={styles.giftValueAmount}>{Number(pkg.priceAmount).toFixed(2)} SAR</Text>
+                                    <View style={[styles.giftValueBlock, isRTL ? styles.giftValueBlockRtl : null]}>
+                                        <View style={[styles.giftValueColumn, isRTL ? styles.giftValueColumnRtl : null]}>
+                                            <Text style={[styles.giftValueLabel, isRTL ? styles.giftValueLabelRtl : null]}>{isRTL ? 'أنت تدفع' : 'You Pay'}</Text>
+                                            <Text style={[styles.giftValueAmount, isRTL ? styles.giftValueAmountRtl : null]}>{Number(pkg.priceAmount).toFixed(2)} SAR</Text>
                                         </View>
                                         <Text style={styles.giftValueArrow}>{isRTL ? '←' : '→'}</Text>
-                                        <View style={[styles.giftValueColumn, { alignItems: 'flex-end' }]}>
-                                            <Text style={[styles.giftValueLabel, styles.giftValueGetLabel]}>{isRTL ? 'يحصل على' : 'They Get'}</Text>
+                                        <View style={[styles.giftValueColumn, { alignItems: 'flex-end' }, isRTL ? styles.giftValueColumnGetRtl : null]}>
+                                            <Text style={[styles.giftValueLabel, styles.giftValueGetLabel, isRTL ? styles.giftValueLabelRtl : null]}>{isRTL ? 'يحصل على' : 'They Get'}</Text>
                                             <Text style={styles.giftValueGetAmount}>{totalCredit.toFixed(2)} SAR</Text>
                                         </View>
                                     </View>
 
-                                    <View style={styles.giftCardFooterRow}>
+                                    <View style={[styles.giftCardFooterRow, isRTL ? styles.giftCardFooterRowRtl : null]}>
                                         {bonusAmount > 0 ? (
                                             <View style={styles.giftBonusPill}>
                                                 <Text style={styles.giftBonusText}>
@@ -807,7 +807,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             )}
 
             {giftPackages.length > 0 ? (
-                <View style={styles.giftInfoBanner}>
+                <View style={[styles.giftInfoBanner, isRTL ? styles.giftInfoBannerRtl : null]}>
                     <View style={styles.giftInfoIconWrap}>
                         <AppIcon name="card" size={16} color={colors.primary} />
                     </View>
@@ -890,7 +890,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         onPress={() => openServiceDetails(service)}
                                         activeOpacity={0.92}
                                     >
-                                        <View style={[styles.serviceContentRow, isRTL ? { flexDirection: 'row-reverse' } : null]}>
+                                        <View style={[styles.serviceContentRow, isRTL ? styles.serviceContentRowRtl : null]}>
                                             {resolveServiceImageUri(service) && !serviceImageErrors[service.id] ? (
                                                 <Image
                                                     source={{ uri: resolveServiceImageUri(service)! }}
@@ -909,21 +909,21 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                                     </Text>
                                                 </LinearGradient>
                                             )}
-                                            <View style={styles.serviceInfo}>
-                                                <Text style={styles.serviceName} numberOfLines={1}>
+                                            <View style={[styles.serviceInfo, isRTL ? styles.serviceInfoRtl : null]}>
+                                                <Text style={[styles.serviceName, isRTL ? styles.serviceNameRtl : null]} numberOfLines={1}>
                                                     {serviceName}
                                                 </Text>
                                                 {serviceDesc ? (
-                                                    <Text style={styles.serviceDescription} numberOfLines={2}>
+                                                    <Text style={[styles.serviceDescription, isRTL ? styles.serviceDescriptionRtl : null]} numberOfLines={2}>
                                                         {serviceDesc}
                                                     </Text>
                                                 ) : null}
-                                                <View style={styles.serviceCardMetaRow}>
+                                                <View style={[styles.serviceCardMetaRow, isRTL ? styles.serviceCardMetaRowRtl : null]}>
                                                     <View style={styles.serviceCardMetaPill}>
                                                         <AppIcon name="clock" size={12} color={colors.textSecondary} />
                                                         <Text style={styles.serviceDuration}>{service.duration} {isRTL ? 'دقيقة' : 'min'}</Text>
                                                     </View>
-                                                    <Text style={styles.servicePrice}>{getServicePrice(service).toFixed(2)} SAR</Text>
+                                                    <Text style={[styles.servicePrice, isRTL ? styles.servicePriceRtl : null]}>{getServicePrice(service).toFixed(2)} SAR</Text>
                                                 </View>
                                             </View>
                                             <View style={styles.serviceArrowButton}>
@@ -1873,6 +1873,9 @@ const styles = StyleSheet.create({
         alignItems: 'stretch',
         gap: spacing.md,
     },
+    serviceContentRowRtl: {
+        flexDirection: 'row-reverse',
+    },
     serviceThumbnail: {
         width: 120,
         height: 120,
@@ -1894,16 +1897,27 @@ const styles = StyleSheet.create({
     serviceInfo: {
         flex: 1,
     },
+    serviceInfoRtl: {
+        alignItems: 'flex-end',
+    },
     serviceName: {
         fontSize: fontSize.xl,
         fontWeight: '700',
         color: colors.text,
         marginBottom: 6,
     },
+    serviceNameRtl: {
+        textAlign: 'right',
+        alignSelf: 'stretch',
+    },
     serviceDescription: {
         fontSize: fontSize.md,
         color: colors.textSecondary,
         lineHeight: 24,
+    },
+    serviceDescriptionRtl: {
+        textAlign: 'right',
+        alignSelf: 'stretch',
     },
     serviceDuration: {
         fontSize: fontSize.xs,
@@ -1915,6 +1929,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: spacing.sm,
+    },
+    serviceCardMetaRowRtl: {
+        flexDirection: 'row-reverse',
     },
     serviceCardMetaPill: {
         flexDirection: 'row',
@@ -1929,6 +1946,9 @@ const styles = StyleSheet.create({
         fontSize: fontSize.lg,
         fontWeight: '700',
         color: colors.primary,
+    },
+    servicePriceRtl: {
+        textAlign: 'left',
     },
     serviceArrowButton: {
         width: 44,
@@ -2429,20 +2449,35 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
+    giftBadgeRtl: {
+        left: undefined,
+        right: 8,
+    },
     giftCardContent: {
         flex: 1,
         justifyContent: 'space-between',
+    },
+    giftCardContentRtl: {
+        alignItems: 'flex-end',
     },
     giftCardTitle: {
         fontSize: 19,
         fontWeight: '800',
         color: '#12123B',
     },
+    giftCardTitleRtl: {
+        textAlign: 'right',
+        alignSelf: 'stretch',
+    },
     giftCardDesc: {
         marginTop: 4,
         fontSize: 16,
         lineHeight: 24,
         color: '#5F6786',
+    },
+    giftCardDescRtl: {
+        textAlign: 'right',
+        alignSelf: 'stretch',
     },
     giftValueBlock: {
         marginTop: 10,
@@ -2456,13 +2491,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    giftValueBlockRtl: {
+        flexDirection: 'row-reverse',
+    },
     giftValueColumn: {
         flex: 1,
+    },
+    giftValueColumnRtl: {
+        alignItems: 'flex-end',
+    },
+    giftValueColumnGetRtl: {
+        alignItems: 'flex-start',
     },
     giftValueLabel: {
         fontSize: 12,
         color: '#6A7191',
         fontWeight: '600',
+    },
+    giftValueLabelRtl: {
+        textAlign: 'right',
     },
     giftValueGetLabel: {
         color: '#168A45',
@@ -2472,6 +2519,9 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: '#191A44',
         fontWeight: '800',
+    },
+    giftValueAmountRtl: {
+        textAlign: 'right',
     },
     giftValueGetAmount: {
         marginTop: 4,
@@ -2490,6 +2540,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    giftCardFooterRowRtl: {
+        flexDirection: 'row-reverse',
     },
     giftBonusPill: {
         backgroundColor: '#E6F9EC',
@@ -2520,6 +2573,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 10,
         alignItems: 'flex-start',
+    },
+    giftInfoBannerRtl: {
+        flexDirection: 'row-reverse',
     },
     giftInfoIconWrap: {
         width: 28,

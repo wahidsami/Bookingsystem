@@ -227,7 +227,7 @@ Reason: fix data/display correctness and direction framework first, then UX enha
 - [x] Phase 1 complete
 - [ ] Phase 2 complete
 - [ ] Phase 3 complete
-- [ ] Phase 4 complete
+- [x] Phase 4 complete
 - [ ] Phase 5 complete
 - [ ] Phase 6 complete
 - [ ] Phase 7 complete
@@ -255,3 +255,16 @@ Reason: fix data/display correctness and direction framework first, then UX enha
 - Hardened service details hero media fallback:
   - `RifahMobile/src/screens/ServiceDetailsScreen.tsx`
   - Hero now resolves from full candidate set (not only `image`), then tenant cover/logo, then final static fallback.
+
+### 2026-05-29 - Phase 4 Completed
+- Implemented true RTL card mirroring for tenant Services cards:
+  - `serviceContentRow` mirrored with dedicated RTL style.
+  - service info block, title, description, and metadata row now right-aligned in Arabic.
+  - service price alignment corrected for mirrored layout.
+- Implemented true RTL card mirroring for tenant Gift Cards cards:
+  - media/content row mirrored with proper directional alignment.
+  - promotional badge position mirrored to the right in Arabic.
+  - title/description/value blocks aligned and mirrored for Arabic reading order.
+  - footer row and info banner mirrored in Arabic.
+- File touched:
+  - `RifahMobile/src/screens/TenantScreen.tsx`
