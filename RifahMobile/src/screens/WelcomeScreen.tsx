@@ -128,7 +128,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
         alignItems: 'center',
     },
     contentWrapper: {
@@ -161,12 +161,12 @@ const styles = StyleSheet.create({
     heroCard: {
         width: '100%',
         borderRadius: 24,
-        backgroundColor: `${colors.surface}CC`,
+        backgroundColor: '#FFFFFFE6',
         paddingVertical: clamp(10, SCREEN_HEIGHT * 0.02, 20),
         paddingHorizontal: clamp(10, SCREEN_WIDTH * 0.04, 20),
-        shadowColor: '#000000',
+        shadowColor: '#2E1065',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
+        shadowOpacity: 0.1,
         shadowRadius: 16,
         elevation: 3,
     },
@@ -221,9 +221,9 @@ const styles = StyleSheet.create({
         width: Math.min(SCREEN_WIDTH * 0.86, 480),
         height: clamp(48, SCREEN_HEIGHT * 0.07, 56),
         borderRadius: 999, // Pill shape
-        backgroundColor: 'transparent',
+        backgroundColor: '#FFFFFF',
         borderWidth: 1.5,
-        borderColor: colors.primary,
+        borderColor: '#8B5CF6',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 20,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         position: 'absolute',
         bottom: 0,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
         paddingTop: 16,
     },
     guestButton: {

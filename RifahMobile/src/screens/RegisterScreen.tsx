@@ -348,7 +348,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     scrollContent: {
         flexGrow: 1,
@@ -378,10 +378,10 @@ const styles = StyleSheet.create({
         writingDirection: 'rtl',
     },
     errorContainer: {
-        backgroundColor: `${colors.error}22`,
+        backgroundColor: '#FEE2E2',
         borderWidth: 1,
-        borderColor: `${colors.error}66`,
-        borderRadius: borderRadius.md,
+        borderColor: '#FCA5A5',
+        borderRadius: 14,
         padding: spacing.md,
         marginBottom: spacing.lg,
     },
@@ -398,11 +398,16 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     formCard: {
-        borderRadius: 22,
+        borderRadius: 24,
         borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: `${colors.surface}D9`,
+        borderColor: '#E9DDFD',
+        backgroundColor: '#FFFFFFEB',
         padding: spacing.lg,
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 2,
     },
     row: {
         flexDirection: 'row',
@@ -422,13 +427,13 @@ const styles = StyleSheet.create({
     },
     input: {
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E9DDFD',
+        borderRadius: 14,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: fontSize.md,
         color: colors.text,
-        backgroundColor: colors.background,
+        backgroundColor: '#FAFAFF',
         minHeight: 48,
     },
     rtlInput: {
@@ -452,8 +457,8 @@ const styles = StyleSheet.create({
         padding: spacing.xs,
     },
     registerButton: {
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#7C3AED',
+        borderRadius: 16,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',
         marginTop: spacing.lg,
@@ -469,9 +474,9 @@ const styles = StyleSheet.create({
     },
     googleButton: {
         borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
-        borderRadius: borderRadius.lg,
+        borderColor: '#DDD6FE',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',
         justifyContent: 'center',

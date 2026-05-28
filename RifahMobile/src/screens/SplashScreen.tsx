@@ -37,7 +37,7 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
                 style={styles.loader}
             />
 
-            <Text style={[styles.version, { bottom: bottomInset }]}>Version 1.0.0</Text>
+            <Text style={[styles.version, { bottom: Math.max(bottomInset, 14) }]}>Version 1.0.0</Text>
         </LinearGradient>
     );
 }
@@ -69,6 +69,10 @@ const styles = StyleSheet.create({
     logoContainer: {
         alignItems: 'center',
         marginBottom: 40,
+        backgroundColor: '#FFFFFF22',
+        borderRadius: 24,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
     },
     logoImage: {
         width: 200,
