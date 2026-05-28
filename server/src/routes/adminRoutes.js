@@ -13,6 +13,7 @@ const adminFinancialController = require('../controllers/adminFinancialControlle
 const adminCategoryController = require('../controllers/adminCategoryController');
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
 const adminGiftCardPackageController = require('../controllers/adminGiftCardPackageController');
+const customerInvoiceController = require('../controllers/customerInvoiceController');
 
 // All routes require super admin authentication
 router.use(authenticateSuperAdmin);
@@ -33,6 +34,10 @@ router.get('/financial/commission-breakdown', adminFinancialController.getCommis
 router.get('/financial/commission-by-package', adminFinancialController.getCommissionByPackage);
 router.get('/financial/revenue-by-type', adminFinancialController.getRevenueByType);
 router.get('/financial/bills-summary', adminFinancialController.getBillsSummary);
+router.get('/financial/customer-invoices', requirePermission('financial', 'view'), customerInvoiceController.listAdminInvoices);
+router.get('/financial/customer-invoices/:id', requirePermission('financial', 'view'), customerInvoiceController.getAdminInvoiceById);
+router.get('/financial/customer-invoices/:id/invoice-pdf', requirePermission('financial', 'view'), customerInvoiceController.getAdminInvoicePdf);
+router.get('/financial/customer-invoices/:id/receipt-pdf', requirePermission('financial', 'view'), customerInvoiceController.getAdminReceiptPdf);
 router.get('/financial/top-employees', adminFinancialController.getTopEmployees);
 router.get('/financial/transactions/:tenantId', adminFinancialController.getTransactionDetails);
 router.get('/financial/employee-metrics/:tenantId', adminFinancialController.getTenantEmployeeMetrics);
@@ -66,6 +71,7 @@ router.delete('/tenants/:id', requirePermission('tenants', 'delete'), adminTenan
 // ===== USERS MANAGEMENT =====
 router.get('/users', requirePermission('users', 'view'), adminUsersController.listUsers);
 router.get('/users/:id', requirePermission('users', 'view'), adminUsersController.getUserDetails);
+router.get('/users/:id/invoices', requirePermission('users', 'view'), customerInvoiceController.listAdminUserInvoices);
 router.put('/users/:id', requirePermission('users', 'edit'), adminUsersController.updateUser);
 router.post('/users/:id/toggle-status', requirePermission('users', 'edit'), adminUsersController.toggleUserStatus);
 router.post('/users/:id/adjust-balance', requirePermission('users', 'edit'), adminUsersController.adjustUserBalance);

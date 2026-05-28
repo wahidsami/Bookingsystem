@@ -25,6 +25,7 @@ const tenantMessagesController = require('../controllers/tenantMessagesControlle
 const tenantPayrollController = require('../controllers/tenantPayrollController');
 const tenantNotificationController = require('../controllers/tenantNotificationController');
 const tenantGiftCardController = require('../controllers/tenantGiftCardController');
+const customerInvoiceController = require('../controllers/customerInvoiceController');
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const aiController = require('../controllers/tenant/aiController');
 const { authenticateTenant, checkTenantFeature, rateLimitTenant } = require('../middleware/authTenant');
@@ -149,6 +150,10 @@ router.get('/financial/employees/:id', tenantFinancialController.getEmployeeFina
 router.get('/financial/services', tenantFinancialController.getServiceRevenue);
 router.get('/financial/products', tenantFinancialController.getProductRevenue);
 router.get('/financial/daily', tenantFinancialController.getDailyRevenue);
+router.get('/financial/invoices', customerInvoiceController.listTenantInvoices);
+router.get('/financial/invoices/:id', customerInvoiceController.getTenantInvoiceById);
+router.get('/financial/invoices/:id/invoice-pdf', customerInvoiceController.getTenantInvoicePdf);
+router.get('/financial/invoices/:id/receipt-pdf', customerInvoiceController.getTenantReceiptPdf);
 
 // Customer management
 router.get('/customers', tenantCustomerController.getCustomers);

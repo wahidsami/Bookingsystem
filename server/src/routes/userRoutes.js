@@ -5,6 +5,7 @@ const paymentMethodController = require('../controllers/paymentMethodController'
 const reviewController = require('../controllers/reviewController');
 const userGiftController = require('../controllers/userGiftController');
 const userTenantGiftController = require('../controllers/userTenantGiftController');
+const customerInvoiceController = require('../controllers/customerInvoiceController');
 const { authenticateUser } = require('../middleware/authUser');
 
 // Get user profile
@@ -60,6 +61,12 @@ router.post('/tenant-gifts/claim', authenticateUser, userTenantGiftController.cl
 router.get('/tenant-gifts/history', authenticateUser, userTenantGiftController.listMyTenantGiftTransactions);
 router.get('/tenant-gifts/wallet', authenticateUser, userTenantGiftController.getTenantWalletBalance);
 router.get('/tenant-gifts/claim/open', userTenantGiftController.openGiftClaimLink);
+
+// Customer commerce invoices
+router.get('/invoices', authenticateUser, customerInvoiceController.listUserInvoices);
+router.get('/invoices/:id', authenticateUser, customerInvoiceController.getUserInvoiceById);
+router.get('/invoices/:id/invoice-pdf', authenticateUser, customerInvoiceController.getUserInvoicePdf);
+router.get('/invoices/:id/receipt-pdf', authenticateUser, customerInvoiceController.getUserReceiptPdf);
 
 module.exports = router;
 
