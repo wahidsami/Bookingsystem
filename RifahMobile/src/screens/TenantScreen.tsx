@@ -538,7 +538,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         const heroChips = [
             {
                 key: 'status',
-                icon: tenant.isAvailable ? 'check' : 'close',
+                icon: tenant.isAvailable ? 'clock' : 'close',
                 label: tenant.isAvailable
                     ? (isRTL ? 'مفتوح الآن' : 'Open now')
                     : (isRTL ? 'مغلق الآن' : 'Closed now'),

@@ -10,7 +10,6 @@ import { TenantHorizontalList } from '../components/home/TenantHorizontalList';
 import { CategoriesGrid } from '../components/home/CategoriesGrid';
 import { TopProvidersSection } from '../components/home/TopProvidersSection';
 import { useScreenSafeArea } from '../utils/safeArea';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface HomeScreenProps {
     navigation?: any;
@@ -45,22 +44,6 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     />
                 }
             >
-                <LinearGradient
-                    colors={['#F8F4FF', colors.background]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.heroWash}
-                />
-                <View style={styles.heroCard}>
-                    <Text style={styles.heroTitle}>
-                        {isRTL ? 'اكتشفي أفضل تجارب الجمال والعناية' : 'Discover premium beauty & wellness experiences'}
-                    </Text>
-                    <Text style={styles.heroSubtitle}>
-                        {isRTL
-                            ? 'احجزي بسهولة، اختاري مقدم الخدمة المناسب، واستمتعي بتجربة رفاهية متكاملة.'
-                            : 'Book effortlessly, choose the right provider, and enjoy a complete luxury journey.'}
-                    </Text>
-                </View>
                 {/* Section 1: Hot Deals */}
                 <SectionHeader title={t('hotDeals')} />
                 <HotDealsCarousel navigation={navigation} />
@@ -79,7 +62,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
                 {/* Section 5: Top service providers */}
                 <SectionHeader title={t('topProviders')} />
-                <TopProvidersSection />
+                <TopProvidersSection navigation={navigation} />
 
             </ScrollView>
         </View>
@@ -92,39 +75,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
     },
     scrollContent: {
+        paddingTop: spacing.sm,
         paddingBottom: spacing.lg,
-    },
-    heroWash: {
-        height: 12,
-        width: '100%',
-    },
-    heroCard: {
-        marginHorizontal: spacing.lg,
-        marginTop: spacing.sm,
-        marginBottom: spacing.md,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
-        borderRadius: 24,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#EEE8FB',
-        shadowColor: '#1B1540',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
-        elevation: 2,
-    },
-    heroTitle: {
-        fontSize: 28,
-        lineHeight: 34,
-        color: '#13133A',
-        fontWeight: '800',
-    },
-    heroSubtitle: {
-        marginTop: 8,
-        fontSize: 15,
-        lineHeight: 23,
-        color: '#626A89',
-        fontWeight: '500',
     },
 });

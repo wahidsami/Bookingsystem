@@ -149,6 +149,6 @@ const iconMap = {
 } as const;
 
 export function AppIcon({ name, size = 22, color = '#7F50D2' }: Props) {
-  const Icon = iconMap[name];
+  const Icon = iconMap[name] || WarningIcon;
   return <Icon width={size} height={size} color={color} />;
 }
