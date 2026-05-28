@@ -13,6 +13,8 @@ const {
     createAppointmentTransaction,
     resolveLedgerPaymentMethod
 } = require('./paymentTransactionLedgerService');
+const { ensureAppointmentInvoice } = require('./customerInvoiceService');
+const { sendCustomerInvoiceLifecycleEmail } = require('./customerInvoiceEmailService');
 
 /**
  * Calculate deposit and remainder amounts based on tenant settings
@@ -74,6 +76,15 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
         totalPaid: newTotalPaid,
         paymentStatus: 'fully_paid'
     });
+
+    const invoice = await ensureAppointmentInvoice(appointment.id, {
+        triggerSource: 'tenant_remainder_collection'
+    });
+    if (invoice?.id) {
+        sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
+            console.warn('Remainder payment invoice email warning:', error.message);
+        });
+    }
 
     return appointment;
 };
@@ -161,6 +172,15 @@ const refundPayment = async (appointmentId, refundData) => {
         depositPaid: newTotalPaid >= appointment.depositAmount,
         remainderPaid: newTotalPaid >= parseFloat(appointment.price)
     });
+
+    const invoice = await ensureAppointmentInvoice(appointment.id, {
+        triggerSource: 'appointment_refund'
+    });
+    if (invoice?.id) {
+        sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
+            console.warn('Refund invoice email warning:', error.message);
+        });
+    }
 
     return transaction;
 };
