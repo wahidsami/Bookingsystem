@@ -681,6 +681,9 @@ const startServer = async () => {
         await db.StaffPayroll.sync({ force: false }); // Payroll records
         await db.Order.sync({ force: false }); // Order system
         await db.OrderItem.sync({ force: false }); // Order items
+        await db.CustomerInvoice.sync({ force: false }); // Customer commerce invoices
+        await db.CustomerInvoiceItem.sync({ force: false }); // Customer invoice line items
+        await db.CustomerInvoiceEvent.sync({ force: false }); // Customer invoice audit trail
         await db.PublicPageData.sync({ force: false }); // Public page data
 
         console.log('✅ Database synced successfully.');
