@@ -73,16 +73,16 @@ Replace the current appointment details drawer/modal in customer app with a full
 - Arabic/English text fit checks.
 - Overflow checks for long service/provider names.
 - QA pass on small and large phones.
-- Status: `pending`
+- Status: `completed`
 
 ## Compact Design Constraints Checklist
-- [ ] Header title max lines = 1 with ellipsis.
-- [ ] Booking number max lines = 1 with truncation strategy.
-- [ ] Status pills wrap without clipping.
-- [ ] Service title max lines = 2.
-- [ ] Variant/provider/date rows never overflow container width.
-- [ ] Action buttons preserve text inside bounds in EN/AR.
-- [ ] Notes block clamps or scrolls safely when long.
+- [x] Header title max lines = 1 with ellipsis.
+- [x] Booking number max lines = 1 with truncation strategy.
+- [x] Status pills wrap without clipping.
+- [x] Service title max lines = 2.
+- [x] Variant/provider/date rows never overflow container width.
+- [x] Action buttons preserve text inside bounds in EN/AR.
+- [x] Notes block clamps or scrolls safely when long.
 
 ## QA Acceptance Criteria
 - Tapping appointment card opens full page (not drawer).
@@ -98,3 +98,4 @@ Replace the current appointment details drawer/modal in customer app with a full
 - 2026-05-28: Completed premium header/summary hero pass in `AppointmentDetails` with tenant image fallback to Refah gradient.
 - 2026-05-28: Completed metrics/services compact pass with overflow hardening in `AppointmentDetails`.
 - 2026-05-28: Completed guest/payment/actions pass including contact-center placeholder action.
+- 2026-05-28: Completed robustness/polish pass for empty state, policy note, and compact text-fit constraints.

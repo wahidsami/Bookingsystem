@@ -212,8 +212,8 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', padding: spacing.lg }]}>
         <Text style={styles.emptyText}>{language === 'ar' ? 'تعذر تحميل تفاصيل الموعد.' : 'Unable to load appointment details.'}</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.primaryBtnText}>{language === 'ar' ? 'رجوع' : 'Back'}</Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Browse')}>
+          <Text style={styles.primaryBtnText}>{language === 'ar' ? 'تصفح الخدمات' : 'Browse Services'}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -385,6 +385,15 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               <Text style={styles.contactBtnText}>{language === 'ar' ? 'التواصل مع المركز' : 'Contact Center'}</Text>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.policyNote}>
+            <AppIcon name="info" size={16} color={colors.textSecondary} />
+            <Text style={styles.policyText}>
+              {language === 'ar'
+                ? 'يمكنك تعديل الموعد أو إلغاؤه بحسب سياسة المركز.'
+                : 'You can change or cancel your appointment based on center policy.'}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -471,6 +480,8 @@ const styles = StyleSheet.create({
   secondaryBtnPlaceholder: { flex: 1 },
   contactBtn: { minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#D7DAEA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   contactBtnText: { color: '#4B5072', fontWeight: '700' },
+  policyNote: { marginBottom: spacing.md, borderRadius: 14, borderWidth: 1, borderColor: '#E8EAF4', backgroundColor: '#FFFFFF', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  policyText: { flex: 1, color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
   emptyText: { color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.5)', justifyContent: 'center' },
   modalCard: { marginHorizontal: spacing.lg, borderRadius: borderRadius.md, backgroundColor: '#FFFFFF', padding: spacing.md },
