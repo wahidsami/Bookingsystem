@@ -17,6 +17,10 @@ const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatu
 const notificationOrchestrator = require('./notificationOrchestratorService');
 const { createAppointmentTransaction } = require('./paymentTransactionLedgerService');
 const walletService = require('./walletService');
+const {
+    ensureAppointmentInvoice,
+    syncOrderInvoiceStatus
+} = require('./customerInvoiceService');
 
 class PaymentService {
     async processWalletPayment(paymentData) {
@@ -174,6 +178,11 @@ class PaymentService {
                 }
             }
 
+            await ensureAppointmentInvoice(appointment.id, {
+                transaction,
+                triggerSource: 'customer_wallet_payment'
+            });
+
             return { transaction: tx, paymentMethodId: null };
         });
     }
@@ -239,6 +248,11 @@ class PaymentService {
                     transaction
                 });
             }
+
+            await syncOrderInvoiceStatus(order.id, {
+                transaction,
+                triggerSource: 'customer_wallet_payment'
+            });
 
             return { transaction: tx, paymentMethodId: null, order };
         });
@@ -545,6 +559,10 @@ class PaymentService {
             }
         }
 
+        await ensureAppointmentInvoice(appointment.id, {
+            triggerSource: 'customer_card_payment'
+        });
+
         try {
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'booking';
             await notificationOrchestrator.notifyCustomer({
@@ -717,6 +735,10 @@ class PaymentService {
             paymentStatus: 'paid',
             status: order.status === 'pending' ? 'confirmed' : order.status,
             paidAt: new Date()
+        });
+
+        await syncOrderInvoiceStatus(order.id, {
+            triggerSource: 'customer_card_payment'
         });
 
         if (!wasPaid) {

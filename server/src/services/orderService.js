@@ -10,6 +10,10 @@ const {
     createOrderTransaction,
     resolveLedgerPaymentMethod
 } = require('./paymentTransactionLedgerService');
+const {
+    ensureOrderInvoice,
+    syncOrderInvoiceStatus
+} = require('./customerInvoiceService');
 
 class OrderService {
     _calculateShippingFee(deliveryType, shippingFee = null, deliveryMethod = 'standard') {
@@ -169,6 +173,11 @@ class OrderService {
                 }, { transaction });
             }
 
+            await ensureOrderInvoice(order.id, {
+                transaction,
+                triggerSource: 'order_created'
+            });
+
             if (shouldCommit) {
                 await transaction.commit();
             }
@@ -323,6 +332,11 @@ class OrderService {
                     }
                 }, { transaction });
             }
+
+            await syncOrderInvoiceStatus(order.id, {
+                transaction,
+                triggerSource: 'order_payment_status_update'
+            });
 
             if (shouldCommit) {
                 await transaction.commit();
