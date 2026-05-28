@@ -59,7 +59,7 @@ Replace the current appointment details drawer/modal in customer app with a full
 - Metrics 2x2 block (services/total/payable/first time).
 - Vertical service cards (compact, no overflow).
 - Service metadata and status/payment chips.
-- Status: `pending`
+- Status: `completed`
 
 ## Phase 4 — Guest, Payment, Actions
 - Guest info card (conditional).
@@ -96,3 +96,4 @@ Replace the current appointment details drawer/modal in customer app with a full
 - 2026-05-28: Added `AppointmentDetails` screen and wired appointment cards to open full page.
 - 2026-05-28: Removed legacy appointment details drawer from `BookingsScreen`.
 - 2026-05-28: Completed premium header/summary hero pass in `AppointmentDetails` with tenant image fallback to Refah gradient.
+- 2026-05-28: Completed metrics/services compact pass with overflow hardening in `AppointmentDetails`.

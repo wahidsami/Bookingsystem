@@ -229,10 +229,10 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
           </View>
 
           <View style={styles.metricsGrid}>
-          <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text><Text style={styles.metricValue}>{group.items.length}</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue}>{group.totalPrice.toFixed(2)} SAR</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue}>{group.payableNowTotal.toFixed(2)} SAR</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel}>{language === 'ar' ? 'أول موعد' : 'First Appt.'}</Text><Text style={styles.metricValueSmall}>{format(new Date(group.startTime), 'd MMM, h:mm a', { locale: language === 'ar' ? ar : enUS })}</Text></View>
+          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.items.length}</Text></View>
+          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.totalPrice.toFixed(2)} SAR</Text></View>
+          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.payableNowTotal.toFixed(2)} SAR</Text></View>
+          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'أول موعد' : 'First Appt.'}</Text><Text style={styles.metricValueSmall} numberOfLines={1}>{format(new Date(group.startTime), 'd MMM, h:mm a', { locale: language === 'ar' ? ar : enUS })}</Text></View>
           </View>
 
           {guest ? (
@@ -249,11 +249,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <Text style={styles.serviceIndex}>{language === 'ar' ? `الخدمة ${index + 1}` : `Service ${index + 1}`}</Text>
             <Text style={styles.serviceName} numberOfLines={2}>{getServiceName(booking)}</Text>
             {!!booking.serviceVariantName && <Text style={styles.serviceVariant} numberOfLines={1}>{booking.serviceVariantName}</Text>}
-            <Text style={styles.rowText}>{format(new Date(booking.startTime), 'PPP p', { locale: language === 'ar' ? ar : enUS })}</Text>
-            <Text style={styles.rowText}>{language === 'ar' ? 'الموظف' : 'Provider'}: {getStaffName(booking)}</Text>
-            <Text style={styles.rowText}>{language === 'ar' ? 'الحالة' : 'Status'}: {getStatusText(booking.status, language)}</Text>
-            <Text style={styles.rowText}>{language === 'ar' ? 'الدفع' : 'Payment'}: {getPaymentStatusText(booking)}</Text>
-            <Text style={styles.priceText}>{Number(booking.price || 0).toFixed(2)} SAR</Text>
+            <Text style={styles.rowText} numberOfLines={2}>{format(new Date(booking.startTime), 'PPP p', { locale: language === 'ar' ? ar : enUS })}</Text>
+            <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الموظف' : 'Provider'}: {getStaffName(booking)}</Text>
+            <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الحالة' : 'Status'}: {getStatusText(booking.status, language)}</Text>
+            <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الدفع' : 'Payment'}: {getPaymentStatusText(booking)}</Text>
+            <Text style={styles.priceText} numberOfLines={1}>{Number(booking.price || 0).toFixed(2)} SAR</Text>
 
             <View style={styles.actionsWrap}>
               {bookingNeedsPayment(booking.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(booking.status) && activeTab === 'upcoming' && (
@@ -272,18 +272,18 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               {['confirmed', 'pending'].includes(booking.status) && activeTab === 'upcoming' && (
                 <View style={styles.secondaryActions}>
                   {(booking.Service?.allowReschedule || booking.service?.allowReschedule) ? (
-                    <TouchableOpacity style={styles.secondaryBtn} onPress={() => openReschedule(booking)}>
-                      <Text style={styles.secondaryBtnText}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
+                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => openReschedule(booking)}>
+                      <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
                     </TouchableOpacity>
                   ) : null}
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(booking.id)}>
-                    <Text style={styles.cancelBtnText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+                    <Text style={styles.cancelBtnText} numberOfLines={1}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
                   </TouchableOpacity>
                 </View>
               )}
               {booking.status === 'completed' && activeTab === 'history' && (
                 <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('Review', { appointmentId: booking.id })}>
-                  <Text style={styles.secondaryBtnText}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
+                  <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },
   heroSubTitle: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.9)' },
-  contentWrap: { paddingHorizontal: spacing.md, marginTop: -38 },
+  contentWrap: { paddingHorizontal: spacing.md, marginTop: -38, gap: spacing.md },
   summaryCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
   label: { color: colors.textSecondary, fontSize: 12 },
   bookingNumber: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 4 },
@@ -342,19 +342,19 @@ const styles = StyleSheet.create({
   paymentPillText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   metaText: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   metricsGrid: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', flexWrap: 'wrap' },
-  metricCell: { width: '50%', paddingVertical: spacing.sm, paddingRight: spacing.sm },
+  metricCell: { width: '50%', paddingVertical: spacing.sm, paddingRight: spacing.sm, minHeight: 56, justifyContent: 'center' },
   metricLabel: { fontSize: 12, color: colors.textSecondary },
   metricValue: { marginTop: 3, fontSize: 15, fontWeight: '800', color: colors.text },
   metricValueSmall: { marginTop: 3, fontSize: 13, fontWeight: '700', color: colors.text },
-  sectionTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.text, marginBottom: spacing.sm },
+  sectionTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.xs },
   guestCard: { borderRadius: 20, backgroundColor: '#F4EEFF', borderWidth: 1, borderColor: '#E6DAFD', padding: spacing.md, marginBottom: spacing.md },
   guestName: { fontSize: 16, color: colors.text, fontWeight: '700' },
   guestPhone: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
-  serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+  serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
   serviceIndex: { fontSize: 12, color: colors.primary, fontWeight: '700' },
   serviceName: { marginTop: 2, fontSize: 18, fontWeight: '800', color: colors.text },
   serviceVariant: { marginTop: 2, fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
-  rowText: { marginTop: 3, fontSize: 13, color: '#4B5072' },
+  rowText: { marginTop: 3, fontSize: 13, color: '#4B5072', flexShrink: 1 },
   priceText: { marginTop: spacing.sm, fontSize: 18, color: colors.primary, fontWeight: '800' },
   actionsWrap: { marginTop: spacing.sm, gap: spacing.sm },
   primaryBtn: { minHeight: 48, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
