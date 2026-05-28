@@ -718,6 +718,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       { kind: "link", name: t("payroll"), href: `/${locale}/dashboard/payroll`, icon: BanknotesIcon, visible: hasPayroll, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.payroll },
       { kind: "link", name: t("reports"), href: `/${locale}/dashboard/reports`, icon: GlobeAltIcon, visible: hasReports, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.reports },
       { kind: "link", name: t("settings"), href: `/${locale}/dashboard/settings`, icon: Cog6ToothIcon, permissionKey: DASHBOARD_SECTION_PERMISSION_MAP.settings },
+      { kind: "link", name: locale === 'ar' ? 'قائمة اختبار الجودة' : 'QA Checklist', href: `/${locale}/dashboard/qa-checklist`, icon: DocumentTextIcon, permissionKey: null },
     ];
   }, [billingChildren, canAccessPermission, catalogChildren, hasHotDeals, hasInternalMessaging, hasPayroll, hasPushNotifications, hasReports, locale, marketingChildren, posDueCount, t]);
   const navigation = navigationItems.filter((item) => item.visible !== false && (item.kind === "group" || canAccessPermission(item.permissionKey)));
