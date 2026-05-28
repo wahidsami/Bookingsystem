@@ -192,6 +192,12 @@ export interface Service {
     allowReschedule?: boolean;
     variants?: ServiceVariant[];
     employees?: Staff[];
+    image?: string;
+    imageUrl?: string;
+    images?: string[];
+    thumbnail?: string;
+    coverImage?: string;
+    media?: string[];
 }
 
 export interface ServiceVariant {
@@ -642,6 +648,22 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
     finalPrice: toNumber(service?.finalPrice),
     paymentOptions: normalizeServicePaymentOptionsValue((service as Partial<Service> & { paymentOptions?: unknown }).paymentOptions),
     allowReschedule: toBoolean((service as Partial<Service> & { allowReschedule?: unknown }).allowReschedule, false),
+    image: toOptionalString((service as Partial<Service> & { image?: unknown; imageUrl?: unknown }).image)
+        || toOptionalString((service as Partial<Service> & { imageUrl?: unknown }).imageUrl),
+    imageUrl: toOptionalString((service as Partial<Service> & { imageUrl?: unknown; image?: unknown }).imageUrl)
+        || toOptionalString((service as Partial<Service> & { image?: unknown }).image),
+    images: Array.isArray((service as Partial<Service> & { images?: unknown }).images)
+        ? ((service as Partial<Service> & { images?: unknown }).images as unknown[])
+            .map((img) => toStringValue(img))
+            .filter(Boolean)
+        : [],
+    thumbnail: toOptionalString((service as Partial<Service> & { thumbnail?: unknown }).thumbnail),
+    coverImage: toOptionalString((service as Partial<Service> & { coverImage?: unknown }).coverImage),
+    media: Array.isArray((service as Partial<Service> & { media?: unknown }).media)
+        ? ((service as Partial<Service> & { media?: unknown }).media as unknown[])
+            .map((img) => toStringValue(img))
+            .filter(Boolean)
+        : [],
     variants: Array.isArray((service as Partial<Service> & { variants?: unknown }).variants)
         ? ((service as Partial<Service> & { variants?: unknown }).variants as unknown[])
             .map((variant) => normalizeServiceVariant(variant))

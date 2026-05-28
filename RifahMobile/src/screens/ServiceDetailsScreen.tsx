@@ -69,7 +69,25 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
     const selectedVariant = activeVariants.find((variant: ServiceVariant) => variant.id === selectedVariantId) || null;
     const effectivePrice = getServicePrice(resolvedService, selectedVariant || undefined);
     const effectiveDuration = selectedVariant?.duration || resolvedService.duration;
-    const heroUri = getImageUrl((resolvedService as any).image) || getImageUrl(tenant?.coverImage || '') || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=1800&auto=format&fit=crop';
+    const heroUri = useMemo(() => {
+        const candidates = [
+            (resolvedService as any).image,
+            (resolvedService as any).imageUrl,
+            (resolvedService as any).thumbnail,
+            (resolvedService as any).coverImage,
+            ...((resolvedService as any).images && Array.isArray((resolvedService as any).images) ? (resolvedService as any).images : []),
+            ...((resolvedService as any).media && Array.isArray((resolvedService as any).media) ? (resolvedService as any).media : []),
+            tenant?.coverImage,
+            tenant?.logo,
+        ].filter(Boolean) as string[];
+
+        for (const candidate of candidates) {
+            const resolved = getImageUrl(candidate) || candidate;
+            if (resolved && `${resolved}`.trim()) return resolved;
+        }
+
+        return 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=1800&auto=format&fit=crop';
+    }, [resolvedService, tenant?.coverImage, tenant?.logo]);
 
     const handleShare = async () => {
         try {

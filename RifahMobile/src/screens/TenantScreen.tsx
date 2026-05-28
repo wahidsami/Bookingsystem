@@ -79,6 +79,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showGiftsTab, setShowGiftsTab] = useState(false);
     const [giftPackages, setGiftPackages] = useState<TenantGiftPackage[]>([]);
     const [giftImageErrors, setGiftImageErrors] = useState<Record<string, boolean>>({});
+    const [serviceImageErrors, setServiceImageErrors] = useState<Record<string, boolean>>({});
     const [reviews, setReviews] = useState<TenantReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
@@ -295,6 +296,25 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const getLocalizedText = (enValue?: string | null, arValue?: string | null, fallback?: string | null) =>
         (isRTL ? arValue || enValue : enValue || arValue) || fallback || null;
+
+    const resolveServiceImageUri = (service: Service) => {
+        const mediaCandidates = [
+            service.image,
+            service.imageUrl,
+            service.thumbnail,
+            service.coverImage,
+            ...(Array.isArray(service.images) ? service.images : []),
+            ...((service as any).media && Array.isArray((service as any).media) ? (service as any).media : []),
+            (service as any).photo,
+            (service as any).avatar,
+        ].filter(Boolean) as string[];
+
+        for (const candidate of mediaCandidates) {
+            const resolved = getImageUrl(candidate) || candidate;
+            if (resolved && `${resolved}`.trim()) return resolved;
+        }
+        return null;
+    };
 
     const normalizeList = (items: unknown): string[] => {
         if (!Array.isArray(items)) {
@@ -871,10 +891,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         activeOpacity={0.92}
                                     >
                                         <View style={[styles.serviceContentRow, isRTL ? { flexDirection: 'row-reverse' } : null]}>
-                                            {(service as any).image ? (
+                                            {resolveServiceImageUri(service) && !serviceImageErrors[service.id] ? (
                                                 <Image
-                                                    source={{ uri: getImageUrl((service as any).image) }}
+                                                    source={{ uri: resolveServiceImageUri(service)! }}
                                                     style={styles.serviceThumbnail}
+                                                    onError={() => setServiceImageErrors((prev) => ({ ...prev, [service.id]: true }))}
                                                 />
                                             ) : (
                                                 <LinearGradient
