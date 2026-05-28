@@ -682,59 +682,125 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const renderGifts = () => (
         <View style={styles.contentSection}>
+            <View style={styles.giftsHeaderBlock}>
+                <Text style={styles.giftsHeaderTitle}>{isRTL ? 'بطاقات الهدايا' : 'Gift Cards'}</Text>
+                <Text style={styles.giftsHeaderSubtitle}>
+                    {isRTL ? 'قدّم هدية العناية والرفاهية لمن تحب.' : 'Give the gift of wellness and self-care.'}
+                </Text>
+            </View>
+
             {giftPackages.length === 0 ? (
-                renderEmptyState(isRTL ? 'لا توجد بطاقات هدايا حالياً.' : 'No gift cards available right now.')
+                renderEmptyState(isRTL ? 'تجارب الهدايا قريباً ✨' : 'Gift experiences coming soon ✨')
             ) : (
-                giftPackages.map((pkg) => {
+                giftPackages.map((pkg, index) => {
                     const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                    const bonusAmount = Number(pkg.bonusAmount || 0);
                     const hasImage = !!pkg.imageUrl && !giftImageErrors[pkg.id];
+                    const localizedTitle = isRTL ? pkg.title_ar : pkg.title_en;
+                    const localizedDescription = (isRTL ? pkg.description_ar : pkg.description_en) || (isRTL ? pkg.description_en : pkg.description_ar) || '';
+                    const badgeLabel = index === 0
+                        ? (isRTL ? 'الأكثر طلباً' : 'Most Popular')
+                        : bonusAmount > 0
+                            ? (isRTL ? 'قيمة إضافية' : 'Best Value')
+                            : null;
+
                     return (
-                        <View key={pkg.id} style={styles.giftCard}>
-                            {hasImage ? (
-                                <Image
-                                    source={{ uri: getImageUrl(pkg.imageUrl) }}
-                                    style={styles.giftCardImage}
-                                    onError={() => setGiftImageErrors((prev) => ({ ...prev, [pkg.id]: true }))}
-                                />
-                            ) : (
-                                <LinearGradient
-                                    colors={['#8B5CF6', '#A78BFA']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={styles.giftCardImageFallback}
-                                >
-                                    <Text style={styles.giftCardImageFallbackTitle}>
-                                        {isRTL ? pkg.title_ar : pkg.title_en}
-                                    </Text>
-                                    <Text style={styles.giftCardImageFallbackSub}>
-                                        {isRTL ? 'بطاقة هدية' : 'Gift Card'}
-                                    </Text>
-                                </LinearGradient>
-                            )}
-                            <Text style={styles.giftCardTitle}>{isRTL ? pkg.title_ar : pkg.title_en}</Text>
-                            {!!(isRTL ? pkg.description_ar : pkg.description_en) && (
-                                <Text style={styles.giftCardDesc} numberOfLines={2}>
-                                    {isRTL ? pkg.description_ar : pkg.description_en}
-                                </Text>
-                            )}
-                            <Text style={styles.giftCardAmount}>
-                                {Number(pkg.priceAmount).toFixed(2)} SAR {'->'} {totalCredit.toFixed(2)} SAR
-                            </Text>
-                            <TouchableOpacity
-                                style={styles.giftCardButton}
-                                onPress={() => navigation.navigate('Gifts', {
-                                    tenantId: tenant?.id,
-                                    tenantName: tenant?.name
-                                })}
-                            >
-                                <Text style={styles.giftCardButtonText}>
-                                    {isRTL ? 'شراء / إرسال' : 'Buy / Send'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            key={pkg.id}
+                            style={styles.giftCard}
+                            activeOpacity={0.92}
+                            onPress={() => navigation.navigate('Gifts', {
+                                tenantId: tenant?.id,
+                                tenantName: tenant?.name,
+                            })}
+                        >
+                            <View style={[styles.giftCardRow, isRTL ? styles.giftCardRowRtl : null]}>
+                                <View style={styles.giftCardMediaWrap}>
+                                    {hasImage ? (
+                                        <Image
+                                            source={{ uri: getImageUrl(pkg.imageUrl) }}
+                                            style={styles.giftCardImage}
+                                            onError={() => setGiftImageErrors((prev) => ({ ...prev, [pkg.id]: true }))}
+                                        />
+                                    ) : (
+                                        <LinearGradient
+                                            colors={['#221146', '#6D3BC8', '#A18AF5']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={styles.giftCardImageFallback}
+                                        >
+                                            <AppIcon name="sparkles" size={22} color="#F8F2FF" />
+                                            <Text style={styles.giftCardImageFallbackTitle} numberOfLines={2}>
+                                                {localizedTitle}
+                                            </Text>
+                                            <Text style={styles.giftCardImageFallbackSub}>
+                                                {isRTL ? 'هدية رفاهية' : 'Wellness Gift'}
+                                            </Text>
+                                        </LinearGradient>
+                                    )}
+                                    {badgeLabel ? (
+                                        <View style={styles.giftBadge}>
+                                            <Text style={styles.giftBadgeText}>{badgeLabel}</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+
+                                <View style={styles.giftCardContent}>
+                                    <Text style={styles.giftCardTitle} numberOfLines={1}>{localizedTitle}</Text>
+                                    {localizedDescription ? (
+                                        <Text style={styles.giftCardDesc} numberOfLines={2}>
+                                            {localizedDescription}
+                                        </Text>
+                                    ) : null}
+
+                                    <View style={styles.giftValueBlock}>
+                                        <View style={styles.giftValueColumn}>
+                                            <Text style={styles.giftValueLabel}>{isRTL ? 'أنت تدفع' : 'You Pay'}</Text>
+                                            <Text style={styles.giftValueAmount}>{Number(pkg.priceAmount).toFixed(2)} SAR</Text>
+                                        </View>
+                                        <Text style={styles.giftValueArrow}>{isRTL ? '←' : '→'}</Text>
+                                        <View style={[styles.giftValueColumn, { alignItems: 'flex-end' }]}>
+                                            <Text style={[styles.giftValueLabel, styles.giftValueGetLabel]}>{isRTL ? 'يحصل على' : 'They Get'}</Text>
+                                            <Text style={styles.giftValueGetAmount}>{totalCredit.toFixed(2)} SAR</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.giftCardFooterRow}>
+                                        {bonusAmount > 0 ? (
+                                            <View style={styles.giftBonusPill}>
+                                                <Text style={styles.giftBonusText}>
+                                                    + {bonusAmount.toFixed(2)} SAR {isRTL ? 'هدية إضافية' : 'Bonus'}
+                                                </Text>
+                                            </View>
+                                        ) : <View />}
+                                        <View style={styles.giftArrowButton}>
+                                            <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={18} color={colors.primary} />
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
                     );
                 })
             )}
+
+            {giftPackages.length > 0 ? (
+                <View style={styles.giftInfoBanner}>
+                    <View style={styles.giftInfoIconWrap}>
+                        <AppIcon name="card" size={16} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.giftInfoText}>
+                            {isRTL
+                                ? 'جميع بطاقات الهدايا صالحة لمدة 12 شهرًا من تاريخ الشراء.'
+                                : 'All gift cards are valid for 12 months from the date of purchase.'}
+                        </Text>
+                        <Text style={styles.giftInfoSubText}>
+                            {isRTL ? 'تُطبق الشروط والأحكام.' : 'Terms & conditions apply.'}
+                        </Text>
+                    </View>
+                </View>
+            ) : null}
         </View>
     );
 
@@ -2106,73 +2172,195 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         fontWeight: '700',
     },
-    giftCard: {
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 24,
-        padding: spacing.md,
+    giftsHeaderBlock: {
         marginBottom: spacing.md,
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-        elevation: 2,
+    },
+    giftsHeaderTitle: {
+        fontSize: 38,
+        fontWeight: '800',
+        color: '#111236',
+    },
+    giftsHeaderSubtitle: {
+        marginTop: 6,
+        fontSize: 18,
+        lineHeight: 26,
+        color: '#61698A',
+    },
+    giftCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: '#EEE9FA',
+        padding: 12,
+        marginBottom: 16,
+        shadowColor: '#221146',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 3,
+    },
+    giftCardRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    giftCardRowRtl: {
+        flexDirection: 'row-reverse',
+    },
+    giftCardMediaWrap: {
+        width: 142,
+        height: 142,
+        borderRadius: 22,
+        overflow: 'hidden',
+        position: 'relative',
+        backgroundColor: '#EDE7FF',
     },
     giftCardImage: {
         width: '100%',
-        height: 140,
-        borderRadius: borderRadius.md,
-        marginBottom: spacing.sm,
+        height: '100%',
     },
     giftCardImageFallback: {
         width: '100%',
-        height: 140,
-        borderRadius: borderRadius.md,
-        marginBottom: spacing.sm,
-        paddingHorizontal: spacing.md,
+        height: '100%',
+        paddingHorizontal: spacing.sm,
         paddingVertical: spacing.sm,
-        justifyContent: 'flex-end',
+        justifyContent: 'space-between',
     },
     giftCardImageFallbackTitle: {
-        color: colors.textInverse,
-        fontSize: fontSize.md,
-        fontWeight: '700',
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '800',
     },
     giftCardImageFallbackSub: {
         marginTop: 2,
-        color: 'rgba(255,255,255,0.9)',
+        color: 'rgba(255,255,255,0.95)',
         fontSize: fontSize.xs,
         fontWeight: '600',
     },
-    giftCardTitle: {
-        fontSize: fontSize.md,
+    giftBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: '#7A3CE0',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    giftBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 12,
         fontWeight: '700',
-        color: colors.text,
+    },
+    giftCardContent: {
+        flex: 1,
+        justifyContent: 'space-between',
+    },
+    giftCardTitle: {
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#12123B',
     },
     giftCardDesc: {
         marginTop: 4,
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 16,
+        lineHeight: 24,
+        color: '#5F6786',
     },
-    giftCardAmount: {
-        marginTop: spacing.sm,
-        fontSize: fontSize.sm,
-        color: colors.primary,
+    giftValueBlock: {
+        marginTop: 10,
+        borderRadius: 16,
+        backgroundColor: '#F7F4FF',
+        borderWidth: 1,
+        borderColor: '#ECE6FF',
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    giftValueColumn: {
+        flex: 1,
+    },
+    giftValueLabel: {
+        fontSize: 12,
+        color: '#6A7191',
+        fontWeight: '600',
+    },
+    giftValueGetLabel: {
+        color: '#168A45',
+    },
+    giftValueAmount: {
+        marginTop: 4,
+        fontSize: 18,
+        color: '#191A44',
+        fontWeight: '800',
+    },
+    giftValueGetAmount: {
+        marginTop: 4,
+        fontSize: 18,
+        color: '#169947',
+        fontWeight: '800',
+    },
+    giftValueArrow: {
+        fontSize: 21,
+        color: '#2E315D',
+        fontWeight: '700',
+        paddingHorizontal: 8,
+    },
+    giftCardFooterRow: {
+        marginTop: 10,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    giftBonusPill: {
+        backgroundColor: '#E6F9EC',
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+    },
+    giftBonusText: {
+        color: '#19854A',
+        fontSize: 14,
         fontWeight: '700',
     },
-    giftCardButton: {
-        marginTop: spacing.md,
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.md,
+    giftArrowButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#F3EEFF',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: spacing.sm,
     },
-    giftCardButtonText: {
-        color: colors.textInverse,
+    giftInfoBanner: {
+        marginTop: 4,
+        borderRadius: 20,
+        backgroundColor: '#F3EEFF',
+        borderWidth: 1,
+        borderColor: '#E8DEFF',
+        padding: 14,
+        flexDirection: 'row',
+        gap: 10,
+        alignItems: 'flex-start',
+    },
+    giftInfoIconWrap: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#E9DEFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    giftInfoText: {
+        color: '#36385C',
+        fontSize: 14,
         fontWeight: '700',
-        fontSize: fontSize.sm,
+        lineHeight: 20,
+    },
+    giftInfoSubText: {
+        marginTop: 2,
+        color: '#5F6786',
+        fontSize: 13,
     },
     emptyState: {
         alignItems: 'center',
