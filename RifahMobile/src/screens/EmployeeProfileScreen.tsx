@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, Vie
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { api, getImageUrl, Staff } from '../api/client';
-import { borderRadius, colors, fontSize, spacing } from '../theme/colors';
+import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -51,19 +51,24 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 
   const avatarUrl = getImageUrl(provider.avatar || provider.image);
   const initials = provider.name?.charAt(0)?.toUpperCase() || '?';
+  const displayRating = summary.avgRating ? summary.avgRating.toFixed(1) : (provider.rating || 0).toFixed(1);
+  const subtitle = provider.specialty || provider.role || (isRTL ? 'مقدم خدمة' : 'Service Provider');
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <AppIcon name="arrow_back" size={22} color={colors.text} />
+      <View style={[styles.heroHeader, { paddingTop: topInset + 8 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.glassButton}>
+          <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isRTL ? 'ملف الموظف' : 'Employee Profile'}</Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.heroActions}>
+          <TouchableOpacity style={styles.glassButton}>
+            <AppIcon name="share" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding + spacing.lg }]}>
-        <View style={styles.profileCard}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding + 120 }]}>
+        <View style={styles.profileHeroCard}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
@@ -72,58 +77,93 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
             </View>
           )}
           <Text style={styles.name}>{provider.name}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
           {provider.experience ? (
-            <Text style={styles.metaText}>
-              {isRTL ? `الخبرة: ${provider.experience}` : `Experience: ${provider.experience}`}
-            </Text>
-          ) : null}
-          <View style={styles.ratingRow}>
-            <AppIcon name="star" size={14} color={colors.warning} />
-            <Text style={styles.ratingText}>
-              {summary.avgRating ? summary.avgRating.toFixed(1) : (provider.rating || 0).toFixed(1)}
-            </Text>
-            <Text style={styles.reviewsCountText}>
-              {summary.total} {isRTL ? 'تقييم' : 'reviews'}
-            </Text>
-          </View>
-          {provider.bio ? <Text style={styles.bioText}>{provider.bio}</Text> : null}
-          {Array.isArray(provider.skills) && provider.skills.length > 0 ? (
-            <Text style={styles.skillsText}>{provider.skills.join(' • ')}</Text>
+            <View style={styles.experiencePill}>
+              <AppIcon name="sparkles" size={13} color={colors.primary} />
+              <Text style={styles.experienceText}>{isRTL ? `الخبرة: ${provider.experience}` : `Experience: ${provider.experience}`}</Text>
+            </View>
           ) : null}
         </View>
 
-        <Text style={styles.sectionTitle}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
-        ) : reviews.length === 0 ? (
-          <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
-        ) : (
-          reviews.map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
-                <View style={styles.starsRow}>
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Text
-                      key={`${review.id}-star-${index}`}
-                      style={[styles.star, index < Number(review.rating || 0) ? styles.starActive : null]}
-                    >
-                      ★
-                    </Text>
-                  ))}
-                </View>
-              </View>
-              {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
-              {review.staffReply ? (
-                <View style={styles.replyBox}>
-                  <Text style={styles.replyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
-                  <Text style={styles.replyText}>{review.staffReply}</Text>
-                </View>
-              ) : null}
+        <View style={styles.statsCard}>
+          <View style={styles.statBlock}>
+            <Text style={styles.statValue}>{displayRating}</Text>
+            <View style={styles.starsRow}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Text key={`overall-star-${index}`} style={[styles.star, index < Math.round(Number(displayRating)) ? styles.starActive : null]}>★</Text>
+              ))}
             </View>
-          ))
-        )}
+            <Text style={styles.statLabel}>{isRTL ? 'متوسط التقييم' : 'Average rating'}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBlock}>
+            <Text style={styles.statValue}>{summary.total}</Text>
+            <Text style={styles.statLabel}>{isRTL ? 'إجمالي التقييمات' : 'Total reviews'}</Text>
+          </View>
+        </View>
+
+        {provider.bio ? (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>{isRTL ? 'نبذة' : 'About'}</Text>
+            <Text style={styles.bioText}>{provider.bio}</Text>
+          </View>
+        ) : null}
+
+        {Array.isArray(provider.skills) && provider.skills.length > 0 ? (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>{isRTL ? 'المهارات' : 'Skills'}</Text>
+            <View style={styles.skillsWrap}>
+              {provider.skills.map((skill: string, index: number) => (
+                <View key={`${skill}-${index}`} style={styles.skillChip}>
+                  <Text style={styles.skillChipText}>{skill}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
+          {provider.bio ? <Text style={styles.bioText}>{provider.bio}</Text> : null}
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
+          ) : reviews.length === 0 ? (
+            <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
+          ) : (
+            reviews.map((review) => (
+              <View key={review.id} style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
+                  <View style={styles.starsRow}>
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <Text
+                        key={`${review.id}-star-${index}`}
+                        style={[styles.star, index < Number(review.rating || 0) ? styles.starActive : null]}
+                      >
+                        ★
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+                {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                {review.staffReply ? (
+                  <View style={styles.replyBox}>
+                    <Text style={styles.replyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
+                    <Text style={styles.replyText}>{review.staffReply}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
+
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
+        <TouchableOpacity style={styles.primaryCta} onPress={() => navigation.goBack()}>
+          <Text style={styles.primaryCtaText}>{isRTL ? 'العودة للخدمات' : 'Back to services'}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -131,116 +171,169 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: '#F7F6FB'
   },
-  header: {
+  heroHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border
+    paddingBottom: spacing.sm
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  heroActions: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  glassButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.backgroundGray
-  },
-  headerTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text
-  },
-  headerSpacer: {
-    width: 36
+    backgroundColor: '#FFFFFF'
   },
   content: {
     padding: spacing.md
   },
-  profileCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+  profileHeroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#ECE6FA',
     padding: spacing.lg,
     alignItems: 'center',
-    marginBottom: spacing.lg
+    marginBottom: spacing.md
   },
   avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     marginBottom: spacing.sm
   },
   avatarPlaceholder: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.border
+    backgroundColor: '#EDE7FF'
   },
   avatarInitial: {
-    fontSize: fontSize.xl,
+    fontSize: 30,
     fontWeight: '700',
-    color: colors.text
+    color: colors.primary
   },
   name: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#15153E'
   },
-  metaText: {
+  subtitle: {
     marginTop: 4,
-    fontSize: fontSize.sm,
-    color: colors.textSecondary
+    fontSize: 16,
+    color: '#646B89',
+    fontWeight: '600'
   },
-  ratingRow: {
-    marginTop: spacing.sm,
+  experiencePill: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#F3EEFF',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6
   },
-  ratingText: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.text
+  experienceText: {
+    color: '#4D4B73',
+    fontSize: 13,
+    fontWeight: '600'
   },
-  reviewsCountText: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary
+  statsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#ECE6FA',
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md
+  },
+  statBlock: {
+    flex: 1,
+    alignItems: 'center'
+  },
+  statValue: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#221A62'
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#767D9D',
+    marginTop: 4
+  },
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: '#E7E2F6',
+    marginHorizontal: 10
+  },
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#ECE6FA',
+    padding: spacing.md,
+    marginBottom: spacing.md
   },
   bioText: {
-    marginTop: spacing.md,
-    fontSize: fontSize.sm,
-    color: colors.text,
-    textAlign: 'center'
+    marginTop: 4,
+    fontSize: 16,
+    color: '#4D5576',
+    lineHeight: 24
   },
-  skillsText: {
-    marginTop: spacing.sm,
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-    textAlign: 'center'
+  skillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
   },
   sectionTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    color: colors.text,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#171840',
     marginBottom: spacing.sm
+  },
+  skillChip: {
+    borderRadius: 999,
+    backgroundColor: '#F3EEFF',
+    borderWidth: 1,
+    borderColor: '#E4DBFC',
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  skillChipText: {
+    color: '#4F4672',
+    fontSize: 13,
+    fontWeight: '600'
   },
   emptyText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm
+    color: '#737A9A',
+    fontSize: 14
   },
   reviewCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EDE9FA',
     padding: spacing.md,
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
+    shadowColor: '#1D1540',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -249,9 +342,9 @@ const styles = StyleSheet.create({
     marginBottom: 6
   },
   reviewAuthor: {
-    fontSize: fontSize.sm,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.text
+    color: '#1E1E47'
   },
   starsRow: {
     flexDirection: 'row'
@@ -265,17 +358,18 @@ const styles = StyleSheet.create({
     color: colors.warning
   },
   reviewComment: {
-    fontSize: fontSize.sm,
-    color: colors.text
+    fontSize: 15,
+    color: '#4F5678',
+    lineHeight: 22
   },
   replyBox: {
     marginTop: spacing.sm,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.primary,
-    backgroundColor: colors.backgroundGray,
+    borderLeftWidth: 2.5,
+    borderLeftColor: '#6E34DB',
+    backgroundColor: '#F8F4FF',
     paddingVertical: 8,
     paddingHorizontal: 10,
-    borderRadius: borderRadius.sm
+    borderRadius: 10
   },
   replyLabel: {
     fontSize: fontSize.xs,
@@ -285,6 +379,32 @@ const styles = StyleSheet.create({
   },
   replyText: {
     fontSize: fontSize.sm,
-    color: colors.text
+    color: '#3F4567'
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 14,
+    shadowColor: '#1A1340',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  primaryCta: {
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  primaryCtaText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800'
   }
 });
