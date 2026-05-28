@@ -54,7 +54,7 @@ Upgrade appointment actions in customer app to:
 - Validate no overflows in EN/AR.
 - Validate cancellation flow for each reason chip.
 - Validate reschedule with no slots available.
-- Status: `pending`
+- Status: `completed`
 
 ## Progress Log
 - 2026-05-28: Created tracker file.
@@ -62,3 +62,4 @@ Upgrade appointment actions in customer app to:
 - 2026-05-28: Implemented premium reschedule options popup and start of routing into booking flow.
 - 2026-05-28: Replaced free-text reschedule with real slot picker based on `/bookings/search` and confirmed via `rescheduleBooking`.
 - 2026-05-28: Added cancellation reason payload support (`reasonCode`, `reasonText`) from mobile API to backend and persisted reason metadata in appointment notes via structured `[CANCELLATION_AUDIT]` marker for tenant/admin traceability.
+- 2026-05-28: Replaced remaining native alerts in `AppointmentDetailsScreen` actions with premium in-app feedback modal and added inline error handling for cancellation reason validation + reschedule slot empty/error states.

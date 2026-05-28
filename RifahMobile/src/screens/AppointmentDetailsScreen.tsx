@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ImageBackground, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ImageBackground, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { Booking, bookingNeedsPayment, getBookingOutstandingAmount } from '../api/client';
+import { Booking, SlotItem, bookingNeedsPayment, getBookingOutstandingAmount } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
@@ -81,6 +81,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
   const [cancelBookingTarget, setCancelBookingTarget] = useState<Booking | null>(null);
   const [cancelReasonCode, setCancelReasonCode] = useState<string>('time_conflict');
   const [cancelReasonText, setCancelReasonText] = useState('');
+  const [cancelReasonError, setCancelReasonError] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
@@ -89,6 +90,12 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
   const [rescheduleSlots, setRescheduleSlots] = useState<SlotItem[]>([]);
   const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState<SlotItem | null>(null);
+  const [rescheduleError, setRescheduleError] = useState('');
+  const [feedback, setFeedback] = useState<{ visible: boolean; title: string; message: string }>({
+    visible: false,
+    title: '',
+    message: '',
+  });
 
   const representative = group?.items?.[0];
   const guest = useMemo(() => parseGroupGuestFromNotes(representative?.notes), [representative?.notes]);
@@ -164,24 +171,29 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     return paymentMethod || '-';
   };
 
+  const showFeedback = (title: string, message: string) => {
+    setFeedback({ visible: true, title, message });
+  };
+
   const handleCancelSubmit = async () => {
     if (!cancelBookingTarget || cancelSubmitting) return;
     if (cancelReasonCode === 'other' && !cancelReasonText.trim()) {
-      Alert.alert(language === 'ar' ? 'سبب مطلوب' : 'Reason required', language === 'ar' ? 'يرجى كتابة سبب الإلغاء.' : 'Please write cancellation reason.');
+      setCancelReasonError(language === 'ar' ? 'يرجى كتابة سبب الإلغاء.' : 'Please write cancellation reason.');
       return;
     }
     try {
       setCancelSubmitting(true);
+      setCancelReasonError('');
       await api.cancelBooking(cancelBookingTarget.id, {
         reasonCode: cancelReasonCode || undefined,
         reasonText: cancelReasonText.trim() || undefined,
       });
       setCancelBookingTarget(null);
       setCancelReasonText('');
-      Alert.alert(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تم إلغاء الموعد.' : 'Booking cancelled.');
+      showFeedback(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تم إلغاء الموعد.' : 'Booking cancelled.');
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error?.message || 'Failed to cancel');
+      showFeedback(language === 'ar' ? 'خطأ' : 'Error', error?.message || 'Failed to cancel');
     } finally {
       setCancelSubmitting(false);
     }
@@ -195,6 +207,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     setRescheduleDate(`${yyyy}-${mm}-${dd}`);
     setRescheduleSlots([]);
     setRescheduleSelectedSlot(null);
+    setRescheduleError('');
     setRescheduleBooking(booking);
     setRescheduleChoiceOpen(true);
   };
@@ -206,6 +219,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     try {
       setRescheduleSlotsLoading(true);
       setRescheduleSelectedSlot(null);
+      setRescheduleError('');
       const response = await api.post<{ slots: SlotItem[] }>('/bookings/search', {
         tenantId,
         serviceId,
@@ -215,8 +229,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
       });
       const available = (response.slots || []).filter((slot) => !!slot?.available);
       setRescheduleSlots(available);
+      if (available.length === 0) {
+        setRescheduleError(language === 'ar' ? 'لا توجد مواعيد متاحة لهذا اليوم.' : 'No available slots for this date.');
+      }
     } catch (error: any) {
-      Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error?.message || (language === 'ar' ? 'تعذر تحميل المواعيد المتاحة.' : 'Could not load available slots.'));
+      setRescheduleError(error?.message || (language === 'ar' ? 'تعذر تحميل المواعيد المتاحة.' : 'Could not load available slots.'));
     } finally {
       setRescheduleSlotsLoading(false);
     }
@@ -244,10 +261,10 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
       setRescheduleBooking(null);
       setRescheduleSlots([]);
       setRescheduleSelectedSlot(null);
-      Alert.alert(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تمت إعادة الجدولة بنجاح.' : 'Appointment rescheduled successfully');
+      showFeedback(language === 'ar' ? 'تم' : 'Done', language === 'ar' ? 'تمت إعادة الجدولة بنجاح.' : 'Appointment rescheduled successfully');
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error?.message || (language === 'ar' ? 'تعذرت إعادة الجدولة' : 'Failed to reschedule'));
+      showFeedback(language === 'ar' ? 'خطأ' : 'Error', error?.message || (language === 'ar' ? 'تعذرت إعادة الجدولة' : 'Failed to reschedule'));
     } finally {
       setRescheduleSubmitting(false);
     }
@@ -421,7 +438,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <TouchableOpacity
               style={styles.contactBtn}
               onPress={() =>
-                Alert.alert(
+                showFeedback(
                   language === 'ar' ? 'قريباً' : 'Coming soon',
                   language === 'ar' ? 'التواصل مع المركز سيكون متاحاً قريباً.' : 'Contact center action will be available soon.'
                 )
@@ -466,9 +483,10 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 );
               })}
               {!rescheduleSlotsLoading && rescheduleSlots.length === 0 && (
-                <Text style={styles.modalHint}>{language === 'ar' ? 'لا توجد مواعيد متاحة لهذا اليوم.' : 'No available slots for this date.'}</Text>
+                <Text style={styles.modalErrorText}>{rescheduleError || (language === 'ar' ? 'لا توجد مواعيد متاحة لهذا اليوم.' : 'No available slots for this date.')}</Text>
               )}
             </View>
+            {!!rescheduleError && rescheduleSlots.length > 0 && <Text style={styles.modalErrorText}>{rescheduleError}</Text>}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setRescheduleBooking(null)} disabled={rescheduleSubmitting}>
                 <Text style={styles.modalCancelText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
@@ -506,6 +524,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 multiline
               />
             )}
+            {!!cancelReasonError && <Text style={styles.modalErrorText}>{cancelReasonError}</Text>}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setCancelBookingTarget(null)} disabled={cancelSubmitting}>
                 <Text style={styles.modalCancelText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
@@ -533,6 +552,20 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setRescheduleChoiceOpen(false)}>
                 <Text style={styles.modalCancelText}>{language === 'ar' ? 'إغلاق' : 'Close'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={feedback.visible} transparent animationType="fade" onRequestClose={() => setFeedback((prev) => ({ ...prev, visible: false }))}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{feedback.title}</Text>
+            <Text style={styles.modalHint}>{feedback.message}</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalSave} onPress={() => setFeedback((prev) => ({ ...prev, visible: false }))}>
+                <Text style={styles.modalSaveText}>{language === 'ar' ? 'حسناً' : 'OK'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -617,6 +650,7 @@ const styles = StyleSheet.create({
   reasonChipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   reasonChipTextActive: { color: colors.primary },
   modalInput: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginBottom: spacing.sm },
+  modalErrorText: { color: colors.error, fontSize: 12, marginBottom: spacing.sm, fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   modalCancel: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   modalCancelText: { color: colors.textSecondary, fontWeight: '600' },
