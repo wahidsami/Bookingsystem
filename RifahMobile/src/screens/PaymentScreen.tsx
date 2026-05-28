@@ -29,6 +29,7 @@ export function PaymentScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
     const [walletBalance, setWalletBalance] = useState<number>(0);
+    const amountValue = Number(amount || 0);
 
     React.useEffect(() => {
         let mounted = true;
@@ -41,7 +42,6 @@ export function PaymentScreen({ route, navigation }: any) {
     }, []);
 
     const handlePay = async () => {
-        const amountValue = Number(amount);
         if (paymentMethod === 'wallet' && walletBalance < amountValue) {
             Alert.alert(t('error'), isRTL ? 'رصيد المحفظة غير كافٍ' : 'Insufficient wallet balance');
             return;
@@ -116,7 +116,7 @@ export function PaymentScreen({ route, navigation }: any) {
                             ? (isRTL ? 'المبلغ المطلوب الآن' : 'Due Now')
                             : t('totalAmount')}
                     </Text>
-                    <Text style={styles.amountValue}>{amount} SAR</Text>
+                    <Text style={styles.amountValue}>{amountValue.toFixed(2)} SAR</Text>
                     {paymentChoice === 'booking-fee' ? (
                         <Text style={styles.amountHint}>
                             {isRTL ? 'هذا هو عربون الحجز المطلوب لتأكيد الموعد.' : 'This is the booking fee required to confirm your appointment.'}
@@ -230,19 +230,23 @@ export function PaymentScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.xl,
-        backgroundColor: colors.background,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 0,
         gap: spacing.md,
     },
     backButton: {
-        padding: spacing.xs,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F3E8FF',
     },
     backButtonText: {
         fontSize: fontSize.xl,
@@ -260,6 +264,14 @@ const styles = StyleSheet.create({
     amountContainer: {
         alignItems: 'center',
         marginBottom: spacing.xl,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: spacing.xl,
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 2,
     },
     amountLabel: {
         fontSize: fontSize.md,
@@ -269,7 +281,7 @@ const styles = StyleSheet.create({
     amountValue: {
         fontSize: 32,
         fontWeight: '700',
-        color: colors.primary,
+        color: '#7C3AED',
     },
     amountHint: {
         marginTop: spacing.sm,
@@ -278,13 +290,13 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     testCardButton: {
-        backgroundColor: `${colors.primary}20`,
+        backgroundColor: '#F5F3FF',
         padding: spacing.md,
-        borderRadius: borderRadius.md,
+        borderRadius: 16,
         alignItems: 'center',
         marginBottom: spacing.xl,
         borderWidth: 1,
-        borderColor: colors.primary,
+        borderColor: '#C4B5FD',
         borderStyle: 'dashed',
     },
     testCardRow: {
@@ -303,10 +315,10 @@ const styles = StyleSheet.create({
     },
     methodOption: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#DDD6FE',
+        borderRadius: 14,
         paddingVertical: spacing.sm,
         alignItems: 'center',
         justifyContent: 'center',
@@ -314,7 +326,7 @@ const styles = StyleSheet.create({
     },
     methodOptionActive: {
         borderColor: colors.primary,
-        backgroundColor: `${colors.primary}20`,
+        backgroundColor: '#F3E8FF',
     },
     methodOptionText: {
         fontSize: fontSize.sm,
@@ -326,6 +338,15 @@ const styles = StyleSheet.create({
     },
     form: {
         gap: spacing.lg,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: spacing.lg,
+        marginBottom: spacing.md,
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 1,
     },
     inputGroup: {
         gap: spacing.xs,
@@ -336,12 +357,13 @@ const styles = StyleSheet.create({
         color: colors.text,
     },
     input: {
-        backgroundColor: colors.background,
+        backgroundColor: '#FAFAFF',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E9DDFD',
+        borderRadius: 14,
         padding: spacing.md,
         fontSize: fontSize.md,
+        color: colors.text,
     },
     rtlText: {
         textAlign: 'right',
@@ -350,9 +372,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     payButton: {
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
         padding: spacing.lg,
-        borderRadius: borderRadius.md,
+        borderRadius: 16,
         alignItems: 'center',
         marginTop: spacing.md,
     },
