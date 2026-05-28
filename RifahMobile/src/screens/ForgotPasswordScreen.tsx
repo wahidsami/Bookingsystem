@@ -14,6 +14,7 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ForgotPasswordScreenProps {
     onBackToLogin: () => void;
@@ -57,6 +58,12 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <LinearGradient
+                colors={['#FFFFFF', '#F8F2FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
@@ -92,6 +99,7 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
                     </View>
                 ) : null}
 
+                <View style={styles.formCard}>
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('email')}</Text>
@@ -123,6 +131,7 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
                         <Text style={styles.secondaryButtonText}>{t('backToWelcome')}</Text>
                     </TouchableOpacity>
                 </View>
+                </View>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -131,7 +140,7 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     scrollContent: {
         flexGrow: 1,
@@ -168,7 +177,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FEE2E2',
         borderWidth: 1,
         borderColor: '#FCA5A5',
-        borderRadius: borderRadius.md,
+        borderRadius: 14,
         padding: spacing.md,
         marginBottom: spacing.lg,
     },
@@ -180,7 +189,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#DCFCE7',
         borderWidth: 1,
         borderColor: '#86EFAC',
-        borderRadius: borderRadius.md,
+        borderRadius: 14,
         padding: spacing.md,
         marginBottom: spacing.lg,
     },
@@ -190,6 +199,18 @@ const styles = StyleSheet.create({
     },
     form: {
         flex: 1,
+    },
+    formCard: {
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
+        backgroundColor: '#FFFFFFEB',
+        padding: spacing.lg,
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 2,
     },
     inputGroup: {
         marginBottom: spacing.lg,
@@ -202,21 +223,21 @@ const styles = StyleSheet.create({
     },
     input: {
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
+        borderColor: '#E9DDFD',
+        borderRadius: 14,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: fontSize.md,
         color: colors.text,
-        backgroundColor: colors.background,
+        backgroundColor: '#FAFAFF',
         minHeight: 48,
     },
     rtlInput: {
         textAlign: 'right',
     },
     submitButton: {
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#7C3AED',
+        borderRadius: 16,
         paddingVertical: spacing.md + 2,
         alignItems: 'center',
         minHeight: 48,

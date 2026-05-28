@@ -111,7 +111,7 @@ Targets:
 - Phase 3: `100%` (CartScreen + PaymentScreen + PaymentSimulatorScreen + GiftsScreen drawers premium shell completed)
 - Phase 4: `75%` (Bookings + Purchases + Notifications screens premium shell upgraded)
 - Phase 5: `100%` (More + Profile + EditProfile + Settings premium shell completed)
-- Phase 6: `45%` (first-run fix + Splash/Welcome/Login/Register premium shell completed)
+- Phase 6: `100%` (first-run fix + all auth/onboarding screens premium shell completed)
 
 ## Current Step
 Continue Phase 3 with `PaymentScreen`, then `PaymentSimulatorScreen`, then `GiftsScreen` drawers.
