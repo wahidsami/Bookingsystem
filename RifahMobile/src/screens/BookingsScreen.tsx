@@ -46,7 +46,7 @@ export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const { showLogin } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
-    const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
+    const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'no_show' | 'cancelled'>('upcoming');
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -94,7 +94,7 @@ export function BookingsScreen({ navigation }: any) {
             }
             setIsAuthenticated(true);
             const [data, reviews] = await Promise.all([
-                api.getBookings(activeTab === 'upcoming' ? 'upcoming' : 'completed'),
+                api.getBookings(activeTab),
                 api.getMyReviews(200).catch(() => []),
             ]);
             const reviewedIds = new Set<string>(
@@ -236,6 +236,8 @@ export function BookingsScreen({ navigation }: any) {
         return language === 'ar' ? `النوع: ${variantName}` : `Variant: ${variantName}`;
     };
 
+    const hasRescheduleAudit = (booking: Booking) => `${booking.notes || ''}`.includes('[RESCHEDULE_AUDIT]');
+
     const renderBookingCard = ({ item }: { item: BookingGroup }) => {
         const isArabic = language === 'ar';
         const representative = item.items[0];
@@ -243,12 +245,18 @@ export function BookingsScreen({ navigation }: any) {
         const dateDate = new Date(item.startTime);
         const serviceCount = item.items.length;
 
+        const isRescheduled = item.items.some((booking) => hasRescheduleAudit(booking));
         return (
             <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.9}
                 onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}
             >
+                {isRescheduled && activeTab === 'upcoming' ? (
+                    <View style={styles.rescheduledRibbon}>
+                        <Text style={styles.rescheduledRibbonText}>{language === 'ar' ? 'أعيدت الجدولة' : 'Rescheduled'}</Text>
+                    </View>
+                ) : null}
                 {/* Header: Salon Info */}
                 <View style={styles.cardHeader}>
                     <View style={styles.salonInfo}>
@@ -382,23 +390,29 @@ export function BookingsScreen({ navigation }: any) {
 
             {/* Tabs */}
             <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
-                    onPress={() => setActiveTab('upcoming')}
-                >
+                <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} onPress={() => setActiveTab('upcoming')}>
                     <Text style={[
                         styles.tabText,
                         activeTab === 'upcoming' && styles.activeTabText
                     ]}>{t('upcoming')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'history' && styles.activeTab]}
-                    onPress={() => setActiveTab('history')}
-                >
+                <TouchableOpacity style={[styles.tab, activeTab === 'completed' && styles.activeTab]} onPress={() => setActiveTab('completed')}>
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'history' && styles.activeTabText
-                    ]}>{t('history')}</Text>
+                        activeTab === 'completed' && styles.activeTabText
+                    ]}>{language === 'ar' ? 'مكتمل' : 'Completed'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.tab, activeTab === 'no_show' && styles.activeTab]} onPress={() => setActiveTab('no_show')}>
+                    <Text style={[
+                        styles.tabText,
+                        activeTab === 'no_show' && styles.activeTabText
+                    ]}>{language === 'ar' ? 'لم يحضر' : 'No Show'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.tab, activeTab === 'cancelled' && styles.activeTab]} onPress={() => setActiveTab('cancelled')}>
+                    <Text style={[
+                        styles.tabText,
+                        activeTab === 'cancelled' && styles.activeTabText
+                    ]}>{language === 'ar' ? 'ملغي' : 'Canceled'}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -417,7 +431,13 @@ export function BookingsScreen({ navigation }: any) {
                 <View style={styles.emptyContainer}>
                     <AppIcon name="bookings" size={64} color={colors.textSecondary} />
                     <Text style={styles.emptyText}>
-                        {activeTab === 'upcoming' ? t('noUpcomingBookings') : t('noBookingHistory')}
+                        {activeTab === 'upcoming'
+                            ? t('noUpcomingBookings')
+                            : activeTab === 'completed'
+                                ? (language === 'ar' ? 'لا توجد مواعيد مكتملة' : 'No completed bookings')
+                                : activeTab === 'no_show'
+                                    ? (language === 'ar' ? 'لا توجد مواعيد لم يحضرها العميل' : 'No no-show bookings')
+                                    : (language === 'ar' ? 'لا توجد مواعيد ملغاة' : 'No canceled bookings')}
                     </Text>
                     <TouchableOpacity
                         style={styles.bookButton}
@@ -550,6 +570,7 @@ const styles = StyleSheet.create({
     },
     tabsContainer: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.sm,
         backgroundColor: colors.background,
@@ -570,7 +591,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F5EEFF',
     },
     tabText: {
-        fontSize: fontSize.md,
+        fontSize: fontSize.sm,
         color: colors.textSecondary,
         fontWeight: '600',
     },
@@ -594,6 +615,24 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         borderWidth: 1,
         borderColor: '#ECE7FA',
+        position: 'relative',
+    },
+    rescheduledRibbon: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        zIndex: 10,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        backgroundColor: '#E8F1FF',
+        borderWidth: 1,
+        borderColor: '#C8DDFE',
+    },
+    rescheduledRibbonText: {
+        fontSize: 11,
+        color: '#2E5FA8',
+        fontWeight: '700',
     },
     cardHeader: {
         flexDirection: 'row',

@@ -34,10 +34,10 @@ export function BrowseScreen({ route, navigation }: any) {
     const initialCategory = route.params?.category as string | undefined;
     const initialTitle = route.params?.title as string | undefined;
     const isCompact = width < 390;
-    const heroTitleSize = isCompact ? 42 : 48;
-    const heroTitleLineHeight = isCompact ? 46 : 52;
-    const heroSubtitleSize = isCompact ? 18 : 20;
-    const heroSubtitleLineHeight = isCompact ? 26 : 30;
+    const heroTitleSize = isCompact ? 34 : 38;
+    const heroTitleLineHeight = isCompact ? 38 : 42;
+    const heroSubtitleSize = isCompact ? 14 : 15;
+    const heroSubtitleLineHeight = isCompact ? 20 : 22;
     const cardImageHeight = isCompact ? 160 : 176;
 
     const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -74,7 +74,7 @@ export function BrowseScreen({ route, navigation }: any) {
     const dynamicTitle = useMemo(() => {
         if (selectedCategory) return isRTL ? selectedCategory.name_ar : selectedCategory.name_en;
         if (initialTitle) return initialTitle;
-        return isRTL ? 'اكتشف الفئات' : 'Browse Categories';
+        return isRTL ? 'الفئات' : 'Categories';
     }, [initialTitle, isRTL, selectedCategory]);
 
     const filteredTenants = useMemo(() => {
@@ -139,7 +139,7 @@ export function BrowseScreen({ route, navigation }: any) {
                     </View>
 
                     <View style={styles.tenantContent}>
-                        <Text style={styles.tenantName} numberOfLines={2}>{displayName}</Text>
+                    <Text style={styles.tenantName} numberOfLines={2}>{displayName}</Text>
 
                         <View style={[styles.metaRow, isRTL ? styles.metaRowRtl : null]}>
                             <Text style={styles.metaText}>⭐ {ratingValue > 0 ? ratingValue.toFixed(1) : '—'} ({reviewsCount || 0})</Text>
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     },
     heroTextBlock: {
         marginTop: spacing.lg,
-        maxWidth: '72%',
+        maxWidth: '76%',
     },
     heroTitle: {
         fontWeight: '800',
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 20,
+        fontSize: 16,
         color: '#3A3F62',
         paddingVertical: 0,
     },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
         borderColor: '#E8DDFB',
     },
     chipText: {
-        fontSize: 17,
+        fontSize: 14,
         fontWeight: '700',
     },
     chipTextActive: {
@@ -401,14 +401,14 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md + 2,
     },
     featuredTitle: {
-        fontSize: 38,
-        lineHeight: 42,
+        fontSize: 32,
+        lineHeight: 36,
         color: '#15153E',
         fontWeight: '800',
     },
     featuredSubtitle: {
         marginTop: 6,
-        fontSize: 17,
+        fontSize: 15,
         color: '#66708F',
     },
     tenantCard: {
@@ -479,8 +479,8 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     tenantName: {
-        fontSize: 26,
-        lineHeight: 30,
+        fontSize: 20,
+        lineHeight: 24,
         color: '#171742',
         fontWeight: '800',
     },
@@ -518,8 +518,8 @@ const styles = StyleSheet.create({
     },
     tenantDescription: {
         marginTop: 8,
-        fontSize: 17,
-        lineHeight: 26,
+        fontSize: 14,
+        lineHeight: 20,
         color: '#61698A',
     },
     tenantCardFooter: {

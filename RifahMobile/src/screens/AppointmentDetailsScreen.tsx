@@ -108,7 +108,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
   const { language } = useLanguage();
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
   const initialGroup = route?.params?.bookingGroup as BookingGroup | undefined;
-  const activeTab = (route?.params?.activeTab as 'upcoming' | 'history' | undefined) || 'upcoming';
+  const activeTab = (route?.params?.activeTab as 'upcoming' | 'completed' | 'no_show' | 'cancelled' | undefined) || 'upcoming';
   const [group] = useState<BookingGroup | null>(initialGroup || null);
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
   const [cancelBookingTarget, setCancelBookingTarget] = useState<Booking | null>(null);
@@ -455,7 +455,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                   </TouchableOpacity>
                 </View>
               )}
-              {booking.status === 'completed' && activeTab === 'history' && (
+              {booking.status === 'completed' && activeTab === 'completed' && (
                 <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('Review', { appointmentId: booking.id })}>
                   <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
                 </TouchableOpacity>

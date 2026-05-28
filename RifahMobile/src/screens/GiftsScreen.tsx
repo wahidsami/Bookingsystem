@@ -43,6 +43,8 @@ type RecipientCheckResult = {
 };
 
 const HERO_IMAGE = require('../../assets/wallethero.jpg');
+const RIYAL_SYMBOL = '\u20C0';
+const sar = (value: number) => `${RIYAL_SYMBOL} ${Number(value || 0).toFixed(2)}`;
 
 export function GiftsScreen({ navigation, route }: any) {
   const { language, isRTL } = useLanguage();
@@ -109,17 +111,17 @@ export function GiftsScreen({ navigation, route }: any) {
         if (tenantToken) {
           const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token: tenantToken });
           if (!response.success) Alert.alert('Error', response.message || 'Failed to claim gift');
-          else Alert.alert('Success', `Gift claimed. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
+          else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(response.walletBalance || 0))}`);
           return;
         }
         try {
           const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
           if (!response.success) Alert.alert('Error', response.message || 'Failed to claim gift');
-          else Alert.alert('Success', `Gift claimed. New balance: ${Number(response.walletBalance || 0).toFixed(2)} SAR`);
+          else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(response.walletBalance || 0))}`);
         } catch {
           const tenantResponse = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token });
           if (!tenantResponse.success) Alert.alert('Error', tenantResponse.message || 'Failed to claim gift');
-          else Alert.alert('Success', `Gift claimed. New balance: ${Number(tenantResponse.walletBalance || 0).toFixed(2)} SAR`);
+          else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(tenantResponse.walletBalance || 0))}`);
         }
       } catch (error: any) {
         Alert.alert('Error', error?.message || 'Failed to claim gift');
@@ -182,7 +184,7 @@ export function GiftsScreen({ navigation, route }: any) {
         Alert.alert('Error', finalResponse.message || 'Failed to recharge wallet');
         return;
       }
-      Alert.alert('Success', `Wallet recharged. New balance: ${Number(finalResponse.walletBalance || 0).toFixed(2)} SAR`);
+      Alert.alert('Success', `Wallet recharged. New balance: ${sar(Number(finalResponse.walletBalance || 0))}`);
       setWalletBalance(Number(finalResponse.walletBalance || 0));
       setSelected(null);
       setCardNumber('');
@@ -308,14 +310,14 @@ export function GiftsScreen({ navigation, route }: any) {
             <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: walletBalance || 0, history })} activeOpacity={0.9}>
               <View style={styles.balanceIcon}><AppIcon name="account_balance_wallet" size={20} color={colors.primary} /></View>
               <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
-              <Text style={styles.balanceAmount}>{Number(walletBalance || 0).toFixed(2)} SAR</Text>
+              <Text style={styles.balanceAmount}>{sar(Number(walletBalance || 0))}</Text>
               <Text style={styles.balanceMeta}>{language === 'ar' ? 'متاح لكل المراكز' : 'Usable across all centers'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.balanceCard, styles.centerBalanceCard]} onPress={() => navigation.navigate('CentersBalance', { centersBalance, history })} activeOpacity={0.9}>
               <View style={[styles.balanceIcon, styles.centerBalanceIcon]}><AppIcon name="storefront" size={20} color="#7A4F00" /></View>
               <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}</Text>
-              <Text style={styles.balanceAmount}>{Number(centersBalance || 0).toFixed(2)} SAR</Text>
+              <Text style={styles.balanceAmount}>{sar(Number(centersBalance || 0))}</Text>
               <Text style={styles.balanceMeta}>{language === 'ar' ? `عبر ${centersCount || 0} مراكز` : `Across ${centersCount || 0} centers`}</Text>
             </TouchableOpacity>
           </View>
@@ -341,7 +343,7 @@ export function GiftsScreen({ navigation, route }: any) {
               <TouchableOpacity key={pkg.id} style={styles.giftCard} onPress={() => setSelected(pkg)} activeOpacity={0.95}>
                 <ImageBackground source={HERO_IMAGE} style={styles.giftHero} imageStyle={styles.giftHeroImage}>
                   {index === 0 ? <View style={styles.badgePill}><Text style={styles.badgeText}>{language === 'ar' ? 'الأكثر شعبية' : 'Most Popular'}</Text></View> : null}
-                  <View style={styles.pricePill}><Text style={styles.pricePillText}>{Number(pkg.priceAmount).toFixed(0)} SAR</Text></View>
+                  <View style={styles.pricePill}><Text style={styles.pricePillText}>{sar(Number(pkg.priceAmount))}</Text></View>
                 </ImageBackground>
                 <View style={styles.giftBody}>
                   <Text style={styles.giftTitle}>{title}</Text>
@@ -349,15 +351,15 @@ export function GiftsScreen({ navigation, route }: any) {
                   <View style={styles.payGetBlock}>
                     <View>
                       <Text style={styles.payGetLabel}>{language === 'ar' ? 'أنت تدفع' : 'You Pay'}</Text>
-                      <Text style={styles.payGetPay}>{Number(pkg.priceAmount).toFixed(2)} SAR</Text>
+                      <Text style={styles.payGetPay}>{sar(Number(pkg.priceAmount))}</Text>
                     </View>
                     <Text style={styles.payGetArrow}>{isRTL ? '←' : '→'}</Text>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={[styles.payGetLabel, { color: '#0F8A4B' }]}>{language === 'ar' ? 'تحصل على' : 'You Get'}</Text>
-                      <Text style={styles.payGetGet}>{totalCredit.toFixed(2)} SAR</Text>
+                      <Text style={styles.payGetGet}>{sar(totalCredit)}</Text>
                     </View>
                   </View>
-                  {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {Number(pkg.bonusAmount).toFixed(0)} SAR Bonus</Text></View> : null}
+                  {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {sar(Number(pkg.bonusAmount))} {language === 'ar' ? 'مكافأة' : 'Bonus'}</Text></View> : null}
                   <View style={styles.validityRow}><AppIcon name="event" size={14} color={colors.textSecondary} /><Text style={styles.validityText}>{language === 'ar' ? 'صلاحية 12 شهر' : '12 months validity'}</Text></View>
                   <TouchableOpacity style={styles.buyBtn} onPress={() => setSelected(pkg)}>
                     <Text style={styles.buyBtnText}>{language === 'ar' ? 'شراء / إرسال هدية' : 'Buy / Send Gift'}</Text>
@@ -377,7 +379,7 @@ export function GiftsScreen({ navigation, route }: any) {
                     <Text style={styles.activityTitle}>{getStatusLabel(item.status)}</Text>
                     <Text style={styles.activitySub}>{formatDateTime(item.createdAt)}</Text>
                   </View>
-                  <Text style={styles.activityAmount}>+{Number(item.totalCreditAmount || 0).toFixed(2)} SAR</Text>
+                  <Text style={styles.activityAmount}>+{sar(Number(item.totalCreditAmount || 0))}</Text>
                 </View>
               ))}
             </View>
@@ -472,13 +474,13 @@ const styles = StyleSheet.create({
   pricePill: { backgroundColor: 'rgba(20,16,30,0.55)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   pricePillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   giftBody: { padding: spacing.md, gap: spacing.sm },
-  giftTitle: { fontSize: 24, fontWeight: '800', color: colors.text },
-  giftDesc: { fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
+  giftTitle: { fontSize: 20, fontWeight: '800', color: colors.text },
+  giftDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   payGetBlock: { borderRadius: 18, padding: spacing.sm, borderWidth: 1, borderColor: '#E8E0F8', backgroundColor: '#F8F5FF', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   payGetLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
-  payGetPay: { fontSize: fontSize.md, color: colors.text, fontWeight: '800' },
+  payGetPay: { fontSize: 14, color: colors.text, fontWeight: '800' },
   payGetArrow: { color: colors.primary, fontWeight: '700', fontSize: fontSize.lg },
-  payGetGet: { fontSize: fontSize.md, color: '#0F8A4B', fontWeight: '800' },
+  payGetGet: { fontSize: 14, color: '#0F8A4B', fontWeight: '800' },
   bonusPill: { alignSelf: 'flex-start', backgroundColor: '#E8F7EE', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   bonusText: { color: '#0F8A4B', fontSize: 12, fontWeight: '700' },
   validityRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -128,7 +128,7 @@ export default function DashboardPage() {
       const [statsResponse, appointmentsResponse, posAlertsResponse] = await Promise.allSettled([
         tenantApi.getDashboardStats(),
         tenantApi.getTodaysAppointments(),
-        tenantApi.getPosAlerts({ limit: 3 }).catch(() => null)
+        tenantApi.getPosAlerts({ limit: 12 }).catch(() => null)
       ]);
 
       const failedSections: string[] = [];

@@ -1362,7 +1362,7 @@ class ApiClient {
     /**
      * Get user bookings
      */
-    async getBookings(status?: 'upcoming' | 'completed' | 'cancelled'): Promise<Booking[]> {
+    async getBookings(status?: 'upcoming' | 'completed' | 'cancelled' | 'no_show'): Promise<Booking[]> {
         const response = await this.get<{ success: boolean; appointments: Booking[] }>('/bookings');
         const normalized = (response.appointments || []).map((appointment) => normalizeBooking(appointment));
 
@@ -1374,9 +1374,9 @@ class ApiClient {
             return normalized.filter((appointment) => ['pending', 'confirmed', 'checked_in', 'in_service'].includes(appointment.status));
         }
 
-        if (status === 'completed') {
-            return normalized.filter((appointment) => ['completed', 'cancelled', 'no_show'].includes(appointment.status));
-        }
+        if (status === 'completed') return normalized.filter((appointment) => appointment.status === 'completed');
+        if (status === 'cancelled') return normalized.filter((appointment) => appointment.status === 'cancelled');
+        if (status === 'no_show') return normalized.filter((appointment) => appointment.status === 'no_show');
 
         return normalized.filter((appointment) => appointment.status === status);
     }

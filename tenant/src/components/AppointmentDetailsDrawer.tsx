@@ -203,8 +203,15 @@ type RescheduleAuditEntry = {
   toStartTime?: string;
   toEndTime?: string;
 };
+type CancellationAuditEntry = {
+  at?: string;
+  actor?: string;
+  reasonCode?: string;
+  reasonText?: string;
+};
 
 const RESCHEDULE_AUDIT_MARKER = "[RESCHEDULE_AUDIT]";
+const CANCELLATION_AUDIT_MARKER = "[CANCELLATION_AUDIT]";
 
 function parseRescheduleAuditEntries(notes?: string) {
   const text = `${notes || ""}`;
@@ -233,6 +240,25 @@ function stripRescheduleAuditMarkers(notes?: string) {
     .filter((line) => !line.includes(RESCHEDULE_AUDIT_MARKER))
     .join("\n")
     .trim();
+}
+
+function parseCancellationAuditEntries(notes?: string) {
+  const text = `${notes || ""}`;
+  if (!text.includes(CANCELLATION_AUDIT_MARKER)) return [] as CancellationAuditEntry[];
+
+  const entries: CancellationAuditEntry[] = [];
+  const regex = /\[CANCELLATION_AUDIT\]\s*(\{.*\})/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed && typeof parsed === "object") entries.push(parsed);
+    } catch {
+      // Ignore malformed marker payload.
+    }
+  }
+
+  return entries;
 }
 
 function getStatusLabel(status: string, locale: string) {
@@ -576,6 +602,13 @@ export function AppointmentDetailsDrawer({
   const latestRescheduleAudit = useMemo(() => {
     if (!appointment?.notes) return null;
     const entries = parseRescheduleAuditEntries(appointment.notes);
+    if (!entries.length) return null;
+    return entries[entries.length - 1];
+  }, [appointment?.notes]);
+
+  const latestCancellationAudit = useMemo(() => {
+    if (!appointment?.notes) return null;
+    const entries = parseCancellationAuditEntries(appointment.notes);
     if (!entries.length) return null;
     return entries[entries.length - 1];
   }, [appointment?.notes]);
@@ -1155,6 +1188,13 @@ export function AppointmentDetailsDrawer({
                             {locale === "ar"
                               ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
                               : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+                          </span>
+                        ) : null}
+                        {latestCancellationAudit ? (
+                          <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                            {locale === "ar"
+                              ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.updatedAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+                              : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.updatedAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
                           </span>
                         ) : null}
                       </div>

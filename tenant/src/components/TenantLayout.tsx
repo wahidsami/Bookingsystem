@@ -270,7 +270,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         tenantApi.getSubscriptionLimits(),
         tenantApi.getSubscriptionConsumption().catch(() => null),
         tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null),
-        tenantApi.getPosAlerts({ limit: 3 }).catch(() => null),
+        tenantApi.getPosAlerts({ limit: 12 }).catch(() => null),
         tenantApi.getSettings().catch(() => null)
       ]);
 
@@ -292,7 +292,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
           : true
       };
         if (posResponse?.success) {
-          const nextPosAlerts = Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 3) : [];
+          const nextPosAlerts = Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 12) : [];
           const nextAppointmentAlertIds = nextPosAlerts
           .filter((alert: any) => alert?.kind === 'appointment')
           .map((alert: any) => String(alert.id));
