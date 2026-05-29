@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Image, I18nManager, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import Swiper from 'react-native-swiper';
@@ -22,6 +22,7 @@ interface OnboardingScreensProps {
 
 export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingScreensProps) {
     const { t, language } = useLanguage();
+    const isRTL = language === 'ar';
     const swiperRef = useRef<Swiper>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const textAnim = useRef(new Animated.Value(0)).current;
@@ -129,10 +130,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
         const physicalLeftButton = language === 'ar' ? nextButton : prevButton;
         const physicalRightButton = language === 'ar' ? prevButton : nextButton;
 
-        // If I18nManager.isRTL is TRUE, react-native natively flips 'row' to be Right-to-Left.
-        // Therefore, if we want physicalLeftButton to actually appear on the left, we must
-        // put it at the END of the array so Native RTL puts it on the physical left.
-        if (I18nManager.isRTL) {
+        if (isRTL) {
             return [physicalRightButton, spacer, physicalLeftButton];
         }
 
@@ -144,7 +142,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 
             {/* Top Navigation - Skip */}
-            <View style={styles.topNav}>
+            <View style={[styles.topNav, isRTL && styles.topNavRtl]}>
                 <TouchableOpacity
                     onPress={onComplete}
                     style={styles.skipButton}
@@ -215,11 +213,13 @@ const styles = StyleSheet.create({
     },
     topNav: {
         width: '100%',
-        // In Arabic, Skip is on the physical Left. So if Native RTL is true, 'row-reverse' puts it on the left.
-        flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
+        flexDirection: 'row',
         paddingHorizontal: PADDING_HORIZONTAL,
         paddingTop: 8,
         height: 44,
+    },
+    topNavRtl: {
+        flexDirection: 'row-reverse',
     },
     skipButton: {
         justifyContent: 'center',

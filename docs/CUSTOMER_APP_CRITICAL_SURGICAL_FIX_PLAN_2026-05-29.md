@@ -228,7 +228,7 @@ Reason: fix data/display correctness and direction framework first, then UX enha
 - [ ] Phase 2 complete
 - [ ] Phase 3 complete
 - [x] Phase 4 complete
-- [ ] Phase 5 complete
+- [x] Phase 5 complete
 - [ ] Phase 6 complete
 - [ ] Phase 7 complete
 - [ ] Phase 8 complete
@@ -258,6 +258,12 @@ Reason: fix data/display correctness and direction framework first, then UX enha
 
 ### 2026-05-29 - Phase 4 Completed
 - Implemented true RTL card mirroring for tenant Services cards:
+
+### 2026-05-29 - Phase 5 Completed
+- Removed restart-dependent `I18nManager.forceRTL` coupling from `RifahMobile/src/contexts/LanguageContext.tsx`.
+- Language direction now derives from app language state (`language === 'ar'`) and updates live.
+- Updated onboarding directional logic in `RifahMobile/src/screens/OnboardingScreens.tsx` to use context-driven `isRTL` instead of native `I18nManager` state.
+- Result: switching AR/EN updates both text and layout direction without stale RTL persistence.
   - `serviceContentRow` mirrored with dedicated RTL style.
   - service info block, title, description, and metadata row now right-aligned in Arabic.
   - service price alignment corrected for mirrored layout.

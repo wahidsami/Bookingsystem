@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { I18nManager } from 'react-native';
 import { getLanguage, saveLanguage } from '../utils/language';
 import { translations, Language, TranslationKey } from '../i18n/translations';
 
@@ -23,26 +22,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         const savedLang = await getLanguage();
         if (savedLang) {
             setLanguageState(savedLang);
-
-            // Set RTL for Arabic
-            const isRTL = savedLang === 'ar';
-            if (I18nManager.isRTL !== isRTL) {
-                I18nManager.forceRTL(isRTL);
-                // Note: App needs to restart for RTL to take effect
-            }
         }
     };
 
     const setLanguage = async (lang: Language) => {
         await saveLanguage(lang);
         setLanguageState(lang);
-
-        // Set RTL for Arabic
-        const isRTL = lang === 'ar';
-        if (I18nManager.isRTL !== isRTL) {
-            I18nManager.forceRTL(isRTL);
-            // App will need restart for RTL to fully work
-        }
     };
 
     const t = (key: TranslationKey): string => {
