@@ -4,6 +4,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -29,7 +30,7 @@ export function WalletBalanceDetailsScreen({ navigation, route }: any) {
         <View style={styles.content}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>{language === 'ar' ? 'الرصيد الحالي' : 'Current balance'}</Text>
-            <Text style={styles.balanceAmount}>{walletBalance.toFixed(2)} SAR</Text>
+            <Text style={styles.balanceAmount}>{formatRiyal(walletBalance, language)}</Text>
           </View>
           <Text style={styles.sectionTitle}>{language === 'ar' ? 'آخر النشاطات' : 'Recent activity'}</Text>
           {history.map((item: any) => (

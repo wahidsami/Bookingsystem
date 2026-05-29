@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useCart } from '../contexts/CartContext';
 import { AppIcon } from '../components/AppIcon';
 import { api } from '../api/client';
@@ -99,7 +100,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
                 <View style={styles.content}>
                     <View style={styles.amountContainer}>
                         <Text style={styles.amountLabel}>{labels.totalToPay}</Text>
-                        <Text style={styles.amountValue}>{Number(total).toFixed(2)} SAR</Text>
+                        <Text style={styles.amountValue}>{formatRiyal(Number(total), isRTL ? 'ar' : 'en')}</Text>
                     </View>
 
                     <Text style={styles.simulatorWarning}>{labels.warning}</Text>
@@ -169,7 +170,7 @@ export function PaymentSimulatorScreen({ route, navigation }: PaymentSimulatorPr
                         {isProcessing ? (
                             <ActivityIndicator color="white" />
                         ) : (
-                            <Text style={styles.payButtonText}>{labels.payNow} {Number(total).toFixed(2)} SAR</Text>
+                            <Text style={styles.payButtonText}>{labels.payNow} {formatRiyal(Number(total), isRTL ? 'ar' : 'en')}</Text>
                         )}
                     </TouchableOpacity>
                     <View style={styles.secureBadge}>

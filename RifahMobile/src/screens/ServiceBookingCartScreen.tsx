@@ -6,6 +6,7 @@ import { ar, enUS } from 'date-fns/locale';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { api } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -175,11 +176,11 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                     </Text>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>{language === 'ar' ? 'إجمالي الخدمات' : 'Total services'}</Text>
-                        <Text style={styles.summaryValue}>{totalPrice.toFixed(2)} SAR</Text>
+                        <Text style={styles.summaryValue}>{formatRiyal(totalPrice, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Due now'}</Text>
-                        <Text style={styles.summaryValue}>{payableNowTotal.toFixed(2)} SAR</Text>
+                        <Text style={styles.summaryValue}>{formatRiyal(payableNowTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                     {groupedByPayment.map((group) => (
                         <View key={group.paymentMethod} style={styles.paymentGroupRow}>
@@ -192,7 +193,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                                 {' '}
                                 ({group.count})
                             </Text>
-                            <Text style={styles.summaryValue}>{group.payableNowTotal.toFixed(2)} SAR</Text>
+                            <Text style={styles.summaryValue}>{formatRiyal(group.payableNowTotal, isRTL ? 'ar' : 'en')}</Text>
                         </View>
                     ))}
                 </View>
@@ -262,11 +263,11 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                                 </View>
                                 <View style={styles.detailRow}>
                                     <Text style={styles.detailLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text>
-                                    <Text style={styles.detailValue}>{item.totalPrice.toFixed(2)} SAR</Text>
+                                    <Text style={styles.detailValue}>{formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
                                 <View style={styles.detailRow}>
                                     <Text style={styles.detailLabel}>{language === 'ar' ? 'يدفع الآن' : 'Due now'}</Text>
-                                    <Text style={styles.detailValue}>{item.payableNowAmount.toFixed(2)} SAR</Text>
+                                    <Text style={styles.detailValue}>{formatRiyal(item.payableNowAmount, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
                             </View>
                         </View>

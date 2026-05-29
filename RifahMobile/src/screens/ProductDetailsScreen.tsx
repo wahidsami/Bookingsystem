@@ -5,6 +5,7 @@ import { AppIcon } from '../components/AppIcon';
 import { colors } from '../theme/colors';
 import { getImageUrl, Product, Tenant } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useCart } from '../contexts/CartContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -72,7 +73,7 @@ export function ProductDetailsScreen({ route, navigation }: any) {
                                 {product.stock > 0 ? (isRTL ? 'متوفر' : 'In stock') : (isRTL ? 'غير متوفر' : 'Out of stock')}
                             </Text>
                         </View>
-                        <Text style={styles.price}>{product.price.toFixed(2)} SAR</Text>
+                        <Text style={styles.price}>{formatRiyal(product.price, isRTL ? 'ar' : 'en')}</Text>
                     </View>
 
                     {description ? (

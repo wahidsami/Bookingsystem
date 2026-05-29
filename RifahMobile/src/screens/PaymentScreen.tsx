@@ -13,6 +13,7 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
@@ -116,14 +117,14 @@ export function PaymentScreen({ route, navigation }: any) {
                             ? (isRTL ? 'المبلغ المطلوب الآن' : 'Due Now')
                             : t('totalAmount')}
                     </Text>
-                    <Text style={styles.amountValue}>{amountValue.toFixed(2)} SAR</Text>
+                    <Text style={styles.amountValue}>{formatRiyal(amountValue, isRTL ? 'ar' : 'en')}</Text>
                     {paymentChoice === 'booking-fee' ? (
                         <Text style={styles.amountHint}>
                             {isRTL ? 'هذا هو عربون الحجز المطلوب لتأكيد الموعد.' : 'This is the booking fee required to confirm your appointment.'}
                         </Text>
                     ) : null}
                     <Text style={styles.amountHint}>
-                        {isRTL ? `رصيد المحفظة: ${walletBalance.toFixed(2)} ريال` : `Wallet balance: ${walletBalance.toFixed(2)} SAR`}
+                        {isRTL ? `رصيد المحفظة: ${formatRiyal(walletBalance, 'ar')}` : `Wallet balance: ${formatRiyal(walletBalance, 'en')}`}
                     </Text>
                 </View>
 

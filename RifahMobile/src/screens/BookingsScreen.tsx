@@ -14,6 +14,7 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { api, Booking, getBookingOutstandingAmount, getImageUrl } from '../api/client';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -338,11 +339,11 @@ export function BookingsScreen({ navigation }: any) {
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
                     <View style={styles.priceBlock}>
-                        <Text style={styles.price}>{item.totalPrice.toFixed(2)} SAR</Text>
+                        <Text style={styles.price}>{formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}</Text>
                         <Text style={styles.dueNowText}>
                             {language === 'ar'
-                                ? `يدفع الآن: ${item.payableNowTotal.toFixed(2)} SAR`
-                                : `Due now: ${item.payableNowTotal.toFixed(2)} SAR`}
+                                ? `يدفع الآن: ${formatRiyal(item.payableNowTotal, 'ar')}`
+                                : `Due now: ${formatRiyal(item.payableNowTotal, 'en')}`}
                         </Text>
                     </View>
                     <View style={styles.actions}>

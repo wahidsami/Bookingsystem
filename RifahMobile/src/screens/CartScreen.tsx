@@ -3,6 +3,7 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, TextInput, ActivityIndi
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useCart } from '../contexts/CartContext';
 import { AppIcon } from '../components/AppIcon';
 import { api, getImageUrl, Tenant } from '../api/client';
@@ -208,7 +209,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             />
                             <View style={styles.itemInfo}>
                                 <Text style={styles.itemName} numberOfLines={2}>{isRTL ? item.product.name_ar : item.product.name_en}</Text>
-                                <Text style={styles.itemPrice}>{item.product.price} SAR</Text>
+                                <Text style={styles.itemPrice}>{formatRiyal(item.product.price, isRTL ? 'ar' : 'en')}</Text>
                                 <View style={styles.qtyControls}>
                                     <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.product.id, item.quantity - 1)}>
                                         <AppIcon name="minus" size={18} color={colors.text} />
@@ -345,19 +346,19 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                     <Text style={styles.sectionTitle}>{labels.orderSummary}</Text>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Subtotal</Text>
-                        <Text style={styles.summaryValue}>{cartTotal.toFixed(2)} SAR</Text>
+                        <Text style={styles.summaryValue}>{formatRiyal(cartTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Delivery</Text>
-                        <Text style={styles.summaryValue}>{deliveryFee.toFixed(2)} SAR</Text>
+                        <Text style={styles.summaryValue}>{formatRiyal(deliveryFee, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>VAT (15%)</Text>
-                        <Text style={styles.summaryValue}>{tax.toFixed(2)} SAR</Text>
+                        <Text style={styles.summaryValue}>{formatRiyal(tax, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                     <View style={[styles.summaryRow, styles.totalRow]}>
                         <Text style={styles.totalLabel}>Total</Text>
-                        <Text style={styles.totalValue}>{finalTotal.toFixed(2)} SAR</Text>
+                        <Text style={styles.totalValue}>{formatRiyal(finalTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -367,7 +368,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text style={styles.checkoutBtnText}>{labels.placeOrder} • {finalTotal.toFixed(2)} SAR</Text>
+                        <Text style={styles.checkoutBtnText}>{labels.placeOrder} • {formatRiyal(finalTotal, isRTL ? 'ar' : 'en')}</Text>
                     )}
                 </TouchableOpacity>
             </View>

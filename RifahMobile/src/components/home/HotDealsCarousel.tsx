@@ -3,6 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions } from 
 import { ThemedText as Text } from '../ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { formatRiyal } from '../../utils/currency';
 import { api, HotDeal, getImageUrl } from '../../api/client';
 import { SkeletonCard } from './SkeletonCard';
 
@@ -106,8 +107,8 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
                     <Text style={styles.tenantName} numberOfLines={1}>{tenantName}</Text>
 
                     <View style={styles.priceRow}>
-                        <Text style={styles.discountedPrice}>{item.discountedPrice.toFixed(0)} SAR</Text>
-                        <Text style={styles.originalPrice}>{item.originalPrice.toFixed(0)} SAR</Text>
+                        <Text style={styles.discountedPrice}>{formatRiyal(item.discountedPrice, isRTL ? 'ar' : 'en')}</Text>
+                        <Text style={styles.originalPrice}>{formatRiyal(item.originalPrice, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                 </View>
             </TouchableOpacity>

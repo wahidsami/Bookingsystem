@@ -3,6 +3,7 @@ import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, Activi
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useCart } from '../contexts/CartContext';
 import { api, Tenant, Service, ServiceVariant, Staff, Product, Booking, getImageUrl, getServicePrice, normalizeProduct, normalizeService, normalizeStaff, normalizeTenant } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -778,12 +779,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <View style={[styles.giftValueBlock, isRTL ? styles.giftValueBlockRtl : null]}>
                                         <View style={[styles.giftValueColumn, isRTL ? styles.giftValueColumnRtl : null]}>
                                             <Text style={[styles.giftValueLabel, isRTL ? styles.giftValueLabelRtl : null]}>{isRTL ? 'أنت تدفع' : 'You Pay'}</Text>
-                                            <Text style={[styles.giftValueAmount, isRTL ? styles.giftValueAmountRtl : null]}>{Number(pkg.priceAmount).toFixed(2)} SAR</Text>
+                                            <Text style={[styles.giftValueAmount, isRTL ? styles.giftValueAmountRtl : null]}>{formatRiyal(Number(pkg.priceAmount), isRTL ? 'ar' : 'en')}</Text>
                                         </View>
                                         <Text style={styles.giftValueArrow}>{isRTL ? '←' : '→'}</Text>
                                         <View style={[styles.giftValueColumn, { alignItems: 'flex-end' }, isRTL ? styles.giftValueColumnGetRtl : null]}>
                                             <Text style={[styles.giftValueLabel, styles.giftValueGetLabel, isRTL ? styles.giftValueLabelRtl : null]}>{isRTL ? 'يحصل على' : 'They Get'}</Text>
-                                            <Text style={styles.giftValueGetAmount}>{totalCredit.toFixed(2)} SAR</Text>
+                                            <Text style={styles.giftValueGetAmount}>{formatRiyal(totalCredit, isRTL ? 'ar' : 'en')}</Text>
                                         </View>
                                     </View>
 
@@ -791,7 +792,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         {bonusAmount > 0 ? (
                                             <View style={styles.giftBonusPill}>
                                                 <Text style={styles.giftBonusText}>
-                                                    + {bonusAmount.toFixed(2)} SAR {isRTL ? 'هدية إضافية' : 'Bonus'}
+                                                    + {formatRiyal(bonusAmount, isRTL ? 'ar' : 'en')} {isRTL ? 'هدية إضافية' : 'Bonus'}
                                                 </Text>
                                             </View>
                                         ) : <View />}
@@ -923,7 +924,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                                         <AppIcon name="clock" size={12} color={colors.textSecondary} />
                                                         <Text style={styles.serviceDuration}>{service.duration} {isRTL ? 'دقيقة' : 'min'}</Text>
                                                     </View>
-                                                    <Text style={[styles.servicePrice, isRTL ? styles.servicePriceRtl : null]}>{getServicePrice(service).toFixed(2)} SAR</Text>
+                                                    <Text style={[styles.servicePrice, isRTL ? styles.servicePriceRtl : null]}>{formatRiyal(getServicePrice(service), isRTL ? 'ar' : 'en')}</Text>
                                                 </View>
                                             </View>
                                             <View style={styles.serviceArrowButton}>
@@ -979,7 +980,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                             <Text style={styles.productDescription} numberOfLines={2}>{productDescription}</Text>
                                         ) : null}
                                         <View style={styles.productMetaRow}>
-                                            <Text style={styles.productPrice}>{product.price.toFixed(2)} SAR</Text>
+                                            <Text style={styles.productPrice}>{formatRiyal(product.price, isRTL ? 'ar' : 'en')}</Text>
                                             <View style={styles.productStockPill}>
                                                 <Text style={styles.productStockText}>
                                                     {product.stock > 0

@@ -8,6 +8,7 @@ import { AppIcon } from '../components/AppIcon';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
+import { formatRiyal } from '../utils/currency';
 import { api } from '../api/client';
 import { getImageUrl } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -402,8 +403,8 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
           <View style={styles.metricsGrid}>
           <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.items.length}</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.totalPrice.toFixed(2)} SAR</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.payableNowTotal.toFixed(2)} SAR</Text></View>
+          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue} numberOfLines={1}>{formatRiyal(group.totalPrice, language)}</Text></View>
+          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue} numberOfLines={1}>{formatRiyal(group.payableNowTotal, language)}</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'أول موعد' : 'First Appt.'}</Text><Text style={styles.metricValueSmall} numberOfLines={1}>{format(new Date(group.startTime), 'd MMM, h:mm a', { locale: language === 'ar' ? ar : enUS })}</Text></View>
           </View>
 
@@ -419,15 +420,15 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <Text style={styles.sectionTitle}>{language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}</Text>
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>{language === 'ar' ? 'الإجمالي' : 'Subtotal'}</Text>
-              <Text style={styles.paymentValue}>{subtotalAmount.toFixed(2)} SAR</Text>
+              <Text style={styles.paymentValue}>{formatRiyal(subtotalAmount, language)}</Text>
             </View>
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>{language === 'ar' ? 'المدفوع' : 'Paid'}</Text>
-              <Text style={styles.paymentValue}>- {paidAmount.toFixed(2)} SAR</Text>
+              <Text style={styles.paymentValue}>- {formatRiyal(paidAmount, language)}</Text>
             </View>
             <View style={styles.paymentRow}>
               <Text style={styles.paymentDueLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text>
-              <Text style={styles.paymentDueValue}>{Number(group.payableNowTotal || 0).toFixed(2)} SAR</Text>
+              <Text style={styles.paymentDueValue}>{formatRiyal(Number(group.payableNowTotal || 0), language)}</Text>
             </View>
             {!!representative.paymentMethod && (
               <Text style={styles.paymentMethodHint}>
@@ -446,7 +447,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الموظف' : 'Provider'}: {getStaffName(booking)}</Text>
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الحالة' : 'Status'}: {getStatusText(booking.status, language)}</Text>
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الدفع' : 'Payment'}: {getPaymentStatusText(booking)}</Text>
-            <Text style={styles.priceText} numberOfLines={1}>{Number(booking.price || 0).toFixed(2)} SAR</Text>
+            <Text style={styles.priceText} numberOfLines={1}>{formatRiyal(Number(booking.price || 0), language)}</Text>
 
             <View style={styles.actionsWrap}>
               {bookingNeedsPayment(booking.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(booking.status) && activeTab === 'upcoming' && (

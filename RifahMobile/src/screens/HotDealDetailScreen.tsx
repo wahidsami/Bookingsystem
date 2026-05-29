@@ -10,6 +10,7 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { HotDeal, getImageUrl } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -94,18 +95,18 @@ export function HotDealDetailScreen() {
                     <View style={styles.priceRow}>
                         <View>
                             <Text style={styles.priceLabel}>{t('discountedPriceLabel')}</Text>
-                            <Text style={styles.discountedPrice}>{deal.discountedPrice.toFixed(2)} SAR</Text>
+                            <Text style={styles.discountedPrice}>{formatRiyal(deal.discountedPrice, isRTL ? 'ar' : 'en')}</Text>
                         </View>
                         <View style={styles.savingsBadge}>
                             <Text style={styles.savingsText}>
                                 {deal.discountType === 'percentage'
                                     ? `-${deal.discountValue}%`
-                                    : `-${deal.discountValue} SAR`}
+                                    : `-${formatRiyal(deal.discountValue, isRTL ? 'ar' : 'en')}`}
                             </Text>
                         </View>
                     </View>
                     <Text style={styles.originalPrice}>
-                        {t('originalPriceLabel')} {deal.originalPrice.toFixed(2)} SAR
+                        {t('originalPriceLabel')} {formatRiyal(deal.originalPrice, isRTL ? 'ar' : 'en')}
                     </Text>
                 </View>
 

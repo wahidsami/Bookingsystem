@@ -7,6 +7,7 @@ import { api, Service, Staff, SlotItem, getImageUrl, getServicePrice, normalizeS
 import { AppIcon } from '../components/AppIcon';
 import { format, addDays, startOfToday, isSameDay } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
+import { formatRiyal } from '../utils/currency';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { ServiceBookingCartItem, useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
@@ -216,7 +217,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             subtitle: language === 'ar'
                 ? 'ادفع كامل قيمة الخدمة الآن لتأكيد الحجز.'
                 : 'Pay the full service amount now to lock in your booking.',
-            amountLabel: `${servicePrice.toFixed(2)} SAR`,
+            amountLabel: formatRiyal(servicePrice, language),
             icon: 'card' as const,
         } : null,
         paymentSettings.allowServiceDeposit && allowedServicePaymentMethods.has('booking-fee') ? {
@@ -225,7 +226,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             subtitle: language === 'ar'
                 ? 'ادفع جزءاً من المبلغ الآن وأكمل الباقي عند المركز.'
                 : 'Pay a deposit now and settle the rest at the center.',
-            amountLabel: `${bookingFeeAmount.toFixed(2)} SAR`,
+            amountLabel: formatRiyal(bookingFeeAmount, language),
             icon: 'cash' as const,
         } : null,
     ].filter(Boolean) as Array<{
@@ -350,7 +351,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nSelected variant: ${selectedVariantLabel}` : ''}\nPayment will be collected when you arrive at the center.`)
                 : (language === 'ar'
                     ? `تم حجز موعدك بنجاح. رقم الحجز: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nالنوع المختار: ${selectedVariantLabel}` : ''}\nالمطلوب الآن: ${payableNowAmount.toFixed(2)} ريال.`
-                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nSelected variant: ${selectedVariantLabel}` : ''}\nDue now: ${payableNowAmount.toFixed(2)} SAR.`);
+                    : `Your appointment has been scheduled successfully. Booking No.: ${bookingNumber || '-'}.${selectedVariantLabel ? `\nSelected variant: ${selectedVariantLabel}` : ''}\nDue now: ${formatRiyal(payableNowAmount, 'en')}.`);
             const payLaterLabel = language === 'ar' ? 'الدفع لاحقاً' : 'Pay Later';
             const payNowLabel = selectedPaymentMethod === 'booking-fee'
                 ? (language === 'ar' ? 'دفع العربون الآن' : 'Pay Deposit Now')
@@ -599,7 +600,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 ) : null}
                 <View style={[styles.summaryRow, styles.totalRow]}>
                     <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalValue}>{servicePrice.toFixed(2)} SAR</Text>
+                    <Text style={styles.totalValue}>{formatRiyal(servicePrice, language)}</Text>
                 </View>
             </View>
 

@@ -4,6 +4,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -45,7 +46,7 @@ export function CentersBalanceScreen({ navigation, route }: any) {
         <View style={styles.content}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>{language === 'ar' ? 'إجمالي رصيد المراكز' : 'Total centers balance'}</Text>
-            <Text style={styles.balanceAmount}>{centersBalance.toFixed(2)} SAR</Text>
+            <Text style={styles.balanceAmount}>{formatRiyal(centersBalance, language)}</Text>
           </View>
           <Text style={styles.sectionTitle}>{language === 'ar' ? 'حسب المراكز' : 'By centers'}</Text>
           {grouped.map((item) => (
@@ -55,7 +56,7 @@ export function CentersBalanceScreen({ navigation, route }: any) {
                 <Text style={styles.rowTitle}>{item.name}</Text>
                 <Text style={styles.rowHint}>{language === 'ar' ? `${item.count} عمليات` : `${item.count} transactions`}</Text>
               </View>
-              <Text style={styles.rowSub}>+{Number(item.total).toFixed(2)} SAR</Text>
+              <Text style={styles.rowSub}>+{formatRiyal(Number(item.total), language)}</Text>
             </View>
           ))}
         </View>

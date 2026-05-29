@@ -12,6 +12,7 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { api, Order, getImageUrl } from '../api/client';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -155,7 +156,7 @@ export function PurchasesScreen({ navigation }: any) {
                 {/* Footer: Price & Actions */}
                 <View style={styles.cardFooter}>
                     <View style={styles.priceBlock}>
-                        <Text style={styles.price}>{Number(item.totalAmount || 0).toFixed(2)} SAR</Text>
+                        <Text style={styles.price}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
                         <Text style={styles.totalHint}>{language === 'ar' ? 'إجمالي الطلب' : 'Order total'}</Text>
                     </View>
                     <View style={styles.actions}>

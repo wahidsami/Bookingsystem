@@ -15,6 +15,7 @@ import { AppIcon } from '../components/AppIcon';
 import { api, getImageUrl, getServicePrice, normalizeService, normalizeStaff, Service, ServiceVariant, Staff, Tenant } from '../api/client';
 import { colors } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 
 type FullService = Service & { employees?: Staff[]; variants?: ServiceVariant[] };
@@ -144,7 +145,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                 </View>
                                 <View style={styles.chip}>
                                     <AppIcon name="cash" size={14} color={colors.primary} />
-                                    <Text style={styles.chipText}>{effectivePrice.toFixed(2)} SAR</Text>
+                                    <Text style={styles.chipText}>{formatRiyal(effectivePrice, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
                                 <View style={styles.chip}>
                                     <AppIcon name="card" size={14} color={colors.primary} />
@@ -166,7 +167,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                                 <View style={styles.variantMain}>
                                                     <Text style={styles.variantName}>{variant.description || (isRTL ? 'نسخة' : 'Variant')}</Text>
                                                     <Text style={styles.variantMeta}>
-                                                        {(variant.duration || resolvedService.duration)} {isRTL ? 'دقيقة' : 'min'} • {getServicePrice(resolvedService, variant).toFixed(2)} SAR
+                                                        {(variant.duration || resolvedService.duration)} {isRTL ? 'دقيقة' : 'min'} • {formatRiyal(getServicePrice(resolvedService, variant), isRTL ? 'ar' : 'en')}
                                                     </Text>
                                                 </View>
                                                 <TouchableOpacity style={styles.variantBtn} onPress={() => handleBook(undefined, variant)}>
