@@ -940,7 +940,7 @@ const fetchRecentCustomerRescheduleAlerts = async (tenantId, limit = POS_ALERT_L
         limit: Math.max(limit * 3, limit)
     });
 
-    const alerts = events
+    let alerts = events
         .map((event) => {
             const appointment = event.appointment;
             if (!appointment) return null;
@@ -969,6 +969,73 @@ const fetchRecentCustomerRescheduleAlerts = async (tenantId, limit = POS_ALERT_L
         })
         .filter(Boolean)
         .slice(0, limit);
+
+    // Fallback: derive reschedule alerts from appointment notes when event rows are missing.
+    if (alerts.length < limit) {
+        const lookbackDate = new Date();
+        lookbackDate.setDate(lookbackDate.getDate() - RESCHEDULE_ALERT_LOOKBACK_DAYS);
+
+        const fallbackAppointments = await db.Appointment.findAll({
+            where: {
+                tenantId,
+                updatedAt: { [Op.gte]: lookbackDate },
+                notes: { [Op.iLike]: `%${RESCHEDULE_AUDIT_MARKER}%` }
+            },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
+            order: [['updatedAt', 'DESC']],
+            limit: Math.max(limit * 3, limit)
+        });
+
+        const existingIds = new Set(alerts.map((item) => `${item.entityId}`));
+        const fallbackAlerts = fallbackAppointments
+            .map((appointment) => {
+                if (!appointment) return null;
+                const audits = extractRescheduleAuditEntries(appointment.notes);
+                const latest = audits.length ? audits[audits.length - 1] : null;
+                if (!latest?.toStartTime && !latest?.fromStartTime) return null;
+
+                const at = latest?.at ? new Date(latest.at) : new Date(appointment.updatedAt || appointment.startTime);
+                const fromStart = latest?.fromStartTime ? new Date(latest.fromStartTime) : null;
+                const toStart = latest?.toStartTime ? new Date(latest.toStartTime) : null;
+                const customerName = getCustomerName(appointment.user);
+                const serviceName = getServiceName(appointment.service);
+                const reference = appointment.bookingNumber || appointment.id;
+
+                return {
+                    id: `appointment-rescheduled-fallback-${appointment.id}-${at.getTime()}`,
+                    kind: 'appointment',
+                    entityType: 'appointment',
+                    entityId: appointment.id,
+                    reference,
+                    severity: 'medium',
+                    title: `Customer rescheduled booking ${reference}`,
+                    title_ar: `العميل أعاد جدولة الحجز ${reference}`,
+                    message: `${customerName} moved ${serviceName} from ${fromStart ? formatDateTimeLabel(fromStart) : '-'} to ${toStart ? formatDateTimeLabel(toStart) : '-'}.`,
+                    message_ar: `${customerName} قام بتغيير موعد ${serviceName} من ${fromStart ? formatDateTimeLabel(fromStart) : '-'} إلى ${toStart ? formatDateTimeLabel(toStart) : '-'}.`,
+                    scheduledAt: at.toISOString(),
+                    detailPath: appointment.id ? `/dashboard/appointments/${appointment.id}` : null
+                };
+            })
+            .filter(Boolean)
+            .filter((item) => !existingIds.has(`${item.entityId}`));
+
+        alerts = [...alerts, ...fallbackAlerts]
+            .sort((left, right) => toTimestamp(right.scheduledAt) - toTimestamp(left.scheduledAt))
+            .slice(0, limit);
+    }
 
     return {
         alerts,
@@ -1013,7 +1080,7 @@ const fetchRecentCustomerCancellationAlerts = async (tenantId, limit = POS_ALERT
         limit: Math.max(limit * 3, limit)
     });
 
-    const alerts = events
+    let alerts = events
         .map((event) => {
             const appointment = event.appointment;
             if (!appointment) return null;
@@ -1045,6 +1112,73 @@ const fetchRecentCustomerCancellationAlerts = async (tenantId, limit = POS_ALERT
         })
         .filter(Boolean)
         .slice(0, limit);
+
+    // Fallback: derive cancellation alerts from cancelled appointments when event rows are missing.
+    if (alerts.length < limit) {
+        const lookbackDate = new Date();
+        lookbackDate.setDate(lookbackDate.getDate() - RESCHEDULE_ALERT_LOOKBACK_DAYS);
+
+        const fallbackAppointments = await db.Appointment.findAll({
+            where: {
+                tenantId,
+                status: 'cancelled',
+                updatedAt: { [Op.gte]: lookbackDate }
+            },
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
+            order: [['updatedAt', 'DESC']],
+            limit: Math.max(limit * 3, limit)
+        });
+
+        const existingIds = new Set(alerts.map((item) => `${item.entityId}`));
+        const fallbackAlerts = fallbackAppointments
+            .map((appointment) => {
+                if (!appointment) return null;
+                const audits = extractCancellationAuditEntries(appointment.notes);
+                const latest = audits.length ? audits[audits.length - 1] : null;
+                const at = latest?.at ? new Date(latest.at) : new Date(appointment.updatedAt || appointment.startTime);
+                const customerName = getCustomerName(appointment.user);
+                const serviceName = getServiceName(appointment.service);
+                const reference = appointment.bookingNumber || appointment.id;
+                const reasonCode = `${latest?.reasonCode || ''}`.trim();
+                const reasonText = `${latest?.reasonText || ''}`.trim();
+                const reasonLabel = reasonText || reasonCode || 'Not specified';
+                const reasonLabelAr = reasonText || reasonCode || 'غير محدد';
+
+                return {
+                    id: `appointment-cancelled-fallback-${appointment.id}-${at.getTime()}`,
+                    kind: 'appointment',
+                    entityType: 'appointment',
+                    entityId: appointment.id,
+                    reference,
+                    severity: 'high',
+                    title: `Customer cancelled booking ${reference}`,
+                    title_ar: `العميل ألغى الحجز ${reference}`,
+                    message: `${customerName} cancelled ${serviceName}. Reason: ${reasonLabel}.`,
+                    message_ar: `${customerName} قام بإلغاء ${serviceName}. السبب: ${reasonLabelAr}.`,
+                    scheduledAt: at.toISOString(),
+                    detailPath: appointment.id ? `/dashboard/appointments/${appointment.id}` : null
+                };
+            })
+            .filter(Boolean)
+            .filter((item) => !existingIds.has(`${item.entityId}`));
+
+        alerts = [...alerts, ...fallbackAlerts]
+            .sort((left, right) => toTimestamp(right.scheduledAt) - toTimestamp(left.scheduledAt))
+            .slice(0, limit);
+    }
 
     return {
         alerts,
