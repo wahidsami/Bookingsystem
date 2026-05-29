@@ -91,6 +91,14 @@ const toTimestamp = (value) => {
     return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
 };
 
+const getOperationalAlertPriority = (alert) => {
+    const kind = `${alert?.kind || ''}`.trim();
+    if (kind === 'appointment') return 4; // Customer cancel/reschedule must be most visible.
+    if (kind === 'review') return 3;
+    if (kind === 'pos') return 2;
+    return 1;
+};
+
 const getOperationalAlertReaderId = (req) => req.tenantAccountId || req.userId || req.tenantId;
 
 const getOperationalAlertsReadState = async (tenantId, readerId, alerts) => {
@@ -1584,7 +1592,11 @@ exports.getOperationalAlerts = async (req, res) => {
             ...cancellationResult.alerts,
             ...completedDueResult.alerts
         ]
-            .sort((left, right) => toTimestamp(right.scheduledAt) - toTimestamp(left.scheduledAt))
+            .sort((left, right) => {
+                const priorityDiff = getOperationalAlertPriority(right) - getOperationalAlertPriority(left);
+                if (priorityDiff !== 0) return priorityDiff;
+                return toTimestamp(right.scheduledAt) - toTimestamp(left.scheduledAt);
+            })
             .slice(0, limit);
 
         const { readKeys, readAllAt } = await getOperationalAlertsReadState(tenantId, readerId, alerts);
