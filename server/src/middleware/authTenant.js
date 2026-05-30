@@ -69,9 +69,7 @@ const authenticateTenant = async (req, res, next) => {
 
     // Fetch tenant from database
     const tenantId = decoded.id;
-    const tenant = await db.Tenant.findByPk(tenantId, {
-      attributes: { exclude: ['password'] }
-    });
+    const tenant = await db.Tenant.findByPk(tenantId);
 
     if (!tenant) {
       return res.status(404).json({
@@ -145,7 +143,13 @@ const authenticateTenant = async (req, res, next) => {
 
     // Attach tenant data to request
     req.tenantId = tenant.id;
-    req.tenant = tenant;
+    if (tenant?.toJSON) {
+      const tenantData = tenant.toJSON();
+      delete tenantData.password;
+      req.tenant = tenantData;
+    } else {
+      req.tenant = tenant;
+    }
     req.tenantAccount = tenantAccount;
     req.tenantAccountId = tenantAccount?.id || null;
     req.dashboardPermissions = dashboardPermissions;
