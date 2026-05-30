@@ -332,6 +332,34 @@ class TenantApiClient {
     }
   }
 
+  async requestForgotPassword(email: string, locale: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/auth/tenant/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, locale }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to request password reset');
+    }
+    return data;
+  }
+
+  async resetForgottenPassword(token: string, password: string, confirmPassword: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/auth/tenant/reset-password/${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, confirmPassword }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to reset password');
+    }
+    return data;
+  }
+
   async changePassword(data: {
     currentPassword: string;
     newPassword: string;

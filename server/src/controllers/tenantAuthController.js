@@ -8,11 +8,14 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const db = require('../models');
 const { normalizeDashboardPermissions } = require('../utils/tenantDashboardPermissions');
+const emailService = require('../utils/emailService');
+const { getTenantDashboardResetUrl } = require('../utils/url');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+const TENANT_PASSWORD_RESET_EXPIRES_IN = process.env.TENANT_PASSWORD_RESET_EXPIRES_IN || '60m';
 
 const buildPasswordFingerprint = (passwordHash) => {
   if (!passwordHash) {
@@ -24,6 +27,19 @@ const buildPasswordFingerprint = (passwordHash) => {
     .update(`${passwordHash}:${JWT_SECRET}`)
     .digest('hex')
     .slice(0, 24);
+};
+
+const buildTenantResetToken = ({ tenantId, accountId = null, passwordFingerprint }) => {
+  return jwt.sign(
+    {
+      type: 'tenant_password_reset',
+      id: tenantId,
+      accountId,
+      pf: passwordFingerprint || null
+    },
+    JWT_SECRET,
+    { expiresIn: TENANT_PASSWORD_RESET_EXPIRES_IN }
+  );
 };
 
 /**
@@ -499,6 +515,171 @@ const updateProfile = async (req, res) => {
 };
 
 /**
+ * Forgot Password
+ * POST /api/v1/auth/tenant/forgot-password
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, locale } = req.body || {};
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    let tenant = await db.Tenant.findOne({ where: { email: normalizedEmail } });
+    let account = null;
+    let displayName = '';
+
+    if (!tenant) {
+      account = await findDashboardAccountByEmail(normalizedEmail);
+      if (account) {
+        tenant = await db.Tenant.findByPk(account.tenantId);
+        displayName = account.displayName || '';
+      }
+    } else {
+      displayName = tenant.name_en || tenant.name || '';
+    }
+
+    if (tenant && (tenant.password || account?.password)) {
+      const passwordFingerprint = buildPasswordFingerprint(account ? account.password : tenant.password);
+      const resetToken = buildTenantResetToken({
+        tenantId: tenant.id,
+        accountId: account?.id || null,
+        passwordFingerprint
+      });
+      const resetUrl = getTenantDashboardResetUrl(resetToken, locale === 'en' ? 'en' : 'ar');
+
+      if (resetUrl) {
+        await emailService.sendCustomerPasswordResetEmail({
+          email: normalizedEmail,
+          firstName: displayName || (locale === 'ar' ? 'مستخدم' : 'User'),
+          resetUrl,
+          expiresInMinutes: 60
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'If the email exists, a reset link has been sent'
+    });
+  } catch (error) {
+    console.error('Tenant forgot password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process forgot password',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Reset Password
+ * POST /api/v1/auth/tenant/reset-password/:token
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password, confirmPassword } = req.body || {};
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password and confirmation are required'
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password and confirmation do not match'
+      });
+    }
+
+    if (String(password).length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long'
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (verifyError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    if (decoded?.type !== 'tenant_password_reset' || !decoded?.id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    if (decoded.accountId) {
+      const account = await findDashboardAccountById(decoded.accountId);
+      if (!account || account.tenantId !== decoded.id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token'
+        });
+      }
+
+      const currentFingerprint = buildPasswordFingerprint(account.password);
+      if (!decoded.pf || decoded.pf !== currentFingerprint) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token'
+        });
+      }
+
+      account.password = await bcrypt.hash(password, 10);
+      account.passwordResetRequired = false;
+      await account.save();
+    } else {
+      const tenant = await db.Tenant.findByPk(decoded.id);
+      if (!tenant) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token'
+        });
+      }
+
+      const currentFingerprint = buildPasswordFingerprint(tenant.password);
+      if (!decoded.pf || decoded.pf !== currentFingerprint) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token'
+        });
+      }
+
+      tenant.password = await bcrypt.hash(password, 10);
+      await tenant.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error) {
+    console.error('Tenant reset password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Change Password
  * POST /api/v1/auth/tenant/change-password
  */
@@ -607,6 +788,8 @@ module.exports = {
   refreshToken,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 };
 

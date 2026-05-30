@@ -91,6 +91,17 @@ const getCustomerAppResetUrl = (token) => {
     return `com.refah.mobile://reset-password?token=${encodedToken}`;
 };
 
+const getTenantDashboardResetUrl = (token, locale = 'ar') => {
+    const encodedToken = encodeURIComponent(token || '');
+    const baseUrl = getTenantDashboardBaseUrl();
+
+    if (!baseUrl) {
+        return '';
+    }
+
+    return `${baseUrl}/${locale}/reset-password?token=${encodedToken}`;
+};
+
 const buildPublicAssetUrl = (assetPath) => {
     if (!assetPath || typeof assetPath !== 'string') {
         return assetPath;
@@ -122,6 +133,7 @@ module.exports = {
     getTenantDashboardLoginUrl,
     getStaffAppLoginUrl,
     getCustomerAppResetUrl,
+    getTenantDashboardResetUrl,
     getServerPublicUrl,
     buildPublicAssetUrl
 };
