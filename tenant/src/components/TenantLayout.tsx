@@ -99,7 +99,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [expandedNavGroups, setExpandedNavGroups] = useState<Record<string, boolean>>({});
-  const [now, setNow] = useState(() => new Date());
+  const [hasMounted, setHasMounted] = useState(false);
+  const [now, setNow] = useState<Date | null>(null);
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
   const [notificationPanelPosition, setNotificationPanelPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
   const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
@@ -169,6 +170,9 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     .map((part: string) => part[0]?.toUpperCase())
     .join('') || (locale === 'ar' ? 'م' : 'U');
   const currentDateTimeLabel = useMemo(() => {
+    if (!now) {
+      return locale === 'ar' ? '—' : '--';
+    }
     return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
       timeZone: tenantTimeZone,
       weekday: 'short',
@@ -569,6 +573,9 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   }, [user?.id]);
 
   useEffect(() => {
+    setHasMounted(true);
+    setNow(new Date());
+
     const timer = window.setInterval(() => {
       setNow(new Date());
     }, 60_000);
@@ -1055,7 +1062,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                 <div className="flex items-center justify-end gap-3 min-w-0">
                   <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 text-right">
                     <ClockIcon className="inline-block h-4 w-4 ml-2 align-[-2px]" />
-                    {currentDateTimeLabel}
+                    <span suppressHydrationWarning>{hasMounted ? currentDateTimeLabel : (locale === 'ar' ? '—' : '--')}</span>
                   </div>
                   <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
                     <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
@@ -1070,7 +1077,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                 <div className="flex items-center justify-start gap-3 min-w-0">
                   <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
                     <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
-                    {currentDateTimeLabel}
+                    <span suppressHydrationWarning>{hasMounted ? currentDateTimeLabel : (locale === 'ar' ? '—' : '--')}</span>
                   </div>
                   <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
