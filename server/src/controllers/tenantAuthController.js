@@ -641,7 +641,8 @@ const resetPassword = async (req, res) => {
         });
       }
 
-      account.password = await bcrypt.hash(password, 10);
+      // Model hook hashes password on update; keep raw value here.
+      account.password = password;
       account.passwordResetRequired = false;
       await account.save();
     } else {
@@ -661,7 +662,8 @@ const resetPassword = async (req, res) => {
         });
       }
 
-      tenant.password = await bcrypt.hash(password, 10);
+      // Model hook hashes password on update; keep raw value here.
+      tenant.password = password;
       await tenant.save();
     }
 
@@ -725,7 +727,8 @@ const changePassword = async (req, res) => {
         });
       }
 
-      account.password = await bcrypt.hash(newPassword, 10);
+      // Model hook hashes password on update; keep raw value here.
+      account.password = newPassword;
       account.passwordResetRequired = false;
       await account.save();
 
@@ -758,7 +761,8 @@ const changePassword = async (req, res) => {
       });
     }
 
-    tenant.password = await bcrypt.hash(newPassword, 10);
+    // Model hook hashes password on update; keep raw value here.
+    tenant.password = newPassword;
     await tenant.save();
 
     const passwordFingerprint = buildPasswordFingerprint(tenant.password);
