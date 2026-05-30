@@ -198,8 +198,8 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
             try {
                 const startResult = await api.googleStart(idToken);
-                if (startResult.requiresOnboarding === false && startResult.accessToken && startResult.refreshToken && startResult.user) {
-                    await api.setTokens(startResult.accessToken, startResult.refreshToken);
+                if (startResult.requiresOnboarding === false && startResult.accessToken && startResult.user) {
+                    await api.setTokens(startResult.accessToken, startResult.refreshToken ?? null);
                     await api.setUser(startResult.user);
                     setError('');
                     onSuccess();

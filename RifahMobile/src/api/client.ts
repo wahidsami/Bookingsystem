@@ -917,10 +917,13 @@ class ApiClient {
     /**
      * Store tokens securely (using SecureStore for sensitive data)
      */
-    async setTokens(accessToken: string, refreshToken: string): Promise<void> {
+    async setTokens(accessToken: string, refreshToken?: string | null): Promise<void> {
         try {
             await SecureStore.setItemAsync(KEYS.ACCESS_TOKEN, accessToken);
-            await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, refreshToken);
+            const normalizedRefresh = `${refreshToken ?? ''}`.trim();
+            if (normalizedRefresh) {
+                await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, normalizedRefresh);
+            }
             await this.touchSession();
         } catch (error) {
             console.error('Error storing tokens:', error);
@@ -1090,9 +1093,6 @@ class ApiClient {
                     ...requestOptions,
                     headers,
                 }, timeoutMs);
-            } else {
-                // Refresh failed, clear tokens
-                await this.clearTokens();
             }
         }
 
