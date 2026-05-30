@@ -5,6 +5,7 @@
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const db = require('../models');
 const { normalizeDashboardPermissions } = require('../utils/tenantDashboardPermissions');
 
@@ -13,12 +14,24 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
+const buildPasswordFingerprint = (passwordHash) => {
+  if (!passwordHash) {
+    return null;
+  }
+
+  return crypto
+    .createHash('sha256')
+    .update(`${passwordHash}:${JWT_SECRET}`)
+    .digest('hex')
+    .slice(0, 24);
+};
+
 /**
  * Generate access token
  */
-const generateAccessToken = (tenantId) => {
+const generateAccessToken = (tenantId, passwordFingerprint) => {
   return jwt.sign(
-    { id: tenantId, type: 'tenant' },
+    { id: tenantId, type: 'tenant', pf: passwordFingerprint || null },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
@@ -27,9 +40,9 @@ const generateAccessToken = (tenantId) => {
 /**
  * Generate dashboard account access token
  */
-const generateAccountAccessToken = (tenantId, accountId) => {
+const generateAccountAccessToken = (tenantId, accountId, passwordFingerprint) => {
   return jwt.sign(
-    { id: tenantId, accountId, type: 'tenant_account' },
+    { id: tenantId, accountId, type: 'tenant_account', pf: passwordFingerprint || null },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
@@ -38,9 +51,9 @@ const generateAccountAccessToken = (tenantId, accountId) => {
 /**
  * Generate refresh token
  */
-const generateRefreshToken = (tenantId) => {
+const generateRefreshToken = (tenantId, passwordFingerprint) => {
   return jwt.sign(
-    { id: tenantId, type: 'tenant', isRefresh: true },
+    { id: tenantId, type: 'tenant', isRefresh: true, pf: passwordFingerprint || null },
     JWT_REFRESH_SECRET,
     { expiresIn: JWT_REFRESH_EXPIRES_IN }
   );
@@ -49,9 +62,9 @@ const generateRefreshToken = (tenantId) => {
 /**
  * Generate dashboard account refresh token
  */
-const generateAccountRefreshToken = (tenantId, accountId) => {
+const generateAccountRefreshToken = (tenantId, accountId, passwordFingerprint) => {
   return jwt.sign(
-    { id: tenantId, accountId, type: 'tenant_account', isRefresh: true },
+    { id: tenantId, accountId, type: 'tenant_account', isRefresh: true, pf: passwordFingerprint || null },
     JWT_REFRESH_SECRET,
     { expiresIn: JWT_REFRESH_EXPIRES_IN }
   );
@@ -171,8 +184,9 @@ const login = async (req, res) => {
       tenant.lastLogin = new Date();
       await tenant.save();
 
-      const accessToken = generateAccessToken(tenant.id);
-      const refreshToken = generateRefreshToken(tenant.id);
+      const passwordFingerprint = buildPasswordFingerprint(tenant.password);
+      const accessToken = generateAccessToken(tenant.id, passwordFingerprint);
+      const refreshToken = generateRefreshToken(tenant.id, passwordFingerprint);
 
       return res.json({
         success: true,
@@ -230,8 +244,9 @@ const login = async (req, res) => {
     dashboardAccount.lastLoginIP = req.ip;
     await dashboardAccount.save();
 
-    const accessToken = generateAccountAccessToken(accountTenant.id, dashboardAccount.id);
-    const refreshToken = generateAccountRefreshToken(accountTenant.id, dashboardAccount.id);
+    const passwordFingerprint = buildPasswordFingerprint(dashboardAccount.password);
+    const accessToken = generateAccountAccessToken(accountTenant.id, dashboardAccount.id, passwordFingerprint);
+    const refreshToken = generateAccountRefreshToken(accountTenant.id, dashboardAccount.id, passwordFingerprint);
     const accountData = sanitizeDashboardAccount(dashboardAccount);
 
     return res.json({
@@ -341,9 +356,27 @@ const refreshToken = async (req, res) => {
         });
       }
 
-      newAccessToken = generateAccountAccessToken(tenant.id, dashboardAccount.id);
+      const tokenFingerprint = decoded.pf || null;
+      const currentFingerprint = buildPasswordFingerprint(dashboardAccount.password);
+      if (!tokenFingerprint || tokenFingerprint !== currentFingerprint) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session is no longer valid. Please login again.'
+        });
+      }
+
+      newAccessToken = generateAccountAccessToken(tenant.id, dashboardAccount.id, currentFingerprint);
     } else {
-      newAccessToken = generateAccessToken(tenant.id);
+      const tokenFingerprint = decoded.pf || null;
+      const currentFingerprint = buildPasswordFingerprint(tenant.password);
+      if (!tokenFingerprint || tokenFingerprint !== currentFingerprint) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session is no longer valid. Please login again.'
+        });
+      }
+
+      newAccessToken = generateAccessToken(tenant.id, currentFingerprint);
     }
 
     res.json({
@@ -515,9 +548,16 @@ const changePassword = async (req, res) => {
       account.passwordResetRequired = false;
       await account.save();
 
+      const passwordFingerprint = buildPasswordFingerprint(account.password);
+      const accessToken = generateAccountAccessToken(req.tenantId, account.id, passwordFingerprint);
+      const refreshToken = generateAccountRefreshToken(req.tenantId, account.id, passwordFingerprint);
+
       return res.json({
         success: true,
-        message: 'Password changed successfully'
+        message: 'Password changed successfully',
+        accessToken,
+        refreshToken,
+        forceLogoutOtherSessions: true
       });
     }
 
@@ -540,9 +580,16 @@ const changePassword = async (req, res) => {
     tenant.password = await bcrypt.hash(newPassword, 10);
     await tenant.save();
 
+    const passwordFingerprint = buildPasswordFingerprint(tenant.password);
+    const accessToken = generateAccessToken(tenant.id, passwordFingerprint);
+    const refreshToken = generateRefreshToken(tenant.id, passwordFingerprint);
+
     return res.json({
       success: true,
-      message: 'Password changed successfully'
+      message: 'Password changed successfully',
+      accessToken,
+      refreshToken,
+      forceLogoutOtherSessions: true
     });
   } catch (error) {
     console.error('Change tenant password error:', error);

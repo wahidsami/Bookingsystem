@@ -48,6 +48,10 @@ export function PasswordSecuritySection() {
         throw new Error(response?.message || (locale === "ar" ? "تعذر تغيير كلمة المرور" : "Failed to change password"));
       }
 
+      if (response?.accessToken) {
+        tenantApi.setAuthTokens(response.accessToken, response.refreshToken || null);
+      }
+
       resetForm();
       setSuccess(response.message || (locale === "ar" ? "تم تغيير كلمة المرور بنجاح" : "Password changed successfully"));
     } catch (err: any) {

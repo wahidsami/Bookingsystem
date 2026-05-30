@@ -5,6 +5,7 @@
  */
 
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../models');
 const JWT_SECRET = process.env.JWT_SECRET;
 const {
@@ -23,6 +24,18 @@ const isMissingTenantDashboardAccountTableError = (error) => {
     message.includes('tenant_dashboard_accounts') ||
     (message.includes('relation') && message.includes('does not exist'))
   );
+};
+
+const buildPasswordFingerprint = (passwordHash) => {
+  if (!passwordHash) {
+    return null;
+  }
+
+  return crypto
+    .createHash('sha256')
+    .update(`${passwordHash}:${JWT_SECRET}`)
+    .digest('hex')
+    .slice(0, 24);
 };
 
 /**
@@ -109,7 +122,25 @@ const authenticateTenant = async (req, res, next) => {
         });
       }
 
+      const tokenFingerprint = decoded.pf || null;
+      const currentFingerprint = buildPasswordFingerprint(tenantAccount.password);
+      if (!tokenFingerprint || tokenFingerprint !== currentFingerprint) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session is no longer valid. Please login again.'
+        });
+      }
+
       dashboardPermissions = normalizeDashboardPermissions(tenantAccount.permissions || {}, tenantAccount.roleKey);
+    } else {
+      const tokenFingerprint = decoded.pf || null;
+      const currentFingerprint = buildPasswordFingerprint(tenant.password);
+      if (!tokenFingerprint || tokenFingerprint !== currentFingerprint) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session is no longer valid. Please login again.'
+        });
+      }
     }
 
     // Attach tenant data to request
@@ -168,6 +199,15 @@ const optionalTenantAuth = async (req, res, next) => {
       });
 
       if (tenant && (tenant.status === 'active' || tenant.status === 'approved' || tenant.status === 'more_info_required')) {
+        if (decoded.type === 'tenant') {
+          const tokenFingerprint = decoded.pf || null;
+          const currentTenant = await db.Tenant.findByPk(decoded.id);
+          const currentFingerprint = buildPasswordFingerprint(currentTenant?.password);
+          if (!tokenFingerprint || tokenFingerprint !== currentFingerprint) {
+            return next();
+          }
+        }
+
         req.tenantId = tenant.id;
         req.tenant = tenant;
         req.userId = decoded.type === 'tenant_account' ? decoded.accountId : decoded.id;
@@ -176,6 +216,12 @@ const optionalTenantAuth = async (req, res, next) => {
           try {
             const tenantAccount = await db.TenantDashboardAccount.findByPk(decoded.accountId);
             if (tenantAccount && tenantAccount.tenantId === tenant.id && tenantAccount.isActive) {
+              const tokenFingerprint = decoded.pf || null;
+              const currentFingerprint = buildPasswordFingerprint(tenantAccount.password);
+              if (!tokenFingerprint || tokenFingerprint !== currentFingerprint) {
+                return next();
+              }
+
               req.tenantAccount = tenantAccount;
               req.tenantAccountId = tenantAccount.id;
               req.dashboardPermissions = normalizeDashboardPermissions(tenantAccount.permissions || {}, tenantAccount.roleKey);
