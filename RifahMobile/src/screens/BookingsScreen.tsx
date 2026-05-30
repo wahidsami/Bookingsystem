@@ -45,6 +45,7 @@ type GroupGuestMeta = {
 
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
+    const isRTL = language === 'ar';
     const { showLogin } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'no_show' | 'cancelled'>('upcoming');

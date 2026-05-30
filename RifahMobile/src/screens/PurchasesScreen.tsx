@@ -26,6 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export function PurchasesScreen({ navigation }: any) {
     const { t, language } = useLanguage();
+    const isRTL = language === 'ar';
     const { showLogin } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [orders, setOrders] = useState<Order[]>([]);
