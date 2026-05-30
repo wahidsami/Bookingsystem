@@ -332,6 +332,14 @@ class TenantApiClient {
     }
   }
 
+  async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<any> {
+    return this.post('/auth/tenant/change-password', data);
+  }
+
   /**
    * Tenant dashboard accounts
    */

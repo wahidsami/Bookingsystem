@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
 import { TeamAccessSection } from '@/components/settings/TeamAccessSection';
+import { PasswordSecuritySection } from '@/components/settings/PasswordSecuritySection';
 import { useTenantAuth } from '@/contexts/TenantAuthContext';
 import {
   BuildingOfficeIcon,
@@ -17,6 +18,7 @@ import {
   PhotoIcon,
   CheckIcon,
   UserGroupIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 
 interface WorkingDay {
@@ -383,6 +385,11 @@ export default function SettingsPage() {
     { id: 'notifications', icon: BellIcon, label: t('notifications') },
     { id: 'payment', icon: CreditCardIcon, label: t('payment') },
     { id: 'localization', icon: GlobeAltIcon, label: t('localization') },
+    {
+      id: 'security',
+      icon: ShieldCheckIcon,
+      label: locale === 'ar' ? 'أمان الحساب' : 'Account Security'
+    },
     ...(canManageAccounts ? [{
       id: 'team',
       icon: UserGroupIcon,
@@ -1349,6 +1356,10 @@ export default function SettingsPage() {
 
             {canManageAccounts && activeTab === 'team' && (
               <TeamAccessSection />
+            )}
+
+            {activeTab === 'security' && (
+              <PasswordSecuritySection />
             )}
           </div>
         </div>

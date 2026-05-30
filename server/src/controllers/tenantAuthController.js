@@ -465,11 +465,101 @@ const updateProfile = async (req, res) => {
   }
 };
 
+/**
+ * Change Password
+ * POST /api/v1/auth/tenant/change-password
+ */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password, new password, and confirmation are required'
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirmation do not match'
+      });
+    }
+
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 8 characters'
+      });
+    }
+
+    if (req.tenantAccount) {
+      const account = await findDashboardAccountById(req.tenantAccount.id);
+      if (!account || account.tenantId !== req.tenantId) {
+        return res.status(404).json({
+          success: false,
+          message: 'Tenant dashboard account not found'
+        });
+      }
+
+      const isCurrentValid = await bcrypt.compare(currentPassword, account.password);
+      if (!isCurrentValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is incorrect'
+        });
+      }
+
+      account.password = await bcrypt.hash(newPassword, 10);
+      account.passwordResetRequired = false;
+      await account.save();
+
+      return res.json({
+        success: true,
+        message: 'Password changed successfully'
+      });
+    }
+
+    const tenant = await db.Tenant.findByPk(req.tenantId);
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tenant not found'
+      });
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, tenant.password);
+    if (!isCurrentValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    tenant.password = await bcrypt.hash(newPassword, 10);
+    await tenant.save();
+
+    return res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change tenant password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to change password',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   login,
   logout,
   refreshToken,
   getProfile,
-  updateProfile
+  updateProfile,
+  changePassword
 };
 

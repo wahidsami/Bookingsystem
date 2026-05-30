@@ -16,6 +16,7 @@ router.post('/refresh-token', tenantAuthController.refreshToken);
 
 // Protected routes (authentication required)
 router.post('/logout', authenticateTenant, tenantAuthController.logout);
+router.post('/change-password', authenticateTenant, tenantAuthController.changePassword);
 
 module.exports = router;
 
