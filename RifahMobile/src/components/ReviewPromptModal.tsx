@@ -16,7 +16,7 @@ interface ReviewPromptModalProps {
 }
 
 export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: ReviewPromptModalProps) {
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const [rating, setRating] = useState(0);
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -37,7 +37,14 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                 appointmentId: appointment.id,
                 rating,
                 comment,
-                customerName: (appointment as any).user?.firstName || (appointment as any).legacyCustomer?.firstName || 'Valued Customer'
+                customerName:
+                    [((appointment as any).user?.firstName || ''), ((appointment as any).user?.lastName || '')]
+                        .join(' ')
+                        .trim()
+                    || [((appointment as any).legacyCustomer?.firstName || ''), ((appointment as any).legacyCustomer?.lastName || '')]
+                        .join(' ')
+                        .trim()
+                    || (isRTL ? 'عميل موثّق' : 'Verified Customer')
             };
 
             const res = await api.post<{ success: boolean; message?: string }>(`/users/reviews`, payload);
@@ -87,7 +94,7 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
 
                     <View style={styles.starsContainer}>
                         {[1, 2, 3, 4, 5].map((star) => (
-                            <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                            <TouchableOpacity key={star} activeOpacity={0.8} onPressIn={() => setRating(star)} onPress={() => setRating(star)}>
                                 <AppIcon
                                     name="star"
                                     size={40}
@@ -96,6 +103,11 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                             </TouchableOpacity>
                         ))}
                     </View>
+                    <Text style={styles.ratingHint}>
+                        {rating > 0
+                            ? (isRTL ? `التقييم المختار: ${rating}/5` : `Selected rating: ${rating}/5`)
+                            : (isRTL ? 'اختر عدد النجوم' : 'Choose your star rating')}
+                    </Text>
 
                     <TextInput
                         style={styles.input}
@@ -175,6 +187,14 @@ const styles = StyleSheet.create({
         color: colors.text,
         marginBottom: spacing.xl,
         minHeight: 100,
+    },
+    ratingHint: {
+        textAlign: 'center',
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        marginTop: -spacing.md,
+        marginBottom: spacing.lg,
+        fontWeight: '600',
     },
     submitButton: {
         backgroundColor: colors.primary,

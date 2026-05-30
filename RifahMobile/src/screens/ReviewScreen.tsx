@@ -113,7 +113,13 @@ export function ReviewScreen({ route, navigation }: any) {
 
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => setRating(star)} style={{ padding: 2 }}>
+                <TouchableOpacity
+                  key={star}
+                  activeOpacity={0.8}
+                  onPressIn={() => setRating(star)}
+                  onPress={() => setRating(star)}
+                  style={{ padding: 2 }}
+                >
                   <AppIcon name="star" size={38} color={star <= rating ? colors.warning : colors.borderStrong} />
                 </TouchableOpacity>
               ))}
