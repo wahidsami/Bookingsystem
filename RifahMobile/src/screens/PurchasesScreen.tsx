@@ -33,6 +33,7 @@ export function PurchasesScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -96,9 +97,15 @@ export function PurchasesScreen({ navigation }: any) {
     const renderOrderCard = ({ item }: { item: Order }) => {
         const isArabic = language === 'ar';
         const dateDate = new Date(item.createdAt);
+        const isExpanded = expandedOrderId === item.id;
+        const visibleItems = isExpanded ? item.items : item.items.slice(0, 2);
 
         return (
-            <View style={styles.card}>
+            <TouchableOpacity
+                activeOpacity={0.95}
+                style={styles.card}
+                onPress={() => setExpandedOrderId((prev) => (prev === item.id ? null : item.id))}
+            >
                 {/* Header: Tenant Info & Status */}
                 <View style={styles.cardHeader}>
                     <View style={styles.salonInfo}>
@@ -141,16 +148,21 @@ export function PurchasesScreen({ navigation }: any) {
 
                     {/* Items Summary */}
                     <View style={styles.itemsContainer}>
-                        {item.items.slice(0, 2).map((orderItem, index) => (
+                        {visibleItems.map((orderItem, index) => (
                             <Text key={index} style={styles.itemText}>
                                 • {isArabic ? orderItem.Product?.name_ar || orderItem.product?.name_ar : orderItem.Product?.name_en || orderItem.product?.name_en} (x{orderItem.quantity})
                             </Text>
                         ))}
-                        {item.items.length > 2 && (
+                        {!isExpanded && item.items.length > 2 && (
                             <Text style={styles.moreItemsText}>
                                 + {item.items.length - 2} {t('moreItems')}
                             </Text>
                         )}
+                        <Text style={styles.viewDetailsText}>
+                            {isExpanded
+                                ? (isArabic ? 'إخفاء التفاصيل' : 'Hide details')
+                                : (isArabic ? 'عرض تفاصيل الطلب' : 'View order details')}
+                        </Text>
                     </View>
                 </View>
 
@@ -183,7 +195,7 @@ export function PurchasesScreen({ navigation }: any) {
                         )}
                     </View>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -426,6 +438,12 @@ const styles = StyleSheet.create({
         color: '#6E7596',
         fontStyle: 'italic',
         marginTop: 2,
+    },
+    viewDetailsText: {
+        marginTop: spacing.xs,
+        fontSize: 13,
+        fontWeight: '700',
+        color: colors.primary,
     },
     cardFooter: {
         flexDirection: 'row',

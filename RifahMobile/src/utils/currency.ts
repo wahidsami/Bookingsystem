@@ -1,4 +1,5 @@
-const RIYAL_SYMBOL = '\u20C0';
+// Use the widely supported Arabic Rial sign glyph used across most Android fonts.
+const RIYAL_SYMBOL = '\uFDFC';
 
 const toNumber = (value: number | string | null | undefined) => {
   const parsed = Number(value);
@@ -19,4 +20,3 @@ export const formatRiyal = (
 };
 
 export const getRiyalSymbol = () => RIYAL_SYMBOL;
-
