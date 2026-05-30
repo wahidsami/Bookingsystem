@@ -962,13 +962,31 @@ export default function RegisterPage() {
         licenseDocument: null
     });
 
+    const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+    const isValidPhone = (value: string) => /^\+?[0-9]{8,15}$/.test(value.trim());
+    const isValidUrl = (value: string) => {
+        const raw = value.trim();
+        if (!raw) return true;
+        try {
+            const candidate = raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
+            const parsed = new URL(candidate);
+            return Boolean(parsed.hostname);
+        } catch {
+            return false;
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
+        const phoneFields = new Set(['phone', 'mobile', 'contactPersonMobile', 'ownerPhone']);
+        const normalizedValue = phoneFields.has(name)
+            ? value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+            : value;
 
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: type === 'checkbox' ? checked : normalizedValue
         }));
 
         // Clear error for this field
@@ -1007,8 +1025,13 @@ export default function RegisterPage() {
             if (!formData.name_ar) newErrors.name_ar = t('step1.errors.nameArRequired');
             if (!formData.businessType || formData.businessType.length === 0) newErrors.businessType = t('step1.errors.businessTypeRequired');
             if (!formData.email) newErrors.email = t('step1.errors.emailRequired');
+            if (formData.email && !isValidEmail(formData.email)) newErrors.email = locale === 'ar' ? 'صيغة البريد الإلكتروني غير صحيحة' : 'Invalid email format';
             if (!formData.phone) newErrors.phone = t('step1.errors.phoneRequired');
+            if (formData.phone && !isValidPhone(formData.phone)) newErrors.phone = locale === 'ar' ? 'رقم الهاتف غير صحيح (8-15 رقم)' : 'Invalid phone number (8-15 digits)';
             if (!formData.mobile) newErrors.mobile = t('step1.errors.mobileRequired');
+            if (formData.mobile && !isValidPhone(formData.mobile)) newErrors.mobile = locale === 'ar' ? 'رقم الجوال غير صحيح (8-15 رقم)' : 'Invalid mobile number (8-15 digits)';
+            if (formData.website && !isValidUrl(formData.website)) newErrors.website = locale === 'ar' ? 'رابط الموقع الإلكتروني غير صحيح' : 'Invalid website URL';
+            if (formData.googleMapLink && !isValidUrl(formData.googleMapLink)) newErrors.googleMapLink = locale === 'ar' ? 'رابط خرائط Google غير صحيح' : 'Invalid Google Maps URL';
             if (!formData.password) newErrors.password = t('step1.errors.passwordRequired');
             if (formData.password && formData.password.length < 8) {
                 newErrors.password = t('step1.errors.passwordMinLength');
@@ -1031,7 +1054,9 @@ export default function RegisterPage() {
             if (!formData.contactPersonNameAr) newErrors.contactPersonNameAr = t('step3.errors.nameArRequired');
             if (!formData.contactPersonNameEn) newErrors.contactPersonNameEn = t('step3.errors.nameEnRequired');
             if (!formData.contactPersonEmail) newErrors.contactPersonEmail = t('step3.errors.emailRequired');
+            if (formData.contactPersonEmail && !isValidEmail(formData.contactPersonEmail)) newErrors.contactPersonEmail = locale === 'ar' ? 'صيغة البريد الإلكتروني غير صحيحة' : 'Invalid email format';
             if (!formData.contactPersonMobile) newErrors.contactPersonMobile = t('step3.errors.mobileRequired');
+            if (formData.contactPersonMobile && !isValidPhone(formData.contactPersonMobile)) newErrors.contactPersonMobile = locale === 'ar' ? 'رقم جوال جهة الاتصال غير صحيح' : 'Invalid contact person mobile number';
             if (!formData.contactPersonPosition) newErrors.contactPersonPosition = t('step3.errors.positionRequired');
         }
 
@@ -1039,7 +1064,9 @@ export default function RegisterPage() {
             if (!formData.ownerNameAr) newErrors.ownerNameAr = t('step4.errors.nameArRequired');
             if (!formData.ownerNameEn) newErrors.ownerNameEn = t('step4.errors.nameEnRequired');
             if (!formData.ownerPhone) newErrors.ownerPhone = t('step4.errors.phoneRequired');
+            if (formData.ownerPhone && !isValidPhone(formData.ownerPhone)) newErrors.ownerPhone = locale === 'ar' ? 'رقم هاتف المالك غير صحيح' : 'Invalid owner phone number';
             if (!formData.ownerEmail) newErrors.ownerEmail = t('step4.errors.emailRequired');
+            if (formData.ownerEmail && !isValidEmail(formData.ownerEmail)) newErrors.ownerEmail = locale === 'ar' ? 'صيغة البريد الإلكتروني غير صحيحة' : 'Invalid email format';
             if (!formData.ownerNationalId) newErrors.ownerNationalId = t('step4.errors.nationalIdRequired');
         }
 

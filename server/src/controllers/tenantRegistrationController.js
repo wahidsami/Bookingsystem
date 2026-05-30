@@ -5,6 +5,8 @@ const fs = require('fs');
 const { notifyTenantRegistered } = require('../services/adminNotificationService');
 
 const VALID_BUSINESS_TYPES = ['salon', 'spa', 'barbershop', 'beauty_center', 'clinic', 'nail_studio', 'other'];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^\+?[0-9]{8,15}$/;
 
 const normalizeBusinessTypes = (businessTypeInput) => {
     if (businessTypeInput == null) {
@@ -190,11 +192,59 @@ exports.register = async (req, res) => {
                 message: 'Email is required'
             });
         }
+        if (!EMAIL_REGEX.test(String(email).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid business email format'
+            });
+        }
+        if (contactPersonEmail && !EMAIL_REGEX.test(String(contactPersonEmail).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid contact person email format'
+            });
+        }
+        if (ownerEmail && !EMAIL_REGEX.test(String(ownerEmail).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid owner email format'
+            });
+        }
+        if (!phone || !PHONE_REGEX.test(String(phone).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid business phone number format'
+            });
+        }
+        if (!mobile || !PHONE_REGEX.test(String(mobile).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid business mobile number format'
+            });
+        }
+        if (!contactPersonMobile || !PHONE_REGEX.test(String(contactPersonMobile).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid contact person mobile number format'
+            });
+        }
+        if (!ownerPhone || !PHONE_REGEX.test(String(ownerPhone).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid owner phone number format'
+            });
+        }
 
         if (!password) {
             return res.status(400).json({
                 success: false,
                 message: 'Password is required'
+            });
+        }
+        if (String(password).length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 8 characters long'
             });
         }
 
