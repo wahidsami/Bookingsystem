@@ -655,9 +655,13 @@ class AvailabilityService {
         const recurringBreaks = await db.StaffBreak.findAll({
             where: {
                 staffId,
-                dayOfWeek,
                 isRecurring: true,
                 isActive: true,
+                [Op.or]: [
+                    { dayOfWeek },
+                    { dayOfWeek: null }
+                ]
+                ,
                 [Op.and]: [
                     {
                         [Op.or]: [

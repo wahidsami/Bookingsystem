@@ -214,6 +214,21 @@ export default function AppointmentsPage() {
     mode?: "grid" | "staff";
     dateKey?: string;
   } | null>(null);
+  const isContextSlotBlocked = useMemo(() => {
+    if (!boardContextMenu) return false;
+    const slotStart = new Date(boardContextMenu.startTime);
+    const slotMs = slotStart.getTime();
+    if (Number.isNaN(slotMs)) return false;
+
+    return breaks.some((breakItem) => {
+      if (breakItem.staffId !== boardContextMenu.staffId) return false;
+      if (!breakItem.startDateTime || !breakItem.endDateTime) return false;
+      const breakStartMs = new Date(breakItem.startDateTime).getTime();
+      const breakEndMs = new Date(breakItem.endDateTime).getTime();
+      if (Number.isNaN(breakStartMs) || Number.isNaN(breakEndMs)) return false;
+      return slotMs >= breakStartMs && slotMs < breakEndMs;
+    });
+  }, [boardContextMenu, breaks]);
   const [showShiftEditorModal, setShowShiftEditorModal] = useState(false);
   const [shiftEditorStaffId, setShiftEditorStaffId] = useState<string | null>(null);
   const [shiftDraft, setShiftDraft] = useState<ShiftDraft[]>([]);
@@ -1388,14 +1403,22 @@ export default function AppointmentsPage() {
             }}
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={handleOpenAppointmentFromMenu}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-            >
-              <PlusIcon className="h-4 w-4 text-primary" />
-              <span>{locale === 'ar' ? 'إضافة موعد جديد' : 'Add new appointment'}</span>
-            </button>
+            {!isContextSlotBlocked ? (
+              <button
+                type="button"
+                onClick={handleOpenAppointmentFromMenu}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                <PlusIcon className="h-4 w-4 text-primary" />
+                <span>{locale === 'ar' ? 'إضافة موعد جديد' : 'Add new appointment'}</span>
+              </button>
+            ) : (
+              <div className="rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 bg-rose-50">
+                {locale === 'ar'
+                  ? 'هذه الفترة محجوزة ولا يمكن إضافة موعد فيها'
+                  : 'This time slot is blocked and cannot accept appointments'}
+              </div>
+            )}
             <button
               type="button"
               onClick={handleOpenBlockedTimeFromMenu}

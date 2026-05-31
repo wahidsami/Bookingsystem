@@ -37,6 +37,17 @@ function isUuid(value) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(`${value || ''}`);
 }
 
+function normalizeRecurringFlag(value, fallback = true) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+    }
+    if (typeof value === 'number') return value !== 0;
+    return fallback;
+}
+
 /**
  * Get all shifts for an employee
  * GET /api/v1/tenant/employees/:id/shifts
@@ -116,6 +127,7 @@ exports.createShift = async (req, res) => {
             endDate,
             label
         } = req.body;
+        const recurring = normalizeRecurringFlag(isRecurring, true);
 
         // Verify employee belongs to tenant
         const employee = await db.Staff.findOne({
@@ -130,14 +142,14 @@ exports.createShift = async (req, res) => {
         }
 
         // Validate: either dayOfWeek (recurring) or specificDate (one-time)
-        if (isRecurring && dayOfWeek === null) {
+        if (recurring && dayOfWeek == null) {
             return res.status(400).json({
                 success: false,
                 message: 'dayOfWeek is required for recurring shifts'
             });
         }
 
-        if (!isRecurring && !specificDate) {
+        if (!recurring && !specificDate) {
             return res.status(400).json({
                 success: false,
                 message: 'specificDate is required for one-time shifts'
@@ -146,13 +158,13 @@ exports.createShift = async (req, res) => {
 
         const shift = await db.StaffShift.create({
             staffId: employeeId,
-            dayOfWeek: isRecurring ? dayOfWeek : null,
-            specificDate: isRecurring ? null : specificDate,
+            dayOfWeek: recurring ? dayOfWeek : null,
+            specificDate: recurring ? null : specificDate,
             startTime,
             endTime,
-            isRecurring: isRecurring !== false,
-            startDate,
-            endDate,
+            isRecurring: recurring,
+            startDate: recurring ? (startDate || null) : null,
+            endDate: recurring ? (endDate || null) : null,
             label
         });
 
@@ -203,7 +215,15 @@ exports.updateShift = async (req, res) => {
             });
         }
 
-        await shift.update(req.body);
+        const recurring = normalizeRecurringFlag(req.body?.isRecurring, shift.isRecurring);
+        await shift.update({
+            ...req.body,
+            isRecurring: recurring,
+            dayOfWeek: recurring ? req.body?.dayOfWeek : null,
+            specificDate: recurring ? null : (req.body?.specificDate || null),
+            startDate: recurring ? (req.body?.startDate || null) : null,
+            endDate: recurring ? (req.body?.endDate || null) : null
+        });
 
         res.json({
             success: true,
@@ -356,6 +376,7 @@ exports.createBreak = async (req, res) => {
             startDate,
             endDate
         } = req.body;
+        const recurring = normalizeRecurringFlag(isRecurring, true);
 
         const employee = await db.Staff.findOne({
             where: { id: employeeId, tenantId }
@@ -372,14 +393,14 @@ exports.createBreak = async (req, res) => {
         // - weekly recurrence when dayOfWeek is provided
         // - daily recurrence when dayOfWeek is null
 
-        if (!isRecurring && !specificDate) {
+        if (!recurring && !specificDate) {
             return res.status(400).json({
                 success: false,
                 message: 'specificDate is required for one-time breaks'
             });
         }
 
-        if (!isRecurring) {
+        if (!recurring) {
             const breakStart = combineDateAndTime(specificDate, startTime);
             const breakEnd = combineDateAndTime(specificDate, endTime);
 
@@ -498,15 +519,15 @@ exports.createBreak = async (req, res) => {
 
         const breakRecord = await db.StaffBreak.create({
             staffId: employeeId,
-            dayOfWeek: isRecurring ? dayOfWeek : null,
-            specificDate: isRecurring ? null : specificDate,
+            dayOfWeek: recurring ? dayOfWeek : null,
+            specificDate: recurring ? null : specificDate,
             startTime,
             endTime,
             type: type || 'lunch',
             label: label || `${type || 'lunch'} break`,
-            isRecurring: isRecurring !== false,
-            startDate,
-            endDate
+            isRecurring: recurring,
+            startDate: recurring ? (startDate || null) : null,
+            endDate: recurring ? (endDate || null) : null
         });
 
         res.status(201).json({
@@ -568,7 +589,9 @@ exports.updateBreak = async (req, res) => {
             });
         }
 
-        const nextIsRecurring = isRecurring !== undefined ? isRecurring : breakRecord.isRecurring;
+        const nextIsRecurring = isRecurring !== undefined
+            ? normalizeRecurringFlag(isRecurring, breakRecord.isRecurring)
+            : breakRecord.isRecurring;
         const nextSpecificDate = nextIsRecurring ? null : (specificDate ?? breakRecord.specificDate);
         const nextStartTime = startTime || breakRecord.startTime;
         const nextEndTime = endTime || breakRecord.endTime;
@@ -726,15 +749,15 @@ exports.updateBreak = async (req, res) => {
         }
 
         await breakRecord.update({
-            ...(dayOfWeek !== undefined ? { dayOfWeek } : {}),
-            ...(specificDate !== undefined ? { specificDate } : {}),
+            ...(dayOfWeek !== undefined ? { dayOfWeek: nextIsRecurring ? dayOfWeek : null } : {}),
+            ...(specificDate !== undefined ? { specificDate: nextIsRecurring ? null : specificDate } : {}),
             ...(startTime !== undefined ? { startTime } : {}),
             ...(endTime !== undefined ? { endTime } : {}),
             ...(type !== undefined ? { type } : {}),
             ...(label !== undefined ? { label } : {}),
-            ...(isRecurring !== undefined ? { isRecurring } : {}),
-            ...(startDate !== undefined ? { startDate } : {}),
-            ...(endDate !== undefined ? { endDate } : {}),
+            ...(isRecurring !== undefined ? { isRecurring: nextIsRecurring } : {}),
+            ...(startDate !== undefined ? { startDate: nextIsRecurring ? startDate : null } : {}),
+            ...(endDate !== undefined ? { endDate: nextIsRecurring ? endDate : null } : {}),
             ...rest
         });
 

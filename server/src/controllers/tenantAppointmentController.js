@@ -27,6 +27,7 @@ const {
 } = require('../utils/appointmentStatus');
 const { getServerPublicUrl } = require('../utils/url');
 const { sendEmail } = require('../utils/emailService');
+const availabilityService = require('../services/availabilityService');
 
 const INVITE_EXPIRY_HOURS = 72;
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
@@ -115,6 +116,25 @@ function buildBreakDateTime(date, timeValue) {
 
     const safeTime = `${timeValue}`.slice(0, 8);
     return `${date}T${safeTime}`;
+}
+
+async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTime }) {
+    if (!tenantId || !serviceId || !staffId || !startTime) return false;
+    const requestedStart = new Date(startTime);
+    if (Number.isNaN(requestedStart.getTime())) return false;
+    const dateKey = requestedStart.toISOString().split('T')[0];
+
+    const availability = await availabilityService.getAvailableSlots(tenantId, {
+        serviceId,
+        staffId,
+        date: dateKey
+    });
+
+    const startMs = requestedStart.getTime();
+    return (availability?.slots || []).some((slot) => {
+        const slotStartMs = new Date(slot.startTime).getTime();
+        return slot.available === true && Math.abs(slotStartMs - startMs) < 60 * 1000;
+    });
 }
 
 async function resolveAppointmentCustomer({ platformUserId, customer, transaction }) {
@@ -272,6 +292,23 @@ exports.createAppointment = async (req, res) => {
             customer,
             transaction
         });
+
+        const explicitStaffId = staffId || requestedStaffId || null;
+        if (explicitStaffId) {
+            const slotAvailable = await ensureStaffSlotAvailable({
+                tenantId,
+                serviceId,
+                staffId: explicitStaffId,
+                startTime
+            });
+            if (!slotAvailable) {
+                await transaction.rollback();
+                return res.status(409).json({
+                    success: false,
+                    message: 'Selected staff is not available for this time slot'
+                });
+            }
+        }
 
         const normalizedNotes = appendGroupGuestToNotes(notes, groupGuest);
 
@@ -1385,6 +1422,20 @@ exports.reassignAppointmentStaff = async (req, res) => {
             });
         }
 
+        const slotAvailable = await ensureStaffSlotAvailable({
+            tenantId,
+            serviceId: appointment.serviceId,
+            staffId,
+            startTime: appointment.startTime
+        });
+        if (!slotAvailable) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected staff is not available for this time slot'
+            });
+        }
+
         appointment.requestedStaffId = staffId;
         appointment.assignmentMode = 'tenant_reassigned';
         const previousStaffId = appointment.staffId;
@@ -1577,6 +1628,20 @@ exports.rescheduleAppointment = async (req, res) => {
         );
 
         if (hasConflict) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected time slot is no longer available'
+            });
+        }
+
+        const slotAvailable = await ensureStaffSlotAvailable({
+            tenantId,
+            serviceId: appointment.serviceId,
+            staffId: requestedStaffId,
+            startTime: requestedStart
+        });
+        if (!slotAvailable) {
             await transaction.rollback();
             return res.status(409).json({
                 success: false,
@@ -1812,6 +1877,20 @@ exports.reassignRescheduleAppointment = async (req, res) => {
         );
 
         if (hasConflict) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected slot is not available'
+            });
+        }
+
+        const slotAvailable = await ensureStaffSlotAvailable({
+            tenantId,
+            serviceId: appointment.serviceId,
+            staffId,
+            startTime: requestedStart
+        });
+        if (!slotAvailable) {
             await transaction.rollback();
             return res.status(409).json({
                 success: false,
