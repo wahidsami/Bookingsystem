@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>وثائق منصة رفاه - لوحة التحكم الإدارية</title>
+    
+    <!-- Google Fonts: Cairo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           CSS VARIABLES & RESET
+           ========================================= */
+        :root {
+            --primary-color: #7A1F1F;      /* Dark Red / Burgundy */
+            --secondary-color: #3A3A3A;    /* Dark Gray */
+            --accent-color: #E5E5E5;       /* Soft Gray */
+            --bg-color: #FFFFFF;           /* White */
+            --bg-alt: #F9F9F9;             /* Very Light Gray */
+            --text-color: #1a1a1a;
+            --text-muted: #666666;
+            --border-color: #d1d1d1;
+            
+            --font-main: 'Cairo', sans-serif;
+            
+            /* Page Dimensions (A4) - 210mm x 297mm */
+            --page-width: 210mm;
+            --page-height: 297mm;
+            --margin-top: 24mm;
+            --margin-bottom: 20mm;
+            --margin-left: 18mm; /* Inner side in RTL */
+            --margin-right: 18mm; /* Outer side in RTL */
+            
+            /* Calculated Safe Content Height */
+            /* 297mm - 24mm - 20mm approx 250mm. 
+               Header (~60px) + Footer (~30px) = ~90px overhead.
+               297mm is approx 1122px. 
+               Safe area is roughly 950px to 1000px. 
+               Setting strict max-height to ensure no overflow. */
+            --content-max-height: 940px; 
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #525659; /* Dark background for screen viewing */
+            font-family: var(--font-main);
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--text-color);
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* =========================================
+           DOCUMENT LAYOUT (A4 PAGES)
+           ========================================= */
+        .document-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0; /* No gap in print, managed by page breaks */
+        }
+
+        .page {
+            width: var(--page-width);
+            height: var(--page-height);
+            background: var(--bg-color);
+            padding: var(--margin-top) var(--margin-left) var(--margin-bottom) var(--margin-right);
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 30px; /* Screen spacing */
+        }
+
+        /* PROTECTED CONTENT AREA */
+        .page-content {
+            flex: 1;
+            /* STRICT BOUNDARY FOR SCREEN VIEW */
+            max-height: var(--content-max-height); 
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Print specific adjustments */
+        @media print {
+            body {
+                background: none;
+            }
+            .document-wrapper {
+                gap: 0;
+                padding: 0;
+                width: 100%;
+            }
+            .page {
+                box-shadow: none;
+                margin: 0;
+                break-after: always;
+                page-break-after: always;
+                border: initial;
+                border-radius: initial;
+                width: 100%;
+                height: 100%; 
+            }
+            .page-content {
+                max-height: none; /* Allow browser print engine to handle final flow */
+                overflow: visible;
+            }
+            /* Last page shouldn't force a blank one */
+            .page:last-child {
+                break-after: auto;
+                page-break-after: auto;
+            }
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0; /* We handle margins inside .page */
+        }
+
+        /* =========================================
+           HEADER & FOOTER
+           ========================================= */
+        .doc-header {
+            width: 100%;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0; /* Prevent header from shrinking */
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-left img {
+            height: 35px;
+            width: auto;
+        }
+
+        .header-right {
+            text-align: right; /* Logical right in RTL */
+        }
+
+        .header-right h2 {
+            margin: 0;
+            font-size: 18px;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .header-right span {
+            font-size: 12px;
+            color: var(--secondary-color);
+        }
+
+        .doc-footer {
+            position: absolute;
+            bottom: var(--margin-bottom);
+            left: var(--margin-left);
+            right: var(--margin-right);
+            width: calc(100% - var(--margin-left) - var(--margin-right));
+            border-top: 1px solid var(--accent-color);
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        /* =========================================
+           TYPOGRAPHY
+           ========================================= */
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--secondary-color);
+            margin-top: 0;
+            break-after: avoid;
+        }
+
+        h1 { font-size: 28px; font-weight: 900; color: var(--primary-color); margin-bottom: 24px; line-height: 1.4; }
+        h2 { font-size: 22px; font-weight: 700; margin-top: 30px; margin-bottom: 16px; border-bottom: 1px solid var(--accent-color); padding-bottom: 8px; border-right: 4px solid var(--primary-color); padding-right: 10px; }
+        h3 { font-size: 18px; font-weight: 600; margin-top: 24px; margin-bottom: 12px; color: #4a4a4a; }
+        h4 { font-size: 16px; font-weight: 600; margin-top: 20px; margin-bottom: 10px; color: #555; }
+        
+        p { margin-bottom: 12px; text-align: justify; }
+        
+        ul, ol { margin-bottom: 16px; padding-right: 20px; }
+        li { margin-bottom: 6px; }
+
+        /* =========================================
+           COMPONENTS
+           ========================================= */
+        
+        /* Cover Page Specifics */
+        .cover-page {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: linear-gradient(135deg, #fff 0%, #fbfbfb 100%);
+        }
+        .cover-page .doc-header, .cover-page .doc-footer {
+            display: none;
+        }
+        
+        .cover-logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 30px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+
+        .cover-title {
+            font-size: 36px;
+            font-weight: 900;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .cover-subtitle {
+            font-size: 24px;
+            color: var(--secondary-color);
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+
+        .cover-meta {
+            margin-top: 60px;
+            padding: 20px;
+            background: var(--bg-alt);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            width: 80%;
+        }
+
+        .cover-meta p { margin: 5px 0; text-align: center; color: var(--text-muted); }
+
+        /* Tables */
+        .table-container {
+            width: 100%;
+            margin-bottom: 20px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--accent-color);
+            color: var(--text-color);
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #f8f8f8;
+        }
+
+        /* Feature Cards / Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .card h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--accent-color);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .kpi-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+            break-inside: avoid;
+        }
+
+        .kpi-box {
+            background: var(--bg-alt);
+            border-right: 3px solid var(--primary-color);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .kpi-value {
+            display: block;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+        .kpi-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* TOC Styles */
+        .toc-list {
+            list-style: none;
+            padding: 0;
+        }
+        .toc-item {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: baseline;
+        }
+        .toc-level-1 { font-weight: 700; font-size: 15px; color: var(--primary-color); }
+        .toc-level-2 { font-weight: 400; font-size: 13px; color: var(--text-color); padding-right: 20px; }
+        .toc-dots {
+            flex: 1;
+            border-bottom: 1px dotted #ccc;
+            margin: 0 10px;
+            position: relative;
+            top: -5px;
+        }
+        .toc-page {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-color);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: var(--accent-color);
+            color: var(--secondary-color);
+            margin-left: 5px;
+            margin-bottom: 5px;
+        }
+        .badge.active { background-color: #e8f5e9; color: #2e7d32; }
+        .badge.pending { background-color: #fff3e0; color: #ef6c00; }
+        .badge.suspended { background-color: #ffebee; color: #c62828; }
+
+        /* Utility */
+        .text-center { text-align: center; }
+        .mt-40 { margin-top: 40px; }
+        
+    </style>
+</head>
+<body>
+
+    <div class="document-wrapper">
+
+        <!-- ==================== PAGE 1: COVER ==================== -->
+        <div class="page cover-page">
+            <div>
+                <img src="https://z-cdn-media.chatglm.cn/files/81469854-46d8-46cd-b080-0c0eff954c59.png?auth_key=1879159783-b4eae9742ff14f888508e382bc20e441-0-c67cc5aaaa875e56714532c3d7f507ae" alt="Logo" class="cover-logo">
+                <h1 class="cover-title">نظام رفاه</h1>
+                <div class="cover-subtitle">لوحة التحكم الإدارية<br>Refah Admin Dashboard</div>
+                
+                <div class="cover-meta">
+                    <p><strong>وثيقة تقنية وتشغيلية</strong></p>
+                    <p>الإصدار 1.0</p>
+                    <p>تاريخ الإصدار: 2024</p>
+                    <p>الجهة المالكة: BMI Dev</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== PAGE 2: TOC ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>جدول المحتويات</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h1>جدول المحتويات</h1>
+                <ul class="toc-list" id="toc-container">
+                    <!-- Javascript will populate this -->
+                </ul>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 2</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 3: INTRO & TECHNICAL ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>مقدمة وتفاصيل تقنية</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h1>مقدمة</h1>
+                <p>
+                    تُعتبر لوحة التحكم الإدارية في نظام رفاه المركز الرئيسي لإدارة وتشغيل المنصة متعددة العملاء (Multi-Tenant Platform)، حيث توفر للإدارة العليا وفِرق التشغيل جميع الأدوات اللازمة لإدارة العملاء، مراقبة العمليات، التحكم في الخطط التجارية، متابعة الأداء المالي، وإدارة إعدادات النظام المركزية.
+                </p>
+                <p>
+                    تمثل اللوحة العقل التشغيلي والتجاري لمنصة رفاه، حيث تجمع بين:
+                </p>
+                <ul style="column-count: 2; column-gap: 30px;">
+                    <li>الإدارة التشغيلية</li>
+                    <li>الحوكمة والرقابة</li>
+                    <li>إدارة الاشتراكات</li>
+                    <li>التحكم المالي</li>
+                    <li>إدارة الخطط التجارية</li>
+                    <li>مراقبة نمو المنصة</li>
+                </ul>
+                <p style="margin-top: 10px;">
+                    وتوفر بيئة متكاملة لإدارة دورة حياة العملاء والمنشآت داخل المنصة.
+                </p>
+
+                <h2 id="section-1">1. التفاصيل التقنية للنظام</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 30%;">العنصر</th>
+                                <th>التفاصيل</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>اسم النظام</strong></td>
+                                <td>Refah Admin Dashboard</td>
+                            </tr>
+                            <tr>
+                                <td><strong>نوع التطبيق</strong></td>
+                                <td>لوحة تحكم إدارية مركزية</td>
+                            </tr>
+                            <tr>
+                                <td><strong>التقنيات المستخدمة</strong></td>
+                                <td>Next.js 14، React 18، TypeScript، Tailwind CSS، Recharts</td>
+                            </tr>
+                            <tr>
+                                <td><strong>بيئة التشغيل</strong></td>
+                                <td>Node.js + Next.js SSR</td>
+                            </tr>
+                            <tr>
+                                <td><strong>واجهات الربط</strong></td>
+                                <td>/api/v1/admin/*</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 3</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 4: GOALS & AUDIENCE ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>الفئات المستهدفة والوظائف</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h2 id="section-2">2. الهدف من النظام</h2>
+                <p>تم تطوير لوحة التحكم الإدارية لتكون مركز التحكم الكامل لمنصة رفاه، حيث تساعد الإدارة على:</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <ul style="padding-right: 15px; margin:0;">
+                            <li>إدارة العملاء والمنشآت</li>
+                            <li>إدارة المستخدمين</li>
+                            <li>مراقبة الأداء المالي</li>
+                            <li>إدارة الخطط والاشتراكات</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <ul style="padding-right: 15px; margin:0;">
+                            <li>متابعة العمولات والإيرادات</li>
+                            <li>إدارة إعدادات النظام العامة</li>
+                            <li>مراقبة الأنشطة التشغيلية</li>
+                            <li>إدارة التوسع التجاري للمنصة</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h2 id="section-3">3. الفئات المستهدفة</h2>
+                <p>تم تصميم لوحة التحكم لتخدم الفئات التالية:</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+                    <span class="badge active">مدير النظام</span>
+                    <span class="badge active">الإدارة العليا</span>
+                    <span class="badge active">فريق التشغيل</span>
+                    <span class="badge active">فريق الدعم الفني</span>
+                    <span class="badge active">الإدارة المالية</span>
+                    <span class="badge active">فريق إدارة الاشتراكات</span>
+                    <span class="badge active">إدارة الحوكمة والتدقيق</span>
+                </div>
+
+                <h2 id="section-4">4. الوظائف الرئيسية للنظام</h2>
+                <p>توفر لوحة التحكم مجموعة واسعة من الوظائف الإدارية والتجارية، وتشمل:</p>
+                <ul>
+                    <li><strong>إدارة العملاء والمنشآت:</strong> اعتماد وتفعيل الحسابات، إدارة المستخدمين والعملاء النهائيين.</li>
+                    <li><strong>إدارة الخطط التجارية:</strong> إدارة الخطط والاشتراكات ومتابعة الإيرادات والعمولات.</li>
+                    <li><strong>المراقبة والتحكم:</strong> مراقبة الأداء التشغيلي، مراجعة الأنشطة والسجلات.</li>
+                    <li><strong>الإدارة العامة:</strong> إدارة إعدادات النظام، مراقبة التنبيهات والإشعارات، إدارة المزايا التجارية والتسويقية.</li>
+                </ul>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 4</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 5: DASHBOARD ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>لوحة المعلومات الرئيسية</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h2 id="section-5">5. الهيكل العام للنظام</h2>
+                <p>تنقسم لوحة التحكم إلى مجموعة من الأقسام الرئيسية المتكاملة.</p>
+                
+                <h3 id="section-6-1">6.1 لوحة المعلومات الرئيسية (Main Dashboard)</h3>
+                <p>توفر هذه الصفحة نظرة شاملة وفورية عن أداء المنصة.</p>
+                
+                <div class="kpi-container">
+                    <div class="kpi-box">
+                        <span class="kpi-value">120+</span>
+                        <span class="kpi-label">عدد العملاء</span>
+                    </div>
+                    <div class="kpi-box">
+                        <span class="kpi-value">5K+</span>
+                        <span class="kpi-label">عدد المستخدمين</span>
+                    </div>
+                    <div class="kpi-box">
+                        <span class="kpi-value">12K</span>
+                        <span class="kpi-label">عدد الحجوزات</span>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <h4>الوظائف المتاحة</h4>
+                        <ul>
+                            <li>عرض إحصائيات المنصة</li>
+                            <li>متابعة النمو والأداء</li>
+                            <li>عرض التنبيهات المهمة</li>
+                            <li>متابعة الطلبات المعلقة</li>
+                            <li>الوصول السريع للعمليات الحرجة</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4>مميزات تشغيلية</h4>
+                        <ul>
+                            <li>متابعة الأداء اللحظي</li>
+                            <li>تحسين اتخاذ القرار</li>
+                            <li>مراقبة مؤشرات النمو</li>
+                            <li>تقارير فورية</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <strong>المؤشرات الرئيسية:</strong>
+                    <ul>
+                        <li>عدد العملاء، عدد المستخدمين، عدد الحجوزات</li>
+                        <li>الإيرادات، العملاء الجدد، الاشتراكات النشطة</li>
+                    </ul>
+                </div>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 5</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 6: MODULES (CLIENTS & USERS) ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>إدارة العملاء والمالية</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h3 id="section-6-2">6.2 إدارة العملاء والمنشآت (Clients / Tenants Management)</h3>
+                <p>يُستخدم هذا القسم لإدارة جميع المنشآت والعملاء داخل منصة رفاه.</p>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الوظائف المتاحة</th>
+                                <th>حالات العملاء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <ul>
+                                        <li>عرض قائمة العملاء</li>
+                                        <li>البحث والتصفية</li>
+                                        <li>مراجعة بيانات المنشآت</li>
+                                        <li>مراجعة المستندات والتحقق</li>
+                                        <li>اعتماد أو رفض الحسابات</li>
+                                        <li>تعليق أو إعادة التفعيل</li>
+                                        <li>مراجعة السجل التشغيلي</li>
+                                    </ul>
+                                </td>
+                                <td>
+                                    <ul>
+                                        <li><span class="badge active">معتمد</span></li>
+                                        <li><span class="badge pending">قيد المراجعة</span></li>
+                                        <li><span class="badge suspended">موقوف</span></li>
+                                        <li><span class="badge suspended">مرفوض</span></li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <h4 id="section-6-3">6.3 إدارة المستخدمين (Users Management)</h4>
+                        <p>يوفر هذا القسم أدوات لإدارة مستخدمي المنصة النهائيين.</p>
+                        <ul>
+                            <li>البحث عن المستخدمين ومراجعة الحسابات</li>
+                            <li>مراجعة الحجوزات والمعاملات</li>
+                            <li>تعديل الأرصدة أو نقاط الولاء</li>
+                            <li>تفعيل أو تعطيل الحسابات</li>
+                            <li>مراجعة حالة التحقق</li>
+                        </ul>
+                        <p><strong>مميزات تشغيلية:</strong> تحسين الرقابة على الحسابات، متابعة النشاطات المشبوهة، دعم فرق خدمة العملاء.</p>
+                    </div>
+                    <div class="card">
+                        <h4 id="section-6-4">6.4 الإدارة المالية (Financial Section)</h4>
+                        <p>يوفر أدوات متقدمة لمراقبة الأداء المالي للمنصة.</p>
+                        <ul>
+                            <li>مراجعة الإيرادات ومتابعة نمو الأرباح</li>
+                            <li>تحليل العمولات</li>
+                            <li>مراجعة بيانات العملاء المالية</li>
+                            <li>متابعة المدفوعات والتحويلات</li>
+                        </ul>
+                        <p><strong>ملاحظة تشغيلية:</strong> بعض وظائف التحويلات والمدفوعات ما زالت محدودة بحسب حالة التكامل الحالية.</p>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 6</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 7: MODULES (LOGS & PACKAGES INTRO) ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>سجل الأنشطة وإدارة الباقات</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="card">
+                    <h4 id="section-6-5">6.5 سجل الأنشطة والتدقيق (Activity Log)</h4>
+                    <p>يُعتبر هذا القسم أحد أهم عناصر الحوكمة والرقابة داخل المنصة.</p>
+                    <ul>
+                        <li>تسجيل جميع العمليات الإدارية</li>
+                        <li>تصفية العمليات حسب التاريخ أو النوع</li>
+                        <li>مراجعة تفاصيل الإجراءات</li>
+                        <li>تتبع التغييرات داخل النظام</li>
+                    </ul>
+                    <p><strong>أهداف القسم:</strong> تعزيز الشفافية، دعم التدقيق الداخلي، تحسين الحوكمة، مراقبة العمليات الحساسة.</p>
+                </div>
+                
+                <div class="grid-2 mt-40">
+                     <div>
+                        <h4 id="section-6-6">6.6 الإعدادات العامة (Settings)</h4>
+                        <p>يوفر هذا القسم إدارة الإعدادات العامة للمنصة.</p>
+                        <ul>
+                            <li>إدارة نسب العمولات</li>
+                            <li>إدارة إعدادات المنصة</li>
+                            <li>إدارة حسابات المشرفين</li>
+                            <li>الإعدادات العامة</li>
+                            <li>مراجعة بطاقات الخطط والأسعار</li>
+                        </ul>
+                     </div>
+                     <div>
+                        <h4 id="section-6-7">6.7 إدارة الباقات والخطط التجارية</h4>
+                        <p>يُعتبر هذا القسم أحد أهم المكونات التجارية داخل منصة رفاه، حيث يسمح بإدارة نموذج الاشتراكات التجارية الخاص بالمنصة.</p>
+                        <p><strong>البطاقات التجارية المعروضة:</strong> السعر الشهري، سعر 6 أشهر، السعر السنوي، حالة التفعيل، حالة الباقة المميزة.</p>
+                     </div>
+                </div>
+
+                <h2 id="section-7">7. إدارة الباقات التجارية</h2>
+                <p>يوفر النظام محركاً متكاملاً لإدارة الخطط التجارية والاشتراكات الخاصة بالعملاء.</p>
+                <ul>
+                    <li>إنشاء الباقات وتعديل الباقات</li>
+                    <li>إدارة حدود الاستخدام وإدارة المزايا التجارية</li>
+                    <li>إدارة الأسعار وحالة التفعيل وتحديد الباقات المميزة</li>
+                </ul>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 7</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 8: PACKAGES COMPONENTS & RESOURCES ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>تفاصيل الباقات والموارد</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h3 id="section-7-1">7.1 مكونات الباقة التجارية</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الفئة</th>
+                                <th>العناصر</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>البيانات الأساسية</strong></td>
+                                <td>الاسم بالعربية والإنجليزية، الوصف، Slug، ترتيب العرض، حالة التفعيل، الباقة المميزة (Featured).</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الرسوم والعمولات</strong></td>
+                                <td>رسوم الاشتراك (رسوم شهرية أساسية قابلة للتخصيص)، عمولة المنصة (نسبة مئوية تُضاف على التكلفة الأساسية).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="section-7-2">7.2 حدود الموارد (Resource Limits)</h3>
+                <p>يمكن التحكم في حدود كل باقة من خلال:</p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>العنصر</th>
+                                <th>الوصف</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>عدد الحجوزات</td>
+                                <td>الحد الشهري للحجوزات</td>
+                            </tr>
+                            <tr>
+                                <td>عدد الموظفين</td>
+                                <td>الحد الأقصى للموظفين</td>
+                            </tr>
+                            <tr>
+                                <td>عدد الخدمات</td>
+                                <td>الحد الأقصى للخدمات</td>
+                            </tr>
+                            <tr>
+                                <td>عدد المنتجات</td>
+                                <td>الحد الأقصى للمنتجات</td>
+                            </tr>
+                            <tr>
+                                <td>التخزين</td>
+                                <td>المساحة التخزينية بالجيجابايت</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 8</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 9: PACKAGES FEATURES & PRICING ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>المزايا والتسعير</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h3 id="section-7-3">7.3 المزايا الأساسية للمنصة</h3>
+                <p>يمكن تفعيل أو تعطيل مزايا متعددة داخل كل باقة.</p>
+                
+                <div class="grid-2">
+                    <div class="card">
+                        <h4>المزايا التشغيلية</h4>
+                        <ul>
+                            <li>إدارة المنتجات والطلبات</li>
+                            <li>المراسلات الداخلية</li>
+                            <li>التقارير</li>
+                            <li>إدارة الرواتب</li>
+                            <li>تخصيص الصفحة العامة</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4>المزايا التسويقية</h4>
+                        <ul>
+                            <li>إشعارات WhatsApp</li>
+                            <li>الإشعارات التسويقية داخل التطبيق</li>
+                            <li>مساعد الذكاء الاصطناعي للمحتوى</li>
+                            <li>الرسائل البريدية الترويجية</li>
+                            <li>تحسين الظهور في البحث</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 15px;">
+                    <h4>مزايا الترويج داخل المنصة</h4>
+                    <ul>
+                        <li>الظهور ضمن “جديد في رفاه”</li>
+                        <li>الظهور في البطاقات المميزة</li>
+                        <li>إدارة العروض الخاصة Hot Deals</li>
+                        <li>عدد المنتجات المميزة</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="border-right: 4px solid var(--primary-color); margin-top: 15px;">
+                    <h3 id="section-7-4">7.4 نموذج التسعير التجاري (Pricing Model)</h3>
+                    <p>يعتمد احتساب أسعار الباقات على نموذج تسعير ديناميكي يتضمن:</p>
+                    <ul>
+                        <li>رسوم الاشتراك الأساسية</li>
+                        <li>تكلفة الموارد</li>
+                        <li>تكلفة المزايا الإضافية</li>
+                        <li>عمولة المنصة</li>
+                        <li>ضريبة القيمة المضافة 15%</li>
+                    </ul>
+                    <div style="background: var(--bg-alt); padding: 10px; border-radius: 4px; margin-top: 10px;">
+                        <strong>القيم المالية المخزنة:</strong> يقوم النظام بحساب وتخزين السعر الشهري، سعر 6 أشهر، والسعر السنوي.
+                    </div>
+                    <p style="margin-top: 10px;"><strong>أهداف محرك التسعير:</strong> تسهيل بناء الباقات، احتساب التكلفة بشكل تلقائي، مراجعة الأثر التجاري قبل النشر، دعم التوسع التجاري للمنصة.</p>
+                </div>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 9</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 10: SERVICES & OPERATIONAL ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>الخدمات والجوانب التشغيلية</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h2 id="section-8">8. الخدمات المقدمة للعملاء عبر رفاه</h2>
+                <p>توفر منصة رفاه مجموعة واسعة من الخدمات للعملاء المشتركين، منها:</p>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>نظام إدارة الحجوزات</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>إدارة الموظفين</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>إدارة الخدمات</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>إدارة المنتجات والطلبات</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>أدوات التقارير</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>التسويق والإشعارات</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>إدارة الصفحات العامة</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>الترويج داخل المنصة</span>
+                    </div>
+                    <div class="card text-center" style="padding: 10px;">
+                        <span>تخزين الوسائط والبيانات</span>
+                    </div>
+                </div>
+
+                <h2 id="section-9">9. الجوانب التشغيلية والرقابية</h2>
+                <p>يدعم النظام مجموعة من الممارسات التشغيلية المهمة:</p>
+                <ul>
+                    <li>إدارة الصلاحيات</li>
+                    <li>الحوكمة والتدقيق</li>
+                    <li>مراقبة الأداء</li>
+                    <li>إدارة الاشتراكات</li>
+                    <li>مراقبة الإيرادات</li>
+                    <li>التحكم المركزي بالمنصة</li>
+                </ul>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 10</span>
+            </footer>
+        </div>
+
+        <!-- ==================== PAGE 11: CONCLUSION ==================== -->
+        <div class="page">
+            <header class="doc-header">
+                <div class="header-left">
+                    <span style="font-weight: 700; color: var(--primary-color);">BMI Dev</span>
+                </div>
+                <div class="header-right">
+                    <h2>منصة رفاه</h2>
+                    <span>ملاحظات ختامية</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <h2 id="section-10">10. ملاحظات تشغيلية مهمة</h2>
+                <div class="card" style="background-color: #fff8f8; border-color: #f5c6c6;">
+                    <ul>
+                        <li>لوحة التحكم هي مركز الإدارة الرئيسي لمنصة رفاه.</li>
+                        <li>عمليات اعتماد العملاء تُعتبر عمليات حساسة ويجب مراجعتها بعناية.</li>
+                        <li>تؤثر الإعدادات العامة على جميع العملاء داخل المنصة.</li>
+                        <li>يجب مراجعة الخطط التجارية قبل نشرها للعملاء.</li>
+                        <li>تُستخدم السجلات التشغيلية لدعم الحوكمة والتدقيق.</li>
+                    </ul>
+                </div>
+
+                <h2 id="section-11">11. الرؤية المستقبلية للنظام</h2>
+                <p>تم تصميم النظام بحيث يدعم التوسع مستقبلاً لإضافة مزايا مثل:</p>
+                <div class="grid-2">
+                    <div>
+                        <ul>
+                            <li>التحليلات الذكية</li>
+                            <li>التسعير الديناميكي</li>
+                            <li>توصيات الذكاء الاصطناعي</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <ul>
+                            <li>إدارة متقدمة للعمولات</li>
+                            <li>دعم الأسواق متعددة المناطق</li>
+                            <li>تقارير تشغيلية متقدمة</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="margin-top: auto; padding-top: 50px; text-align: center;">
+                    <h3 style="color: var(--primary-color);">شكراً لاستخدامكم منصة رفاه</h3>
+                    <p>للمزيد من الدعم التقني، يرجى التواصل مع فريق BMI Dev.</p>
+                </div>
+            </div>
+
+            <footer class="doc-footer">
+                <span>Confidential - Refah Platform</span>
+                <span>2024</span>
+                <span>الصفحة 11</span>
+            </footer>
+        </div>
+
+    </div>
+
+    <!-- JavaScript for Dynamic TOC -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tocContainer = document.getElementById('toc-container');
+            const headers = document.querySelectorAll('h2, h3'); 
+            
+            // Manual Page Mapping
+            const pageMap = {
+                'section-1': '3',
+                'section-2': '4',
+                'section-3': '4',
+                'section-4': '4',
+                'section-5': '5',
+                'section-6-1': '5',
+                'section-6-2': '6',
+                'section-6-3': '6',
+                'section-6-4': '6',
+                'section-6-5': '7',
+                'section-6-6': '7',
+                'section-6-7': '7',
+                'section-7': '7',
+                'section-7-1': '8',
+                'section-7-2': '8',
+                'section-7-3': '9',
+                'section-7-4': '9',
+                'section-8': '10',
+                'section-9': '10',
+                'section-10': '11',
+                'section-11': '11'
+            };
+
+            headers.forEach(header => {
+                if (header.id) {
+                    const li = document.createElement('li');
+                    li.className = 'toc-item';
+                    
+                    const link = document.createElement('a');
+                    link.href = '#' + header.id;
+                    link.textContent = header.textContent;
+                    
+                    if (header.tagName === 'H3') {
+                        link.className = 'toc-level-2';
+                    } else {
+                        link.className = 'toc-level-1';
+                    }
+
+                    const dots = document.createElement('span');
+                    dots.className = 'toc-dots';
+
+                    const pageNum = document.createElement('span');
+                    pageNum.className = 'toc-page';
+                    pageNum.textContent = pageMap[header.id] || '-';
+
+                    li.appendChild(link);
+                    li.appendChild(dots);
+                    li.appendChild(pageNum);
+                    tocContainer.appendChild(li);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -133,7 +133,7 @@ module.exports = (sequelize, DataTypes) => {
             }
         ],
         hooks: {
-            beforeCreate: async (session) => {
+            beforeValidate: async (session) => {
                 if (!session.bookingReference) {
                     session.bookingReference = await BookingSession.generateBookingReference();
                 }

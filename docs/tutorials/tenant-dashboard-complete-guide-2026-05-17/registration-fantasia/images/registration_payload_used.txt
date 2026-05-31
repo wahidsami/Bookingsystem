@@ -1,0 +1,6 @@
+tenantNameAr=فانتازيا
+tenantNameEn=Fantasia 1779046566864
+email=fantasia.1779046566864@example.com
+phone=0555555555
+password=Fantasia@2727
+timestamp=1779046566864

@@ -29,7 +29,8 @@
     "test": "cd server && npm test"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "playwright": "^1.60.0"
   },
   "keywords": [
     "booking",
@@ -40,4 +41,3 @@
   "author": "",
   "license": "ISC"
 }
-

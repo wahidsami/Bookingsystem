@@ -11,11 +11,12 @@
     },
     "preview": {
       "node": "20.19.4",
-      "distribution": "internal",
+      "distribution": "store",
       "android": {
         "buildType": "apk"
       },
       "channel": "preview",
+      "environment": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://rapi.unifinitylab.com/api/v1"
       }
@@ -24,6 +25,7 @@
       "node": "20.19.4",
       "channel": "production",
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://rapi.unifinitylab.com/api/v1"
       }

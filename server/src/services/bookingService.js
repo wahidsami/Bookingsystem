@@ -422,19 +422,34 @@ class BookingService {
             const sessionPaymentMethod = distinctMethods.length > 1
                 ? 'mixed'
                 : (distinctMethods[0] || `${paymentMethod || 'at-center'}`.trim().toLowerCase());
-
-            const session = await db.BookingSession.create({
-                tenantId,
-                platformUserId,
-                status: 'confirmed',
-                itemCount: items.length,
-                subtotal: 0,
-                taxAmount: 0,
-                platformFee: 0,
-                totalAmount: 0,
-                paymentMethod: sessionPaymentMethod,
-                notes: normalizedNotes || null
-            }, { transaction: finalTransaction });
+            let session = null;
+            let createAttempts = 0;
+            while (!session && createAttempts < 3) {
+                createAttempts += 1;
+                const generatedBookingReference = await db.BookingSession.generateBookingReference();
+                try {
+                    session = await db.BookingSession.create({
+                        bookingReference: generatedBookingReference,
+                        tenantId,
+                        platformUserId,
+                        status: 'confirmed',
+                        itemCount: items.length,
+                        subtotal: 0,
+                        taxAmount: 0,
+                        platformFee: 0,
+                        totalAmount: 0,
+                        paymentMethod: sessionPaymentMethod,
+                        notes: normalizedNotes || null
+                    }, { transaction: finalTransaction });
+                } catch (createError) {
+                    const isUniqueReferenceConflict = createError?.name === 'SequelizeUniqueConstraintError'
+                        && Array.isArray(createError?.errors)
+                        && createError.errors.some((err) => `${err?.path || ''}`.toLowerCase().includes('bookingreference'));
+                    if (!isUniqueReferenceConflict || createAttempts >= 3) {
+                        throw createError;
+                    }
+                }
+            }
 
             const appointments = [];
             let subtotal = 0;

@@ -80,6 +80,13 @@ const getStaffAppLoginUrl = () => {
 const getCustomerAppResetUrl = (token) => {
     const encodedToken = encodeURIComponent(token || '');
     const explicitBaseUrl = normalizeBaseUrl(process.env.CUSTOMER_APP_URL);
+    const publicServerUrl = getServerPublicUrl();
+
+    // Prefer an https/http bridge URL for email clients.
+    // The bridge endpoint can deep-link into the app with a safe fallback.
+    if (publicServerUrl) {
+        return `${publicServerUrl}/api/v1/auth/user/reset-password/open?token=${encodedToken}`;
+    }
 
     if (explicitBaseUrl) {
         if (explicitBaseUrl.startsWith('http://') || explicitBaseUrl.startsWith('https://')) {

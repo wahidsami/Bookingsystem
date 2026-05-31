@@ -30,15 +30,6 @@ type TenantReview = {
     } | null;
 };
 
-type StaffReview = {
-    id: string;
-    rating: number;
-    comment?: string | null;
-    customerName?: string | null;
-    staffReply?: string | null;
-    createdAt: string;
-};
-
 type TenantGiftPackage = {
     id: string;
     title_en: string;
@@ -84,14 +75,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [reviews, setReviews] = useState<TenantReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
-    const [selectedProvider, setSelectedProvider] = useState<Staff | null>(null);
     const [galleryPreviewImage, setGalleryPreviewImage] = useState<string | null>(null);
     const [reviewTargetBooking, setReviewTargetBooking] = useState<Booking | null>(null);
     const [reviewEligibleBookings, setReviewEligibleBookings] = useState<Booking[]>([]);
     const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
-    const [providerReviews, setProviderReviews] = useState<StaffReview[]>([]);
-    const [providerReviewsLoading, setProviderReviewsLoading] = useState(false);
-    const [providerReviewsSummary, setProviderReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
+    const [serviceFilterCategory, setServiceFilterCategory] = useState<string>('all');
     const pageEnterAnim = useMemo(() => new Animated.Value(0), []);
     const { itemCount, addToCart, clearCart } = useCart();
     const { itemCount: serviceBookingItemCount } = useServiceBookingCart();
@@ -299,16 +287,34 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         (isRTL ? arValue || enValue : enValue || arValue) || fallback || null;
 
     const resolveServiceImageUri = (service: Service) => {
+        const unpack = (candidate: any): string[] => {
+            if (!candidate) return [];
+            if (typeof candidate === 'string') return [candidate];
+            if (Array.isArray(candidate)) return candidate.flatMap((item) => unpack(item));
+            if (typeof candidate === 'object') {
+                return [
+                    candidate.url,
+                    candidate.path,
+                    candidate.src,
+                    candidate.image,
+                    candidate.imageUrl,
+                    candidate.thumbnail,
+                    candidate.secure_url,
+                ].filter(Boolean) as string[];
+            }
+            return [];
+        };
+
         const mediaCandidates = [
-            service.image,
-            service.imageUrl,
-            service.thumbnail,
-            service.coverImage,
-            ...(Array.isArray(service.images) ? service.images : []),
-            ...((service as any).media && Array.isArray((service as any).media) ? (service as any).media : []),
-            (service as any).photo,
-            (service as any).avatar,
-        ].filter(Boolean) as string[];
+            ...unpack(service.image),
+            ...unpack(service.imageUrl),
+            ...unpack(service.thumbnail),
+            ...unpack(service.coverImage),
+            ...unpack((service as any).images),
+            ...unpack((service as any).media),
+            ...unpack((service as any).photo),
+            ...unpack((service as any).avatar),
+        ];
 
         for (const candidate of mediaCandidates) {
             const resolved = getImageUrl(candidate) || candidate;
@@ -414,9 +420,30 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     ].filter(Boolean).join(', ') || tenant?.address || null;
     const mapUrl = pageSetup?.googleMapLink || tenant?.googleMapLink || null;
 
-    const handleAddProduct = (product: Product) => {
+    const handleAddProduct = (product: Product, options?: { navigateToCart?: boolean }) => {
         const result = addToCart(product);
         if (result.success) {
+            Alert.alert(
+                isRTL ? 'تمت الإضافة إلى السلة' : 'Added to Cart',
+                isRTL
+                    ? `تمت إضافة "${product.name_ar || product.name_en}" إلى سلة المنتجات.`
+                    : `"${product.name_en || product.name_ar}" was added to your product cart.`,
+                [
+                    {
+                        text: isRTL ? 'متابعة التسوق' : 'Continue Shopping',
+                        style: 'cancel',
+                    },
+                    ...(options?.navigateToCart
+                        ? [{
+                            text: isRTL ? 'فتح السلة' : 'Open Cart',
+                            onPress: () => navigation.navigate('Cart', { tenant }),
+                        }]
+                        : []),
+                ]
+            );
+            if (options?.navigateToCart) {
+                navigation.navigate('Cart', { tenant });
+            }
             return;
         }
 
@@ -431,7 +458,27 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         style: 'destructive',
                         onPress: () => {
                             clearCart();
-                            addToCart(product);
+                            const replaceResult = addToCart(product);
+                            if (replaceResult.success) {
+                                Alert.alert(
+                                    isRTL ? 'تمت الإضافة إلى السلة' : 'Added to Cart',
+                                    isRTL
+                                        ? `تمت إضافة "${product.name_ar || product.name_en}" إلى سلة المنتجات.`
+                                        : `"${product.name_en || product.name_ar}" was added to your product cart.`,
+                                    [
+                                        { text: isRTL ? 'متابعة التسوق' : 'Continue Shopping', style: 'cancel' },
+                                        ...(options?.navigateToCart
+                                            ? [{
+                                                text: isRTL ? 'فتح السلة' : 'Open Cart',
+                                                onPress: () => navigation.navigate('Cart', { tenant }),
+                                            }]
+                                            : []),
+                                    ]
+                                );
+                                if (options?.navigateToCart) {
+                                    navigation.navigate('Cart', { tenant });
+                                }
+                            }
                         },
                     },
                 ]
@@ -485,25 +532,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         setReviewTargetBooking(tenantBooking);
     };
 
-    const openProviderReviewPrompt = (providerId: string) => {
-        const providerBooking = reviewEligibleBookings.find((booking) =>
-            booking.tenantId === tenant?.id
-            && booking.staffId === providerId
-            && booking.status === 'completed'
-            && !reviewedAppointmentIds.has(booking.id)
-        );
-
-        if (!providerBooking) {
-            Alert.alert(
-                isRTL ? 'لا يوجد موعد مؤهل' : 'No eligible appointment',
-                isRTL ? 'أكمل موعدًا مع هذا المتخصص أولًا لإضافة تقييم.' : 'Complete an appointment with this specialist first to add a review.'
-            );
-            return;
-        }
-
-        setReviewTargetBooking(providerBooking);
-    };
-
     const getServiceDescription = (service: Service) =>
         (isRTL ? service.description_ar : service.description_en)
         || service.description_en
@@ -519,7 +547,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     };
 
     const openProviderProfile = (provider: Staff) => {
-        navigation.navigate('EmployeeProfile', { provider });
+        navigation.navigate('EmployeeProfile', { provider, tenant });
     };
 
     const extractMapCoordinates = (mapUrl?: string | null): { lat: number; lng: number } | null => {
@@ -828,8 +856,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     );
 
     const renderServices = () => {
-        // Group services by category
-        const categories = Array.from(new Set(services.map(s => s.category || 'General'))); // Fallback category
+        const categories = Array.from(new Set(services.map(s => s.category || 'General')));
+        const filteredServices = serviceFilterCategory === 'all'
+            ? services
+            : services.filter((s) => (s.category || 'General') === serviceFilterCategory);
+        const groupedCategories = Array.from(new Set(filteredServices.map((s) => s.category || 'General')));
 
         return (
             <View style={styles.contentSection}>
@@ -840,14 +871,29 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             {isRTL ? 'اختر من خدماتنا المميزة' : 'Choose from our premium services'}
                         </Text>
                     </View>
-                    <TouchableOpacity
-                        style={styles.servicesFilterButton}
-                        onPress={() => Alert.alert(isRTL ? 'قريباً' : 'Coming soon', isRTL ? 'التصفية ستكون متاحة قريباً.' : 'Service filtering will be available soon.')}
-                    >
-                        <AppIcon name="settings" size={16} color={colors.primary} />
-                        <Text style={styles.servicesFilterButtonText}>{isRTL ? 'تصفية' : 'Filter'}</Text>
-                    </TouchableOpacity>
                 </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow}>
+                    <TouchableOpacity
+                        style={[styles.filterChip, serviceFilterCategory === 'all' ? styles.filterChipActive : null]}
+                        onPress={() => setServiceFilterCategory('all')}
+                    >
+                        <Text style={[styles.filterChipText, serviceFilterCategory === 'all' ? styles.filterChipTextActive : null]}>
+                            {isRTL ? 'الكل' : 'All'}
+                        </Text>
+                    </TouchableOpacity>
+                    {categories.map((category) => {
+                        const active = serviceFilterCategory === category;
+                        return (
+                            <TouchableOpacity
+                                key={category}
+                                style={[styles.filterChip, active ? styles.filterChipActive : null]}
+                                onPress={() => setServiceFilterCategory(category)}
+                            >
+                                <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}>{category}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
 
                 {serviceBookingItemCount > 0 && (
                     <View style={styles.serviceBookingBanner}>
@@ -876,12 +922,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     </View>
                 )}
                 {services.length === 0 ? (
-                    renderEmptyState('No services available yet.')
+                    renderEmptyState(isRTL ? 'لا توجد خدمات متاحة حالياً.' : 'No services available yet.')
                 ) : (
-                    categories.map(category => (
+                    groupedCategories.map(category => (
                         <View key={category} style={styles.categorySection}>
                             <Text style={styles.categoryTitle}>{category}</Text>
-                            {services.filter(s => (s.category || 'General') === category).map(service => {
+                            {filteredServices.filter(s => (s.category || 'General') === category).map(service => {
                                 const serviceName = isRTL ? service.name_ar : service.name_en;
                                 const serviceDesc = getServiceDescription(service);
                                 return (
@@ -990,14 +1036,27 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                             </View>
                                         </View>
                                     </View>
-                                    <TouchableOpacity
-                                        style={[styles.addToCartButton, product.stock <= 0 ? styles.addToCartButtonDisabled : null]}
-                                        onPress={() => handleAddProduct(product)}
-                                        disabled={product.stock <= 0}
-                                    >
-                                        <Text style={styles.addToCartText}>{t('addToCart' as any) || 'Add'}</Text>
-                                        <AppIcon name="cart" size={18} color="white" />
-                                    </TouchableOpacity>
+                                    <View style={styles.productActionsRow}>
+                                        <TouchableOpacity
+                                            style={[styles.productActionButton, styles.productActionButtonSecondary, product.stock <= 0 ? styles.addToCartButtonDisabled : null]}
+                                            onPress={() => handleAddProduct(product)}
+                                            disabled={product.stock <= 0}
+                                        >
+                                            <Text style={[styles.productActionText, styles.productActionTextSecondary]}>
+                                                {t('addToCart' as any) || (isRTL ? 'أضف للسلة' : 'Add to Cart')}
+                                            </Text>
+                                            <AppIcon name="cart" size={16} color={colors.primary} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.productActionButton, styles.productActionButtonPrimary, product.stock <= 0 ? styles.addToCartButtonDisabled : null]}
+                                            onPress={() => handleAddProduct(product, { navigateToCart: true })}
+                                            disabled={product.stock <= 0}
+                                        >
+                                            <Text style={[styles.productActionText, styles.productActionTextPrimary]}>
+                                                {isRTL ? 'اشترِ الآن' : 'Buy Now'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </TouchableOpacity>
                             );
                         })}
@@ -1057,7 +1116,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         <View key={review.id} style={styles.reviewCardPremium}>
                             <View style={styles.reviewHeader}>
                                 <View style={styles.reviewAuthorBlock}>
-                                    <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
+                                    <Text style={styles.reviewAuthor}>
+                                        {review.customerName && review.customerName.toLowerCase() !== 'valued customer'
+                                            ? review.customerName
+                                            : (isRTL ? 'عميل موثّق' : 'Verified Customer')}
+                                    </Text>
                                     {dateLabel ? <Text style={styles.reviewDateText}>{dateLabel}</Text> : null}
                                 </View>
                                 <View style={styles.reviewStarsRow}>
@@ -1077,7 +1140,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             ) : null}
                             {review.staffReply ? (
                                 <View style={styles.reviewReplyBox}>
-                                    <Text style={styles.reviewReplyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
+                                    <Text style={styles.reviewReplyLabel}>
+                                        {isRTL
+                                            ? `رد ${tenant?.name_ar || tenant?.name || 'المركز'}`
+                                            : `${tenant?.name_en || tenant?.name || 'Center'} reply`}
+                                    </Text>
                                     <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
                                 </View>
                             ) : null}
@@ -1274,88 +1341,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             </TouchableOpacity>
                         </View>
                     ) : null}
-                </View>
-            </Modal>
-
-            <Modal
-                visible={!!selectedProvider}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setSelectedProvider(null)}
-            >
-                <View style={styles.modalBackdrop}>
-                    <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setSelectedProvider(null)} />
-                    <View style={styles.providerModalCard}>
-                        {selectedProvider ? (
-                            <>
-                                <View style={styles.providerModalHeader}>
-                                    <Text style={styles.providerModalTitle}>{selectedProvider.name}</Text>
-                                    <TouchableOpacity onPress={() => setSelectedProvider(null)} style={styles.serviceModalClose}>
-                                        <AppIcon name="close" size={24} color={colors.text} />
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.providerSummaryRow}>
-                                    <View style={styles.providerSummaryBadge}>
-                                        <AppIcon name="star" size={14} color={colors.warning} />
-                                        <Text style={styles.providerSummaryText}>
-                                            {providerReviewsSummary.avgRating ? providerReviewsSummary.avgRating.toFixed(1) : (selectedProvider.rating || 0).toFixed(1)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.providerSummaryBadge}>
-                                        <AppIcon name="bookings" size={14} color={colors.primary} />
-                                        <Text style={styles.providerSummaryText}>
-                                            {providerReviewsSummary.total} {isRTL ? 'تقييم' : 'reviews'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                {selectedProvider.experience ? (
-                                    <Text style={styles.providerExperienceText}>
-                                        {isRTL ? `الخبرة: ${selectedProvider.experience}` : `Experience: ${selectedProvider.experience}`}
-                                    </Text>
-                                ) : null}
-                                {selectedProvider.bio ? (
-                                    <Text style={styles.providerBioText}>{selectedProvider.bio}</Text>
-                                ) : null}
-                                {Array.isArray(selectedProvider.skills) && selectedProvider.skills.length > 0 ? (
-                                    <Text style={styles.providerSkillsText}>{selectedProvider.skills.join(' • ')}</Text>
-                                ) : null}
-                                <Text style={styles.providerReviewsHeading}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
-                                <TouchableOpacity style={styles.providerWriteReviewButton} onPress={() => openProviderReviewPrompt(selectedProvider.id)}>
-                                    <AppIcon name="star" size={14} color={colors.textInverse} />
-                                    <Text style={styles.providerWriteReviewButtonText}>{isRTL ? 'إضافة تقييم' : 'Write Review'}</Text>
-                                </TouchableOpacity>
-                                {providerReviewsLoading ? (
-                                    <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
-                                ) : providerReviews.length === 0 ? (
-                                    <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
-                                ) : (
-                                    <ScrollView style={styles.providerReviewsList} showsVerticalScrollIndicator={false}>
-                                        {providerReviews.map((review) => (
-                                            <View key={review.id} style={styles.providerReviewCard}>
-                                                <View style={styles.reviewHeader}>
-                                                    <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
-                                                    <View style={styles.reviewStarsRow}>
-                                                        {Array.from({ length: 5 }).map((_, index) => (
-                                                            <Text key={`${review.id}-provider-star-${index}`} style={[styles.reviewStar, index < Number(review.rating || 0) ? styles.reviewStarActive : null]}>
-                                                                ★
-                                                            </Text>
-                                                        ))}
-                                                    </View>
-                                                </View>
-                                                {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
-                                                {review.staffReply ? (
-                                                    <View style={styles.reviewReplyBox}>
-                                                        <Text style={styles.reviewReplyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
-                                                        <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
-                                                    </View>
-                                                ) : null}
-                                            </View>
-                                        ))}
-                                    </ScrollView>
-                                )}
-                            </>
-                        ) : null}
-                    </View>
                 </View>
             </Modal>
 
@@ -1818,6 +1803,31 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         color: colors.textSecondary,
     },
+    filterChipRow: {
+        gap: spacing.sm,
+        paddingBottom: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    filterChip: {
+        borderWidth: 1,
+        borderColor: '#E6DBFF',
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.surface,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+    },
+    filterChipActive: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    filterChipText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.textSecondary,
+    },
+    filterChipTextActive: {
+        color: colors.textInverse,
+    },
     servicesFilterButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1949,7 +1959,7 @@ const styles = StyleSheet.create({
         color: colors.primary,
     },
     servicePriceRtl: {
-        textAlign: 'left',
+        textAlign: 'right',
     },
     serviceArrowButton: {
         width: 44,
@@ -2261,97 +2271,6 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         fontWeight: '700',
         color: colors.primary,
-    },
-    providerModalCard: {
-        width: '100%',
-        maxHeight: '85%',
-        marginTop: 'auto',
-        backgroundColor: colors.background,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: spacing.lg,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    providerModalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
-    },
-    providerModalTitle: {
-        fontSize: fontSize.xl,
-        fontWeight: '700',
-        color: colors.text,
-    },
-    providerSummaryRow: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-        marginBottom: spacing.sm,
-    },
-    providerSummaryBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 6,
-        borderRadius: borderRadius.md,
-        backgroundColor: colors.backgroundGray,
-    },
-    providerSummaryText: {
-        fontSize: fontSize.sm,
-        color: colors.text,
-        fontWeight: '600',
-    },
-    providerExperienceText: {
-        fontSize: fontSize.sm,
-        color: colors.primaryDark,
-        marginBottom: spacing.xs,
-    },
-    providerBioText: {
-        fontSize: fontSize.sm,
-        color: colors.textSecondary,
-        lineHeight: 20,
-        marginBottom: spacing.sm,
-    },
-    providerSkillsText: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
-        marginBottom: spacing.md,
-    },
-    providerReviewsHeading: {
-        fontSize: fontSize.md,
-        fontWeight: '700',
-        color: colors.text,
-        marginBottom: spacing.sm,
-    },
-    providerWriteReviewButton: {
-        marginTop: spacing.xs,
-        marginBottom: spacing.sm,
-        alignSelf: 'flex-start',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        borderRadius: borderRadius.full,
-        backgroundColor: colors.primary,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-    },
-    providerWriteReviewButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.sm,
-        fontWeight: '700',
-    },
-    providerReviewsList: {
-        maxHeight: 320,
-    },
-    providerReviewCard: {
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.md,
-        padding: spacing.sm,
-        marginBottom: spacing.sm,
     },
     serviceModalDescription: {
         fontSize: fontSize.md,
@@ -2874,20 +2793,40 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
-    addToCartButton: {
-        backgroundColor: '#6D31D9',
+    productActionsRow: {
+        flexDirection: 'row',
+        gap: spacing.xs,
+        paddingHorizontal: spacing.sm,
+        paddingBottom: spacing.sm,
+    },
+    productActionButton: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
+        paddingVertical: 12,
+        borderRadius: 12,
         gap: spacing.xs,
+    },
+    productActionButtonPrimary: {
+        backgroundColor: '#6D31D9',
+    },
+    productActionButtonSecondary: {
+        backgroundColor: '#F3EDFF',
+        borderWidth: 1,
+        borderColor: '#CDBBF9',
+    },
+    productActionText: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+    },
+    productActionTextPrimary: {
+        color: 'white',
+    },
+    productActionTextSecondary: {
+        color: colors.primary,
     },
     addToCartButtonDisabled: {
         backgroundColor: '#B9A8DF',
-    },
-    addToCartText: {
-        color: 'white',
-        fontSize: fontSize.sm,
-        fontWeight: 'bold',
     },
 });

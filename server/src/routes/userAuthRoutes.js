@@ -73,6 +73,13 @@ router.post('/forgot-password', passwordResetLimiter, userAuthController.forgotP
 router.post('/reset-password/:token', passwordResetLimiter, userAuthController.resetPassword);
 
 /**
+ * @route   GET /api/v1/auth/user/reset-password/open?token=...
+ * @desc    Open mobile deep link for customer password reset
+ * @access  Public
+ */
+router.get('/reset-password/open', userAuthController.openResetPasswordLink);
+
+/**
  * @route   POST /api/v1/auth/user/resend-verification
  * @desc    Resend verification email
  * @access  Private

@@ -20,7 +20,7 @@ import { AppIcon } from '../components/AppIcon';
 
 export function PaymentScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
-    const { appointmentId, orderId, amount, tenantId, paymentChoice } = route.params || {};
+    const { appointmentId, orderId, bookingSessionId, amount, tenantId, paymentChoice } = route.params || {};
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [cardNumber, setCardNumber] = useState('');
@@ -31,6 +31,9 @@ export function PaymentScreen({ route, navigation }: any) {
     const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
     const [walletBalance, setWalletBalance] = useState<number>(0);
     const amountValue = Number(amount || 0);
+    const paymentIdempotencyKeyRef = React.useRef<string>(
+        `pay:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`
+    );
 
     React.useEffect(() => {
         let mounted = true;
@@ -58,6 +61,7 @@ export function PaymentScreen({ route, navigation }: any) {
             const response = await api.processPayment({
                 appointmentId,
                 orderId,
+                bookingSessionId,
                 amount: amountValue,
                 paymentMethod,
                 cardNumber: paymentMethod === 'card' ? cardNumber.replace(/\s/g, '') : undefined,
@@ -66,6 +70,7 @@ export function PaymentScreen({ route, navigation }: any) {
                 cardholderName: paymentMethod === 'card' ? cardholderName : undefined,
                 tenantId,
                 paymentChoice,
+                idempotencyKey: paymentIdempotencyKeyRef.current,
             });
 
             if (response.success) {

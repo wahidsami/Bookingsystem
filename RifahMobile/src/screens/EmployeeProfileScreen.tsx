@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
-import { api, getImageUrl, Staff } from '../api/client';
+import { api, Booking, getImageUrl, Staff } from '../api/client';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { ReviewPromptModal } from '../components/ReviewPromptModal';
 
 type StaffReview = {
   id: string;
@@ -19,10 +20,15 @@ type StaffReview = {
 export function EmployeeProfileScreen({ route, navigation }: any) {
   const { provider } = route.params;
   const { isRTL } = useLanguage();
+  const tenantName = route?.params?.tenant?.name || route?.params?.tenant?.name_en || route?.params?.tenant?.name_ar;
+  const replyLabel = isRTL ? `رد ${tenantName || 'المركز'}` : `${tenantName || 'Center'} reply`;
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
   const [reviews, setReviews] = useState<StaffReview[]>([]);
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
+  const [reviewTargetBooking, setReviewTargetBooking] = useState<Booking | null>(null);
+  const [reviewEligibleBookings, setReviewEligibleBookings] = useState<Booking[]>([]);
+  const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadReviews = async () => {
@@ -48,6 +54,62 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 
     loadReviews();
   }, [provider.id]);
+
+  useEffect(() => {
+    const loadReviewEligibility = async () => {
+      try {
+        const user = await api.getUser();
+        if (!user) {
+          setReviewEligibleBookings([]);
+          setReviewedAppointmentIds(new Set());
+          return;
+        }
+
+        const [completedBookings, myReviews] = await Promise.all([
+          api.getBookings('completed'),
+          api.getMyReviews(200).catch(() => []),
+        ]);
+
+        const reviewedIds = new Set<string>(
+          (myReviews || [])
+            .map((review: any) => review?.appointmentId)
+            .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+        );
+
+        setReviewedAppointmentIds(reviewedIds);
+        setReviewEligibleBookings(completedBookings || []);
+      } catch (error) {
+        console.warn('Failed to load provider review eligibility:', error);
+        setReviewEligibleBookings([]);
+      }
+    };
+
+    loadReviewEligibility();
+  }, []);
+
+  const openProviderReviewPrompt = () => {
+    const tenantId = provider?.tenantId || route?.params?.tenant?.id;
+    const eligibleBooking = reviewEligibleBookings.find((booking) =>
+      booking.status === 'completed'
+      && booking.staffId === provider.id
+      && (!tenantId || booking.tenantId === tenantId)
+      && !reviewedAppointmentIds.has(booking.id)
+    );
+
+    if (!eligibleBooking) {
+      return;
+    }
+
+    setReviewTargetBooking(eligibleBooking);
+  };
+
+  const hasEligibleBookingForReview = reviewEligibleBookings.some((booking) => {
+    const tenantId = provider?.tenantId || route?.params?.tenant?.id;
+    return booking.status === 'completed'
+      && booking.staffId === provider.id
+      && (!tenantId || booking.tenantId === tenantId)
+      && !reviewedAppointmentIds.has(booking.id);
+  });
 
   const avatarUrl = getImageUrl(provider.avatar || provider.image);
   const initials = provider.name?.charAt(0)?.toUpperCase() || '?';
@@ -124,8 +186,15 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
         ) : null}
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
-          {provider.bio ? <Text style={styles.bioText}>{provider.bio}</Text> : null}
+          <View style={styles.reviewsHeaderRow}>
+            <Text style={styles.sectionTitle}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
+            {hasEligibleBookingForReview ? (
+              <TouchableOpacity style={styles.writeReviewButton} onPress={openProviderReviewPrompt}>
+                <AppIcon name="star" size={14} color="#FFFFFF" />
+                <Text style={styles.writeReviewButtonText}>{isRTL ? 'إضافة تقييم' : 'Write Review'}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           {loading ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           ) : reviews.length === 0 ? (
@@ -134,7 +203,11 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
             reviews.map((review) => (
               <View key={review.id} style={styles.reviewCard}>
                 <View style={styles.reviewHeader}>
-                  <Text style={styles.reviewAuthor}>{review.customerName || (isRTL ? 'عميل' : 'Customer')}</Text>
+                  <Text style={styles.reviewAuthor}>
+                    {review.customerName && review.customerName.toLowerCase() !== 'valued customer'
+                      ? review.customerName
+                      : (isRTL ? 'عميل موثّق' : 'Verified Customer')}
+                  </Text>
                   <View style={styles.starsRow}>
                     {Array.from({ length: 5 }).map((_, index) => (
                       <Text
@@ -149,7 +222,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
                 {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
                 {review.staffReply ? (
                   <View style={styles.replyBox}>
-                    <Text style={styles.replyLabel}>{isRTL ? 'رد المركز' : 'Center reply'}</Text>
+                    <Text style={styles.replyLabel}>{replyLabel}</Text>
                     <Text style={styles.replyText}>{review.staffReply}</Text>
                   </View>
                 ) : null}
@@ -164,6 +237,33 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
           <Text style={styles.primaryCtaText}>{isRTL ? 'العودة للخدمات' : 'Back to services'}</Text>
         </TouchableOpacity>
       </View>
+
+      <ReviewPromptModal
+        visible={!!reviewTargetBooking}
+        appointment={reviewTargetBooking}
+        onClose={() => setReviewTargetBooking(null)}
+        onSuccess={async () => {
+          setReviewTargetBooking(null);
+          const response = await api.get<{ success: boolean; reviews: StaffReview[]; summary?: { total: number; avgRating: number | null } }>(
+            `/public/staff/${provider.id}/reviews?limit=20`
+          );
+          if (response.success) {
+            const nextReviews = response.reviews || [];
+            setReviews(nextReviews);
+            setSummary({
+              total: response.summary?.total || nextReviews.length,
+              avgRating: response.summary?.avgRating ?? null
+            });
+          }
+          const myReviews = await api.getMyReviews(200).catch(() => []);
+          const reviewedIds = new Set<string>(
+            (myReviews || [])
+              .map((review: any) => review?.appointmentId)
+              .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+          );
+          setReviewedAppointmentIds(reviewedIds);
+        }}
+      />
     </View>
   );
 }
@@ -304,6 +404,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#171840',
     marginBottom: spacing.sm
+  },
+  reviewsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs
+  },
+  writeReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  writeReviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700'
   },
   skillChip: {
     borderRadius: 999,

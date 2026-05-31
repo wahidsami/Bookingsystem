@@ -214,9 +214,9 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
             </ScrollView>
 
             <View style={[styles.stickyBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
-                <TouchableOpacity style={styles.cartBtn}>
+                <TouchableOpacity style={styles.cartBtn} onPress={() => handleBook()}>
                     <AppIcon name="bookings" size={16} color={colors.primary} />
-                    <Text style={styles.cartBtnText}>{isRTL ? 'أضف للسلة' : 'Add to cart'}</Text>
+                    <Text style={styles.cartBtnText}>{isRTL ? 'ابدأ الحجز' : 'Start booking'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.bookBtn} onPress={() => handleBook()}>
                     <Text style={styles.bookBtnText}>{isRTL ? 'احجز الآن' : 'Book now'}</Text>

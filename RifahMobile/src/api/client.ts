@@ -1493,6 +1493,7 @@ class ApiClient {
     async processPayment(data: {
         appointmentId?: string;
         orderId?: string;
+        bookingSessionId?: string;
         amount: number;
         paymentMethod?: 'card' | 'wallet';
         cardNumber?: string;
@@ -1502,6 +1503,7 @@ class ApiClient {
         saveCard?: boolean;
         tenantId?: string;
         paymentChoice?: 'online-full' | 'booking-fee';
+        idempotencyKey?: string;
     }): Promise<{ success: boolean; transaction: any }> {
         return this.post<{ success: boolean; transaction: any }>('/payments/process', data);
     }

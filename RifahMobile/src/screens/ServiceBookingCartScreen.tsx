@@ -84,7 +84,36 @@ export function ServiceBookingCartScreen({ navigation }: any) {
             });
 
             const bookingReference = response.bookingSession?.bookingReference || response.bookingSession?.id || '';
+            const bookingSessionId = response.bookingSession?.id;
             clearCart();
+
+            if (payableNowTotal > 0 && bookingSessionId) {
+                navigation.navigate('Payment', {
+                    bookingSessionId,
+                    amount: payableNowTotal,
+                    tenantId: cartTenantId || items[0]?.tenantId,
+                    paymentChoice: groupedByPayment.some((group) => group.paymentMethod === 'online-full')
+                        ? 'online-full'
+                        : 'booking-fee',
+                });
+                return;
+            }
+
+            if (payableNowTotal > 0 && !bookingSessionId) {
+                Alert.alert(
+                    language === 'ar' ? 'فشل بدء الدفع' : 'Payment setup failed',
+                    language === 'ar'
+                        ? 'تم إنشاء الحجز لكن لا يمكن بدء الدفع الآن. يرجى المحاولة من صفحة المواعيد.'
+                        : 'Booking was created, but payment could not be initialized. Please retry from the Appointments page.',
+                    [
+                        {
+                            text: language === 'ar' ? 'عرض المواعيد' : 'View Appointments',
+                            onPress: () => navigation.navigate('Tabs', { screen: 'Appointments' }),
+                        },
+                    ]
+                );
+                return;
+            }
 
             Alert.alert(
                 language === 'ar' ? 'تم تأكيد الحجز' : 'Booking confirmed',

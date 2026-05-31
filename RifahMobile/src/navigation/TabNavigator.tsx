@@ -8,11 +8,15 @@ import { MoreScreen } from '../screens/MoreScreen';
 import { colors } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { AppIcon } from '../components/AppIcon';
+import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
+import { useCart } from '../contexts/CartContext';
 
 const Tab = createBottomTabNavigator();
 
 export function TabNavigator() {
     const { t, language } = useLanguage();
+    const { itemCount: serviceBookingItemCount } = useServiceBookingCart();
+    const { itemCount: productCartItemCount } = useCart();
     const insets = useSafeAreaInsets();
     const bottomPadding = Math.max(insets.bottom, 12);
 
@@ -51,6 +55,7 @@ export function TabNavigator() {
                 component={BookingsScreen}
                 options={{
                     tabBarLabel: t('appointments'),
+                    tabBarBadge: serviceBookingItemCount > 0 ? serviceBookingItemCount : undefined,
                     tabBarIcon: ({ color, size }) => (
                         <AppIcon name="bookings" size={size} color={color} />
                     ),
@@ -61,6 +66,7 @@ export function TabNavigator() {
                 component={PurchasesScreen}
                 options={{
                     tabBarLabel: t('purchases'),
+                    tabBarBadge: productCartItemCount > 0 ? productCartItemCount : undefined,
                     tabBarIcon: ({ color, size }) => (
                         <AppIcon name="purchases" size={size} color={color} />
                     ),

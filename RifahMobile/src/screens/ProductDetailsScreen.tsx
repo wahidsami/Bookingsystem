@@ -38,7 +38,7 @@ export function ProductDetailsScreen({ route, navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <ScrollView contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 120) }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 28) }}>
                 <View style={[styles.topBar, { paddingTop: topInset + 6 }]}>
                     <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
                         <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
@@ -156,9 +156,10 @@ const styles = StyleSheet.create({
     },
     qtyText: { fontSize: 18, fontWeight: '700', color: '#1D1D45', minWidth: 24, textAlign: 'center' },
     bottomBar: {
-        position: 'absolute', left: 0, right: 0, bottom: 0,
         backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 14,
         shadowColor: '#1D1442', shadowOpacity: 0.08, shadowRadius: 14, elevation: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#ECE6FA',
     },
     addBtn: { height: 54, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     addBtnDisabled: { backgroundColor: '#B9AADF' },

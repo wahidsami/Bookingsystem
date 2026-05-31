@@ -424,6 +424,71 @@ const googleComplete = async (req, res) => {
     }
 };
 
+/**
+ * Open reset-password deep link with browser-safe fallback.
+ * GET /api/v1/auth/user/reset-password/open?token=...
+ */
+const openResetPasswordLink = async (req, res) => {
+    try {
+        const token = `${req.query?.token || ''}`.trim();
+        if (!token) {
+            return res.status(400).send('Missing reset token');
+        }
+
+        const encodedToken = encodeURIComponent(token);
+        const deepLink = `com.refah.mobile://reset-password?token=${encodedToken}`;
+        const legacyDeepLink = `refah://reset-password?token=${encodedToken}`;
+
+        // If a web URL is configured for customer app, use it as browser fallback.
+        const customerAppUrl = `${process.env.CUSTOMER_APP_URL || ''}`.trim().replace(/\/+$/, '');
+        const fallbackUrl = customerAppUrl
+            ? `${customerAppUrl}/reset-password?token=${encodedToken}`
+            : null;
+
+        const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Refah App</title>
+    <style>
+      body{font-family:Arial,sans-serif;background:#faf7ff;color:#1f1f33;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px}
+      .card{max-width:420px;background:#fff;border:1px solid #e7def7;border-radius:16px;padding:24px;box-shadow:0 12px 30px rgba(76,29,149,.08)}
+      h1{margin:0 0 8px;font-size:22px}
+      p{margin:0 0 16px;line-height:1.5;color:#5b5b7b}
+      a.btn{display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Open Refah App</h1>
+      <p>Redirecting you to reset your password in the mobile app.</p>
+      <a class="btn" href="${deepLink}">Open App</a>
+    </div>
+    <script>
+      (function() {
+        var deep = "${deepLink}";
+        var legacy = "${legacyDeepLink}";
+        var fallback = ${fallbackUrl ? `"${fallbackUrl}"` : "null"};
+        var started = Date.now();
+        window.location.href = deep;
+        setTimeout(function(){ window.location.href = legacy; }, 250);
+        setTimeout(function(){
+          if (fallback && Date.now() - started < 2600) {
+            window.location.href = fallback;
+          }
+        }, 1600);
+      })();
+    </script>
+  </body>
+</html>`;
+
+        return res.status(200).set('Content-Type', 'text/html; charset=utf-8').send(html);
+    } catch (error) {
+        return res.status(500).send('Unable to open reset link');
+    }
+};
+
 module.exports = {
     register,
     login,
@@ -437,5 +502,6 @@ module.exports = {
     resendVerification,
     googleStart,
     googleSendPhoneOtp,
-    googleComplete
+    googleComplete,
+    openResetPasswordLink
 };
