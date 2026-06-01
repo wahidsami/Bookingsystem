@@ -410,8 +410,18 @@ export function GiftsScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.quickRow}>
-            <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}><AppIcon name="redeem" size={20} color={colors.primary} /><Text style={styles.quickText}>{language === 'ar' ? 'استلام كود هدية' : 'Claim Gift Code'}</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: walletBalance || 0, history })}><AppIcon name="history" size={20} color={colors.primary} /><Text style={styles.quickText}>{language === 'ar' ? 'سجل العمليات' : 'Transaction History'}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}>
+              <View style={styles.quickIconWrap}>
+                <AppIcon name="sparkles" size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.quickText}>{language === 'ar' ? 'استبدال كود الهدية' : 'Redeem Gift Code'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: walletBalance || 0, history })}>
+              <View style={styles.quickIconWrap}>
+                <AppIcon name="file" size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.quickText}>{language === 'ar' ? 'سجل المحفظة والهدايا' : 'Wallet & Gift History'}</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.claimRow}>
             <TextInput
@@ -580,8 +590,9 @@ const styles = StyleSheet.create({
   balanceAmount: { color: colors.text, fontSize: 17, fontWeight: '800', marginTop: 4 },
   balanceMeta: { color: colors.textSecondary, fontSize: 9, marginTop: 4 },
   quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  quickCard: { flex: 1, minHeight: 68, borderRadius: 20, backgroundColor: '#F6F0FF', borderWidth: 1, borderColor: '#E7DAFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, gap: 6 },
-  quickText: { fontSize: 10, color: colors.primary, fontWeight: '700', textAlign: 'center' },
+  quickCard: { flex: 1, minHeight: 84, borderRadius: 20, backgroundColor: '#F6F0FF', borderWidth: 1, borderColor: '#E7DAFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, gap: 8 },
+  quickIconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEE5FF' },
+  quickText: { fontSize: 11, color: colors.primary, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
   claimRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   claimInput: { flex: 1 },
   claimBtn: { minWidth: 96, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6D28D9', paddingHorizontal: spacing.md },
