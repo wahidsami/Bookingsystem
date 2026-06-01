@@ -160,18 +160,18 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     let phone = `${normalizedCustomer.phone || ''}`.trim();
     const password = `${normalizedCustomer.password || ''}`;
 
-    if (isGuest) {
-        if (!email) {
-            const guestTag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-            email = `guest+${guestTag}@guest.refah.local`;
-        }
-        if (!phone) {
-            phone = `+9665${String(Date.now()).slice(-8)}`;
-        }
+    // PlatformUser requires non-null unique email/phone in DB.
+    // For quick appointment creation we allow missing input, then fill safe placeholders.
+    if (!email) {
+        const guestTag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        email = `guest+${guestTag}@guest.refah.local`;
+    }
+    if (!phone) {
+        phone = `+9665${String(Date.now()).slice(-8)}`;
     }
 
-    if (!firstName || !lastName || !email || !phone) {
-        throw new Error('Customer details are required when no existing customer is selected');
+    if (!firstName || !lastName) {
+        throw new Error('Customer first and last name are required when no existing customer is selected');
     }
 
     const existingUser = await userService.findUserByEmailOrPhone(email, phone);
@@ -214,6 +214,10 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
 
 async function sendAppointmentInviteEmail({ to, customerName, tenantName, inviteLink, startTime, serviceName, locale = 'en' }) {
     if (!to) {
+        return;
+    }
+
+    if (`${to}`.toLowerCase().endsWith('@guest.refah.local')) {
         return;
     }
 

@@ -441,13 +441,11 @@ export function AppointmentActionDrawer({
     if (customerMode === "new") {
       const requiredFields = [
         newCustomer.firstName.trim(),
-        newCustomer.lastName.trim(),
-        newCustomer.email.trim(),
-        newCustomer.phone.trim()
+        newCustomer.lastName.trim()
       ];
 
       if (requiredFields.some((value) => !value)) {
-        setError(locale === "ar" ? "الرجاء إكمال بيانات العميل الجديد." : "Please complete the new customer details.");
+        setError(locale === "ar" ? "الرجاء إدخال الاسم الأول والأخير للعميل." : "Please enter customer first and last name.");
         return;
       }
     }
@@ -477,6 +475,24 @@ export function AppointmentActionDrawer({
     if (includeGroupGuest && (!groupGuest.firstName.trim() || !groupGuest.lastName.trim())) {
       setError(locale === "ar" ? "الرجاء إدخال الاسم الكامل للضيف الإضافي." : "Please enter the additional guest full name.");
       return;
+    }
+
+    const emailForConfirmation =
+      customerMode === "existing"
+        ? (selectedCustomer?.email || "").trim()
+        : (newCustomer.email || "").trim();
+
+    if (!emailForConfirmation) {
+      const confirmedWithoutEmail = typeof window === "undefined"
+        ? true
+        : window.confirm(
+            locale === "ar"
+              ? "لم يتم إدخال بريد إلكتروني للعميل. لن يتم إرسال رسالة تأكيد الموعد عبر البريد الإلكتروني. هل تريد المتابعة وحفظ الموعد بدون إرسال تأكيد بريد؟"
+              : "No customer email was entered. Appointment confirmation email will NOT be sent. Do you want to continue and save the appointment anyway?"
+          );
+      if (!confirmedWithoutEmail) {
+        return;
+      }
     }
 
     setSaving(true);
