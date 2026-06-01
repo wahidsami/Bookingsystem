@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatRiyal } from '../utils/currency';
+import { useFocusEffect } from '@react-navigation/native';
 
 type GiftPackage = {
   id: string;
@@ -28,6 +29,28 @@ type GiftHistoryItem = {
   purchaseAmount: number;
   createdAt: string;
   tenant?: { name?: string; name_en?: string; name_ar?: string } | null;
+};
+
+type WalletSummaryResponse = {
+  success: boolean;
+  summary?: {
+    wallet?: {
+      balance: number;
+      currency?: string;
+    };
+    platformGift?: {
+      receivedTotal?: number;
+      pendingToOthersTotal?: number;
+      sentPurchaseTotal?: number;
+      transactionCount?: number;
+    };
+    tenantGiftBalances?: Array<{
+      tenantId: string;
+      tenantName?: string | null;
+      balance: number;
+      currency?: string;
+    }>;
+  };
 };
 
 type RecipientCheckResult = {
@@ -55,7 +78,9 @@ export function GiftsScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [packages, setPackages] = useState<GiftPackage[]>([]);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [refahBalance, setRefahBalance] = useState<number>(0);
+  const [tenantCenterBalance, setTenantCenterBalance] = useState<number>(0);
+  const [tenantCentersSummary, setTenantCentersSummary] = useState<Array<{ tenantId: string; balance: number }>>([]);
   const [history, setHistory] = useState<GiftHistoryItem[]>([]);
   const [selected, setSelected] = useState<GiftPackage | null>(null);
   const [mode, setMode] = useState<'self' | 'send'>('self');
@@ -70,12 +95,16 @@ export function GiftsScreen({ navigation, route }: any) {
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [claimCode, setClaimCode] = useState('');
+  const [platformGiftReceivedTotal, setPlatformGiftReceivedTotal] = useState(0);
 
   const centersBalance = useMemo(() => {
-    if (tenantId) return Number(walletBalance || 0);
-    return history.reduce((sum, item) => sum + Number(item.totalCreditAmount || 0), 0);
-  }, [history, tenantId, walletBalance]);
-  const centersCount = useMemo(() => new Set(history.map((h) => h.tenantId).filter(Boolean)).size, [history]);
+    if (tenantId) return Number(tenantCenterBalance || 0);
+    return tenantCentersSummary.reduce((sum, item) => sum + Number(item.balance || 0), 0);
+  }, [tenantId, tenantCenterBalance, tenantCentersSummary]);
+  const centersCount = useMemo(() => {
+    if (tenantId) return tenantCenterBalance > 0 ? 1 : 0;
+    return tenantCentersSummary.length;
+  }, [tenantId, tenantCenterBalance, tenantCentersSummary]);
 
   const getStatusLabel = (status?: string) => {
     const key = (status || '').toLowerCase();
@@ -133,16 +162,19 @@ export function GiftsScreen({ navigation, route }: any) {
           const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token: tenantToken });
           if (!response.success) Alert.alert('Error', response.message || 'Failed to claim gift');
           else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(response.walletBalance || 0))}`);
+          await loadPackages();
           return;
         }
         try {
           const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
           if (!response.success) Alert.alert('Error', response.message || 'Failed to claim gift');
           else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(response.walletBalance || 0))}`);
+          await loadPackages();
         } catch {
           const tenantResponse = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token });
           if (!tenantResponse.success) Alert.alert('Error', tenantResponse.message || 'Failed to claim gift');
           else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(tenantResponse.walletBalance || 0))}`);
+          await loadPackages();
         }
       } catch (error: any) {
         Alert.alert('Error', error?.message || 'Failed to claim gift');
@@ -165,13 +197,40 @@ export function GiftsScreen({ navigation, route }: any) {
       if (response.success) setPackages(response.packages || []);
 
       if (tenantId) {
-        const walletRes = await api.get<{ success: boolean; balance: number }>(`/users/tenant-gifts/wallet?tenantId=${encodeURIComponent(tenantId)}&limit=5`);
-        if (walletRes.success) setWalletBalance(Number(walletRes.balance || 0));
+        const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
+        if (summaryRes?.success && summaryRes.summary) {
+          setRefahBalance(Number(summaryRes.summary.wallet?.balance || 0));
+          const tenantBucket = (summaryRes.summary.tenantGiftBalances || []).find((entry) => entry.tenantId === tenantId);
+          setTenantCenterBalance(Number(tenantBucket?.balance || 0));
+          setTenantCentersSummary((summaryRes.summary.tenantGiftBalances || []).map((entry) => ({
+            tenantId: entry.tenantId,
+            balance: Number(entry.balance || 0),
+          })));
+        } else {
+          const generalWallet = await api.getWalletBalance().catch(() => 0);
+          setRefahBalance(Number(generalWallet || 0));
+          const walletRes = await api.get<{ success: boolean; balance: number }>(`/users/tenant-gifts/wallet?tenantId=${encodeURIComponent(tenantId)}&limit=5`);
+          if (walletRes.success) setTenantCenterBalance(Number(walletRes.balance || 0));
+          setTenantCentersSummary([]);
+        }
         const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/tenant-gifts/history');
         if (historyRes.success) setHistory((historyRes.transactions || []).filter((tx) => tx.tenantId === tenantId).slice(0, 10));
       } else {
-        const generalWallet = await api.getWalletBalance().catch(() => 0);
-        setWalletBalance(generalWallet);
+        const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
+        if (summaryRes?.success && summaryRes.summary?.wallet) {
+          setRefahBalance(Number(summaryRes.summary.wallet.balance || 0));
+          setPlatformGiftReceivedTotal(Number(summaryRes.summary.platformGift?.receivedTotal || 0));
+          setTenantCentersSummary((summaryRes.summary.tenantGiftBalances || []).map((entry) => ({
+            tenantId: entry.tenantId,
+            balance: Number(entry.balance || 0),
+          })));
+        } else {
+          const generalWallet = await api.getWalletBalance().catch(() => 0);
+          setRefahBalance(generalWallet);
+          setPlatformGiftReceivedTotal(0);
+          setTenantCentersSummary([]);
+        }
+        setTenantCenterBalance(0);
         const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/gifts/history');
         if (historyRes.success) {
           setHistory((historyRes.transactions || []).slice(0, 10));
@@ -186,9 +245,11 @@ export function GiftsScreen({ navigation, route }: any) {
     }
   };
 
-  useEffect(() => {
-    loadPackages();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadPackages();
+    }, [tenantId])
+  );
 
   const handleSelfRecharge = async () => {
     if (!selected) return;
@@ -212,12 +273,12 @@ export function GiftsScreen({ navigation, route }: any) {
         return;
       }
       Alert.alert('Success', `Wallet recharged. New balance: ${sar(Number(finalResponse.walletBalance || 0))}`);
-      setWalletBalance(Number(finalResponse.walletBalance || 0));
       setSelected(null);
       setCardNumber('');
       setExpiryDate('');
       setCvv('');
       setCardholderName('');
+      await loadPackages();
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to recharge wallet');
     } finally {
@@ -364,10 +425,9 @@ export function GiftsScreen({ navigation, route }: any) {
         Alert.alert('Error', response.message || 'Failed to claim gift');
         return;
       }
-      setWalletBalance(Number(response.walletBalance || 0));
       setClaimCode('');
       Alert.alert(language === 'ar' ? 'نجاح' : 'Success', language === 'ar' ? 'تم استلام الهدية بنجاح.' : 'Gift claimed successfully.');
-      loadPackages();
+      await loadPackages();
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to claim gift');
     } finally {
@@ -394,11 +454,17 @@ export function GiftsScreen({ navigation, route }: any) {
 
         <View style={styles.contentWrap}>
           <View style={styles.balanceRow}>
-            <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: walletBalance || 0, history })} activeOpacity={0.9}>
+            <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })} activeOpacity={0.9}>
               <View style={styles.balanceIcon}><AppIcon name="account_balance_wallet" size={20} color={colors.primary} /></View>
               <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
-              <Text style={styles.balanceAmount}>{sar(Number(walletBalance || 0))}</Text>
-              <Text style={styles.balanceMeta}>{language === 'ar' ? 'متاح لكل المراكز' : 'Usable across all centers'}</Text>
+              <Text style={styles.balanceAmount}>{sar(Number(refahBalance || 0))}</Text>
+              <Text style={styles.balanceMeta}>
+                {tenantId
+                  ? (language === 'ar' ? 'رصيد بطاقات هذا المركز' : 'This center gift balance')
+                  : (language === 'ar'
+                    ? `متاح لكل المراكز${platformGiftReceivedTotal > 0 ? ` • هدايا مستلمة ${sar(platformGiftReceivedTotal)}` : ''}`
+                    : `Usable across all centers${platformGiftReceivedTotal > 0 ? ` • Received gifts ${sar(platformGiftReceivedTotal)}` : ''}`)}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.balanceCard, styles.centerBalanceCard]} onPress={() => navigation.navigate('CentersBalance', { centersBalance, history })} activeOpacity={0.9}>
@@ -416,7 +482,7 @@ export function GiftsScreen({ navigation, route }: any) {
               </View>
               <Text style={styles.quickText}>{language === 'ar' ? 'استبدال كود الهدية' : 'Redeem Gift Code'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: walletBalance || 0, history })}>
+            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })}>
               <View style={styles.quickIconWrap}>
                 <AppIcon name="file" size={18} color={colors.primary} />
               </View>
