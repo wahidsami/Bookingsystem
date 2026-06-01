@@ -3,6 +3,33 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const { SERVICE_PAYMENT_METHOD_RULES } = require('../utils/tenantPaymentSettings');
 const { getServerPublicUrl } = require('../utils/url');
+const crypto = require('crypto');
+
+const INVITE_ACCOUNT_MISMATCH_CODE = 'INVITE_ACCOUNT_MISMATCH';
+
+const maskEmail = (email) => {
+    const value = `${email || ''}`.trim().toLowerCase();
+    if (!value || !value.includes('@')) return null;
+    const [local, domain] = value.split('@');
+    if (!local || !domain) return null;
+    const first = local.slice(0, 1);
+    const last = local.length > 1 ? local.slice(-1) : '';
+    const stars = '*'.repeat(Math.max(2, local.length - 2));
+    return `${first}${stars}${last}@${domain}`;
+};
+
+const hashInviteToken = (token) => crypto.createHash('sha256').update(`${token || ''}`).digest('hex').slice(0, 16);
+
+const logInviteAttempt = (payload) => {
+    try {
+        console.info('[invite-response-audit]', JSON.stringify({
+            at: new Date().toISOString(),
+            ...payload
+        }));
+    } catch (error) {
+        console.info('[invite-response-audit]', payload);
+    }
+};
 
 const appendGroupGuestToNotes = (notes, groupGuest) => {
     if (!groupGuest || typeof groupGuest !== 'object') {
@@ -772,7 +799,8 @@ const getInviteDetails = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar', 'duration'] },
                 { model: db.Staff, as: 'staff', attributes: ['id', 'name'] },
-                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo'], required: false },
+                { model: db.PlatformUser, as: 'user', attributes: ['id', 'email'], required: false }
             ]
         });
 
@@ -782,6 +810,9 @@ const getInviteDetails = async (req, res) => {
 
         const isExpired = !!appointment.inviteExpiresAt && new Date(appointment.inviteExpiresAt).getTime() < Date.now();
 
+        const requestUserId = req.userId || null;
+        const canRespondWhileAuthenticated = !requestUserId || !appointment.platformUserId || requestUserId === appointment.platformUserId;
+
         return res.json({
             success: true,
             invite: {
@@ -789,6 +820,8 @@ const getInviteDetails = async (req, res) => {
                 isExpired,
                 appointmentId: appointment.id,
                 platformUserId: appointment.platformUserId,
+                recipientMaskedEmail: maskEmail(appointment.user?.email),
+                canRespondWhileAuthenticated,
                 customerConfirmationRequired: !!appointment.customerConfirmationRequired,
                 customerConfirmationStatus: appointment.customerConfirmationStatus || 'not_required',
                 inviteExpiresAt: appointment.inviteExpiresAt,
@@ -797,7 +830,8 @@ const getInviteDetails = async (req, res) => {
                 status: appointment.status,
                 service: appointment.service || null,
                 staff: appointment.staff || null,
-                tenant: appointment.tenant || null
+                tenant: appointment.tenant || null,
+                openUrl: `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/bookings/invites/${encodeURIComponent(token)}/open`
             }
         });
     } catch (error) {
@@ -819,31 +853,118 @@ const openInvite = async (req, res) => {
     const iosStore = process.env.IOS_APP_URL || 'https://apps.apple.com';
     const apiBase = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1`;
     const inviteApiUrl = `${apiBase}/bookings/invites/${encodeURIComponent(token || '')}`;
+    const inviteRespondUrl = `${apiBase}/bookings/invites/${encodeURIComponent(token || '')}/respond`;
 
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Refah Appointment Invite</title>
-<style>body{font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:0 auto;color:#111}a.button{display:inline-block;margin-top:8px;padding:10px 14px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px}small{display:block;margin-top:16px;color:#666}</style>
+<style>
+body{font-family:Arial,sans-serif;padding:20px;max-width:560px;margin:0 auto;color:#111;background:#f7f7fb}
+.card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.row{margin:8px 0;font-size:14px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button,a.button{display:inline-block;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;text-decoration:none;font-weight:600}
+.primary{background:#7c3aed;color:#fff}
+.danger{background:#ef4444;color:#fff}
+.ghost{background:#fff;color:#7c3aed;border:1px solid #c4b5fd}
+.muted{color:#666;font-size:12px;margin-top:12px}
+.status{margin-top:10px;font-size:13px}
+</style>
 </head><body>
-<h2>Refah Appointment Invite</h2>
-<p>Opening Refah app to confirm your appointment.</p>
-<a class="button" href="${deepLinkPrimary}">Open Refah App</a>
-<p>If you do not have the app yet, install it first:</p>
-<a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a>
-<small>If the app did not open automatically, use the button above.</small>
+<div class="card">
+<h2 style="margin:0 0 10px 0;">Refah Appointment Confirmation</h2>
+<p style="margin:0 0 12px 0;">Review and confirm your appointment.</p>
+<div id="details" class="row">Loading appointment details...</div>
+<div class="actions">
+  <button class="primary" id="confirmBtn">Confirm Appointment</button>
+  <button class="danger" id="declineBtn">Decline Appointment</button>
+  <a class="button ghost" href="${deepLinkPrimary}">Open in Refah App</a>
+</div>
+<p class="status" id="status"></p>
+<p class="muted">No app installed? You can confirm directly on this page. Install app: <a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a></p>
+</div>
 <script>
-function tryOpenRefahApp() {
-  window.location.href='${deepLinkPrimary}';
-  setTimeout(function(){ window.location.href='${deepLinkLegacy}'; }, 450);
+const detailsEl = document.getElementById('details');
+const statusEl = document.getElementById('status');
+const confirmBtn = document.getElementById('confirmBtn');
+const declineBtn = document.getElementById('declineBtn');
+
+function setStatus(message, isError) {
+  statusEl.textContent = message || '';
+  statusEl.style.color = isError ? '#dc2626' : '#16a34a';
 }
-setTimeout(tryOpenRefahApp, 300);
-setTimeout(function(){
-fetch('${inviteApiUrl}').then(r=>r.json()).then(data=>{
-if(data && data.success && data.invite && data.invite.platformUserId){
-console.log('Invite is linked to an existing Refah user');
+
+function humanDate(value) {
+  try { return new Date(value).toLocaleString(); } catch { return value || '-'; }
 }
-});
-}, 1200);
+
+async function loadInvite() {
+  try {
+    const response = await fetch('${inviteApiUrl}');
+    const data = await response.json();
+    if (!data || !data.success || !data.invite) {
+      detailsEl.textContent = 'Invite not found.';
+      confirmBtn.disabled = true;
+      declineBtn.disabled = true;
+      return;
+    }
+    const invite = data.invite;
+    if (invite.isExpired) {
+      detailsEl.textContent = 'This invite has expired.';
+      confirmBtn.disabled = true;
+      declineBtn.disabled = true;
+      return;
+    }
+    if (invite.customerConfirmationStatus !== 'pending') {
+      detailsEl.textContent = 'This invite was already handled.';
+      confirmBtn.disabled = true;
+      declineBtn.disabled = true;
+      return;
+    }
+    const serviceName = (invite.service && (invite.service.name_en || invite.service.name_ar)) || 'Service';
+    const staffName = invite.staff && invite.staff.name ? invite.staff.name : 'Provider';
+    const tenantName = invite.tenant && invite.tenant.name ? invite.tenant.name : 'Refah';
+    detailsEl.innerHTML =
+      '<strong>Center:</strong> ' + tenantName + '<br/>' +
+      '<strong>Service:</strong> ' + serviceName + '<br/>' +
+      '<strong>Provider:</strong> ' + staffName + '<br/>' +
+      '<strong>Date:</strong> ' + humanDate(invite.startTime);
+  } catch (error) {
+    detailsEl.textContent = 'Failed to load appointment details.';
+    confirmBtn.disabled = true;
+    declineBtn.disabled = true;
+  }
+}
+
+async function respond(responseValue) {
+  try {
+    setStatus('Submitting...', false);
+    confirmBtn.disabled = true;
+    declineBtn.disabled = true;
+    const response = await fetch('${inviteRespondUrl}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response: responseValue })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      setStatus((data && data.message) ? data.message : 'Failed to submit response.', true);
+      confirmBtn.disabled = false;
+      declineBtn.disabled = false;
+      return;
+    }
+    setStatus(responseValue === 'confirm' ? 'Appointment confirmed successfully.' : 'Appointment declined successfully.', false);
+  } catch (error) {
+    setStatus('Failed to submit response.', true);
+    confirmBtn.disabled = false;
+    declineBtn.disabled = false;
+  }
+}
+
+confirmBtn.addEventListener('click', function(){ respond('confirm'); });
+declineBtn.addEventListener('click', function(){ respond('decline'); });
+loadInvite();
+setTimeout(function(){ window.location.href='${deepLinkPrimary}'; setTimeout(function(){ window.location.href='${deepLinkLegacy}'; }, 450); }, 400);
 </script>
 </body></html>`;
 
@@ -987,35 +1108,83 @@ const respondToInviteByToken = async (req, res) => {
         const appointment = await db.Appointment.findOne({
             where: { inviteToken: token }
         });
+        const inviteTokenHash = hashInviteToken(token);
 
         if (!appointment) {
+            logInviteAttempt({
+                inviteTokenHash,
+                appointmentId: null,
+                platformUserId,
+                decision: 'blocked',
+                reason: 'invite_not_found'
+            });
             return res.status(404).json({ success: false, message: 'Invite not found' });
         }
 
         const isExpired = !!appointment.inviteExpiresAt && new Date(appointment.inviteExpiresAt).getTime() < Date.now();
         if (isExpired) {
+            logInviteAttempt({
+                inviteTokenHash,
+                appointmentId: appointment.id,
+                platformUserId,
+                decision: 'blocked',
+                reason: 'invite_expired'
+            });
             return res.status(410).json({ success: false, message: 'Invite link has expired' });
         }
 
         if (!appointment.customerConfirmationRequired) {
+            logInviteAttempt({
+                inviteTokenHash,
+                appointmentId: appointment.id,
+                platformUserId,
+                decision: 'blocked',
+                reason: 'confirmation_not_required'
+            });
             return res.status(400).json({ success: false, message: 'This appointment does not require confirmation' });
         }
 
         if (appointment.customerConfirmationStatus !== 'pending') {
+            logInviteAttempt({
+                inviteTokenHash,
+                appointmentId: appointment.id,
+                platformUserId,
+                decision: 'blocked',
+                reason: 'invite_already_handled'
+            });
             return res.status(400).json({ success: false, message: 'This invite has already been handled' });
         }
 
-        // Token-based confirmation is intentionally permitted even when the
-        // currently authenticated app user differs from the appointment owner.
-        // The token itself is the authorization secret for this flow.
-        if (!appointment.platformUserId && platformUserId) {
-            appointment.platformUserId = platformUserId;
+        // If an authenticated user is present, enforce strict owner match.
+        // Logged-out users can still respond through secure token web flow.
+        if (platformUserId && appointment.platformUserId && appointment.platformUserId !== platformUserId) {
+            logInviteAttempt({
+                inviteTokenHash,
+                appointmentId: appointment.id,
+                platformUserId,
+                appointmentOwnerId: appointment.platformUserId,
+                decision: 'blocked',
+                reason: 'authenticated_user_mismatch'
+            });
+            return res.status(403).json({
+                success: false,
+                code: INVITE_ACCOUNT_MISMATCH_CODE,
+                message: 'This invite belongs to another account. Please switch account or continue in browser.'
+            });
         }
 
         appointment.customerConfirmationStatus = response === 'confirm' ? 'confirmed' : 'declined';
         appointment.customerConfirmedAt = new Date();
         appointment.status = response === 'confirm' ? 'confirmed' : 'cancelled';
         await appointment.save();
+        logInviteAttempt({
+            inviteTokenHash,
+            appointmentId: appointment.id,
+            platformUserId,
+            appointmentOwnerId: appointment.platformUserId,
+            decision: 'allowed',
+            reason: response === 'confirm' ? 'confirmed' : 'declined'
+        });
 
         return res.json({
             success: true,

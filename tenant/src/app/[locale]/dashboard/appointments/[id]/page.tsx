@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
+import { parseGroupGuestFromNotes, sanitizeAppointmentNotes } from "@/lib/appointmentNotes";
 
 function avatarUrl(path: string | undefined): string {
   if (!path) return "";
@@ -412,6 +413,8 @@ export default function AppointmentDetailsPage() {
   const userName = appointment.user 
     ? `${appointment.user.firstName} ${appointment.user.lastName}`.trim()
     : t("unknownCustomer");
+  const cleanNotes = sanitizeAppointmentNotes(appointment.notes || "");
+  const groupGuest = parseGroupGuestFromNotes(appointment.notes || "");
 
   return (
     <TenantLayout>
@@ -610,14 +613,29 @@ export default function AppointmentDetailsPage() {
           </div>
 
           {/* Notes */}
-          {appointment.notes && (
+          {cleanNotes && (
             <div className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t("notes")}
               </h3>
               <p className="text-gray-700 whitespace-pre-wrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {appointment.notes}
+                {cleanNotes}
               </p>
+            </div>
+          )}
+          {groupGuest && (
+            <div className="card">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details"}
+              </h3>
+              <p className="text-gray-800 font-semibold" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {groupGuest.fullName}
+              </p>
+              {groupGuest.phone && (
+                <p className="text-gray-600 mt-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {groupGuest.phone}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Currency } from "@/components/Currency";
 import { getImageUrl, tenantApi } from "@/lib/api";
+import { parseGroupGuestFromNotes, sanitizeAppointmentNotes } from "@/lib/appointmentNotes";
 
 export interface AppointmentItem {
   id: string;
@@ -614,8 +615,9 @@ export function AppointmentDetailsDrawer({
   }, [appointment?.notes]);
 
   const cleanAppointmentNotes = useMemo(() => {
-    return stripRescheduleAuditMarkers(appointment?.notes);
+    return sanitizeAppointmentNotes(stripRescheduleAuditMarkers(appointment?.notes));
   }, [appointment?.notes]);
+  const groupGuest = useMemo(() => parseGroupGuestFromNotes(appointment?.notes), [appointment?.notes]);
 
   const handleReschedule = () => {
     if (!appointment) return;
@@ -1277,6 +1279,17 @@ export function AppointmentDetailsDrawer({
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
                       </div>
                     )}
+                    {groupGuest ? (
+                      <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
+                          {locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details"}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-indigo-950">{groupGuest.fullName}</p>
+                        {groupGuest.phone ? (
+                          <p className="mt-1 text-sm text-indigo-900">{groupGuest.phone}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <button

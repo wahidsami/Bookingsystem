@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, type DragEvent, type ReactNode } from "re
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
+import { parseGroupGuestFromNotes, sanitizeAppointmentNotes } from "@/lib/appointmentNotes";
 import { getImageUrl } from "@/lib/api";
 
 interface Appointment {
@@ -1227,7 +1228,9 @@ export function CalendarView({
                           ? `${appointment.user.firstName?.[0] || ''}${appointment.user.lastName?.[0] || ''}`.toUpperCase() || '?'
                           : '?';
                         const hasCustomerSelectedStaff = appointment.assignmentMode === 'customer_selected';
-                        const hasBookingNote = Boolean(appointment.notes?.trim());
+                        const sanitizedNote = sanitizeAppointmentNotes(appointment.notes);
+                        const groupGuest = parseGroupGuestFromNotes(appointment.notes);
+                        const hasBookingNote = Boolean(sanitizedNote);
                         const paymentTypeLabel = getPaymentTypeLabel(appointment);
                         const paymentStatusLabel = getPaymentBadgeLabel(appointment);
                         const paymentStatusTitle = getPaymentBadgeTitle(appointment);
@@ -1356,7 +1359,7 @@ export function CalendarView({
                                 </div>
                               </div>
 
-                              {(variantName || appointment.notes?.trim()) && (
+                              {(variantName || sanitizedNote || groupGuest) && (
                                 <div className="mt-3 space-y-2 text-xs text-white/85">
                                   {variantName ? (
                                     <div className="rounded-2xl bg-white/8 px-3 py-2">
@@ -1364,12 +1367,21 @@ export function CalendarView({
                                       <div className="mt-1 truncate font-semibold">{variantName}</div>
                                     </div>
                                   ) : null}
-                                  {appointment.notes?.trim() ? (
+                                  {sanitizedNote ? (
                                     <div className="rounded-2xl bg-white/8 px-3 py-2">
                                       <div className="text-white/60">{locale === 'ar' ? 'ملاحظة' : 'Note'}</div>
                                       <div className="mt-1 line-clamp-2 whitespace-pre-wrap leading-relaxed">
-                                        {appointment.notes.trim()}
+                                        {sanitizedNote}
                                       </div>
+                                    </div>
+                                  ) : null}
+                                  {groupGuest ? (
+                                    <div className="rounded-2xl bg-white/8 px-3 py-2">
+                                      <div className="text-white/60">{locale === 'ar' ? 'الضيف الإضافي' : 'Additional guest'}</div>
+                                      <div className="mt-1 truncate font-semibold">{groupGuest.fullName}</div>
+                                      {groupGuest.phone ? (
+                                        <div className="mt-1 text-white/80">{groupGuest.phone}</div>
+                                      ) : null}
                                     </div>
                                   ) : null}
                                 </div>
@@ -1517,7 +1529,7 @@ export function CalendarView({
                                 )}
                               </div>
 
-                              {isNoteOpen && appointment.notes ? (
+                              {isNoteOpen && sanitizedNote ? (
                                 <div
                                   data-note-panel="true"
                                   className={`absolute top-16 z-30 w-56 rounded-2xl bg-white px-3 py-2 text-xs text-slate-700 shadow-xl ring-1 ring-slate-200 ${isRTL ? 'left-3' : 'right-3'}`}
@@ -1537,7 +1549,7 @@ export function CalendarView({
                                       ×
                                     </button>
                                   </div>
-                                  <div className="whitespace-pre-wrap leading-relaxed">{appointment.notes}</div>
+                                  <div className="whitespace-pre-wrap leading-relaxed">{sanitizedNote}</div>
                                 </div>
                               ) : null}
                             </div>

@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { api, AppointmentInviteDetails, getImageUrl } from '../api/client';
+import { api, AppointmentInviteDetails, getImageUrl, SERVER_URL } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 export function AppointmentInviteScreen({ route, navigation }: any) {
     const { token } = route.params || {};
     const { language } = useLanguage();
+    const { logout, showLogin } = useAppSession();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [invite, setInvite] = useState<AppointmentInviteDetails | null>(null);
@@ -47,6 +49,35 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
             );
             navigation.navigate('Tabs');
         } catch (err: any) {
+            if (err?.code === 'INVITE_ACCOUNT_MISMATCH') {
+                Alert.alert(
+                    language === 'ar' ? 'الدعوة تخص حسابًا آخر' : 'Invite belongs to another account',
+                    language === 'ar'
+                        ? 'هذا الرابط مرتبط بحساب عميل آخر. يمكنك تبديل الحساب أو المتابعة عبر المتصفح.'
+                        : 'This invite link belongs to a different customer account. You can switch account or continue in browser.',
+                    [
+                        {
+                            text: language === 'ar' ? 'إلغاء' : 'Cancel',
+                            style: 'cancel',
+                        },
+                        {
+                            text: language === 'ar' ? 'المتابعة في المتصفح' : 'Continue in browser',
+                            onPress: async () => {
+                                const fallbackUrl = invite?.openUrl || `${SERVER_URL}/api/v1/bookings/invites/${encodeURIComponent(token)}/open`;
+                                await Linking.openURL(fallbackUrl);
+                            }
+                        },
+                        {
+                            text: language === 'ar' ? 'تبديل الحساب' : 'Switch account',
+                            onPress: async () => {
+                                await logout();
+                                showLogin();
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
             Alert.alert(
                 language === 'ar' ? 'خطأ' : 'Error',
                 err?.message || (language === 'ar' ? 'تعذر إرسال الرد.' : 'Failed to submit response.')

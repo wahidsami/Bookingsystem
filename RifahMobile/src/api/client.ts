@@ -308,6 +308,9 @@ export interface AppointmentInviteDetails {
     isExpired: boolean;
     appointmentId: string;
     platformUserId?: string;
+    recipientMaskedEmail?: string | null;
+    canRespondWhileAuthenticated?: boolean;
+    openUrl?: string;
     customerConfirmationRequired: boolean;
     customerConfirmationStatus: 'not_required' | 'pending' | 'confirmed' | 'declined';
     inviteExpiresAt?: string;
@@ -1473,10 +1476,20 @@ class ApiClient {
     }
 
     async respondToAppointmentInviteByToken(token: string, response: 'confirm' | 'decline'): Promise<Booking> {
-        const payload = await this.post<{ success: boolean; appointment: Booking }>(
-            `/bookings/invites/${encodeURIComponent(token)}/respond`,
-            { response }
-        );
+        const endpoint = `/bookings/invites/${encodeURIComponent(token)}/respond`;
+        const apiResponse = await this.request(endpoint, {
+            method: 'POST',
+            body: JSON.stringify({ response }),
+        });
+
+        const payload = await apiResponse.json().catch(() => ({}));
+        if (!apiResponse.ok) {
+            const error: any = new Error(payload?.message || `HTTP ${apiResponse.status}`);
+            error.code = payload?.code || null;
+            error.status = apiResponse.status;
+            throw error;
+        }
+
         return normalizeBooking(payload.appointment);
     }
 
