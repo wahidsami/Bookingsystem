@@ -88,10 +88,30 @@ export function ServiceBookingCartScreen({ navigation }: any) {
             clearCart();
 
             if (payableNowTotal > 0 && bookingSessionId) {
+                const tenantForCheckout = cartTenantId || items[0]?.tenantId;
+                try {
+                    const sourcesResponse = await api.getEligiblePaymentSources({
+                        tenantId: tenantForCheckout ? String(tenantForCheckout) : undefined,
+                        amount: payableNowTotal,
+                    });
+                    const hasPayableSource = (sourcesResponse.sources || []).some((source) => source.eligible && (source.source === 'online_payment' || source.source === 'wallet'));
+                    if (!hasPayableSource) {
+                        Alert.alert(
+                            language === 'ar' ? 'مصادر الدفع غير متاحة' : 'Payment sources unavailable',
+                            language === 'ar'
+                                ? 'لا تتوفر طريقة دفع صالحة لهذا الحجز حالياً. يرجى المحاولة لاحقاً أو اختيار خدمات بدفع عند المركز.'
+                                : 'No valid payment source is currently available for this booking. Please try again later or choose pay-at-center services.'
+                        );
+                        return;
+                    }
+                } catch {
+                    // Keep backward-compatible behavior when the eligibility endpoint is unavailable.
+                }
+
                 navigation.navigate('Payment', {
                     bookingSessionId,
                     amount: payableNowTotal,
-                    tenantId: cartTenantId || items[0]?.tenantId,
+                    tenantId: tenantForCheckout,
                     paymentChoice: groupedByPayment.some((group) => group.paymentMethod === 'online-full')
                         ? 'online-full'
                         : 'booking-fee',

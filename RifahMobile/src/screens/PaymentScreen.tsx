@@ -17,6 +17,7 @@ import { formatRiyal } from '../utils/currency';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
+import type { EligiblePaymentSource } from '../api/client';
 
 export function PaymentScreen({ route, navigation }: any) {
     const { t, isRTL } = useLanguage();
@@ -30,6 +31,8 @@ export function PaymentScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
     const [walletBalance, setWalletBalance] = useState<number>(0);
+    const [sourcesLoading, setSourcesLoading] = useState(true);
+    const [sourceOptions, setSourceOptions] = useState<EligiblePaymentSource[]>([]);
     const amountValue = Number(amount || 0);
     const paymentIdempotencyKeyRef = React.useRef<string>(
         `pay:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`
@@ -45,7 +48,64 @@ export function PaymentScreen({ route, navigation }: any) {
         return () => { mounted = false; };
     }, []);
 
+    React.useEffect(() => {
+        let mounted = true;
+
+        const loadSources = async () => {
+            try {
+                setSourcesLoading(true);
+                const response = await api.getEligiblePaymentSources({
+                    tenantId: tenantId ? String(tenantId) : undefined,
+                    amount: amountValue,
+                });
+
+                if (!mounted) return;
+                const eligible = (response.sources || []).filter((source) => source.eligible);
+                setSourceOptions(eligible);
+
+                const hasOnline = eligible.some((source) => source.source === 'online_payment');
+                const hasWallet = eligible.some((source) => source.source === 'wallet');
+
+                if (paymentMethod === 'wallet' && !hasWallet) {
+                    setPaymentMethod(hasOnline ? 'card' : 'wallet');
+                }
+                if (paymentMethod === 'card' && !hasOnline && hasWallet) {
+                    setPaymentMethod('wallet');
+                }
+            } catch {
+                if (!mounted) return;
+                // Fallback to legacy behavior if endpoint is unavailable.
+                setSourceOptions([]);
+            } finally {
+                if (mounted) setSourcesLoading(false);
+            }
+        };
+
+        loadSources();
+        return () => { mounted = false; };
+    }, [tenantId, amountValue]);
+
+    const canUseCard = React.useMemo(() => {
+        if (sourceOptions.length === 0) return true;
+        return sourceOptions.some((source) => source.source === 'online_payment');
+    }, [sourceOptions]);
+
+    const canUseWallet = React.useMemo(() => {
+        if (sourceOptions.length === 0) return true;
+        return sourceOptions.some((source) => source.source === 'wallet');
+    }, [sourceOptions]);
+
+    const hasAnyEligibleSource = canUseCard || canUseWallet;
+
     const handlePay = async () => {
+        if (!hasAnyEligibleSource) {
+            Alert.alert(
+                t('error'),
+                isRTL ? 'لا توجد وسيلة دفع متاحة حالياً لهذه العملية.' : 'No payment method is currently available for this checkout.'
+            );
+            return;
+        }
+
         if (paymentMethod === 'wallet' && walletBalance < amountValue) {
             Alert.alert(t('error'), isRTL ? 'رصيد المحفظة غير كافٍ' : 'Insufficient wallet balance');
             return;
@@ -135,8 +195,9 @@ export function PaymentScreen({ route, navigation }: any) {
 
                 <View style={styles.methodOptions}>
                     <TouchableOpacity
-                        style={[styles.methodOption, paymentMethod === 'card' && styles.methodOptionActive]}
-                        onPress={() => setPaymentMethod('card')}
+                        style={[styles.methodOption, paymentMethod === 'card' && styles.methodOptionActive, !canUseCard && styles.methodOptionDisabled]}
+                        onPress={() => canUseCard && setPaymentMethod('card')}
+                        disabled={!canUseCard}
                     >
                         <AppIcon name="card" size={20} color={paymentMethod === 'card' ? colors.primary : colors.textSecondary} />
                         <Text style={[styles.methodOptionText, paymentMethod === 'card' && styles.methodOptionTextActive]}>
@@ -144,8 +205,9 @@ export function PaymentScreen({ route, navigation }: any) {
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.methodOption, paymentMethod === 'wallet' && styles.methodOptionActive]}
-                        onPress={() => setPaymentMethod('wallet')}
+                        style={[styles.methodOption, paymentMethod === 'wallet' && styles.methodOptionActive, !canUseWallet && styles.methodOptionDisabled]}
+                        onPress={() => canUseWallet && setPaymentMethod('wallet')}
+                        disabled={!canUseWallet}
                     >
                         <AppIcon name="cash" size={20} color={paymentMethod === 'wallet' ? colors.primary : colors.textSecondary} />
                         <Text style={[styles.methodOptionText, paymentMethod === 'wallet' && styles.methodOptionTextActive]}>
@@ -153,6 +215,17 @@ export function PaymentScreen({ route, navigation }: any) {
                         </Text>
                     </TouchableOpacity>
                 </View>
+
+                {sourcesLoading ? (
+                    <Text style={styles.amountHint}>
+                        {isRTL ? 'جار تحميل مصادر الدفع...' : 'Loading payment sources...'}
+                    </Text>
+                ) : null}
+                {!sourcesLoading && !canUseWallet ? (
+                    <Text style={styles.amountHint}>
+                        {isRTL ? 'المحفظة غير متاحة لهذه العملية حالياً.' : 'Wallet is not available for this checkout right now.'}
+                    </Text>
+                ) : null}
 
                 {paymentMethod === 'card' ? (
                     <>
@@ -217,9 +290,9 @@ export function PaymentScreen({ route, navigation }: any) {
 
                 <View style={styles.form}>
                     <TouchableOpacity
-                        style={[styles.payButton, loading && styles.disabledButton]}
+                        style={[styles.payButton, (loading || !hasAnyEligibleSource) && styles.disabledButton]}
                         onPress={handlePay}
-                        disabled={loading}
+                        disabled={loading || !hasAnyEligibleSource}
                     >
                         {loading ? (
                             <ActivityIndicator color={colors.textInverse} />
@@ -333,6 +406,9 @@ const styles = StyleSheet.create({
     methodOptionActive: {
         borderColor: colors.primary,
         backgroundColor: '#F3E8FF',
+    },
+    methodOptionDisabled: {
+        opacity: 0.45,
     },
     methodOptionText: {
         fontSize: fontSize.sm,

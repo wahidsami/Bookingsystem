@@ -54,6 +54,25 @@ export interface ApiResponse<T> {
     data?: T;
 }
 
+export interface EligiblePaymentSource {
+    source: 'wallet' | 'platform_gift' | 'tenant_gift' | 'online_payment' | string;
+    label: string;
+    eligible: boolean;
+    availableAmount: number | null;
+    canCoverFullAmount: boolean;
+    currency?: string;
+    tenantId?: string | null;
+    note?: string;
+}
+
+export interface EligiblePaymentSourcesResponse {
+    success: boolean;
+    tenantId?: string | null;
+    amount?: number;
+    sourcePriority?: string[];
+    sources: EligiblePaymentSource[];
+}
+
 export interface User {
     id: string;
     email: string;
@@ -1511,6 +1530,24 @@ class ApiClient {
     async getWalletBalance(): Promise<number> {
         const response = await this.get<{ success: boolean; walletBalance: number }>('/payments/wallet/balance');
         return toNumber(response.walletBalance, 0);
+    }
+
+    async getEligiblePaymentSources(params: {
+        tenantId?: string;
+        amount?: number;
+    }): Promise<EligiblePaymentSourcesResponse> {
+        const query = new URLSearchParams();
+        if (params.tenantId) query.set('tenantId', params.tenantId);
+        if (Number.isFinite(Number(params.amount)) && Number(params.amount) > 0) {
+            query.set('amount', String(Number(params.amount)));
+        }
+
+        const endpoint = `/payments/sources${query.toString() ? `?${query.toString()}` : ''}`;
+        const response = await this.get<EligiblePaymentSourcesResponse>(endpoint);
+        return {
+            ...response,
+            sources: Array.isArray(response?.sources) ? response.sources : [],
+        };
     }
 
     /**

@@ -11,6 +11,7 @@ router.post('/process', authenticateUser, paymentLimiter, paymentController.proc
 router.post('/wallet/topup', authenticateUser, paymentLimiter, paymentController.topUpWallet);
 router.get('/wallet/balance', authenticateUser, paymentController.getWalletBalance);
 router.get('/wallet/ledger', authenticateUser, paymentController.getWalletLedger);
+router.get('/sources', authenticateUser, paymentController.getEligiblePaymentSources);
 
 // Get payment history
 router.get('/history', authenticateUser, paymentController.getPaymentHistory);

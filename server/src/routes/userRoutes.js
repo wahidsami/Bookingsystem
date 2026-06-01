@@ -6,6 +6,7 @@ const reviewController = require('../controllers/reviewController');
 const userGiftController = require('../controllers/userGiftController');
 const userTenantGiftController = require('../controllers/userTenantGiftController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
+const userWalletSummaryController = require('../controllers/userWalletSummaryController');
 const { authenticateUser } = require('../middleware/authUser');
 
 // Get user profile
@@ -45,6 +46,7 @@ router.put('/payment-methods/:id/set-default', authenticateUser, paymentMethodCo
 router.delete('/payment-methods/:id', authenticateUser, paymentMethodController.deletePaymentMethod);
 
 // Gifts & wallet packages
+router.get('/wallet/summary', authenticateUser, userWalletSummaryController.getWalletSummary);
 router.get('/gifts/packages', authenticateUser, userGiftController.getGiftPackages);
 router.post('/gifts/recharge', authenticateUser, userGiftController.rechargeFromGiftPackage);
 router.get('/gifts/recipient-check', authenticateUser, userGiftController.checkGiftRecipient);

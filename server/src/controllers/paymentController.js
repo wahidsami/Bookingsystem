@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const logger = require('../utils/productionLogger');
 const { handlePaymentError } = require('../utils/paymentErrorHandler');
 const walletService = require('../services/walletService');
+const tenantWalletService = require('../services/tenantWalletService');
+const { PAYMENT_SOURCE_PRIORITY } = require('../constants/paymentSourcePriority');
 
 const IDEMPOTENCY_HEADER = 'x-idempotency-key';
 const IDEMPOTENCY_MAX_LENGTH = 191;
@@ -19,6 +21,59 @@ const buildPaymentRequestHash = (payload) => crypto
     .createHash('sha256')
     .update(JSON.stringify(payload))
     .digest('hex');
+
+const buildEligibleSourcesForContext = async ({ platformUserId, tenantId = null, requestedAmount = 0 }) => {
+    const walletBalance = await walletService.getBalance(platformUserId);
+    const tenantGiftBalance = tenantId
+        ? await tenantWalletService.getTenantBalance(platformUserId, tenantId).catch(() => 0)
+        : 0;
+
+    const sources = [
+        {
+            source: 'wallet',
+            label: 'Wallet',
+            eligible: walletBalance > 0,
+            availableAmount: walletBalance,
+            canCoverFullAmount: requestedAmount > 0 ? walletBalance >= requestedAmount : false,
+            currency: 'SAR'
+        },
+        {
+            source: 'platform_gift',
+            label: 'Rafah Gift Card',
+            eligible: false,
+            availableAmount: 0,
+            canCoverFullAmount: false,
+            currency: 'SAR',
+            note: 'Platform gift separation is in rollout; currently redeemed into wallet.'
+        },
+        {
+            source: 'tenant_gift',
+            label: 'Salon Gift Card',
+            tenantId,
+            eligible: Boolean(tenantId) && tenantGiftBalance > 0,
+            availableAmount: tenantGiftBalance,
+            canCoverFullAmount: requestedAmount > 0 ? tenantGiftBalance >= requestedAmount : false,
+            currency: 'SAR'
+        },
+        {
+            source: 'online_payment',
+            label: 'Online Payment',
+            eligible: true,
+            availableAmount: null,
+            canCoverFullAmount: true,
+            currency: 'SAR'
+        }
+    ];
+
+    const sourceOrder = new Map(PAYMENT_SOURCE_PRIORITY.map((item, index) => [item, index]));
+    sources.sort((a, b) => (sourceOrder.get(a.source) ?? 999) - (sourceOrder.get(b.source) ?? 999));
+
+    return {
+        walletBalance,
+        tenantGiftBalance,
+        sources
+    };
+};
 
 /**
  * Process payment for booking or order
@@ -59,6 +114,7 @@ const processPayment = async (req, res, next) => {
         if (!amount) missingFields.push('amount');
         const normalizedPaymentMethod = `${paymentMethod || 'card'}`.trim().toLowerCase();
         const isWalletPayment = normalizedPaymentMethod === 'wallet';
+        const requestedAmount = Number(parseFloat(amount || 0).toFixed(2));
         idempotencyKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_HEADER] || bodyIdempotencyKey);
 
         const idempotencyPayload = {
@@ -66,7 +122,7 @@ const processPayment = async (req, res, next) => {
             appointmentId: appointmentId || null,
             orderId: orderId || null,
             bookingSessionId: bookingSessionId || null,
-            amount: Number(parseFloat(amount || 0).toFixed(2)),
+            amount: requestedAmount,
             paymentMethod: normalizedPaymentMethod,
             paymentChoice: paymentChoice || null
         };
@@ -133,6 +189,29 @@ const processPayment = async (req, res, next) => {
             return res.status(400).json({
                 success: false,
                 message: `Missing required fields: ${missingFields.join(', ')}`
+            });
+        }
+
+        const paymentContextTenantId = tenantId || null;
+        const eligibility = await buildEligibleSourcesForContext({
+            platformUserId,
+            tenantId: paymentContextTenantId,
+            requestedAmount
+        });
+        const walletSource = eligibility.sources.find((source) => source.source === 'wallet');
+        const onlineSource = eligibility.sources.find((source) => source.source === 'online_payment');
+
+        if (isWalletPayment && !walletSource?.eligible) {
+            return res.status(400).json({
+                success: false,
+                message: 'Wallet is not available for this payment context.'
+            });
+        }
+
+        if (!isWalletPayment && !onlineSource?.eligible) {
+            return res.status(400).json({
+                success: false,
+                message: 'Online payment is not available for this payment context.'
             });
         }
 
@@ -459,11 +538,45 @@ const getWalletLedger = async (req, res) => {
     }
 };
 
+/**
+ * Get eligible payment sources for a checkout context
+ * GET /api/v1/payments/sources?tenantId=...&amount=...
+ */
+const getEligiblePaymentSources = async (req, res) => {
+    try {
+        const platformUserId = req.userId;
+        const tenantId = `${req.query?.tenantId || ''}`.trim() || null;
+        const amount = Number(req.query?.amount || 0);
+        const requestedAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
+
+        const { sources } = await buildEligibleSourcesForContext({
+            platformUserId,
+            tenantId,
+            requestedAmount
+        });
+
+        res.json({
+            success: true,
+            tenantId,
+            amount: requestedAmount,
+            sourcePriority: PAYMENT_SOURCE_PRIORITY,
+            sources
+        });
+    } catch (error) {
+        console.error('Get eligible payment sources error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to load payment sources'
+        });
+    }
+};
+
 module.exports = {
     processPayment,
     topUpWallet,
     getPaymentHistory,
     getWalletBalance,
-    getWalletLedger
+    getWalletLedger,
+    getEligiblePaymentSources
 };
 
