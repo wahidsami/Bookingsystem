@@ -14,6 +14,18 @@ const CLAIM_EXPIRY_HOURS = 24 * 30;
 
 const normalize = (value) => `${value || ''}`.trim();
 const normalizePhone = (value) => normalize(value).replace(/\s+/g, '');
+const buildPhoneCandidates = (value) => {
+    const raw = normalizePhone(value);
+    const digits = raw.replace(/\D+/g, '');
+    const candidates = new Set([raw, digits]);
+    if (digits) {
+        candidates.add(`+${digits}`);
+        if (digits.startsWith('0')) {
+            candidates.add(digits.replace(/^0+/, ''));
+        }
+    }
+    return Array.from(candidates).filter(Boolean);
+};
 const generateGiftCode = (prefix = 'TN') => {
     const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
     return `${prefix}-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
@@ -51,6 +63,38 @@ const findActiveTenantPackage = async (tenantId, packageId) => {
     });
 };
 
+const buildRecipientWhere = ({ email, phone }) => {
+    const phoneCandidates = buildPhoneCandidates(phone);
+    return {
+        [Op.or]: [
+            ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
+            ...(phoneCandidates.length ? [{ phone: { [Op.in]: phoneCandidates } }] : [])
+        ]
+    };
+};
+
+const sendTenantGiftClaimEmail = async ({
+    to,
+    senderName,
+    totalCredit,
+    code,
+    claimLink
+}) => {
+    return sendEmail({
+        to,
+        subject: `${senderName} sent you a Refah gift card`,
+        template: 'customer_review_invite',
+        data: {
+            customerName: 'Dear customer',
+            tenantName: 'Refah',
+            serviceName: `Gift card ${Number(totalCredit || 0).toFixed(2)} SAR - Code: ${code || '-'}`,
+            appointmentDate: new Date().toLocaleString('en-US'),
+            reviewLink: claimLink,
+            googleReviewUrl: claimLink
+        }
+    });
+};
+
 exports.checkTenantGiftRecipient = async (req, res) => {
     try {
         const email = normalize(req.query?.recipientEmail).toLowerCase();
@@ -60,12 +104,7 @@ exports.checkTenantGiftRecipient = async (req, res) => {
         }
 
         const recipient = await db.PlatformUser.findOne({
-            where: {
-                [Op.or]: [
-                    ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
-                    ...(phone ? [{ phone }] : [])
-                ]
-            },
+            where: buildRecipientWhere({ email, phone }),
             attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
         });
 
@@ -227,12 +266,7 @@ exports.sendGift = async (req, res) => {
         if (!sender) throw new Error('Sender not found');
 
         const recipient = await db.PlatformUser.findOne({
-            where: {
-                [Op.or]: [
-                    ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
-                    ...(phone ? [{ phone }] : [])
-                ]
-            },
+            where: buildRecipientWhere({ email, phone }),
             transaction: tx
         });
 
@@ -253,6 +287,9 @@ exports.sendGift = async (req, res) => {
         });
 
         const isRecipientRegistered = !!recipient?.id;
+        if (!isRecipientRegistered && !email) {
+            throw new Error('Recipient email is required for users without an account');
+        }
         let createdGiftCode = null;
         if (!isRecipientRegistered) {
             for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -345,32 +382,42 @@ exports.sendGift = async (req, res) => {
 
         await tx.commit();
 
+        const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Someone';
         if (isRecipientRegistered) {
             try {
-                await notificationOrchestrator.sendCustomerPush({
+                await notificationOrchestrator.notifyCustomer({
+                    tenantId,
                     platformUserId: recipient.id,
                     eventType: 'gift_card_received',
                     title: 'You received a gift card',
-                    body: `${sender.firstName || 'Someone'} sent you ${totalCredit.toFixed(2)} SAR for this center.`,
+                    body: `${senderName} sent you ${totalCredit.toFixed(2)} SAR for this center.`,
                     data: { type: 'tenant_gift_card_received', giftTransactionId: giftTx.id, tenantId }
                 });
             } catch (notifyError) {
                 console.warn('Tenant gift push notification failed:', notifyError.message);
             }
+
+            if (email) {
+                const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/tenant-gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
+                const code = createdGiftCode?.code || '';
+                await sendTenantGiftClaimEmail({
+                    to: email,
+                    senderName,
+                    totalCredit,
+                    code,
+                    claimLink
+                }).catch(() => undefined);
+            }
         } else if (email) {
             const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/tenant-gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
             const code = createdGiftCode?.code || '';
-            await sendEmail({
+            await sendTenantGiftClaimEmail({
                 to: email,
-                subject: `${sender.firstName || 'A friend'} sent you a Refah gift card`,
-                template: 'appointment_confirmation',
-                data: {
-                    customerName: normalize(message) || 'Guest',
-                    appointmentDate: new Date().toISOString(),
-                    serviceName: `Gift card ${totalCredit.toFixed(2)} SAR - Code: ${code}`,
-                    confirmationLink: claimLink
-                }
-            });
+                senderName,
+                totalCredit,
+                code,
+                claimLink
+            }).catch(() => undefined);
         }
 
         res.json({
@@ -405,7 +452,10 @@ exports.claimGift = async (req, res) => {
             transaction: tx,
             lock: tx.LOCK.UPDATE
         });
-        if (!giftTx) return res.status(404).json({ success: false, message: 'Gift claim not found' });
+        if (!giftTx) {
+            await tx.rollback();
+            return res.status(404).json({ success: false, message: 'Gift claim not found' });
+        }
         if (giftTx.expiresAt && new Date(giftTx.expiresAt).getTime() < Date.now()) {
             giftTx.status = 'expired';
             await giftTx.save({ transaction: tx });

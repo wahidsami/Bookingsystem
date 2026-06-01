@@ -7,6 +7,7 @@ import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
+import { formatRiyal } from '../utils/currency';
 
 type GiftPackage = {
   id: string;
@@ -43,11 +44,10 @@ type RecipientCheckResult = {
 };
 
 const HERO_IMAGE = require('../../assets/wallethero.jpg');
-const RIYAL_SYMBOL = '\u20C0';
-const sar = (value: number) => `${RIYAL_SYMBOL} ${Number(value || 0).toFixed(2)}`;
 
 export function GiftsScreen({ navigation, route }: any) {
   const { language, isRTL } = useLanguage();
+  const sar = (value: number) => formatRiyal(Number(value || 0), language === 'ar' ? 'ar' : 'en');
   const tenantId = route?.params?.tenantId as string | undefined;
   const tenantName = route?.params?.tenantName as string | undefined;
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
@@ -69,15 +69,20 @@ export function GiftsScreen({ navigation, route }: any) {
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
+  const [claimCode, setClaimCode] = useState('');
 
-  const centersBalance = useMemo(() => history.reduce((sum, item) => sum + Number(item.totalCreditAmount || 0), 0), [history]);
+  const centersBalance = useMemo(() => {
+    if (tenantId) return Number(walletBalance || 0);
+    return history.reduce((sum, item) => sum + Number(item.totalCreditAmount || 0), 0);
+  }, [history, tenantId, walletBalance]);
   const centersCount = useMemo(() => new Set(history.map((h) => h.tenantId).filter(Boolean)).size, [history]);
 
   const getStatusLabel = (status?: string) => {
     const key = (status || '').toLowerCase();
     if (language === 'ar') {
       if (key === 'redeemed') return 'تم الاستلام';
-      if (key === 'sent_completed') return 'تم الإرسال';
+      if (key === 'sent_completed' || key === 'sent_completed_auto_wallet') return 'تم الإرسال';
+      if (key === 'sent_pending_external_redeem') return 'بانتظار استخدام الكود';
       if (key === 'sent_pending_claim') return 'بانتظار الاستلام';
       if (key === 'purchased') return 'تم الشراء';
       if (key === 'cancelled') return 'ملغي';
@@ -85,7 +90,8 @@ export function GiftsScreen({ navigation, route }: any) {
       return status || 'غير معروف';
     }
     if (key === 'redeemed') return 'Redeemed';
-    if (key === 'sent_completed') return 'Sent';
+    if (key === 'sent_completed' || key === 'sent_completed_auto_wallet') return 'Sent';
+    if (key === 'sent_pending_external_redeem') return 'Pending code redeem';
     if (key === 'sent_pending_claim') return 'Pending claim';
     if (key === 'purchased') return 'Purchased';
     if (key === 'cancelled') return 'Cancelled';
@@ -98,6 +104,21 @@ export function GiftsScreen({ navigation, route }: any) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US');
+  };
+
+  const maskEmail = (value?: string) => {
+    const email = `${value || ''}`.trim();
+    if (!email.includes('@')) return email;
+    const [name, domain] = email.split('@');
+    if (!name) return email;
+    const head = name.slice(0, 2);
+    return `${head}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
+  };
+
+  const maskPhone = (value?: string) => {
+    const phone = `${value || ''}`.trim();
+    if (phone.length <= 4) return phone;
+    return `${phone.slice(0, 3)}${'*'.repeat(Math.max(2, phone.length - 5))}${phone.slice(-2)}`;
   };
 
   useEffect(() => {
@@ -151,6 +172,12 @@ export function GiftsScreen({ navigation, route }: any) {
       } else {
         const generalWallet = await api.getWalletBalance().catch(() => 0);
         setWalletBalance(generalWallet);
+        const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/gifts/history');
+        if (historyRes.success) {
+          setHistory((historyRes.transactions || []).slice(0, 10));
+        } else {
+          setHistory([]);
+        }
       }
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to load gift packages');
@@ -267,8 +294,39 @@ export function GiftsScreen({ navigation, route }: any) {
       }
       const next = { exists: !!result.exists, recipient: result.recipient || null };
       setRecipientCheck(next);
-      if (next.exists) setRecipientDecision('send_member');
-      else setRecipientDecision('send_email');
+      if (next.exists) {
+        setRecipientDecision('send_member');
+        return;
+      }
+
+      if (!email) {
+        setRecipientDecision('none');
+        Alert.alert(
+          language === 'ar' ? 'لا يوجد حساب' : 'No account found',
+          language === 'ar'
+            ? 'لم يتم العثور على حساب لهذا الجوال. أضف بريد المستلم لإرسال كود الهدية عبر البريد.'
+            : 'No account matched this phone. Add recipient email to send gift code by email.'
+        );
+        return;
+      }
+
+      Alert.alert(
+        language === 'ar' ? 'المستلم لا يملك حساباً' : 'Recipient has no account',
+        language === 'ar'
+          ? 'هل تريد إرسال بطاقة الهدية إلى بريده الإلكتروني بدلاً من ذلك؟'
+          : 'Would you like to send the gift card to their email instead?',
+        [
+          {
+            text: language === 'ar' ? 'إلغاء' : 'Cancel',
+            style: 'cancel',
+            onPress: () => setRecipientDecision('none'),
+          },
+          {
+            text: language === 'ar' ? 'إرسال بالبريد' : 'Send by Email',
+            onPress: () => setRecipientDecision('send_email'),
+          },
+        ]
+      );
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to verify recipient');
     } finally {
@@ -286,6 +344,35 @@ export function GiftsScreen({ navigation, route }: any) {
     if (recipientDecision === 'recharge_self') return handleSelfRecharge();
     if (recipientDecision !== 'send_email') return Alert.alert('Choose action', 'Please choose an action for this recipient.');
     return handleSendGift();
+  };
+
+  const handleClaimCode = async () => {
+    const token = claimCode.trim();
+    if (!token) {
+      Alert.alert(language === 'ar' ? 'تنبيه' : 'Notice', language === 'ar' ? 'أدخل كود الهدية أولاً.' : 'Enter gift code first.');
+      return;
+    }
+    try {
+      setSaving(true);
+      let response;
+      try {
+        response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
+      } catch {
+        response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token });
+      }
+      if (!response.success) {
+        Alert.alert('Error', response.message || 'Failed to claim gift');
+        return;
+      }
+      setWalletBalance(Number(response.walletBalance || 0));
+      setClaimCode('');
+      Alert.alert(language === 'ar' ? 'نجاح' : 'Success', language === 'ar' ? 'تم استلام الهدية بنجاح.' : 'Gift claimed successfully.');
+      loadPackages();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to claim gift');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -323,8 +410,20 @@ export function GiftsScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.quickRow}>
-            <TouchableOpacity style={styles.quickCard}><AppIcon name="redeem" size={20} color={colors.primary} /><Text style={styles.quickText}>{language === 'ar' ? 'استلام كود هدية' : 'Claim Gift Code'}</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard}><AppIcon name="history" size={20} color={colors.primary} /><Text style={styles.quickText}>{language === 'ar' ? 'سجل العمليات' : 'Transaction History'}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}><AppIcon name="redeem" size={20} color={colors.primary} /><Text style={styles.quickText}>{language === 'ar' ? 'استلام كود هدية' : 'Claim Gift Code'}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: walletBalance || 0, history })}><AppIcon name="history" size={20} color={colors.primary} /><Text style={styles.quickText}>{language === 'ar' ? 'سجل العمليات' : 'Transaction History'}</Text></TouchableOpacity>
+          </View>
+          <View style={styles.claimRow}>
+            <TextInput
+              style={[styles.input, styles.claimInput]}
+              value={claimCode}
+              onChangeText={setClaimCode}
+              placeholder={language === 'ar' ? 'أدخل كود الهدية' : 'Enter gift code'}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity style={styles.claimBtn} onPress={handleClaimCode} disabled={saving}>
+              <Text style={styles.claimBtnText}>{language === 'ar' ? 'استلام' : 'Claim'}</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.sectionHeaderRow}>
@@ -412,6 +511,26 @@ export function GiftsScreen({ navigation, route }: any) {
                 <Text style={styles.inputLabel}>{language === 'ar' ? 'الرسالة (اختياري)' : 'Message (Optional)'}</Text>
                 <TextInput style={styles.input} value={giftMessage} onChangeText={setGiftMessage} placeholder={language === 'ar' ? 'رسالة (اختياري)' : 'Message (optional)'} />
                 <TouchableOpacity style={styles.checkBtn} onPress={checkRecipient} disabled={checkingRecipient}>{checkingRecipient ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.checkBtnText}>{language === 'ar' ? 'تحقق من المستلم' : 'Check recipient'}</Text>}</TouchableOpacity>
+                {recipientCheck?.exists && recipientCheck.recipient ? (
+                  <View style={styles.recipientCard}>
+                    <Text style={styles.recipientTitle}>{language === 'ar' ? 'تم العثور على المستلم' : 'Recipient found'}</Text>
+                    <Text style={styles.recipientLine}>
+                      {(recipientCheck.recipient.fullName || `${recipientCheck.recipient.firstName || ''} ${recipientCheck.recipient.lastName || ''}`.trim() || (language === 'ar' ? 'مستخدم رفاه' : 'Refah User'))}
+                    </Text>
+                    {!!recipientCheck.recipient.email && <Text style={styles.recipientMeta}>{maskEmail(recipientCheck.recipient.email)}</Text>}
+                    {!!recipientCheck.recipient.phone && <Text style={styles.recipientMeta}>{maskPhone(recipientCheck.recipient.phone)}</Text>}
+                  </View>
+                ) : null}
+                {recipientCheck && !recipientCheck.exists && recipientDecision === 'send_email' ? (
+                  <View style={styles.recipientCard}>
+                    <Text style={styles.recipientTitle}>{language === 'ar' ? 'المستلم لا يملك حساباً' : 'Recipient has no account'}</Text>
+                    <Text style={styles.recipientMeta}>
+                      {language === 'ar'
+                        ? 'سيتم إرسال كود الهدية إلى البريد الإلكتروني الذي أدخلته.'
+                        : 'Gift code will be sent to the entered email.'}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
             {(mode === 'self' || (mode === 'send' && recipientCheck?.exists && recipientDecision === 'send_member') || (mode === 'send' && !recipientCheck?.exists && (recipientDecision === 'send_email' || recipientDecision === 'recharge_self'))) && (
@@ -463,6 +582,10 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   quickCard: { flex: 1, minHeight: 68, borderRadius: 20, backgroundColor: '#F6F0FF', borderWidth: 1, borderColor: '#E7DAFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, gap: 6 },
   quickText: { fontSize: 10, color: colors.primary, fontWeight: '700', textAlign: 'center' },
+  claimRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  claimInput: { flex: 1 },
+  claimBtn: { minWidth: 96, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6D28D9', paddingHorizontal: spacing.md },
+  claimBtnText: { color: '#FFFFFF', fontSize: fontSize.sm, fontWeight: '700' },
   sectionHeaderRow: { marginBottom: spacing.sm },
   sectionTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.text },
   sectionSubTitle: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
@@ -496,8 +619,8 @@ const styles = StyleSheet.create({
   trustBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: 24, backgroundColor: '#F3ECFF', borderWidth: 1, borderColor: '#E9DBFF', padding: spacing.md },
   trustTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
   trustSub: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(16, 8, 32, 0.42)' },
-  modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: '#E9DDFD' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(18, 13, 33, 0.55)' },
+  modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md, borderWidth: 1, borderColor: '#E9DDFD' },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   modeRow: { flexDirection: 'row', gap: spacing.sm },
   modeBtn: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: '#D8C7FA', paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#FFFFFF' },
@@ -506,9 +629,13 @@ const styles = StyleSheet.create({
   modeTextActive: { color: colors.primary },
   checkBtn: { borderWidth: 1, borderColor: colors.primary, borderRadius: 14, paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#F5F3FF' },
   checkBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
+  recipientCard: { borderRadius: 14, borderWidth: 1, borderColor: '#D8C7FA', backgroundColor: '#F6F1FF', padding: spacing.sm, gap: 4 },
+  recipientTitle: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  recipientLine: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  recipientMeta: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
   paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
   inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   input: { minHeight: 46, borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 14, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#FAFAFF', color: colors.text },
-  submitBtn: { backgroundColor: '#7C3AED', borderRadius: 16, alignItems: 'center', paddingVertical: spacing.md },
+  submitBtn: { backgroundColor: '#7C3AED', borderRadius: 16, alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.md },
   submitText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md }
 });

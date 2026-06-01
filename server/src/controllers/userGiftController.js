@@ -13,6 +13,18 @@ const CLAIM_EXPIRY_HOURS = 24 * 30; // 30 days
 
 const normalize = (value) => `${value || ''}`.trim();
 const normalizePhone = (value) => normalize(value).replace(/\s+/g, '');
+const buildPhoneCandidates = (value) => {
+    const raw = normalizePhone(value);
+    const digits = raw.replace(/\D+/g, '');
+    const candidates = new Set([raw, digits]);
+    if (digits) {
+        candidates.add(`+${digits}`);
+        if (digits.startsWith('0')) {
+            candidates.add(digits.replace(/^0+/, ''));
+        }
+    }
+    return Array.from(candidates).filter(Boolean);
+};
 const generateGiftCode = (prefix = 'RFH') => {
     const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
     return `${prefix}-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
@@ -85,6 +97,38 @@ const findActivePackage = async (packageId) => {
     });
 };
 
+const buildRecipientWhere = ({ email, phone }) => {
+    const phoneCandidates = buildPhoneCandidates(phone);
+    return {
+        [Op.or]: [
+            ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
+            ...(phoneCandidates.length ? [{ phone: { [Op.in]: phoneCandidates } }] : [])
+        ]
+    };
+};
+
+const sendGiftClaimEmail = async ({
+    to,
+    senderName,
+    totalCredit,
+    code,
+    claimLink
+}) => {
+    return sendEmail({
+        to,
+        subject: `${senderName} sent you a Refah gift card`,
+        template: 'customer_review_invite',
+        data: {
+            customerName: 'Dear customer',
+            tenantName: 'Refah',
+            serviceName: `Gift card ${Number(totalCredit || 0).toFixed(2)} SAR - Code: ${code || '-'}`,
+            appointmentDate: new Date().toLocaleString('en-US'),
+            reviewLink: claimLink,
+            googleReviewUrl: claimLink
+        }
+    });
+};
+
 exports.checkGiftRecipient = async (req, res) => {
     try {
         const email = normalize(req.query?.recipientEmail).toLowerCase();
@@ -94,12 +138,7 @@ exports.checkGiftRecipient = async (req, res) => {
         }
 
         const recipient = await db.PlatformUser.findOne({
-            where: {
-                [Op.or]: [
-                    ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
-                    ...(phone ? [{ phone }] : [])
-                ]
-            },
+            where: buildRecipientWhere({ email, phone }),
             attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
         });
 
@@ -250,12 +289,7 @@ exports.sendGiftPackage = async (req, res) => {
         }
 
         const recipient = await db.PlatformUser.findOne({
-            where: {
-                [Op.or]: [
-                    ...(email ? [db.sequelize.where(db.sequelize.fn('LOWER', db.sequelize.col('email')), email)] : []),
-                    ...(phone ? [{ phone }] : [])
-                ]
-            },
+            where: buildRecipientWhere({ email, phone }),
             attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
             transaction
         });
@@ -276,6 +310,13 @@ exports.sendGiftPackage = async (req, res) => {
         });
 
         const isRecipientRegistered = !!recipient?.id;
+        if (!isRecipientRegistered && !email) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Recipient email is required for users without an account'
+            });
+        }
         let createdGiftCode = null;
         if (!isRecipientRegistered) {
             // Collision-safe gift code generation
@@ -372,21 +413,27 @@ exports.sendGiftPackage = async (req, res) => {
                     amount: totalCredit
                 }
             }).catch(() => undefined);
+
+            if (email) {
+                const code = createdGiftCode?.code || '';
+                const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
+                await sendGiftClaimEmail({
+                    to: email,
+                    senderName,
+                    totalCredit,
+                    code,
+                    claimLink
+                }).catch(() => undefined);
+            }
         } else if (email) {
             const code = createdGiftCode?.code || '';
             const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
-            await sendEmail({
+            await sendGiftClaimEmail({
                 to: email,
-                subject: `${senderName} sent you a Refah gift card`,
-                template: 'customer_review_invite',
-                data: {
-                    customerName: 'Dear customer',
-                    tenantName: 'Refah',
-                    serviceName: `Gift card ${totalCredit.toFixed(2)} SAR - Code: ${code}`,
-                    appointmentDate: new Date().toLocaleString('en-US'),
-                    reviewLink: claimLink,
-                    googleReviewUrl: ''
-                }
+                senderName,
+                totalCredit,
+                code,
+                claimLink
             }).catch(() => undefined);
         }
 
