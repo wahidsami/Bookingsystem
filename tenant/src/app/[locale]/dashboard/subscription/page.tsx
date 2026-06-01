@@ -101,6 +101,17 @@ const FEATURE_DEFINITIONS = [
   }
 ];
 
+const FEATURE_ENTITLEMENT_KEYS: Record<string, string[]> = {
+  productsAndOrders: ['hasProductsAndOrders', 'productsAndOrders', 'maxProducts'],
+  internalMessaging: ['hasInternalMessaging', 'internalMessaging'],
+  pushNotifications: ['hasPushNotifications', 'inAppMarketingNotifications', 'pushNotifications'],
+  aiContentAssistant: ['hasAIContentAssistant', 'aiContentAssistant'],
+  hotDeals: ['maxHotDeals', 'hotDeals'],
+  reports: ['reports', 'hasAdvancedReports', 'advancedAnalytics'],
+  payroll: ['payroll', 'hasPayroll'],
+  publicPageCustomization: ['publicPageCustomization', 'hasCustomBranding', 'whiteLabel']
+};
+
 const RESOURCE_DEFINITIONS = [
   {
     key: 'staff',
@@ -323,7 +334,17 @@ export default function SubscriptionPage() {
   const liveAlerts = Array.isArray(consumptionData?.alerts)
     ? consumptionData.alerts.filter((alert: any) => !alert?.acknowledged).slice(0, 5)
     : [];
-  const lockedFeatures = FEATURE_DEFINITIONS.filter((feature) => !feature.isEnabled(limits));
+  const hasEntitlementKey = (featureKey: string) => {
+    const keys = FEATURE_ENTITLEMENT_KEYS[featureKey] || [];
+    return keys.some((key) => limits?.[key] !== undefined);
+  };
+
+  const lockedFeatures = FEATURE_DEFINITIONS.filter((feature) => {
+    if (!hasEntitlementKey(feature.key)) {
+      return false;
+    }
+    return !feature.isEnabled(limits);
+  });
   const lockedFeatureTitle = FEATURE_DEFINITIONS.find((feature) => feature.key === lockedFeature)?.label[locale === 'ar' ? 'ar' : 'en'];
 
   const daysUntilRenewal = subscription?.currentPeriodEnd

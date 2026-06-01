@@ -38,6 +38,7 @@ export default function ReportPreviewPage() {
 
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadError, setDownloadError] = useState<string>('');
   const [data, setData] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function ReportPreviewPage() {
 
   const handleDownloadPdf = async () => {
     try {
+      setDownloadError('');
       setDownloadingPdf(true);
       const file = await tenantApi.downloadReportPdf({
         startDate,
@@ -92,8 +94,12 @@ export default function ReportPreviewPage() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to download report PDF:', err);
+      setDownloadError(
+        err?.message
+          || (locale === 'ar' ? 'تعذر تنزيل ملف PDF. حاول مرة أخرى.' : 'Failed to download PDF. Please try again.')
+      );
     } finally {
       setDownloadingPdf(false);
     }
@@ -145,6 +151,11 @@ export default function ReportPreviewPage() {
           {locale === 'ar' ? 'العودة إلى التقارير' : 'Back to Reports'}
         </Link>
       </div>
+      {downloadError ? (
+        <div className="no-print mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {downloadError}
+        </div>
+      ) : null}
 
       <div className="report-print-area max-w-4xl">
         <ReportHeader

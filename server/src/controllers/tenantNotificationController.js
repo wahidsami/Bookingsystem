@@ -204,14 +204,15 @@ exports.getPushHistory = async (req, res) => {
         const { page, limit, offset } = parsePage(req.query);
         const { count, rows } = await db.TenantPushCampaign.findAndCountAll({
             where: { tenantId },
-            order: [['sentAt', 'DESC']],
+            order: [['createdAt', 'DESC']],
             limit,
             offset,
-            attributes: ['id', 'title', 'body', 'data', 'audienceType', 'recipientCount', 'sentAt']
+            attributes: ['id', 'title', 'body', 'data', 'audienceType', 'recipientCount', 'sentAt', 'createdAt']
         });
 
         const campaigns = rows.map((campaign) => {
             const item = campaign.toJSON();
+            item.sentAt = item.sentAt || item.createdAt || null;
             item.bodyTruncated = item.body
                 ? (item.body.length > 120 ? `${item.body.slice(0, 120)}...` : item.body)
                 : '';
@@ -245,14 +246,17 @@ exports.getPushHistoryDetail = async (req, res) => {
 
         const campaign = await db.TenantPushCampaign.findOne({
             where: { id, tenantId },
-            attributes: ['id', 'title', 'body', 'data', 'audienceType', 'recipientCount', 'sentAt']
+            attributes: ['id', 'title', 'body', 'data', 'audienceType', 'recipientCount', 'sentAt', 'createdAt']
         });
 
         if (!campaign) {
             return res.status(404).json({ success: false, message: 'Campaign not found' });
         }
 
-        return res.json({ success: true, campaign: campaign.toJSON() });
+        const payload = campaign.toJSON();
+        payload.sentAt = payload.sentAt || payload.createdAt || null;
+
+        return res.json({ success: true, campaign: payload });
     } catch (error) {
         console.error('Get push history detail error:', error);
         return res.status(500).json({ success: false, message: error.message });
