@@ -13,6 +13,148 @@ const {
 
 class AvailabilityService {
     /**
+     * Extract a stable YYYY-MM-DD / HH:MM view of a Date in a target timezone.
+     * @private
+     */
+    _getDatePartsInTimeZone(date, timeZone = 'Asia/Riyadh') {
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+
+        const parts = formatter.formatToParts(date);
+        const map = {};
+        parts.forEach((part) => {
+            if (part.type !== 'literal') {
+                map[part.type] = part.value;
+            }
+        });
+
+        return {
+            dateKey: `${map.year}-${map.month}-${map.day}`,
+            timeKey: `${map.hour}:${map.minute}`,
+            year: map.year,
+            month: map.month,
+            day: map.day,
+            hour: map.hour,
+            minute: map.minute,
+            second: map.second
+        };
+    }
+
+    /**
+     * Get timezone offset in milliseconds for a given instant.
+     * @private
+     */
+    _getTimeZoneOffset(date, timeZone = 'Asia/Riyadh') {
+        const parts = this._getDatePartsInTimeZone(date, timeZone);
+        const asUTC = Date.UTC(
+            Number(parts.year),
+            Number(parts.month) - 1,
+            Number(parts.day),
+            Number(parts.hour),
+            Number(parts.minute),
+            Number(parts.second || 0)
+        );
+        return asUTC - date.getTime();
+    }
+
+    /**
+     * Parse a YYYY-MM-DD date string as a calendar day in the tenant timezone.
+     * @private
+     */
+    _getDayOfWeekForDate(date) {
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            const fallback = new Date(`${date}T12:00:00Z`);
+            return Number.isNaN(fallback.getTime()) ? null : fallback.getUTCDay();
+        }
+
+        const [year, month, day] = date.split('-').map((value) => Number(value));
+        const utcNoon = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        return utcNoon.getUTCDay();
+    }
+
+    /**
+     * Convert a local date/time pair in a timezone to an absolute Date.
+     * @private
+     */
+    _combineDateAndTime(date, time, timeZone = 'Asia/Riyadh') {
+        try {
+            let dateStr;
+            if (date instanceof Date) {
+                dateStr = this._getDatePartsInTimeZone(date, timeZone).dateKey;
+            } else if (typeof date === 'string') {
+                dateStr = date.split('T')[0];
+            } else {
+                throw new Error(`Invalid date format: ${date}`);
+            }
+
+            let timeStr;
+            if (!time) {
+                throw new Error(`Time is required but got: ${time}`);
+            } else if (time instanceof Date) {
+                const timeParts = this._getDatePartsInTimeZone(time, timeZone);
+                timeStr = `${timeParts.hour}:${timeParts.minute}`;
+            } else if (typeof time === 'string') {
+                timeStr = time.split('.')[0];
+                if (!timeStr.includes(':')) {
+                    throw new Error(`Invalid time format: ${time}`);
+                }
+                const parts = timeStr.split(':');
+                if (parts.length >= 2) {
+                    timeStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+                } else {
+                    throw new Error(`Invalid time format: ${time}`);
+                }
+            } else {
+                throw new Error(`Invalid time type: ${typeof time}, value: ${time}`);
+            }
+
+            const [year, month, day] = dateStr.split('-').map((value) => Number(value));
+            const [hour, minute] = timeStr.split(':').map((value) => Number(value));
+            const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0));
+            const offset = this._getTimeZoneOffset(utcGuess, timeZone);
+            const result = new Date(utcGuess.getTime() - offset);
+
+            if (Number.isNaN(result.getTime())) {
+                throw new Error(`Invalid date/time combination: ${dateStr}T${timeStr}:00`);
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error in _combineDateAndTime:', { date, time, timeZone, error: error.message });
+            throw new Error(`Failed to combine date and time: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get the absolute start/end boundaries for a calendar day in a timezone.
+     * @private
+     */
+    _getTimeZoneDayRange(date, timeZone = 'Asia/Riyadh') {
+        const dateKey = typeof date === 'string' ? date.split('T')[0] : this._getDatePartsInTimeZone(date, timeZone).dateKey;
+        const startOfDay = this._combineDateAndTime(dateKey, '00:00', timeZone);
+        const nextDay = new Date(Date.UTC(
+            Number(dateKey.slice(0, 4)),
+            Number(dateKey.slice(5, 7)) - 1,
+            Number(dateKey.slice(8, 10)) + 1,
+            0,
+            0,
+            0,
+            0
+        ));
+        const nextDateKey = this._getDatePartsInTimeZone(nextDay, timeZone).dateKey;
+        const endOfDay = new Date(this._combineDateAndTime(nextDateKey, '00:00', timeZone).getTime() - 1);
+        return { startOfDay, endOfDay, dateKey };
+    }
+
+    /**
      * Get available slots for a service
      * Service-first approach: slots are generated based on service duration + buffers
      * 
@@ -111,7 +253,8 @@ class AvailabilityService {
         const availabilityWindow = await this._calculateAvailabilityWindow(
             tenantId,
             staffId,
-            date
+            date,
+            timezone
         );
 
         if (!availabilityWindow || availabilityWindow.length === 0) {
@@ -135,7 +278,7 @@ class AvailabilityService {
         }
 
         // Get existing appointments for the day
-        const existingAppointments = await this._getExistingAppointments(staffId, date);
+        const existingAppointments = await this._getExistingAppointments(staffId, date, timezone);
 
         // Generate slots for each availability window
         const allSlots = [];
@@ -290,13 +433,13 @@ class AvailabilityService {
      * Considers: tenant business hours, staff schedule, breaks, time-off, overrides
      * @private
      */
-    async _calculateAvailabilityWindow(tenantId, staffId, date) {
+    async _calculateAvailabilityWindow(tenantId, staffId, date, timezone = 'Asia/Riyadh') {
         try {
-            const dateObj = new Date(date);
-            if (isNaN(dateObj.getTime())) {
+            const dateKey = typeof date === 'string' ? date.split('T')[0] : this._getDatePartsInTimeZone(date, timezone).dateKey;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
                 throw new Error(`Invalid date format: ${date}`);
             }
-            const dayOfWeek = dateObj.getDay(); // 0 = Sunday, 6 = Saturday
+            const dayOfWeek = this._getDayOfWeekForDate(dateKey); // 0 = Sunday, 6 = Saturday
 
             // Layer A: Get tenant business hours
             const tenant = await db.Tenant.findByPk(tenantId);
@@ -360,8 +503,8 @@ class AvailabilityService {
                     return []; // No schedule for this day
                 }
 
-                const scheduleStart = this._combineDateAndTime(date, legacySchedule.startTime);
-                const scheduleEnd = this._combineDateAndTime(date, legacySchedule.endTime);
+                const scheduleStart = this._combineDateAndTime(dateKey, legacySchedule.startTime, timezone);
+                const scheduleEnd = this._combineDateAndTime(dateKey, legacySchedule.endTime, timezone);
 
                 availableWindow = [{
                     startTime: scheduleStart,
@@ -370,15 +513,15 @@ class AvailabilityService {
             } else {
                 // Convert shifts to time windows
                 availableWindow = allShifts.map(shift => ({
-                    startTime: this._combineDateAndTime(date, shift.startTime),
-                    endTime: this._combineDateAndTime(date, shift.endTime)
+                    startTime: this._combineDateAndTime(dateKey, shift.startTime, timezone),
+                    endTime: this._combineDateAndTime(dateKey, shift.endTime, timezone)
                 }));
             }
 
             // Apply tenant business hours (intersect)
             if (tenantHours) {
-                const tenantStart = this._combineDateAndTime(date, tenantHours.start);
-                const tenantEnd = this._combineDateAndTime(date, tenantHours.end);
+                const tenantStart = this._combineDateAndTime(dateKey, tenantHours.start, timezone);
+                const tenantEnd = this._combineDateAndTime(dateKey, tenantHours.end, timezone);
                 
                 availableWindow = this._intersectWindows(availableWindow, [{
                     startTime: tenantStart,
@@ -387,16 +530,16 @@ class AvailabilityService {
             }
 
             // Layer C - Subtract breaks
-            const breaks = await this._getStaffBreaks(staffId, date);
+            const breaks = await this._getStaffBreaks(staffId, dateKey, timezone);
             availableWindow = this._subtractWindows(availableWindow, breaks);
 
             // Layer D - Subtract time-off
-            const timeOff = await this._getStaffTimeOff(staffId, date);
+            const timeOff = await this._getStaffTimeOff(staffId, dateKey, timezone);
             availableWindow = this._subtractWindows(availableWindow, timeOff);
 
             // Apply schedule overrides
-            const overrides = await this._getStaffOverrides(staffId, date);
-            availableWindow = this._applyOverrides(availableWindow, overrides);
+            const overrides = await this._getStaffOverrides(staffId, dateKey);
+            availableWindow = this._applyOverrides(availableWindow, overrides, timezone);
 
             return availableWindow;
         } catch (error) {
@@ -565,57 +708,6 @@ class AvailabilityService {
      * Combine date and time string into Date object
      * @private
      */
-    _combineDateAndTime(date, time) {
-        try {
-            // Handle date
-            let dateStr;
-            if (date instanceof Date) {
-                dateStr = date.toISOString().split('T')[0];
-            } else if (typeof date === 'string') {
-                dateStr = date.split('T')[0]; // Extract date part if ISO string
-            } else {
-                throw new Error(`Invalid date format: ${date}`);
-            }
-
-            // Handle time - could be string, Date object, or null
-            let timeStr;
-            if (!time) {
-                throw new Error(`Time is required but got: ${time}`);
-            } else if (time instanceof Date) {
-                // If time is a Date object, extract time part
-                timeStr = time.toTimeString().split(' ')[0].substring(0, 5); // HH:MM
-            } else if (typeof time === 'string') {
-                // Handle various time formats: "09:00:00", "09:00", "09:00:00.000000"
-                timeStr = time.split('.')[0]; // Remove microseconds if present
-                if (!timeStr.includes(':')) {
-                    throw new Error(`Invalid time format: ${time}`);
-                }
-                // Ensure we have at least HH:MM
-                const parts = timeStr.split(':');
-                if (parts.length >= 2) {
-                    timeStr = `${parts[0]}:${parts[1]}`; // Just HH:MM
-                } else {
-                    throw new Error(`Invalid time format: ${time}`);
-                }
-            } else {
-                throw new Error(`Invalid time type: ${typeof time}, value: ${time}`);
-            }
-
-            // Combine and create Date object
-            const combined = `${dateStr}T${timeStr}:00`; // Add seconds
-            const result = new Date(combined);
-            
-            if (isNaN(result.getTime())) {
-                throw new Error(`Invalid date/time combination: ${combined}`);
-            }
-            
-            return result;
-        } catch (error) {
-            console.error('Error in _combineDateAndTime:', { date, time, error: error.message });
-            throw new Error(`Failed to combine date and time: ${error.message}`);
-        }
-    }
-
     /**
      * Intersect two sets of time windows
      * @private
@@ -638,8 +730,8 @@ class AvailabilityService {
      * Get staff breaks for a specific date
      * @private
      */
-    async _getStaffBreaks(staffId, date) {
-        const dayOfWeek = new Date(date).getDay();
+    async _getStaffBreaks(staffId, date, timezone = 'Asia/Riyadh') {
+        const dayOfWeek = this._getDayOfWeekForDate(date);
         
         // Get date-specific breaks
         const dateBreaks = await db.StaffBreak.findAll({
@@ -682,8 +774,8 @@ class AvailabilityService {
         // Combine and convert to time windows
         const allBreaks = [...dateBreaks, ...recurringBreaks];
         return allBreaks.map(breakRecord => ({
-            startTime: this._combineDateAndTime(date, breakRecord.startTime),
-            endTime: this._combineDateAndTime(date, breakRecord.endTime)
+            startTime: this._combineDateAndTime(date, breakRecord.startTime, timezone),
+            endTime: this._combineDateAndTime(date, breakRecord.endTime, timezone)
         }));
     }
 
@@ -691,7 +783,7 @@ class AvailabilityService {
      * Get staff time-off for a specific date
      * @private
      */
-    async _getStaffTimeOff(staffId, date) {
+    async _getStaffTimeOff(staffId, date, timezone = 'Asia/Riyadh') {
         const timeOffRecords = await db.StaffTimeOff.findAll({
             where: {
                 staffId,
@@ -703,8 +795,8 @@ class AvailabilityService {
 
         // Convert to full-day time windows
         return timeOffRecords.map(record => ({
-            startTime: new Date(record.startDate),
-            endTime: new Date(new Date(record.endDate).getTime() + 24 * 60 * 60 * 1000) // End of end date
+            startTime: this._combineDateAndTime(record.startDate, '00:00', timezone),
+            endTime: this._combineDateAndTime(record.endDate, '23:59', timezone)
         }));
     }
 
@@ -778,7 +870,7 @@ class AvailabilityService {
      * Overrides can replace or add special hours
      * @private
      */
-    _applyOverrides(availableWindows, overrides) {
+    _applyOverrides(availableWindows, overrides, timezone = 'Asia/Riyadh') {
         if (overrides.length === 0) return availableWindows;
 
         // For now, handle simple cases:
@@ -793,23 +885,23 @@ class AvailabilityService {
 
         // Remove windows for day-off dates
         for (const dayOff of dayOffOverrides) {
-            const overrideDate = new Date(dayOff.date);
+            const overrideDate = `${dayOff.date}`;
             result = result.filter(w => {
-                const windowDate = new Date(w.startTime);
-                return windowDate.toDateString() !== overrideDate.toDateString();
+                const windowDate = this._getDatePartsInTimeZone(w.startTime, timezone).dateKey;
+                return windowDate !== overrideDate;
             });
         }
 
         // Add special hours
         for (const special of specialHoursOverrides) {
-            const overrideDate = new Date(special.date);
-            const specialStart = this._combineDateAndTime(special.date, special.startTime);
-            const specialEnd = this._combineDateAndTime(special.date, special.endTime);
+            const overrideDate = `${special.date}`;
+            const specialStart = this._combineDateAndTime(special.date, special.startTime, timezone);
+            const specialEnd = this._combineDateAndTime(special.date, special.endTime, timezone);
 
             // Remove existing windows for this date
             result = result.filter(w => {
-                const windowDate = new Date(w.startTime);
-                return windowDate.toDateString() !== overrideDate.toDateString();
+                const windowDate = this._getDatePartsInTimeZone(w.startTime, timezone).dateKey;
+                return windowDate !== overrideDate;
             });
 
             // Add special hours window
@@ -836,14 +928,21 @@ class AvailabilityService {
             throw new Error('serviceId and staffId are required');
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const tenantSettings = await this._getTenantSettings(tenantId);
+        const timezone = tenantSettings.timezone || 'Asia/Riyadh';
+        const today = this._getDatePartsInTimeZone(new Date(), timezone).dateKey;
 
         // Search each day
         for (let i = 0; i < daysToSearch; i++) {
-            const searchDate = new Date(today);
-            searchDate.setDate(today.getDate() + i);
-            const dateString = searchDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            const searchDate = new Date(Date.UTC(
+                Number(today.slice(0, 4)),
+                Number(today.slice(5, 7)) - 1,
+                Number(today.slice(8, 10)) + i,
+                12,
+                0,
+                0
+            ));
+            const dateString = this._getDatePartsInTimeZone(searchDate, timezone).dateKey; // YYYY-MM-DD
 
             try {
                 // Get available slots for this date
