@@ -186,10 +186,18 @@ class TenantApiClient {
         const locale = path.split('/')[1] || 'en';
         if (!path.includes('/dashboard/bills')) {
           window.location.href = `/${locale}/dashboard/bills`;
-          throw new Error(data.message || 'Account suspended. Please pay your bill to restore access.');
+          const error: any = new Error(data.message || 'Account suspended. Please pay your bill to restore access.');
+          error.status = response.status;
+          error.code = (data as { code?: string }).code || null;
+          error.data = data;
+          throw error;
         }
       }
-      throw new Error(data.error || data.message || 'API request failed');
+      const error: any = new Error(data.error || data.message || 'API request failed');
+      error.status = response.status;
+      error.code = (data as { code?: string }).code || null;
+      error.data = data;
+      throw error;
     }
 
     return data;

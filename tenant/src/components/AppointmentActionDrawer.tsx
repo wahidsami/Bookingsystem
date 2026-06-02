@@ -189,6 +189,7 @@ export function AppointmentActionDrawer({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [errorDebug, setErrorDebug] = useState<any>(null);
 
   const [customerMode, setCustomerMode] = useState<"existing" | "new" | "guest">("existing");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -236,6 +237,7 @@ export function AppointmentActionDrawer({
     }
 
     setError("");
+    setErrorDebug(null);
     setSuccess("");
 
     if (mode === "appointment") {
@@ -426,6 +428,7 @@ export function AppointmentActionDrawer({
 
   const handleAppointmentSubmit = async () => {
     setError("");
+    setErrorDebug(null);
     setSuccess("");
 
     if (!selectedServiceId) {
@@ -539,6 +542,7 @@ export function AppointmentActionDrawer({
       }
     } catch (err: any) {
       console.error("Failed to create appointment:", err);
+      setErrorDebug(err?.data?.debug || null);
       const rawMessage = `${err?.message || ''}`.toLowerCase();
       if (rawMessage.includes('conflict') || rawMessage.includes('time slot not available')) {
         setError(locale === "ar"
@@ -692,6 +696,12 @@ export function AppointmentActionDrawer({
             {error && (
               <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
+              </div>
+            )}
+            {errorDebug && (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                <p className="font-semibold">{locale === "ar" ? "تفاصيل التشخيص" : "Debug details"}</p>
+                <pre className="mt-2 whitespace-pre-wrap break-words">{JSON.stringify(errorDebug, null, 2)}</pre>
               </div>
             )}
 
