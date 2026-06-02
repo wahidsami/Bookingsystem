@@ -118,23 +118,106 @@ function buildBreakDateTime(date, timeValue) {
     return `${date}T${safeTime}`;
 }
 
+function getDatePartsInTimeZone(date, timeZone = 'Asia/Riyadh') {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    const parts = formatter.formatToParts(date);
+    const map = {};
+    parts.forEach((part) => {
+        if (part.type !== 'literal') {
+            map[part.type] = part.value;
+        }
+    });
+
+    return {
+        dateKey: `${map.year}-${map.month}-${map.day}`,
+        timeKey: `${map.hour}:${map.minute}`
+    };
+}
+
 async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTime }) {
     if (!tenantId || !serviceId || !staffId || !startTime) return false;
     const requestedStart = new Date(startTime);
     if (Number.isNaN(requestedStart.getTime())) return false;
-    const dateKey = requestedStart.toISOString().split('T')[0];
+    const tenantSettings = await db.TenantSettings.findOne({
+        where: { tenantId },
+        attributes: ['timezone']
+    });
+    const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+    const requestedParts = getDatePartsInTimeZone(requestedStart, timezone);
 
     const availability = await availabilityService.getAvailableSlots(tenantId, {
         serviceId,
         staffId,
-        date: dateKey
+        date: requestedParts.dateKey
     });
 
-    const startMs = requestedStart.getTime();
     return (availability?.slots || []).some((slot) => {
-        const slotStartMs = new Date(slot.startTime).getTime();
-        return slot.available === true && Math.abs(slotStartMs - startMs) < 60 * 1000;
+        if (slot.available !== true) return false;
+        const slotParts = getDatePartsInTimeZone(new Date(slot.startTime), timezone);
+        return slotParts.dateKey === requestedParts.dateKey && slotParts.timeKey === requestedParts.timeKey;
     });
+}
+
+async function inspectStaffSlotAvailability({ tenantId, serviceId, staffId, startTime }) {
+    const requestedStart = new Date(startTime);
+    if (Number.isNaN(requestedStart.getTime())) {
+        return {
+            valid: false,
+            reason: 'invalid_start_time'
+        };
+    }
+
+    const tenantSettings = await db.TenantSettings.findOne({
+        where: { tenantId },
+        attributes: ['timezone']
+    });
+    const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+    const requestedParts = getDatePartsInTimeZone(requestedStart, timezone);
+
+    const availability = await availabilityService.getAvailableSlots(tenantId, {
+        serviceId,
+        staffId,
+        date: requestedParts.dateKey
+    });
+
+    const slots = Array.isArray(availability?.slots) ? availability.slots : [];
+    const slotSample = slots.slice(0, 20).map((slot) => {
+        const slotParts = getDatePartsInTimeZone(new Date(slot.startTime), timezone);
+        return {
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            available: slot.available === true,
+            localDate: slotParts.dateKey,
+            localTime: slotParts.timeKey
+        };
+    });
+    const matchingSlot = slotSample.find((slot) => slot.available && slot.localDate === requestedParts.dateKey && slot.localTime === requestedParts.timeKey) || null;
+
+    return {
+        valid: true,
+        timezone,
+        requested: {
+            iso: requestedStart.toISOString(),
+            localDate: requestedParts.dateKey,
+            localTime: requestedParts.timeKey
+        },
+        availability: {
+            totalSlots: availability?.metadata?.totalSlots ?? slots.length,
+            availableSlots: availability?.metadata?.availableSlots ?? slots.filter((slot) => slot.available === true).length,
+            staffName: availability?.metadata?.staffName || null,
+            stepSize: availability?.metadata?.stepSize || null
+        },
+        matchingSlot,
+        slotSample
+    };
 }
 
 async function resolveAppointmentCustomer({ platformUserId, customer, transaction }) {
@@ -306,10 +389,17 @@ exports.createAppointment = async (req, res) => {
                 startTime
             });
             if (!slotAvailable) {
+                const debug = await inspectStaffSlotAvailability({
+                    tenantId,
+                    serviceId,
+                    staffId: explicitStaffId,
+                    startTime
+                });
                 await transaction.rollback();
                 return res.status(409).json({
                     success: false,
-                    message: 'Selected staff is not available for this time slot'
+                    message: 'Selected staff is not available for this time slot',
+                    debug
                 });
             }
         }
