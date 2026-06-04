@@ -182,8 +182,22 @@ const notifyServiceCompleted = async (appointment) => {
 
     try {
         if (!userEmail) {
+            console.warn('[AppointmentLifecycle] Review invite skipped: missing customer email', {
+                appointmentId: appointment.id,
+                bookingNumber: appointment.bookingNumber || null,
+                tenantId: appointment.tenantId || null
+            });
             return;
         }
+
+        console.log('[AppointmentLifecycle] Sending review invite email', {
+            appointmentId: appointment.id,
+            bookingNumber: appointment.bookingNumber || null,
+            tenantId: appointment.tenantId || null,
+            customerEmail: userEmail,
+            hasGoogleReviewUrl: Boolean(googleReviewUrl),
+            hasReviewLink: Boolean(reviewLink)
+        });
 
         await sendEmail({
             to: userEmail,
@@ -198,8 +212,20 @@ const notifyServiceCompleted = async (appointment) => {
                 googleReviewUrl
             }
         });
+
+        console.log('[AppointmentLifecycle] Review invite email sent', {
+            appointmentId: appointment.id,
+            bookingNumber: appointment.bookingNumber || null,
+            tenantId: appointment.tenantId || null,
+            customerEmail: userEmail
+        });
     } catch (reviewInviteError) {
-        console.warn('Review invite email warning:', reviewInviteError.message);
+        console.warn('[AppointmentLifecycle] Review invite email warning:', reviewInviteError.message, {
+            appointmentId: appointment.id,
+            bookingNumber: appointment.bookingNumber || null,
+            tenantId: appointment.tenantId || null,
+            customerEmail: userEmail
+        });
     }
 };
 
