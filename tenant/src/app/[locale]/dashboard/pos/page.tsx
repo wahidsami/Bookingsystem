@@ -176,7 +176,9 @@ export default function TenantPosPage() {
     currency: string;
   }>(null);
   const [giftCardFeedback, setGiftCardFeedback] = useState<{ type: "error" | "success"; message: string } | null>(null);
+  const [collectionFeedback, setCollectionFeedback] = useState<{ type: "error" | "success"; message: string } | null>(null);
   const [validatingGiftCard, setValidatingGiftCard] = useState(false);
+  const [didAutoOpen, setDidAutoOpen] = useState(false);
 
   const copy = useMemo(() => ({
     title: locale === "ar" ? "نقطة البيع / التحصيل" : "POS / Collections",
@@ -209,7 +211,7 @@ export default function TenantPosPage() {
     newCollection: locale === "ar" ? "تحصيل جديد" : "New Collection",
   }), [locale]);
 
-  const loadPosData = async () => {
+  const loadPosData = async (): Promise<{ queue: PosQueueItem[] }> => {
     setLoading(true);
     setError("");
     setNotice("");
@@ -246,8 +248,12 @@ export default function TenantPosPage() {
       if (failedSections.length > 0) {
         setNotice(locale === "ar" ? `تعذر تحميل بعض الأقسام: ${failedSections.join("، ")}` : `Some POS sections failed: ${failedSections.join(", ")}`);
       }
+      return {
+        queue: queueResponse.status === "fulfilled" && queueResponse.value?.success ? (queueResponse.value.queue || []) : []
+      };
     } catch (err: any) {
       setError(err.message || (locale === "ar" ? "تعذر تحميل بيانات POS" : "Failed to load POS data"));
+      return { queue: [] };
     } finally {
       setLoading(false);
     }
@@ -287,12 +293,13 @@ export default function TenantPosPage() {
   }, [queue, activeTab, intentFilter, statusFilter, sortBy]);
 
   useEffect(() => {
-    if (!selectedItem && filteredQueue.length > 0) {
+    if (!didAutoOpen && !selectedItem && filteredQueue.length > 0) {
       const first = filteredQueue[0];
       setSelectedItem(first);
       setCollectionMethod(normalizeCollectionMethod(first.paymentMethod));
+      setDidAutoOpen(true);
     }
-  }, [filteredQueue, selectedItem]);
+  }, [filteredQueue, selectedItem, didAutoOpen]);
 
   const openCollectionPanel = (item: PosQueueItem) => {
     setSelectedItem(item);
@@ -302,6 +309,7 @@ export default function TenantPosPage() {
     setGiftCardCode("");
     setGiftCardInfo(null);
     setGiftCardFeedback(null);
+    setCollectionFeedback(null);
   };
 
   const handleDownloadReceipt = async (transactionId: string) => {
@@ -349,6 +357,7 @@ export default function TenantPosPage() {
     if (!selectedItem) return;
     setCollecting(true);
     setError("");
+    setCollectionFeedback(null);
     try {
       if (collectionMethod === "gift_card" && !giftCardInfo) {
         throw new Error(locale === "ar" ? "يرجى التحقق من بطاقة الهدية أولاً." : "Please validate the gift card first.");
@@ -368,9 +377,21 @@ export default function TenantPosPage() {
           await tenantApi.updateOrderPaymentStatus(selectedItem.entityId, "paid", { paymentMethod: collectionMethod, transactionRef: transactionRef || undefined, notes: collectionNotes || undefined });
         }
       }
-      await loadPosData();
+      setCollectionFeedback({
+        type: "success",
+        message: locale === "ar" ? "تم تسجيل التحصيل بنجاح." : "Payment collected successfully."
+      });
+      const refreshed = await loadPosData();
+      if (refreshed?.queue?.length) {
+        setSelectedItem(refreshed.queue[0]);
+        setCollectionMethod(normalizeCollectionMethod(refreshed.queue[0].paymentMethod));
+      } else {
+        setSelectedItem(null);
+      }
     } catch (err: any) {
-      setError(err.message || (locale === "ar" ? "تعذر تسجيل التحصيل" : "Failed to collect payment"));
+      const message = err?.data?.message || err?.message || (locale === "ar" ? "تعذر تسجيل التحصيل" : "Failed to collect payment");
+      setError(message);
+      setCollectionFeedback({ type: "error", message });
     } finally {
       setCollecting(false);
     }
@@ -626,6 +647,11 @@ export default function TenantPosPage() {
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     {locale === "ar" ? "تغيير حالة الدفع" : "Payment Status Change"}: {selectedItem.paymentStatus} {"->"} {selectedItem.paymentStatus === "deposit_paid" ? "fully_paid" : (selectedItem.entityType === "order" ? "paid" : "fully_paid")}
                   </div>
+                  {collectionFeedback ? (
+                    <div className={`rounded-xl border px-3 py-2 text-xs ${collectionFeedback.type === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                      {collectionFeedback.message}
+                    </div>
+                  ) : null}
                   <button
                     disabled={collecting || (collectionMethod === "gift_card" && !giftCardInfo)}
                     onClick={handleCollectPayment}
