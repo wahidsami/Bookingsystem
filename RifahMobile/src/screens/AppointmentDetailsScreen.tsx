@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ImageBackground, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ImageBackground, Linking, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { Booking, SlotItem, bookingNeedsPayment, getBookingOutstandingAmount } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -247,6 +247,41 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
     setFeedback({ visible: true, title, message });
   };
 
+  const getCenterPhoneNumber = (booking?: Booking | null) => {
+    const tenant = booking?.tenant;
+    const candidate = `${tenant?.phone || tenant?.mobile || tenant?.whatsappNumber || ''}`.trim();
+    return candidate || '';
+  };
+
+  const handleContactCenter = async () => {
+    const phone = getCenterPhoneNumber(representative);
+    if (!phone) {
+      showFeedback(
+        language === 'ar' ? 'رقم غير متوفر' : 'Number unavailable',
+        language === 'ar'
+          ? 'لم يتم توفير رقم المركز لهذا الموعد.'
+          : 'The center phone number is not available for this appointment.'
+      );
+      return;
+    }
+
+    const telUrl = `tel:${phone.replace(/\s+/g, '')}`;
+    try {
+      const canOpen = await Linking.canOpenURL(telUrl);
+      if (!canOpen) {
+        throw new Error('Cannot open phone dialer');
+      }
+      await Linking.openURL(telUrl);
+    } catch (error) {
+      Alert.alert(
+        language === 'ar' ? 'تعذر الاتصال' : 'Call unavailable',
+        language === 'ar'
+          ? `تعذر فتح تطبيق الاتصال للرقم ${phone}.`
+          : `Could not open the phone dialer for ${phone}.`
+      );
+    }
+  };
+
   const handleCancelSubmit = async () => {
     if (!cancelBookingTarget || cancelSubmitting) return;
     if (cancelReasonCode === 'other' && !cancelReasonText.trim()) {
@@ -448,41 +483,8 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الحالة' : 'Status'}: {getStatusText(booking.status, language)}</Text>
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الدفع' : 'Payment'}: {getPaymentStatusText(booking)}</Text>
             <Text style={styles.priceText} numberOfLines={1}>{formatRiyal(Number(booking.price || 0), language)}</Text>
-
-            <View style={styles.actionsWrap}>
-              {bookingNeedsPayment(booking.paymentStatus) && !['cancelled', 'completed', 'no_show'].includes(booking.status) && activeTab === 'upcoming' && (
-                <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={() => navigation.navigate('Payment', {
-                    appointmentId: booking.id,
-                    amount: getBookingOutstandingAmount(booking),
-                    tenantId: booking.tenantId || booking.tenant?.id,
-                    paymentChoice: booking.paymentStatus === 'pending' && booking.paymentMethod === 'booking-fee' ? 'booking-fee' : undefined,
-                  })}
-                >
-                  <Text style={styles.primaryBtnText}>{language === 'ar' ? 'ادفع الآن' : 'Pay Now'}</Text>
-                </TouchableOpacity>
-              )}
-              {['confirmed', 'pending'].includes(booking.status) && activeTab === 'upcoming' && (
-                <View style={styles.secondaryActions}>
-                  {(booking.Service?.allowReschedule || booking.service?.allowReschedule) ? (
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => openRescheduleChoice(booking)}>
-                      <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelBookingTarget(booking)}>
-                    <Text style={styles.cancelBtnText} numberOfLines={1}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {booking.status === 'completed' && activeTab === 'completed' && (
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('Review', { appointmentId: booking.id })}>
-                  <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'أضف تقييم' : 'Write Review'}</Text>
-                </TouchableOpacity>
-              )}
             </View>
-            </View>
-          ))}
+          ))} 
 
           {appointmentTimeline.length > 0 && (
             <View style={styles.timelineCard}>
@@ -544,12 +546,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
             <TouchableOpacity
               style={styles.contactBtn}
-              onPress={() =>
-                showFeedback(
-                  language === 'ar' ? 'قريباً' : 'Coming soon',
-                  language === 'ar' ? 'التواصل مع المركز سيكون متاحاً قريباً.' : 'Contact center action will be available soon.'
-                )
-              }
+              onPress={handleContactCenter}
             >
               <Text style={styles.contactBtnText}>{language === 'ar' ? 'التواصل مع المركز' : 'Contact Center'}</Text>
             </TouchableOpacity>
@@ -782,8 +779,20 @@ const styles = StyleSheet.create({
   policyNote: { marginBottom: spacing.md, borderRadius: 14, borderWidth: 1, borderColor: '#E8EAF4', backgroundColor: '#FFFFFF', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   policyText: { flex: 1, color: colors.textSecondary, fontSize: 10, lineHeight: 16 },
   emptyText: { color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.5)', justifyContent: 'center', paddingHorizontal: spacing.sm },
-  modalCard: { marginHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: '#FFFFFF', padding: spacing.md },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(18, 13, 33, 0.55)', justifyContent: 'center', paddingHorizontal: spacing.sm },
+  modalCard: {
+    marginHorizontal: spacing.md,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9DDFD',
+    padding: spacing.md,
+    shadowColor: '#1F123F',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   modalCardLarge: { maxHeight: '72%' },
   modalScrollContent: { paddingBottom: spacing.sm },
   modalTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
@@ -795,11 +804,11 @@ const styles = StyleSheet.create({
   reasonChipTextActive: { color: colors.primary },
   reasonChipMeta: { marginTop: 2, color: colors.textSecondary, fontSize: 9, fontWeight: '600' },
   reasonChipMetaActive: { color: colors.primary },
-  modalInput: { borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginBottom: spacing.sm },
+  modalInput: { borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#FAFAFF', color: colors.text, marginBottom: spacing.sm },
   modalDatePickerButton: {
     minHeight: 46,
     borderWidth: 1,
-    borderColor: '#E7DFFA',
+    borderColor: '#E9DDFD',
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -816,7 +825,7 @@ const styles = StyleSheet.create({
   },
   modalErrorText: { color: colors.error, fontSize: 10, marginBottom: spacing.sm, fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, flexWrap: 'wrap' },
-  modalCancel: { minWidth: 96, borderWidth: 1, borderColor: '#E7DFFA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center' },
+  modalCancel: { minWidth: 96, borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#F4EEFF' },
   modalCancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 12 },
   modalSave: { minWidth: 96, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center' },
   modalSaveText: { color: colors.textInverse, fontWeight: '700', fontSize: 12 },

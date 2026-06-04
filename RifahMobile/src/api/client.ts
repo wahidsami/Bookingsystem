@@ -294,6 +294,9 @@ export interface Booking {
         name: string;
         slug?: string;
         logo?: string;
+        phone?: string;
+        mobile?: string;
+        whatsappNumber?: string;
     };
     duration?: number; // Calculated or from service
     customerConfirmationRequired?: boolean;
@@ -776,6 +779,9 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
             name: toStringValue(appointment.tenant.name, 'Refah'),
             slug: toOptionalString(appointment.tenant.slug),
             logo: toOptionalString(appointment.tenant.logo),
+            phone: toOptionalString((appointment.tenant as any).phone),
+            mobile: toOptionalString((appointment.tenant as any).mobile),
+            whatsappNumber: toOptionalString((appointment.tenant as any).whatsappNumber),
         } : undefined,
         duration: appointment?.duration !== undefined
             ? toNumber(appointment.duration)
