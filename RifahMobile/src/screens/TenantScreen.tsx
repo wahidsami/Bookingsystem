@@ -763,6 +763,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             onPress={() => navigation.navigate('Gifts', {
                                 tenantId: tenant?.id,
                                 tenantName: tenant?.name,
+                                previewOnly: true,
                             })}
                         >
                             <View style={[styles.giftCardRow, isRTL ? styles.giftCardRowRtl : null]}>
@@ -2644,7 +2645,7 @@ const styles = StyleSheet.create({
     },
     galleryPreviewBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.88)',
+        backgroundColor: 'rgba(18, 13, 33, 0.82)',
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.lg,
@@ -2668,7 +2669,9 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        borderWidth: 1,
+        borderColor: 'rgba(233,221,253,0.75)',
     },
     hoursRow: {
         flexDirection: 'row',

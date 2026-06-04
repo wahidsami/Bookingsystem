@@ -73,6 +73,7 @@ export function GiftsScreen({ navigation, route }: any) {
   const sar = (value: number) => formatRiyal(Number(value || 0), language === 'ar' ? 'ar' : 'en');
   const tenantId = route?.params?.tenantId as string | undefined;
   const tenantName = route?.params?.tenantName as string | undefined;
+  const [previewOnly, setPreviewOnly] = useState(Boolean(route?.params?.previewOnly));
   const showTenantGiftCards = Boolean(tenantId);
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
@@ -190,6 +191,10 @@ export function GiftsScreen({ navigation, route }: any) {
     claimGift();
   }, [route?.params?.claimToken, route?.params?.tenantClaimToken]);
 
+  useEffect(() => {
+    setPreviewOnly(Boolean(route?.params?.previewOnly));
+  }, [route?.params?.previewOnly]);
+
   const loadPackages = async () => {
     try {
       setLoading(true);
@@ -273,6 +278,7 @@ export function GiftsScreen({ navigation, route }: any) {
         return;
       }
       Alert.alert('Success', `Wallet recharged. New balance: ${sar(Number(finalResponse.walletBalance || 0))}`);
+      setPreviewOnly(false);
       setSelected(null);
       setCardNumber('');
       setExpiryDate('');
@@ -320,6 +326,7 @@ export function GiftsScreen({ navigation, route }: any) {
         return;
       }
       Alert.alert('Success', response.message || 'Gift sent successfully.');
+      setPreviewOnly(false);
       setSelected(null);
       setRecipientEmail('');
       setRecipientPhone('');
@@ -453,29 +460,40 @@ export function GiftsScreen({ navigation, route }: any) {
         </ImageBackground>
 
         <View style={styles.contentWrap}>
-          <View style={styles.balanceRow}>
-            <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })} activeOpacity={0.9}>
-              <View style={styles.balanceIcon}><AppIcon name="account_balance_wallet" size={20} color={colors.primary} /></View>
-              <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
-              <Text style={styles.balanceAmount}>{sar(Number(refahBalance || 0))}</Text>
-              <Text style={styles.balanceMeta}>
-                {tenantId
-                  ? (language === 'ar' ? 'رصيد بطاقات هذا المركز' : 'This center gift balance')
-                  : (language === 'ar'
-                    ? `متاح لكل المراكز${platformGiftReceivedTotal > 0 ? ` • هدايا مستلمة ${sar(platformGiftReceivedTotal)}` : ''}`
-                    : `Usable across all centers${platformGiftReceivedTotal > 0 ? ` • Received gifts ${sar(platformGiftReceivedTotal)}` : ''}`)}
+          {!previewOnly ? (
+            <View style={styles.balanceRow}>
+              <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })} activeOpacity={0.9}>
+                <View style={styles.balanceIcon}><AppIcon name="account_balance_wallet" size={20} color={colors.primary} /></View>
+                <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
+                <Text style={styles.balanceAmount}>{sar(Number(refahBalance || 0))}</Text>
+                <Text style={styles.balanceMeta}>
+                  {tenantId
+                    ? (language === 'ar' ? 'رصيد بطاقات هذا المركز' : 'This center gift balance')
+                    : (language === 'ar'
+                      ? `متاح لكل المراكز${platformGiftReceivedTotal > 0 ? ` • هدايا مستلمة ${sar(platformGiftReceivedTotal)}` : ''}`
+                      : `Usable across all centers${platformGiftReceivedTotal > 0 ? ` • Received gifts ${sar(platformGiftReceivedTotal)}` : ''}`)}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.balanceCard, styles.centerBalanceCard]} onPress={() => navigation.navigate('CentersBalance', { centersBalance, history })} activeOpacity={0.9}>
+                <View style={[styles.balanceIcon, styles.centerBalanceIcon]}><AppIcon name="storefront" size={20} color="#7A4F00" /></View>
+                <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}</Text>
+                <Text style={styles.balanceAmount}>{sar(Number(centersBalance || 0))}</Text>
+                <Text style={styles.balanceMeta}>{language === 'ar' ? `عبر ${centersCount || 0} مراكز` : `Across ${centersCount || 0} centers`}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.previewNotice}>
+              <AppIcon name="info" size={16} color={colors.primary} />
+              <Text style={styles.previewNoticeText}>
+                {language === 'ar'
+                  ? 'استعرض بطاقات هذا المركز أولاً. سيتم تحديث الرصيد فقط بعد إتمام الشراء.'
+                  : 'Browse this center first. Balance updates only after purchase is completed.'}
               </Text>
-            </TouchableOpacity>
+            </View>
+          )}
 
-            <TouchableOpacity style={[styles.balanceCard, styles.centerBalanceCard]} onPress={() => navigation.navigate('CentersBalance', { centersBalance, history })} activeOpacity={0.9}>
-              <View style={[styles.balanceIcon, styles.centerBalanceIcon]}><AppIcon name="storefront" size={20} color="#7A4F00" /></View>
-              <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}</Text>
-              <Text style={styles.balanceAmount}>{sar(Number(centersBalance || 0))}</Text>
-              <Text style={styles.balanceMeta}>{language === 'ar' ? `عبر ${centersCount || 0} مراكز` : `Across ${centersCount || 0} centers`}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {showTenantGiftCards ? (
+          {!previewOnly && showTenantGiftCards ? (
             <>
               <View style={styles.quickRow}>
                 <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}>
@@ -663,6 +681,8 @@ const styles = StyleSheet.create({
   balanceLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '600' },
   balanceAmount: { color: colors.text, fontSize: 17, fontWeight: '800', marginTop: 4 },
   balanceMeta: { color: colors.textSecondary, fontSize: 9, marginTop: 4 },
+  previewNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F4F0FF', borderRadius: 16, padding: spacing.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E6DBFF' },
+  previewNoticeText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
   quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   quickCard: { flex: 1, minHeight: 84, borderRadius: 20, backgroundColor: '#F6F0FF', borderWidth: 1, borderColor: '#E7DAFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, gap: 8 },
   quickIconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEE5FF' },
