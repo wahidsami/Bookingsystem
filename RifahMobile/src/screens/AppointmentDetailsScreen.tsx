@@ -556,7 +556,9 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               style={styles.contactBtn}
               onPress={handleContactCenter}
             >
-              <Text style={styles.contactBtnText}>{language === 'ar' ? 'التواصل مع المركز' : 'Contact Center'}</Text>
+              <Text style={styles.contactBtnText}>
+                {language === 'ar' ? 'واتساب / الاتصال بالمركز' : 'WhatsApp / Call Center'}
+              </Text>
             </TouchableOpacity>
           </View>
 
