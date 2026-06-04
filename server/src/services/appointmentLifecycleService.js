@@ -116,31 +116,12 @@ const notifyServiceCompleted = async (appointment) => {
     const appointmentDate = formatAppointmentDate(appointment);
     const dueAmount = getDueAmount(appointment);
     const hasPaymentDue = dueAmount > 0;
-
-    const customerTitle = hasPaymentDue ? 'Payment due for completed service' : 'Service completed';
-    const customerBody = hasPaymentDue
-        ? `Your ${serviceName} service for ${appointmentDate} is complete. ${dueAmount.toFixed(2)} SAR remains due.`
-        : `Your ${serviceName} service for ${appointmentDate} is complete. Thank you.`;
-
-    await sendCustomerUpdate(appointment, customerTitle, customerBody, {
-        type: hasPaymentDue ? 'appointment_payment_due' : 'appointment_service_completed',
-        customerName,
-        serviceName,
-        scheduledAt: appointment.startTime,
-        dueAmount
-    });
-
-    const staffTitle = hasPaymentDue ? 'Payment due after service completion' : 'Service completed and paid';
-    const staffBody = hasPaymentDue
-        ? `${customerName}'s ${serviceName} service is complete and ${dueAmount.toFixed(2)} SAR remains due.`
-        : `${customerName}'s ${serviceName} service is complete and fully paid.`;
-
-    await sendStaffUpdate(appointment, staffTitle, staffBody, {
-        type: hasPaymentDue ? 'appointment_payment_due' : 'appointment_service_completed',
-        customerName,
-        serviceName,
-        dueAmount
-    });
+    let effectiveServiceName = serviceName;
+    let effectiveCustomerName = customerName;
+    let tenantName = 'Refah';
+    let googleReviewUrl = appointment?.tenant?.googleMapLink || appointment?.tenant?.mapUrl || '';
+    let reviewLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/bookings/${encodeURIComponent(appointment.id)}/review/open`;
+    let userEmail = null;
 
     try {
         const contextAppointment = await db.Appointment.findByPk(appointment.id, {
@@ -148,19 +129,61 @@ const notifyServiceCompleted = async (appointment) => {
                 { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar'], required: false },
                 { model: db.Staff, as: 'staff', attributes: ['id', 'name'], required: false },
                 { model: db.PlatformUser, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
-                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar', 'mapUrl'], required: false }
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar', 'googleMapLink'], required: false }
             ]
         });
 
-        const userEmail = contextAppointment?.user?.email;
+        if (contextAppointment) {
+            effectiveServiceName = contextAppointment?.service?.name_en || contextAppointment?.service?.name_ar || serviceName;
+            effectiveCustomerName = `${contextAppointment?.user?.firstName || ''} ${contextAppointment?.user?.lastName || ''}`.trim() || customerName;
+            tenantName = contextAppointment?.tenant?.name || contextAppointment?.tenant?.name_en || contextAppointment?.tenant?.name_ar || tenantName;
+            googleReviewUrl = contextAppointment?.tenant?.googleMapLink || contextAppointment?.tenant?.mapUrl || googleReviewUrl;
+            reviewLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/bookings/${encodeURIComponent(contextAppointment.id)}/review/open`;
+            userEmail = contextAppointment?.user?.email || null;
+        }
+    } catch (lookupError) {
+        console.warn('Review invite context warning:', lookupError.message);
+    }
+
+    const customerTitle = hasPaymentDue ? 'Payment due for completed service' : 'Service completed';
+    const customerBody = hasPaymentDue
+        ? `Your ${effectiveServiceName} service for ${appointmentDate} is complete. ${dueAmount.toFixed(2)} SAR remains due.`
+        : `Your ${effectiveServiceName} service for ${appointmentDate} is complete. Thank you.`;
+
+    try {
+        await sendCustomerUpdate(appointment, customerTitle, customerBody, {
+            type: hasPaymentDue ? 'appointment_payment_due' : 'appointment_service_completed',
+            customerName: effectiveCustomerName,
+            serviceName: effectiveServiceName,
+            scheduledAt: appointment.startTime,
+            dueAmount,
+            googleReviewUrl,
+            reviewTab: 'reviews'
+        });
+    } catch (customerNotificationError) {
+        console.warn('Service completed customer notification warning:', customerNotificationError.message);
+    }
+
+    const staffTitle = hasPaymentDue ? 'Payment due after service completion' : 'Service completed and paid';
+    const staffBody = hasPaymentDue
+        ? `${effectiveCustomerName}'s ${effectiveServiceName} service is complete and ${dueAmount.toFixed(2)} SAR remains due.`
+        : `${effectiveCustomerName}'s ${effectiveServiceName} service is complete and fully paid.`;
+
+    try {
+        await sendStaffUpdate(appointment, staffTitle, staffBody, {
+            type: hasPaymentDue ? 'appointment_payment_due' : 'appointment_service_completed',
+            customerName: effectiveCustomerName,
+            serviceName: effectiveServiceName,
+            dueAmount
+        });
+    } catch (staffNotificationError) {
+        console.warn('Service completed staff notification warning:', staffNotificationError.message);
+    }
+
+    try {
         if (!userEmail) {
             return;
         }
-
-        const effectiveServiceName = contextAppointment?.service?.name_en || contextAppointment?.service?.name_ar || serviceName;
-        const effectiveCustomerName = `${contextAppointment?.user?.firstName || ''} ${contextAppointment?.user?.lastName || ''}`.trim() || customerName;
-        const tenantName = contextAppointment?.tenant?.name || contextAppointment?.tenant?.name_en || contextAppointment?.tenant?.name_ar || 'Refah';
-        const reviewLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/bookings/${encodeURIComponent(contextAppointment.id)}/review/open`;
 
         await sendEmail({
             to: userEmail,
@@ -172,7 +195,7 @@ const notifyServiceCompleted = async (appointment) => {
                 serviceName: effectiveServiceName,
                 appointmentDate,
                 reviewLink,
-                googleReviewUrl: contextAppointment?.tenant?.mapUrl || ''
+                googleReviewUrl
             }
         });
     } catch (reviewInviteError) {
