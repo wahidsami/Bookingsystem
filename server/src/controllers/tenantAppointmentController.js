@@ -355,6 +355,63 @@ function appendGroupGuestToNotes(notes, groupGuest) {
     return base ? `${base}\n${marker}` : marker;
 }
 
+function normalizeBooleanFlag(value) {
+    return value === true || `${value || ''}`.trim().toLowerCase() === 'true';
+}
+
+async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, groupGuest, transaction }) {
+    if (!groupGuest || typeof groupGuest !== 'object') {
+        return null;
+    }
+
+    const requestedServiceId = `${groupGuest.serviceId || ''}`.trim();
+    if (!requestedServiceId) {
+        return null;
+    }
+
+    if (normalizeBooleanFlag(groupGuest.isFree)) {
+        return {
+            extraPrice: 0,
+            extraRawPrice: 0,
+            extraTaxAmount: 0,
+            extraPlatformFee: 0,
+            extraTenantRevenue: 0,
+            extraEmployeeRevenue: 0,
+            extraEmployeeCommissionRate: Number(appointment.employeeCommissionRate || 0),
+            extraEmployeeCommission: 0,
+            guestService: null
+        };
+    }
+
+    const guestService = await db.Service.findOne({
+        where: { id: requestedServiceId, tenantId },
+        attributes: ['id', 'name_en', 'name_ar', 'rawPrice', 'taxRate', 'commissionRate', 'finalPrice'],
+        transaction
+    });
+
+    if (!guestService) {
+        throw new Error('Guest service not found');
+    }
+
+    const staff = await db.Staff.findByPk(appointment.staffId, {
+        transaction,
+        attributes: ['id', 'commissionRate']
+    });
+
+    const breakdown = db.Appointment.calculateRevenueBreakdown(guestService, staff);
+    return {
+        extraPrice: Number(breakdown.price || 0),
+        extraRawPrice: Number(breakdown.rawPrice || 0),
+        extraTaxAmount: Number(breakdown.taxAmount || 0),
+        extraPlatformFee: Number(breakdown.platformFee || 0),
+        extraTenantRevenue: Number(breakdown.tenantRevenue || 0),
+        extraEmployeeRevenue: Number(breakdown.employeeRevenue || 0),
+        extraEmployeeCommissionRate: Number(breakdown.employeeCommissionRate || 0),
+        extraEmployeeCommission: Number(breakdown.employeeCommission || 0),
+        guestService
+    };
+}
+
 /**
  * Create a new appointment from the tenant dashboard
  * POST /api/v1/tenant/appointments
@@ -431,7 +488,8 @@ exports.createAppointment = async (req, res) => {
             normalizedGroupGuest = {
                 ...groupGuest,
                 serviceId: resolvedGuestService?.id || requestedServiceId || serviceId,
-                serviceName: `${resolvedGuestService?.name_en || resolvedGuestService?.name_ar || groupGuest.serviceName || ''}`.trim() || null
+                serviceName: `${resolvedGuestService?.name_en || resolvedGuestService?.name_ar || groupGuest.serviceName || ''}`.trim() || null,
+                isFree: normalizeBooleanFlag(groupGuest.isFree)
             };
         }
 
@@ -450,6 +508,53 @@ exports.createAppointment = async (req, res) => {
             assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
             skipAdvanceValidation: true
         }, { transaction });
+
+        const groupGuestPrice = await calculateGroupGuestPriceAdjustment({
+            tenantId,
+            appointment,
+            groupGuest: normalizedGroupGuest,
+            transaction
+        });
+        if (groupGuestPrice && groupGuestPrice.extraPrice > 0) {
+            const currentPrice = Number(appointment.price || 0);
+            const currentRawPrice = Number(appointment.rawPrice || 0);
+            const currentTaxAmount = Number(appointment.taxAmount || 0);
+            const currentPlatformFee = Number(appointment.platformFee || 0);
+            const currentTenantRevenue = Number(appointment.tenantRevenue || 0);
+            const currentEmployeeRevenue = Number(appointment.employeeRevenue || 0);
+            const currentEmployeeCommission = Number(appointment.employeeCommission || 0);
+            const totalPrice = parseFloat((currentPrice + groupGuestPrice.extraPrice).toFixed(2));
+            const totalRawPrice = parseFloat((currentRawPrice + groupGuestPrice.extraRawPrice).toFixed(2));
+            const totalTaxAmount = parseFloat((currentTaxAmount + groupGuestPrice.extraTaxAmount).toFixed(2));
+            const totalPlatformFee = parseFloat((currentPlatformFee + groupGuestPrice.extraPlatformFee).toFixed(2));
+            const totalTenantRevenue = parseFloat((currentTenantRevenue + groupGuestPrice.extraTenantRevenue).toFixed(2));
+            const totalEmployeeRevenue = parseFloat((currentEmployeeRevenue + groupGuestPrice.extraEmployeeRevenue).toFixed(2));
+            const totalEmployeeCommission = parseFloat((currentEmployeeCommission + groupGuestPrice.extraEmployeeCommission).toFixed(2));
+            const paymentMethodValue = `${paymentMethod || ''}`.trim().toLowerCase();
+            const combinedSplit = paymentMethodValue === 'booking-fee'
+                ? calculateSplitPayment(tenantId, totalPrice)
+                : Promise.resolve({
+                    depositAmount: 0,
+                    remainderAmount: totalPrice
+                });
+            const bookingSplit = await combinedSplit;
+
+            appointment.price = totalPrice;
+            appointment.rawPrice = totalRawPrice;
+            appointment.taxAmount = totalTaxAmount;
+            appointment.platformFee = totalPlatformFee;
+            appointment.tenantRevenue = totalTenantRevenue;
+            appointment.employeeRevenue = totalEmployeeRevenue;
+            appointment.employeeCommissionRate = groupGuestPrice.extraEmployeeCommissionRate || appointment.employeeCommissionRate;
+            appointment.employeeCommission = totalEmployeeCommission;
+            appointment.depositAmount = parseFloat(Number(bookingSplit.depositAmount || 0).toFixed(2));
+            appointment.remainderAmount = parseFloat(Number(bookingSplit.remainderAmount || totalPrice).toFixed(2));
+            appointment.totalPaid = 0;
+            appointment.depositPaid = false;
+            appointment.remainderPaid = false;
+
+            await appointment.save({ transaction });
+        }
 
         const inviteToken = generateInviteToken();
         const inviteExpiresAt = new Date(Date.now() + (INVITE_EXPIRY_HOURS * 60 * 60 * 1000));

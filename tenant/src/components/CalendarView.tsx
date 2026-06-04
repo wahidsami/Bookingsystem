@@ -1387,6 +1387,11 @@ export function CalendarView({
                                           {locale === 'ar' ? 'الخدمة' : 'Service'}: {groupGuest.serviceName}
                                         </div>
                                       ) : null}
+                                      {groupGuest.isFree ? (
+                                        <div className="mt-1 text-emerald-200">
+                                          {locale === 'ar' ? 'خدمة مجانية' : 'Free service'}
+                                        </div>
+                                      ) : null}
                                     </div>
                                   ) : null}
                                 </div>

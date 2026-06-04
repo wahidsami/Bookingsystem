@@ -3,6 +3,7 @@ export type GroupGuestMeta = {
   phone?: string | null;
   serviceId?: string | null;
   serviceName?: string | null;
+  isFree?: boolean | null;
 };
 
 const GROUP_GUEST_MARKER = "[GROUP_GUEST]";
@@ -32,7 +33,8 @@ export function parseGroupGuestFromNotes(notes?: string | null): GroupGuestMeta 
             fullName,
             phone: parsed.phone ? `${parsed.phone}`.trim() : null,
             serviceId: parsed.serviceId ? `${parsed.serviceId}`.trim() : null,
-            serviceName: parsed.serviceName ? `${parsed.serviceName}`.trim() : null
+            serviceName: parsed.serviceName ? `${parsed.serviceName}`.trim() : null,
+            isFree: parsed.isFree === true || `${parsed.isFree || ''}`.trim().toLowerCase() === 'true'
           };
         }
       }

@@ -39,6 +39,9 @@ const appendGroupGuestToNotes = (notes, groupGuest) => {
     const firstName = `${groupGuest.firstName || ''}`.trim();
     const lastName = `${groupGuest.lastName || ''}`.trim();
     const phone = `${groupGuest.phone || ''}`.trim();
+    const serviceId = `${groupGuest.serviceId || ''}`.trim();
+    const serviceName = `${groupGuest.serviceName || ''}`.trim();
+    const isFree = groupGuest.isFree === true || `${groupGuest.isFree || ''}`.trim().toLowerCase() === 'true';
     const fullName = `${firstName} ${lastName}`.trim();
 
     if (!fullName) {
@@ -47,7 +50,10 @@ const appendGroupGuestToNotes = (notes, groupGuest) => {
 
     const payload = {
         fullName,
-        phone: phone || null
+        phone: phone || null,
+        serviceId: serviceId || null,
+        serviceName: serviceName || null,
+        isFree
     };
 
     const base = `${notes || ''}`.trim();

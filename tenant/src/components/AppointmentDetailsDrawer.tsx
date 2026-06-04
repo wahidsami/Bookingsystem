@@ -1306,6 +1306,11 @@ export function AppointmentDetailsDrawer({
                             {locale === "ar" ? "الخدمة" : "Service"}: {groupGuest.serviceName}
                           </p>
                         ) : null}
+                        {groupGuest.isFree ? (
+                          <p className="mt-1 text-sm font-semibold text-emerald-700">
+                            {locale === "ar" ? "خدمة مجانية" : "Free service"}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
 
