@@ -47,15 +47,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="pos"
         options={{
-          title: 'POS',
-          tabBarIcon: ({ color }) => <Ionicons name="card-outline" size={22} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="customers"
         options={{
-          title: t('customers') || 'Customers',
-          tabBarIcon: ({ color }) => <Ionicons name="people-outline" size={22} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

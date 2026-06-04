@@ -61,6 +61,8 @@ const AuthContext = createContext<AuthContextType>({
     updateUser: () => { },
 });
 
+const STAFF_USER_CACHE_KEY = 'refah_staff_user_cache';
+
 const normalizeUserPayload = (userData: any): User => ({
     id: `${userData?.id || ''}`,
     name: `${userData?.name || 'Staff'}`,
@@ -105,6 +107,30 @@ const normalizeUserPayload = (userData: any): User => ({
     },
 });
 
+const parseCachedUser = async (): Promise<User | null> => {
+    try {
+        const raw = await SecureStore.getItemAsync(STAFF_USER_CACHE_KEY);
+        if (!raw) return null;
+        return normalizeUserPayload(JSON.parse(raw));
+    } catch {
+        return null;
+    }
+};
+
+const persistCachedUser = async (userData: User) => {
+    try {
+        await SecureStore.setItemAsync(STAFF_USER_CACHE_KEY, JSON.stringify(userData));
+    } catch (error) {
+        console.warn('Failed to persist cached staff user', error);
+    }
+};
+
+const clearCachedSession = async () => {
+    await SecureStore.deleteItemAsync('refah_staff_access_token');
+    await SecureStore.deleteItemAsync('refah_staff_refresh_token');
+    await SecureStore.deleteItemAsync(STAFF_USER_CACHE_KEY);
+};
+
 export function useAuth() {
     return useContext(AuthContext);
 }
@@ -142,20 +168,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Attempt to restore session on mount
         const restoreSession = async () => {
+            const cachedUser = await parseCachedUser();
+
             try {
                 const token = await SecureStore.getItemAsync('refah_staff_access_token');
-                if (token) {
-                    // Verify token by fetching user profile
+                if (!token) {
+                    await SecureStore.deleteItemAsync(STAFF_USER_CACHE_KEY);
+                    setUser(null);
+                    return;
+                }
+
+                // Verify token by fetching user profile.
+                // If the backend is temporarily unavailable, fall back to the cached profile
+                // rather than wiping valid credentials.
+                try {
                     const response = await api.get('/staff/me');
                     if (response.data.success && response.data.staff) {
-                        setUser(normalizeUserPayload(response.data.staff));
+                        const normalizedUser = normalizeUserPayload(response.data.staff);
+                        setUser(normalizedUser);
+                        await persistCachedUser(normalizedUser);
+                        return;
                     }
+                    if (cachedUser) {
+                        setUser(cachedUser);
+                        return;
+                    }
+                } catch (error: any) {
+                    const status = error?.response?.status;
+                    if (status === 401 || status === 403) {
+                        await clearCachedSession();
+                        setUser(null);
+                        return;
+                    }
+
+                    if (cachedUser) {
+                        console.warn('Restoring staff session from cache after profile lookup failure');
+                        setUser(cachedUser);
+                        return;
+                    }
+
+                    console.error('Failed to restore session', error);
                 }
-            } catch (error) {
-                console.error('Failed to restore session', error);
-                // Clean up bad tokens
-                await SecureStore.deleteItemAsync('refah_staff_access_token');
-                await SecureStore.deleteItemAsync('refah_staff_refresh_token');
             } finally {
                 setIsLoading(false);
             }
@@ -170,7 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const signIn = async (tokens: { accessToken: string; refreshToken: string }, userData: User) => {
         await SecureStore.setItemAsync('refah_staff_access_token', tokens.accessToken);
         await SecureStore.setItemAsync('refah_staff_refresh_token', tokens.refreshToken);
-        setUser(normalizeUserPayload(userData));
+        const normalizedUser = normalizeUserPayload(userData);
+        await persistCachedUser(normalizedUser);
+        setUser(normalizedUser);
     };
 
     const signOut = async () => {
@@ -179,14 +234,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch {
             // Ignore network errors on logout, we still want to wipe local state
         } finally {
-            await SecureStore.deleteItemAsync('refah_staff_access_token');
-            await SecureStore.deleteItemAsync('refah_staff_refresh_token');
+            await clearCachedSession();
             setUser(null);
         }
     };
 
     const updateUser = (userData: Partial<User>) => {
-        setUser(prev => prev ? normalizeUserPayload({ ...prev, ...userData }) : null);
+        setUser(prev => {
+            if (!prev) return null;
+            const next = normalizeUserPayload({ ...prev, ...userData });
+            void persistCachedUser(next);
+            return next;
+        });
     };
 
     return (

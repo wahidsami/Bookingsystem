@@ -64,7 +64,7 @@ export function usePushNotifications() {
                 || type.startsWith('booking_')
                 || appointmentId
             ) {
-                router.push('/(tabs)/schedule');
+                router.push('/(tabs)/appointments');
                 return;
             }
 
