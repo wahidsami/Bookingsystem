@@ -1301,6 +1301,11 @@ export function AppointmentDetailsDrawer({
                         {groupGuest.phone ? (
                           <p className="mt-1 text-sm text-indigo-900">{groupGuest.phone}</p>
                         ) : null}
+                        {groupGuest.serviceName ? (
+                          <p className="mt-1 text-sm text-indigo-900">
+                            {locale === "ar" ? "الخدمة" : "Service"}: {groupGuest.serviceName}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
 

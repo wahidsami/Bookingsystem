@@ -1,6 +1,8 @@
 export type GroupGuestMeta = {
   fullName: string;
   phone?: string | null;
+  serviceId?: string | null;
+  serviceName?: string | null;
 };
 
 const GROUP_GUEST_MARKER = "[GROUP_GUEST]";
@@ -28,7 +30,9 @@ export function parseGroupGuestFromNotes(notes?: string | null): GroupGuestMeta 
         if (fullName) {
           last = {
             fullName,
-            phone: parsed.phone ? `${parsed.phone}`.trim() : null
+            phone: parsed.phone ? `${parsed.phone}`.trim() : null,
+            serviceId: parsed.serviceId ? `${parsed.serviceId}`.trim() : null,
+            serviceName: parsed.serviceName ? `${parsed.serviceName}`.trim() : null
           };
         }
       }
@@ -50,4 +54,3 @@ export function sanitizeAppointmentNotes(notes?: string | null): string {
     .join("\n")
     .trim();
 }
-

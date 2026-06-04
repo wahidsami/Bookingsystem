@@ -218,7 +218,7 @@ export function AppointmentActionDrawer({
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
-  const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "" });
+  const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "" });
 
   const [breakEmployeeId, setBreakEmployeeId] = useState("");
   const [breakDate, setBreakDate] = useState(getTodayDateKey());
@@ -271,7 +271,7 @@ export function AppointmentActionDrawer({
       setPaymentMethod(prefill?.paymentMethod || "");
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
-      setGroupGuest({ firstName: "", lastName: "", phone: "" });
+      setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "" });
       return;
     }
 
@@ -418,6 +418,23 @@ export function AppointmentActionDrawer({
     defaultStaffId
   ]);
 
+  useEffect(() => {
+    if (!includeGroupGuest) {
+      return;
+    }
+
+    setGroupGuest((prev) => {
+      if (prev.serviceId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        serviceId: selectedServiceId || ""
+      };
+    });
+  }, [includeGroupGuest, selectedServiceId]);
+
   const selectedVariant = useMemo(
     () => serviceVariants.find((variant) => variant.id === selectedVariantId) || null,
     [serviceVariants, selectedVariantId]
@@ -480,6 +497,11 @@ export function AppointmentActionDrawer({
       return;
     }
 
+    if (includeGroupGuest && !groupGuest.serviceId.trim()) {
+      setError(locale === "ar" ? "الرجاء اختيار خدمة الضيف الإضافي." : "Please choose the additional guest service.");
+      return;
+    }
+
     const emailForConfirmation =
       customerMode === "existing"
         ? (selectedCustomer?.email || "").trim()
@@ -516,7 +538,15 @@ export function AppointmentActionDrawer({
         groupGuest: includeGroupGuest ? {
           firstName: groupGuest.firstName.trim(),
           lastName: groupGuest.lastName.trim(),
-          phone: groupGuest.phone.trim() || undefined
+          phone: groupGuest.phone.trim() || undefined,
+          serviceId: groupGuest.serviceId.trim() || undefined,
+          serviceName: (() => {
+            const matchedService = services.find((service) => service.id === groupGuest.serviceId);
+            if (!matchedService) {
+              return undefined;
+            }
+            return (locale === "ar" ? matchedService.name_ar : matchedService.name_en) || matchedService.name_en || matchedService.name_ar || undefined;
+          })()
         } : undefined,
         platformUserId: customerMode === "existing" ? selectedCustomer?.id : undefined,
         customer: customerMode === "new" || customerMode === "guest"
@@ -1152,6 +1182,19 @@ export function AppointmentActionDrawer({
                         placeholder={locale === "ar" ? "الجوال (اختياري)" : "Phone (optional)"}
                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                       />
+                      <select
+                        value={groupGuest.serviceId}
+                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, serviceId: e.target.value }))}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      >
+                        <option value="">{locale === "ar" ? "خدمة الضيف" : "Guest service"}</option>
+                        {services.map((service) => (
+                          <option key={service.id} value={service.id}>
+                            {locale === "ar" ? service.name_ar : service.name_en}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   ) : null}
                 </div>

@@ -338,12 +338,19 @@ function appendGroupGuestToNotes(notes, groupGuest) {
     const firstName = `${groupGuest.firstName || ''}`.trim();
     const lastName = `${groupGuest.lastName || ''}`.trim();
     const phone = `${groupGuest.phone || ''}`.trim();
+    const serviceId = `${groupGuest.serviceId || ''}`.trim();
+    const serviceName = `${groupGuest.serviceName || ''}`.trim();
     const fullName = `${firstName} ${lastName}`.trim();
     if (!fullName) {
         return notes;
     }
 
-    const marker = `[GROUP_GUEST] ${JSON.stringify({ fullName, phone: phone || null })}`;
+    const marker = `[GROUP_GUEST] ${JSON.stringify({
+        fullName,
+        phone: phone || null,
+        serviceId: serviceId || null,
+        serviceName: serviceName || null
+    })}`;
     const base = `${notes || ''}`.trim();
     return base ? `${base}\n${marker}` : marker;
 }
@@ -408,7 +415,27 @@ exports.createAppointment = async (req, res) => {
             }
         }
 
-        const normalizedNotes = appendGroupGuestToNotes(notes, groupGuest);
+        let normalizedGroupGuest = groupGuest || null;
+        if (groupGuest && typeof groupGuest === 'object') {
+            const requestedServiceId = `${groupGuest.serviceId || serviceId || ''}`.trim();
+            let resolvedGuestService = null;
+
+            if (requestedServiceId) {
+                resolvedGuestService = await db.Service.findOne({
+                    where: { id: requestedServiceId, tenantId },
+                    attributes: ['id', 'name_en', 'name_ar'],
+                    transaction
+                });
+            }
+
+            normalizedGroupGuest = {
+                ...groupGuest,
+                serviceId: resolvedGuestService?.id || requestedServiceId || serviceId,
+                serviceName: `${resolvedGuestService?.name_en || resolvedGuestService?.name_ar || groupGuest.serviceName || ''}`.trim() || null
+            };
+        }
+
+        const normalizedNotes = appendGroupGuestToNotes(notes, normalizedGroupGuest);
 
         const appointment = await bookingService.createBooking({
             serviceId,

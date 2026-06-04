@@ -1382,6 +1382,11 @@ export function CalendarView({
                                       {groupGuest.phone ? (
                                         <div className="mt-1 text-white/80">{groupGuest.phone}</div>
                                       ) : null}
+                                      {groupGuest.serviceName ? (
+                                        <div className="mt-1 text-white/80">
+                                          {locale === 'ar' ? 'الخدمة' : 'Service'}: {groupGuest.serviceName}
+                                        </div>
+                                      ) : null}
                                     </div>
                                   ) : null}
                                 </div>
