@@ -663,6 +663,18 @@ export function AppointmentDetailsDrawer({
 
   const handleQuickStatusUpdate = async (nextStatus: "confirmed" | "checked_in" | "in_service" | "completed" | "no_show" | "cancelled") => {
     if (!appointment || statusUpdating) return;
+    if (nextStatus === "completed") {
+      const effectivePaymentStatus = resolveEffectivePaymentStatus(appointment);
+      const isPaid = effectivePaymentStatus === "fully_paid" || effectivePaymentStatus === "paid";
+      if (!isPaid) {
+        alert(
+          locale === "ar"
+            ? "لا يمكنك تغيير الحالة إلى مكتمل إلا بعد سداد مبلغ الحجز بالكامل."
+            : "You can not change to completed unless the booking amount is paid."
+        );
+        return;
+      }
+    }
     try {
       setStatusUpdating(true);
       const response = await tenantApi.updateAppointmentStatus(appointment.id, nextStatus);
@@ -671,6 +683,7 @@ export function AppointmentDetailsDrawer({
       }
     } catch (err) {
       console.error("Failed to update appointment status from drawer:", err);
+      alert((err as any)?.message || (locale === "ar" ? "تعذر تحديث الحالة." : "Failed to update status."));
     } finally {
       setStatusUpdating(false);
     }

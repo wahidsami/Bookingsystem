@@ -7,7 +7,7 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const { Sequelize } = require('sequelize');
 const crypto = require('crypto');
-const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatus');
+const { APPOINTMENT_PAYMENT_STATUS, isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('../services/pushNotificationService');
 const customerNotificationService = require('../services/customerNotificationService');
 const bookingService = require('../services/bookingService');
@@ -1044,6 +1044,20 @@ exports.updateAppointmentStatus = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: `Cannot change appointment from ${appointment.status} to ${normalizedStatus}`
+            });
+        }
+
+        const totalPrice = parseFloat(appointment.price || 0);
+        const totalPaid = parseFloat(appointment.totalPaid || 0);
+        const isSettledByAmount = Number.isFinite(totalPrice) && totalPrice > 0 && Number.isFinite(totalPaid) && totalPaid >= totalPrice;
+        const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
+
+        if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                code: 'APPOINTMENT_PAYMENT_REQUIRED',
+                message: 'You can not change to completed unless the booking amount is paid.'
             });
         }
 
