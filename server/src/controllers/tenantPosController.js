@@ -10,6 +10,11 @@ const {
     normalizeAppointmentNotificationSettings
 } = require('../services/appointmentAutomationService');
 const {
+    ensureAppointmentInvoice,
+    ensureOrderInvoice
+} = require('../services/customerInvoiceService');
+const { sendCustomerInvoiceLifecycleEmail } = require('../services/customerInvoiceEmailService');
+const {
     createAppointmentTransaction,
     createOrderTransaction
 } = require('../services/paymentTransactionLedgerService');
@@ -602,6 +607,27 @@ exports.redeemGiftCardForPos = async (req, res) => {
             redeemAmount,
             remainingAmountAfter: nextRemainingAmount
         });
+
+        try {
+            if (entityType === 'appointment') {
+                const invoice = await ensureAppointmentInvoice(entityId, {
+                    triggerSource: 'tenant_pos_gift_card_redeem'
+                });
+                if (invoice?.id) {
+                    await sendCustomerInvoiceLifecycleEmail(invoice.id);
+                }
+            } else {
+                const invoice = await ensureOrderInvoice(entityId, {
+                    triggerSource: 'tenant_pos_gift_card_redeem'
+                });
+                if (invoice?.id) {
+                    await sendCustomerInvoiceLifecycleEmail(invoice.id);
+                }
+            }
+        } catch (invoiceError) {
+            console.warn('POS gift card invoice email warning:', invoiceError.message);
+        }
+
         return res.json({
             success: true,
             message: 'Gift card redeemed successfully',

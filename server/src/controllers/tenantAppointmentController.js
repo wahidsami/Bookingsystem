@@ -20,6 +20,10 @@ const {
     resolveLedgerPaymentMethod
 } = require('../services/paymentTransactionLedgerService');
 const {
+    ensureAppointmentInvoice
+} = require('../services/customerInvoiceService');
+const { sendCustomerInvoiceLifecycleEmail } = require('../services/customerInvoiceEmailService');
+const {
     TENANT_APPOINTMENT_TRANSITIONS,
     canTransitionAppointmentStatus,
     isValidAppointmentStatus,
@@ -1373,6 +1377,17 @@ exports.updatePaymentStatus = async (req, res) => {
             });
         } catch (notificationError) {
             console.warn('Tenant booking payment notification warning:', notificationError.message);
+        }
+
+        try {
+            const invoice = await ensureAppointmentInvoice(appointment.id, {
+                triggerSource: 'tenant_dashboard_payment_update'
+            });
+            if (invoice?.id) {
+                await sendCustomerInvoiceLifecycleEmail(invoice.id);
+            }
+        } catch (invoiceError) {
+            console.warn('Tenant booking payment invoice email warning:', invoiceError.message);
         }
 
         res.json({
