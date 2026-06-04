@@ -249,7 +249,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
   const getCenterPhoneNumber = (booking?: Booking | null) => {
     const tenant = booking?.tenant;
-    const candidate = `${tenant?.phone || tenant?.mobile || tenant?.whatsappNumber || ''}`.trim();
+    const candidate = `${tenant?.whatsappNumber || tenant?.mobile || tenant?.phone || ''}`.trim();
     return candidate || '';
   };
 
@@ -265,19 +265,27 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
       return;
     }
 
-    const telUrl = `tel:${phone.replace(/\s+/g, '')}`;
+    const normalizedPhone = phone.replace(/\s+/g, '');
+    const whatsappUrl = `https://wa.me/${normalizedPhone.replace(/[^0-9]/g, '')}`;
+    const telUrl = `tel:${normalizedPhone}`;
     try {
-      const canOpen = await Linking.canOpenURL(telUrl);
-      if (!canOpen) {
-        throw new Error('Cannot open phone dialer');
+      const canOpenWhatsApp = await Linking.canOpenURL(whatsappUrl);
+      if (canOpenWhatsApp) {
+        await Linking.openURL(whatsappUrl);
+        return;
       }
-      await Linking.openURL(telUrl);
+      const canOpenDialer = await Linking.canOpenURL(telUrl);
+      if (canOpenDialer) {
+        await Linking.openURL(telUrl);
+        return;
+      }
+      throw new Error('No supported contact app available');
     } catch (error) {
       Alert.alert(
         language === 'ar' ? 'تعذر الاتصال' : 'Call unavailable',
         language === 'ar'
-          ? `تعذر فتح تطبيق الاتصال للرقم ${phone}.`
-          : `Could not open the phone dialer for ${phone}.`
+          ? `تعذر فتح واتساب أو تطبيق الاتصال للرقم ${phone}.`
+          : `Could not open WhatsApp or the phone dialer for ${phone}.`
       );
     }
   };
