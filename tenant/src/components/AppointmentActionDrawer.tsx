@@ -150,6 +150,11 @@ function addMinutesToTime(time: string, minutesToAdd: number) {
   return base.toTimeString().slice(0, 5);
 }
 
+function toSafeMoneyNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function formatTime12Hour(value: string, locale: string) {
   const [h, m] = value.split(":").map((part) => Number(part));
   if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
@@ -440,16 +445,16 @@ export function AppointmentActionDrawer({
     [serviceVariants, selectedVariantId]
   );
 
-  const displayServicePrice = selectedVariant?.finalPrice ?? selectedService?.finalPrice ?? 0;
+  const displayServicePrice = toSafeMoneyNumber(selectedVariant?.finalPrice ?? selectedService?.finalPrice ?? 0);
   const displayDuration = selectedVariant?.duration ?? selectedService?.duration ?? 0;
   const selectedGuestService = useMemo(
     () => services.find((service) => service.id === groupGuest.serviceId) || null,
     [services, groupGuest.serviceId]
   );
   const guestServicePrice = includeGroupGuest
-    ? (groupGuest.isFree ? 0 : (selectedGuestService?.finalPrice ?? 0))
+    ? (groupGuest.isFree ? 0 : toSafeMoneyNumber(selectedGuestService?.finalPrice ?? 0))
     : 0;
-  const displayTotalPrice = displayServicePrice + guestServicePrice;
+  const displayTotalPrice = toSafeMoneyNumber(displayServicePrice + guestServicePrice);
 
   const handleAppointmentSubmit = async () => {
     setError("");
