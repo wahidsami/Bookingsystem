@@ -73,6 +73,7 @@ export function GiftsScreen({ navigation, route }: any) {
   const sar = (value: number) => formatRiyal(Number(value || 0), language === 'ar' ? 'ar' : 'en');
   const tenantId = route?.params?.tenantId as string | undefined;
   const tenantName = route?.params?.tenantName as string | undefined;
+  const showTenantGiftCards = Boolean(tenantId);
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
 
   const [loading, setLoading] = useState(true);
@@ -192,11 +193,9 @@ export function GiftsScreen({ navigation, route }: any) {
   const loadPackages = async () => {
     try {
       setLoading(true);
-      const endpoint = tenantId ? `/public/tenant/${tenantId}/gift-cards` : '/users/gifts/packages';
-      const response = await api.get<{ success: boolean; packages: GiftPackage[] }>(endpoint);
-      if (response.success) setPackages(response.packages || []);
-
       if (tenantId) {
+        const response = await api.get<{ success: boolean; packages: GiftPackage[] }>(`/public/tenant/${tenantId}/gift-cards`);
+        if (response.success) setPackages(response.packages || []);
         const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
         if (summaryRes?.success && summaryRes.summary) {
           setRefahBalance(Number(summaryRes.summary.wallet?.balance || 0));
@@ -216,6 +215,7 @@ export function GiftsScreen({ navigation, route }: any) {
         const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/tenant-gifts/history');
         if (historyRes.success) setHistory((historyRes.transactions || []).filter((tx) => tx.tenantId === tenantId).slice(0, 10));
       } else {
+        setPackages([]);
         const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
         if (summaryRes?.success && summaryRes.summary?.wallet) {
           setRefahBalance(Number(summaryRes.summary.wallet.balance || 0));
@@ -475,74 +475,82 @@ export function GiftsScreen({ navigation, route }: any) {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.quickRow}>
-            <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}>
-              <View style={styles.quickIconWrap}>
-                <AppIcon name="sparkles" size={18} color={colors.primary} />
-              </View>
-              <Text style={styles.quickText}>{language === 'ar' ? 'استبدال كود الهدية' : 'Redeem Gift Code'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })}>
-              <View style={styles.quickIconWrap}>
-                <AppIcon name="file" size={18} color={colors.primary} />
-              </View>
-              <Text style={styles.quickText}>{language === 'ar' ? 'سجل المحفظة والهدايا' : 'Wallet & Gift History'}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.claimRow}>
-            <TextInput
-              style={[styles.input, styles.claimInput]}
-              value={claimCode}
-              onChangeText={setClaimCode}
-              placeholder={language === 'ar' ? 'أدخل كود الهدية' : 'Enter gift code'}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity style={styles.claimBtn} onPress={handleClaimCode} disabled={saving}>
-              <Text style={styles.claimBtnText}>{language === 'ar' ? 'استلام' : 'Claim'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.sectionHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>{language === 'ar' ? 'بطاقات رفاه ✨' : 'Refah Gift Cards ✨'}</Text>
-              <Text style={styles.sectionSubTitle}>{language === 'ar' ? 'أهدِ الرفاهية والعناية لمن تحب.' : 'Give the gift of wellness, self-care and joy.'}</Text>
-            </View>
-          </View>
-
-          {loading ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} /> : null}
-          {packages.map((pkg, index) => {
-            const title = language === 'ar' ? pkg.title_ar : pkg.title_en;
-            const desc = language === 'ar' ? pkg.description_ar : pkg.description_en;
-            const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
-            return (
-              <TouchableOpacity key={pkg.id} style={styles.giftCard} onPress={() => setSelected(pkg)} activeOpacity={0.95}>
-                <ImageBackground source={HERO_IMAGE} style={styles.giftHero} imageStyle={styles.giftHeroImage}>
-                  {index === 0 ? <View style={styles.badgePill}><Text style={styles.badgeText}>{language === 'ar' ? 'الأكثر شعبية' : 'Most Popular'}</Text></View> : null}
-                  <View style={styles.pricePill}><Text style={styles.pricePillText}>{sar(Number(pkg.priceAmount))}</Text></View>
-                </ImageBackground>
-                <View style={styles.giftBody}>
-                  <Text style={styles.giftTitle}>{title}</Text>
-                  {!!desc ? <Text style={styles.giftDesc} numberOfLines={2}>{desc}</Text> : null}
-                  <View style={styles.payGetBlock}>
-                    <View>
-                      <Text style={styles.payGetLabel}>{language === 'ar' ? 'أنت تدفع' : 'You Pay'}</Text>
-                      <Text style={styles.payGetPay}>{sar(Number(pkg.priceAmount))}</Text>
-                    </View>
-                    <Text style={styles.payGetArrow}>{isRTL ? '←' : '→'}</Text>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.payGetLabel, { color: '#0F8A4B' }]}>{language === 'ar' ? 'تحصل على' : 'You Get'}</Text>
-                      <Text style={styles.payGetGet}>{sar(totalCredit)}</Text>
-                    </View>
+          {showTenantGiftCards ? (
+            <>
+              <View style={styles.quickRow}>
+                <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}>
+                  <View style={styles.quickIconWrap}>
+                    <AppIcon name="sparkles" size={18} color={colors.primary} />
                   </View>
-                  {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {sar(Number(pkg.bonusAmount))} {language === 'ar' ? 'مكافأة' : 'Bonus'}</Text></View> : null}
-                  <View style={styles.validityRow}><AppIcon name="event" size={14} color={colors.textSecondary} /><Text style={styles.validityText}>{language === 'ar' ? 'صلاحية 12 شهر' : '12 months validity'}</Text></View>
-                  <TouchableOpacity style={styles.buyBtn} onPress={() => setSelected(pkg)}>
-                    <Text style={styles.buyBtnText}>{language === 'ar' ? 'شراء / إرسال هدية' : 'Buy / Send Gift'}</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.quickText}>{language === 'ar' ? 'استبدال كود الهدية' : 'Redeem Gift Code'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })}>
+                  <View style={styles.quickIconWrap}>
+                    <AppIcon name="file" size={18} color={colors.primary} />
+                  </View>
+                  <Text style={styles.quickText}>{language === 'ar' ? 'سجل المحفظة والهدايا' : 'Wallet & Gift History'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.claimRow}>
+                <TextInput
+                  style={[styles.input, styles.claimInput]}
+                  value={claimCode}
+                  onChangeText={setClaimCode}
+                  placeholder={language === 'ar' ? 'أدخل كود الهدية' : 'Enter gift code'}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity style={styles.claimBtn} onPress={handleClaimCode} disabled={saving}>
+                  <Text style={styles.claimBtnText}>{language === 'ar' ? 'استلام' : 'Claim'}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+
+          {showTenantGiftCards ? (
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionTitle}>{language === 'ar' ? 'بطاقات رفاه ✨' : 'Refah Gift Cards ✨'}</Text>
+                  <Text style={styles.sectionSubTitle}>{language === 'ar' ? 'أهدِ الرفاهية والعناية لمن تحب.' : 'Give the gift of wellness, self-care and joy.'}</Text>
                 </View>
-              </TouchableOpacity>
-            );
-          })}
+              </View>
+
+              {loading ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} /> : null}
+              {packages.map((pkg, index) => {
+                const title = language === 'ar' ? pkg.title_ar : pkg.title_en;
+                const desc = language === 'ar' ? pkg.description_ar : pkg.description_en;
+                const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                return (
+                  <TouchableOpacity key={pkg.id} style={styles.giftCard} onPress={() => setSelected(pkg)} activeOpacity={0.95}>
+                    <ImageBackground source={HERO_IMAGE} style={styles.giftHero} imageStyle={styles.giftHeroImage}>
+                      {index === 0 ? <View style={styles.badgePill}><Text style={styles.badgeText}>{language === 'ar' ? 'الأكثر شعبية' : 'Most Popular'}</Text></View> : null}
+                      <View style={styles.pricePill}><Text style={styles.pricePillText}>{sar(Number(pkg.priceAmount))}</Text></View>
+                    </ImageBackground>
+                    <View style={styles.giftBody}>
+                      <Text style={styles.giftTitle}>{title}</Text>
+                      {!!desc ? <Text style={styles.giftDesc} numberOfLines={2}>{desc}</Text> : null}
+                      <View style={styles.payGetBlock}>
+                        <View>
+                          <Text style={styles.payGetLabel}>{language === 'ar' ? 'أنت تدفع' : 'You Pay'}</Text>
+                          <Text style={styles.payGetPay}>{sar(Number(pkg.priceAmount))}</Text>
+                        </View>
+                        <Text style={styles.payGetArrow}>{isRTL ? '←' : '→'}</Text>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={[styles.payGetLabel, { color: '#0F8A4B' }]}>{language === 'ar' ? 'تحصل على' : 'You Get'}</Text>
+                          <Text style={styles.payGetGet}>{sar(totalCredit)}</Text>
+                        </View>
+                      </View>
+                      {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {sar(Number(pkg.bonusAmount))} {language === 'ar' ? 'مكافأة' : 'Bonus'}</Text></View> : null}
+                      <View style={styles.validityRow}><AppIcon name="event" size={14} color={colors.textSecondary} /><Text style={styles.validityText}>{language === 'ar' ? 'صلاحية 12 شهر' : '12 months validity'}</Text></View>
+                      <TouchableOpacity style={styles.buyBtn} onPress={() => setSelected(pkg)}>
+                        <Text style={styles.buyBtnText}>{language === 'ar' ? 'شراء / إرسال هدية' : 'Buy / Send Gift'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          ) : null}
 
           {!!history.length && (
             <View style={styles.activityCard}>
