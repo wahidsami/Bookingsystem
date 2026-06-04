@@ -175,6 +175,7 @@ export default function TenantPosPage() {
     maxRedeemableAmount: number;
     currency: string;
   }>(null);
+  const [giftCardFeedback, setGiftCardFeedback] = useState<{ type: "error" | "success"; message: string } | null>(null);
   const [validatingGiftCard, setValidatingGiftCard] = useState(false);
 
   const copy = useMemo(() => ({
@@ -300,6 +301,7 @@ export default function TenantPosPage() {
     setCollectionNotes("");
     setGiftCardCode("");
     setGiftCardInfo(null);
+    setGiftCardFeedback(null);
   };
 
   const handleDownloadReceipt = async (transactionId: string) => {
@@ -323,12 +325,21 @@ export default function TenantPosPage() {
   const handleValidateGiftCard = async () => {
     if (!selectedItem || !giftCardCode.trim()) return;
     setValidatingGiftCard(true);
+    setGiftCardFeedback(null);
     try {
       const response = await tenantApi.validatePosGiftCard({ code: giftCardCode.trim(), entityType: selectedItem.entityType, entityId: selectedItem.entityId });
       setGiftCardInfo(response?.data || null);
+      setGiftCardFeedback({
+        type: "success",
+        message: locale === "ar"
+          ? "تم التحقق من بطاقة الهدية بنجاح. يمكنك إتمام التحصيل الآن."
+          : "Gift card validated successfully. You can now complete the payment."
+      });
     } catch (err: any) {
       setGiftCardInfo(null);
-      setError(err.message || (locale === "ar" ? "تعذر التحقق من بطاقة الهدية" : "Failed to validate gift card"));
+      const message = err?.data?.message || err?.message || (locale === "ar" ? "تعذر التحقق من بطاقة الهدية" : "Failed to validate gift card");
+      setGiftCardFeedback({ type: "error", message });
+      setError(message);
     } finally {
       setValidatingGiftCard(false);
     }
@@ -339,6 +350,9 @@ export default function TenantPosPage() {
     setCollecting(true);
     setError("");
     try {
+      if (collectionMethod === "gift_card" && !giftCardInfo) {
+        throw new Error(locale === "ar" ? "يرجى التحقق من بطاقة الهدية أولاً." : "Please validate the gift card first.");
+      }
       if (selectedItem.entityType === "appointment") {
         if (collectionMethod === "gift_card") {
           await tenantApi.redeemPosGiftCard({ code: giftCardCode.trim(), entityType: "appointment", entityId: selectedItem.entityId, amount: selectedItem.dueAmount, transactionRef: transactionRef || undefined, notes: collectionNotes || undefined });
@@ -587,9 +601,23 @@ export default function TenantPosPage() {
                   {collectionMethod === "gift_card" && (
                     <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
                       <div className="flex gap-2">
-                        <input value={giftCardCode} onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())} className="flex-1 rounded-lg border border-gray-300 px-3 py-2" placeholder={locale === "ar" ? "رمز بطاقة الهدية" : "Gift card code"} />
+                        <input
+                          value={giftCardCode}
+                          onChange={(e) => {
+                            setGiftCardCode(e.target.value.toUpperCase());
+                            setGiftCardInfo(null);
+                            setGiftCardFeedback(null);
+                          }}
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2"
+                          placeholder={locale === "ar" ? "رمز بطاقة الهدية" : "Gift card code"}
+                        />
                         <button onClick={handleValidateGiftCard} disabled={validatingGiftCard || !giftCardCode.trim()} className="rounded-lg bg-white px-3 py-2 font-semibold text-primary border border-primary/20">{validatingGiftCard ? "..." : (locale === "ar" ? "تحقق" : "Validate")}</button>
                       </div>
+                      {giftCardFeedback ? (
+                        <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${giftCardFeedback.type === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                          {giftCardFeedback.message}
+                        </div>
+                      ) : null}
                       {giftCardInfo ? <div className="mt-2 text-xs"><p>{locale === "ar" ? "الرصيد" : "Remaining"}: <Currency amount={giftCardInfo.remainingAmount} /></p><p>{locale === "ar" ? "أقصى استخدام" : "Max redeemable"}: <Currency amount={giftCardInfo.maxRedeemableAmount} /></p></div> : null}
                     </div>
                   )}
@@ -598,7 +626,11 @@ export default function TenantPosPage() {
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     {locale === "ar" ? "تغيير حالة الدفع" : "Payment Status Change"}: {selectedItem.paymentStatus} {"->"} {selectedItem.paymentStatus === "deposit_paid" ? "fully_paid" : (selectedItem.entityType === "order" ? "paid" : "fully_paid")}
                   </div>
-                  <button disabled={collecting || (collectionMethod === "gift_card" && !giftCardCode.trim())} onClick={handleCollectPayment} className="w-full rounded-xl bg-gradient-to-r from-primary to-violet-500 px-4 py-3 text-base font-bold text-white disabled:opacity-60">
+                  <button
+                    disabled={collecting || (collectionMethod === "gift_card" && !giftCardInfo)}
+                    onClick={handleCollectPayment}
+                    className="w-full rounded-xl bg-gradient-to-r from-primary to-violet-500 px-4 py-3 text-base font-bold text-white disabled:opacity-60"
+                  >
                     {collecting ? (locale === "ar" ? "جاري..." : "Saving...") : `${copy.confirmCollection} — ${selectedItem.dueAmount.toFixed(2)} SAR`}
                   </button>
                 </div>
