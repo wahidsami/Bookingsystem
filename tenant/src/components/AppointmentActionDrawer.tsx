@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { tenantApi } from "@/lib/api";
+import { getImageUrl, tenantApi } from "@/lib/api";
 import { Currency } from "@/components/Currency";
 
 interface ServiceEmployee {
@@ -23,6 +23,10 @@ interface ServiceItem {
   id: string;
   name_en: string;
   name_ar: string;
+  image?: string | null;
+  category?: string | null;
+  parentName?: string | null;
+  parentService?: string | null;
   duration: number;
   finalPrice?: number;
   paymentOptions?: string[] | string | null;
@@ -297,7 +301,8 @@ export function AppointmentActionDrawer({
 
   const appointmentStepLabels = [
     locale === "ar" ? "العميل" : "Customer",
-    locale === "ar" ? "الخدمة والموعد" : "Service & Time",
+    locale === "ar" ? "الخدمات" : "Services",
+    locale === "ar" ? "الخدمة والموعد" : "Schedule",
     locale === "ar" ? "حجز جماعي" : "Group",
     locale === "ar" ? "الدفع" : "Payment",
     locale === "ar" ? "المراجعة" : "Review"
@@ -323,7 +328,7 @@ export function AppointmentActionDrawer({
       return locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.";
     }
 
-    if (step === 1) {
+    if (step === 2) {
       if (!appointmentDate || !appointmentTime) {
         return locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.";
       }
@@ -333,7 +338,7 @@ export function AppointmentActionDrawer({
       }
     }
 
-    if (step === 2 && includeGroupGuest) {
+    if (step === 3 && includeGroupGuest) {
       if (!groupGuest.firstName.trim() || !groupGuest.lastName.trim()) {
         return locale === "ar" ? "الرجاء إدخال الاسم الكامل للضيف الإضافي." : "Please enter the additional guest full name.";
       }
@@ -343,7 +348,7 @@ export function AppointmentActionDrawer({
       }
     }
 
-    if (step === 3) {
+    if (step === 4) {
       if (!paymentMethod) {
         return locale === "ar" ? "الرجاء اختيار طريقة الدفع." : "Please choose a payment method.";
       }
@@ -502,6 +507,7 @@ export function AppointmentActionDrawer({
     ? (selectedService?.name_ar || selectedService?.name_en || "")
     : (selectedService?.name_en || selectedService?.name_ar || "");
   const selectedVariantName = selectedVariant?.description || "";
+  const selectedServiceParentLabel = (selectedService?.parentName || selectedService?.parentService || selectedService?.category || "").trim();
   const selectedCustomerName = customerMode === "existing"
     ? `${selectedCustomer?.firstName || ""} ${selectedCustomer?.lastName || ""}`.trim()
     : `${newCustomer.firstName || ""} ${newCustomer.lastName || ""}`.trim();
@@ -938,24 +944,127 @@ export function AppointmentActionDrawer({
                 </div>
 
                 <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 1 ? "" : "hidden"}`}>
-                  <h4 className="text-base font-semibold text-gray-900">
-                    {locale === "ar" ? "الخدمة والموعد" : "Service and Time"}
-                  </h4>
-                  <div className="mt-4 grid grid-cols-1 gap-4">
-                    <select
-                      value={selectedServiceId}
-                      onChange={(e) => setSelectedServiceId(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    >
-                      <option value="">{locale === "ar" ? "اختر خدمة" : "Choose a service"}</option>
-                      {services.map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {locale === "ar" ? service.name_ar : service.name_en}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900">
+                        {locale === "ar" ? "الخدمات" : "Services"}
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        {locale === "ar"
+                          ? "اختر الخدمة من البطاقات الأفقية، ثم انتقل إلى تحديد الموعد."
+                          : "Choose a service from the horizontal cards, then continue to scheduling."}
+                      </p>
+                    </div>
+                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                      {selectedServiceName || (locale === "ar" ? "لم تُحدَّد خدمة" : "No service selected")}
+                    </div>
+                  </div>
 
+                  <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+                    {services.map((service) => {
+                      const active = service.id === selectedServiceId;
+                      const serviceName = locale === "ar" ? service.name_ar : service.name_en;
+                      const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
+                      return (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedServiceId(service.id);
+                            setSelectedVariantId("");
+                            setPaymentMethod("");
+                          }}
+                          className={`group flex min-w-[240px] max-w-[240px] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border text-left transition ${
+                            active
+                              ? "border-primary bg-purple-50 ring-2 ring-primary/20"
+                              : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
+                          }`}
+                        >
+                          <div className="h-28 w-full overflow-hidden bg-gray-100">
+                            {service.image ? (
+                              <img
+                                src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
+                                alt={serviceName}
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                  <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
+                                <p className="mt-1 text-xs text-gray-500">
+                                  {serviceParent
+                                    ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
+                                    : locale === "ar"
+                                      ? "بدون فئة"
+                                      : "No category"}
+                                </p>
+                              </div>
+                              {active && (
+                                <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                  {locale === "ar" ? "محدد" : "Selected"}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
+                              <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                ⏱ {displayDuration && active ? `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}` : `${service.duration} ${locale === "ar" ? "دقيقة" : "min"}`}
+                              </span>
+                              <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedService && (
+                    <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {locale === "ar" ? "الخدمة المحددة" : "Selected service"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {selectedVariantName || `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
+                          </p>
+                          {selectedServiceParentLabel ? (
+                            <p className="mt-1 text-xs text-gray-500">
+                              {locale === "ar" ? "الفئة" : "Category"}: {selectedServiceParentLabel}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-primary">
+                            <Currency amount={displayServicePrice} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 2 ? "" : "hidden"}`}>
+                  <h4 className="text-base font-semibold text-gray-900">
+                    {locale === "ar" ? "الخدمة والموعد" : "Schedule"}
+                  </h4>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {locale === "ar"
+                      ? "راجع مقدم الخدمة والتاريخ والوقت إذا احتجت ذلك."
+                      : "Review the provider, date, and time if you need to change them."}
+                  </p>
+                  <div className="mt-4 grid grid-cols-1 gap-4">
                     <select
                       value={selectedVariantId}
                       onChange={(e) => setSelectedVariantId(e.target.value)}
@@ -1029,7 +1138,7 @@ export function AppointmentActionDrawer({
                   </div>
                 </div>
 
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 3 ? "" : "hidden"}`}>
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 4 ? "" : "hidden"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h4 className="text-base font-semibold text-gray-900">
@@ -1093,7 +1202,7 @@ export function AppointmentActionDrawer({
                   ) : null}
                 </div>
 
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 2 ? "" : "hidden"}`}>
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 3 ? "" : "hidden"}`}>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <h4 className="text-base font-semibold text-gray-900">
@@ -1162,7 +1271,7 @@ export function AppointmentActionDrawer({
                   ) : null}
                 </div>
 
-                <div className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 4 ? "" : "hidden"}`}>
+                <div className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 5 ? "" : "hidden"}`}>
                   <div>
                     <h4 className="text-base font-semibold text-gray-900">
                       {locale === "ar" ? "المراجعة" : "Review"}
