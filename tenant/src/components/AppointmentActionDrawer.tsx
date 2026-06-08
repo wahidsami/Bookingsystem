@@ -1579,6 +1579,42 @@ export function AppointmentActionDrawer({
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "سعر الخدمة الأساسية" : "Base service"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        <Currency amount={displayServicePrice} />
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "سعر خدمة الضيف" : "Guest service"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        <Currency amount={guestServicePrice} />
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {includeGroupGuest
+                          ? (groupGuest.isFree
+                            ? (locale === "ar" ? "مجانية" : "Free")
+                            : (locale === "ar" ? "مضافة للإجمالي" : "Included in total"))
+                          : (locale === "ar" ? "غير مفعلة" : "Not enabled")}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الإجمالي النهائي" : "Final total"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-primary">
+                        <Currency amount={displayTotalPrice} />
+                      </div>
+                    </div>
+                  </div>
+
                   {includeGroupGuest ? (
                     <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
