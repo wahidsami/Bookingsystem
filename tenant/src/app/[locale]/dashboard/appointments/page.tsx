@@ -814,6 +814,21 @@ export default function AppointmentsPage() {
     });
   };
 
+  const handleGridTimeSlotClick = (payload: {
+    staffId: string;
+    startTime: string;
+    dateKey: string;
+  }) => {
+    const start = new Date(payload.startTime);
+    const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    openQuickAppointmentDrawer({
+      staffId: payload.staffId,
+      date,
+      time
+    });
+  };
+
   const handleStaffHeaderMenu = (payload: {
     clientX: number;
     clientY: number;
@@ -1737,6 +1752,7 @@ export default function AppointmentsPage() {
           onDropAppointmentChange={advancedDragEnabled ? handleDropAppointmentChange : undefined}
           onAppointmentClick={handleOpenAppointmentDetails}
           onGridContextMenu={handleGridContextMenu}
+          onGridTimeSlotClick={handleGridTimeSlotClick}
           onStaffHeaderMenuRequest={handleStaffHeaderMenu}
           onBreakClick={handleOpenBlockedTime}
           onAppointmentSettingsClick={handleOpenAppointmentDetails}

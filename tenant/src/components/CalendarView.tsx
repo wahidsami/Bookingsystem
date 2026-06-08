@@ -84,6 +84,11 @@ interface CalendarViewProps {
     startTime: string;
     appointmentId?: string;
   }) => void;
+  onGridTimeSlotClick?: (payload: {
+    staffId: string;
+    startTime: string;
+    dateKey: string;
+  }) => void;
   onStaffHeaderMenuRequest?: (payload: {
     clientX: number;
     clientY: number;
@@ -110,7 +115,9 @@ interface CalendarViewProps {
 // Time configuration
 const START_HOUR = 6; // default 6 AM
 const END_HOUR = 22; // default 10 PM
-const MINUTES_PER_SLOT = 30; // 30-minute intervals
+const SNAP_MINUTES = 5; // precise scheduling increments
+const VISUAL_ROW_MINUTES = 60; // visible hourly rows
+const SUBSLOTS_PER_HOUR = VISUAL_ROW_MINUTES / SNAP_MINUTES;
 const MIN_APPOINTMENT_HEIGHT = 88;
 const MIN_BREAK_HEIGHT = 72;
 
@@ -147,6 +154,13 @@ export function CalendarView({
   const [openNoteAppointmentId, setOpenNoteAppointmentId] = useState<string | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
   const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
+  const [hoveredSlot, setHoveredSlot] = useState<null | {
+    hour: number;
+    minute: number;
+    label: string;
+    dateKey: string;
+    staffId: string;
+  }>(null);
   const [visibleStaffIds, setVisibleStaffIds] = useState<Set<string>>(
     new Set(employees.map(emp => emp.id))
   );
@@ -158,6 +172,16 @@ export function CalendarView({
   const isDayScope = calendarScope === 'day';
   const boardStartHour = Math.max(0, Math.min(23, Math.floor(startHour)));
   const boardEndHour = Math.max(boardStartHour + 1, Math.min(24, Math.floor(endHour)));
+  const hourSlots = useMemo(() => {
+    return Array.from({ length: boardEndHour - boardStartHour }, (_, index) => {
+      const hour = boardStartHour + index;
+      return {
+        hour,
+        label: formatTime(hour, 0, locale),
+        position: index * pixelsPerHour
+      };
+    });
+  }, [boardEndHour, boardStartHour, locale, pixelsPerHour]);
 
   useEffect(() => {
     setVisibleStaffIds((previous) => {
@@ -206,6 +230,10 @@ export function CalendarView({
       document.removeEventListener('touchstart', handleDocumentPointerDown);
     };
   }, [openNoteAppointmentId]);
+
+  useEffect(() => {
+    setHoveredSlot(null);
+  }, [selectedDate.getTime(), boardStartHour, boardEndHour, calendarScope, focusedStaffId, visibleStaffIds]);
 
   // Filter appointments for selected date
   // Use local date comparison to avoid timezone issues
@@ -280,22 +308,6 @@ export function CalendarView({
   const boardMinWidth = timeColumnWidth + ((isDayScope ? Math.max(1, visibleStaff.length) : boardDates.length) * staffColumnWidth);
   const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
-  // Generate time slots
-  const timeSlots = useMemo(() => {
-    const slots = [];
-    for (let hour = boardStartHour; hour < boardEndHour; hour++) {
-      for (let minute = 0; minute < 60; minute += MINUTES_PER_SLOT) {
-        slots.push({
-          hour,
-          minute,
-          label: formatTime(hour, minute, locale),
-          position: (hour - boardStartHour) * pixelsPerHour + minute * pixelsPerMinute
-        });
-      }
-    }
-    return slots;
-  }, [boardEndHour, boardStartHour, locale, pixelsPerHour, pixelsPerMinute]);
-
   // Calculate appointment position and height
   const getAppointmentStyle = (appointment: Appointment, targetDateKey?: string) => {
     const start = new Date(appointment.startTime);
@@ -359,13 +371,19 @@ export function CalendarView({
 
   const getSnappedDateTimeFromPointer = (clientY: number, containerTop: number) => {
     const offsetMinutes = (clientY - containerTop) / pixelsPerMinute;
-    const snappedMinutes = Math.round(offsetMinutes / MINUTES_PER_SLOT) * MINUTES_PER_SLOT;
+    const snappedMinutes = Math.round(offsetMinutes / SNAP_MINUTES) * SNAP_MINUTES;
     const totalAvailableMinutes = (boardEndHour - boardStartHour) * 60;
-    const clampedMinutes = Math.max(0, Math.min(totalAvailableMinutes - MINUTES_PER_SLOT, snappedMinutes));
+    const clampedMinutes = Math.max(0, Math.min(totalAvailableMinutes - SNAP_MINUTES, snappedMinutes));
     const baseDate = new Date(selectedDate);
     baseDate.setHours(boardStartHour, 0, 0, 0);
     baseDate.setMinutes(baseDate.getMinutes() + clampedMinutes);
     return baseDate;
+  };
+
+  const buildDateTimeForSlot = (baseDate: Date, hour: number, minute: number) => {
+    const next = new Date(baseDate);
+    next.setHours(hour, minute, 0, 0);
+    return next;
   };
 
   const getBreakStyle = (breakItem: EmployeeBreak) => {
@@ -828,6 +846,25 @@ export function CalendarView({
     }
   };
 
+  const handleSlotHover = (payload: {
+    hour: number;
+    minute: number;
+    dateKey: string;
+    staffId: string;
+  }) => {
+    setHoveredSlot({
+      hour: payload.hour,
+      minute: payload.minute,
+      label: formatTime(payload.hour, payload.minute, locale),
+      dateKey: payload.dateKey,
+      staffId: payload.staffId
+    });
+  };
+
+  const clearHoveredSlot = () => {
+    setHoveredSlot(null);
+  };
+
   const handleAppointmentClick = (appointmentId: string) => {
     if (onAppointmentClick) {
       onAppointmentClick(appointmentId);
@@ -959,7 +996,7 @@ export function CalendarView({
 
       {/* Calendar Grid */}
       <div className="relative z-20 bg-white border-x border-b border-slate-300 overflow-hidden">
-        <div className="overflow-auto h-[calc(100vh-220px)] min-h-[520px]">
+      <div className="overflow-auto h-[calc(100vh-220px)] min-h-[520px]" onMouseLeave={clearHoveredSlot}>
           <div
             className="inline-flex min-w-full items-start"
             style={{ minWidth: `${boardMinWidth}px` }}
@@ -971,17 +1008,21 @@ export function CalendarView({
             >
               <div className="sticky top-0 z-10 h-28 border-b border-slate-300 bg-[#ececec]"></div>
               <div className="relative" style={{ height: `${totalHeight}px` }}>
-                {timeSlots.map((slot, index) => (
+                {hourSlots.map((slot, index) => (
                   <div
                     key={index}
-                    className="absolute text-xs text-gray-500 px-1 md:px-2 z-10 bg-white"
-                    style={{ top: `${slot.position}px`, transform: 'translateY(-50%)' }}
+                    className={`absolute text-xs px-1 md:px-2 z-10 bg-white transition-colors ${
+                      hoveredSlot && hoveredSlot.hour === slot.hour
+                        ? 'rounded-lg bg-primary/10 font-semibold text-primary ring-1 ring-primary/20 shadow-sm'
+                        : 'text-gray-500'
+                    }`}
+                    style={{ top: `${slot.position}px`, transform: slot.position === 0 ? 'translateY(0)' : 'translateY(-50%)' }}
                   >
-                    {slot.label}
+                    {hoveredSlot && hoveredSlot.hour === slot.hour ? hoveredSlot.label : slot.label}
                   </div>
                 ))}
-                {/* Dotted lines for each time slot */}
-                {timeSlots.map((slot, index) => (
+                {/* Hour boundary lines */}
+                {hourSlots.map((slot, index) => (
                   <div
                     key={`line-${index}`}
                     className="absolute left-0 right-0 border-t border-slate-300/80"
@@ -1140,13 +1181,92 @@ export function CalendarView({
                         });
                       }}
                     >
-                      {/* Dotted lines for each time slot (extend into columns) */}
-                      {timeSlots.map((slot, index) => (
+                      {/* Hour boundary lines (extend into columns) */}
+                      {hourSlots.map((slot, index) => (
                         <div
                           key={`column-line-${index}`}
                           className="absolute left-0 right-0 border-t border-slate-300/70 pointer-events-none"
                           style={{ top: `${slot.position}px` }}
                         />
+                      ))}
+
+                      {/* Invisible 5-minute interaction layer */}
+                      {hourSlots.map((slot) => (
+                        <div
+                          key={`subslot-row-${dateKey}-${activeStaffId || 'all'}-${slot.hour}`}
+                          className="absolute left-0 right-0"
+                          style={{
+                            top: `${slot.position}px`,
+                            height: `${pixelsPerHour}px`
+                          }}
+                        >
+                          <div className="grid h-full grid-cols-12">
+                            {Array.from({ length: SUBSLOTS_PER_HOUR }, (_, subslotIndex) => {
+                              const minute = subslotIndex * SNAP_MINUTES;
+                              const exactStart = buildDateTimeForSlot(dateColumn || selectedDate, slot.hour, minute);
+                              const exactStartTime = exactStart.toISOString();
+                              const slotLabel = formatTime(slot.hour, minute, locale);
+                              const isHovered = Boolean(
+                                hoveredSlot &&
+                                hoveredSlot.hour === slot.hour &&
+                                hoveredSlot.minute === minute &&
+                                hoveredSlot.dateKey === dateKey &&
+                                hoveredSlot.staffId === (activeStaffId || '')
+                              );
+
+                              return (
+                                <button
+                                  key={`slot-${dateKey}-${activeStaffId || 'all'}-${slot.hour}-${minute}`}
+                                  type="button"
+                                  tabIndex={-1}
+                                  className={`h-full w-full cursor-pointer border-0 p-0 outline-none transition ${
+                                    isHovered
+                                      ? 'opacity-100 ring-1 ring-primary/25'
+                                      : 'opacity-0 hover:opacity-100'
+                                  }`}
+                                  style={isHovered ? {
+                                    backgroundImage: 'repeating-linear-gradient(135deg, rgba(124, 58, 237, 0.16) 0, rgba(124, 58, 237, 0.16) 6px, rgba(255, 255, 255, 0.04) 6px, rgba(255, 255, 255, 0.04) 12px)'
+                                  } : undefined}
+                                  aria-label={slotLabel}
+                                  title={slotLabel}
+                                  onMouseEnter={() => handleSlotHover({
+                                    hour: slot.hour,
+                                    minute,
+                                    dateKey,
+                                    staffId: activeStaffId || ''
+                                  })}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    if (!activeStaffId) {
+                                      return;
+                                    }
+                                    onGridTimeSlotClick?.({
+                                      staffId: activeStaffId,
+                                      startTime: exactStartTime,
+                                      dateKey
+                                    });
+                                  }}
+                                  onContextMenu={(event) => {
+                                    if (!onGridContextMenu || !activeStaffId) {
+                                      return;
+                                    }
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onGridContextMenu({
+                                      clientX: event.clientX,
+                                      clientY: event.clientY,
+                                      staffId: activeStaffId,
+                                      startTime: exactStartTime
+                                    });
+                                  }}
+                                >
+                                  <span className="sr-only">{slotLabel}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       ))}
 
                       {/* Current Time Indicator */}

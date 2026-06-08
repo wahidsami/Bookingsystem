@@ -163,8 +163,8 @@ function formatTime12Hour(value: string, locale: string) {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
-  const totalMinutes = index * 30;
+const TIME_OPTIONS = Array.from({ length: 24 * 12 }, (_, index) => {
+  const totalMinutes = index * 5;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
