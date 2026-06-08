@@ -183,6 +183,9 @@ export function CalendarView({
       };
     });
   }, [boardEndHour, boardStartHour, locale, pixelsPerHour]);
+  const hoveredSlotTop = hoveredSlot
+    ? ((hoveredSlot.hour - boardStartHour) * pixelsPerHour) + ((hoveredSlot.minute / 60) * pixelsPerHour)
+    : null;
 
   useEffect(() => {
     setVisibleStaffIds((previous) => {
@@ -1012,16 +1015,26 @@ export function CalendarView({
                 {hourSlots.map((slot, index) => (
                   <div
                     key={index}
-                    className={`absolute text-xs px-1 md:px-2 z-10 bg-white transition-colors ${
-                      hoveredSlot && hoveredSlot.hour === slot.hour
-                        ? 'rounded-lg bg-primary/10 font-semibold text-primary ring-1 ring-primary/20 shadow-sm'
-                        : 'text-gray-500'
-                    }`}
+                    className="absolute z-10 bg-white px-1 text-xs text-gray-500 md:px-2"
                     style={{ top: `${slot.position}px`, transform: slot.position === 0 ? 'translateY(0)' : 'translateY(-50%)' }}
                   >
-                    {hoveredSlot && hoveredSlot.hour === slot.hour ? hoveredSlot.label : slot.label}
+                    {slot.label}
                   </div>
                 ))}
+                {hoveredSlot && hoveredSlotTop !== null && (
+                  <div
+                    className="absolute z-20 pointer-events-none"
+                    style={{
+                      top: `${hoveredSlotTop}px`,
+                      left: `${Math.max(4, timeColumnWidth - 10)}px`,
+                      transform: 'translateY(-50%) translateX(-100%)'
+                    }}
+                  >
+                    <div className="inline-flex items-center rounded-md bg-slate-950 px-2 py-1 text-[11px] font-semibold leading-none text-white shadow-lg ring-1 ring-black/20">
+                      {hoveredSlot.label}
+                    </div>
+                  </div>
+                )}
                 {/* Hour boundary lines */}
                 {hourSlots.map((slot, index) => (
                   <div
