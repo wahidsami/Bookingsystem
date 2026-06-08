@@ -1292,41 +1292,132 @@ export function AppointmentActionDrawer({
                     </button>
                   </div>
                   {includeGroupGuest ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <input
-                        type="text"
-                        value={groupGuest.firstName}
-                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, firstName: e.target.value }))}
-                        placeholder={locale === "ar" ? "اسم الضيف الأول" : "Guest first name"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      />
-                      <input
-                        type="text"
-                        value={groupGuest.lastName}
-                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, lastName: e.target.value }))}
-                        placeholder={locale === "ar" ? "اسم العائلة" : "Guest last name"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      />
-                      <input
-                        type="tel"
-                        value={groupGuest.phone}
-                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, phone: e.target.value }))}
-                        placeholder={locale === "ar" ? "الجوال (اختياري)" : "Phone (optional)"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      />
-                      <select
-                        value={groupGuest.serviceId}
-                        onChange={(e) => setGroupGuest((prev) => ({ ...prev, serviceId: e.target.value }))}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      >
-                          <option value="">{locale === "ar" ? "خدمة الضيف" : "Guest service"}</option>
-                          {services.map((service) => (
-                            <option key={service.id} value={service.id}>
-                              {locale === "ar" ? service.name_ar : service.name_en}
-                            </option>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <input
+                          type="text"
+                          value={groupGuest.firstName}
+                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, firstName: e.target.value }))}
+                          placeholder={locale === "ar" ? "اسم الضيف الأول" : "Guest first name"}
+                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        />
+                        <input
+                          type="text"
+                          value={groupGuest.lastName}
+                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, lastName: e.target.value }))}
+                          placeholder={locale === "ar" ? "اسم العائلة" : "Guest last name"}
+                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        />
+                        <input
+                          type="tel"
+                          value={groupGuest.phone}
+                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, phone: e.target.value }))}
+                          placeholder={locale === "ar" ? "الجوال (اختياري)" : "Phone (optional)"}
+                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {locale === "ar" ? "خدمة الضيف" : "Guest service"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {locale === "ar"
+                                ? "اختر خدمة الضيف من القائمة العمودية."
+                                : "Choose the guest service from the vertical list."}
+                            </p>
+                          </div>
+                          {groupGuest.serviceId ? (
+                            <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                              {locale === "ar" ? "محدد" : "Selected"}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-4 space-y-5">
+                          {groupedServices.map((group) => (
+                            <div key={`guest-${group.heading || group.items[0]?.id}`} className="space-y-3">
+                              {group.heading ? (
+                                <div className="flex items-center gap-3">
+                                  <div className="h-px flex-1 bg-gray-200" />
+                                  <div className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-600">
+                                    {group.heading}
+                                  </div>
+                                  <div className="h-px flex-1 bg-gray-200" />
+                                </div>
+                              ) : null}
+
+                              <div className="space-y-3">
+                                {group.items.map((service) => {
+                                  const active = groupGuest.serviceId === service.id;
+                                  const serviceName = locale === "ar" ? service.name_ar : service.name_en;
+                                  const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
+                                  return (
+                                    <button
+                                      key={`guest-${service.id}`}
+                                      type="button"
+                                      onClick={() => setGroupGuest((prev) => ({ ...prev, serviceId: service.id }))}
+                                      className={`group flex w-full items-stretch overflow-hidden rounded-3xl border text-left transition ${
+                                        active
+                                          ? "border-primary bg-purple-50 ring-2 ring-primary/20"
+                                          : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
+                                      }`}
+                                    >
+                                      <div className="h-24 w-24 shrink-0 overflow-hidden bg-gray-100 sm:h-28 sm:w-28">
+                                        {service.image ? (
+                                          <img
+                                            src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
+                                            alt={serviceName}
+                                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                          />
+                                        ) : (
+                                          <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                            <svg className="h-9 w-9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                              <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
+                                            </svg>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="min-w-0 flex-1 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                              {serviceParent
+                                                ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
+                                                : locale === "ar"
+                                                  ? "بدون فئة"
+                                                  : "No category"}
+                                            </p>
+                                          </div>
+                                          {active && (
+                                            <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                              {locale === "ar" ? "محدد" : "Selected"}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
+                                          <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                            ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                          </span>
+                                          <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                            <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           ))}
-                      </select>
+                        </div>
+                      </div>
+
                       <label className="flex items-center gap-3 rounded-2xl border border-gray-300 px-4 py-3 text-sm">
                         <input
                           type="checkbox"
