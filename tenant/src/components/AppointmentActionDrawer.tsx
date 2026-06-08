@@ -520,13 +520,34 @@ export function AppointmentActionDrawer({
     () => serviceVariants.find((variant) => variant.id === selectedVariantId) || null,
     [serviceVariants, selectedVariantId]
   );
+  const selectedStaff = useMemo(
+    () => employees.find((employee) => employee.id === selectedStaffId) || null,
+    [employees, selectedStaffId]
+  );
 
   const displayServicePrice = toSafeMoneyNumber(selectedVariant?.finalPrice ?? selectedService?.finalPrice ?? 0);
   const displayDuration = selectedVariant?.duration ?? selectedService?.duration ?? 0;
+  const selectedServiceName = locale === "ar"
+    ? (selectedService?.name_ar || selectedService?.name_en || "")
+    : (selectedService?.name_en || selectedService?.name_ar || "");
+  const selectedVariantName = selectedVariant?.description || "";
+  const selectedCustomerName = customerMode === "existing"
+    ? `${selectedCustomer?.firstName || ""} ${selectedCustomer?.lastName || ""}`.trim()
+    : `${newCustomer.firstName || ""} ${newCustomer.lastName || ""}`.trim();
+  const paymentMethodLabel = paymentMethod === "at-center"
+    ? (locale === "ar" ? "الدفع عند المركز" : "Pay at Center")
+    : paymentMethod === "online-full"
+      ? (locale === "ar" ? "الدفع الكامل أونلاين" : "Pay in Full Online")
+      : paymentMethod === "booking-fee"
+        ? (locale === "ar" ? "عربون الحجز" : "Booking Fee")
+        : paymentMethod;
   const selectedGuestService = useMemo(
     () => services.find((service) => service.id === groupGuest.serviceId) || null,
     [services, groupGuest.serviceId]
   );
+  const selectedGuestServiceName = selectedGuestService
+    ? (locale === "ar" ? selectedGuestService.name_ar : selectedGuestService.name_en) || selectedGuestService.name_en || selectedGuestService.name_ar || ""
+    : "";
   const guestServicePrice = includeGroupGuest
     ? (groupGuest.isFree ? 0 : toSafeMoneyNumber(selectedGuestService?.finalPrice ?? 0))
     : 0;
@@ -1354,17 +1375,107 @@ export function AppointmentActionDrawer({
                   ) : null}
                 </div>
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-4">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    {locale === "ar" ? "ملاحظات" : "Notes"}
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={4}
-                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                    style={{ textAlign: isRTL ? 'right' : 'left' }}
-                  />
+                <div className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 4 ? "" : "hidden"}`}>
+                  <div>
+                    <h4 className="text-base font-semibold text-gray-900">
+                      {locale === "ar" ? "المراجعة" : "Review"}
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      {locale === "ar" ? "راجع الحجز قبل الحفظ." : "Review the appointment before saving."}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "العميل" : "Customer"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {selectedCustomerName || (locale === "ar" ? "عميل غير محدد" : "No customer selected")}
+                      </div>
+                      {(customerMode === "existing" ? selectedCustomer?.email : newCustomer.email) ? (
+                        <div className="mt-1 text-xs text-gray-500">
+                          {(customerMode === "existing" ? selectedCustomer?.email : newCustomer.email) || ""}
+                        </div>
+                      ) : null}
+                      {(customerMode === "existing" ? selectedCustomer?.phone : newCustomer.phone) ? (
+                        <div className="mt-1 text-xs text-gray-500">
+                          {(customerMode === "existing" ? selectedCustomer?.phone : newCustomer.phone) || ""}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الخدمة" : "Service"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{selectedServiceName || "-"}</div>
+                      {selectedVariantName ? (
+                        <div className="mt-1 text-xs text-gray-500">{selectedVariantName}</div>
+                      ) : null}
+                      <div className="mt-1 text-xs text-gray-500">
+                        {displayDuration} {locale === "ar" ? "دقيقة" : "min"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الموعد" : "Schedule"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {appointmentDate} {appointmentTime}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {selectedStaff?.name || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الدفع" : "Payment"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{paymentMethodLabel || "-"}</div>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                        <span><Currency amount={displayServicePrice} /></span>
+                        {includeGroupGuest ? (
+                          <>
+                            <span>+</span>
+                            <span>
+                              {locale === "ar" ? "الضيف" : "guest"}: <Currency amount={guestServicePrice} />
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  {includeGroupGuest ? (
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الضيف الإضافي" : "Additional guest"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {`${groupGuest.firstName} ${groupGuest.lastName}`.trim()}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {selectedGuestServiceName || "-"}
+                        {groupGuest.isFree ? ` • ${locale === "ar" ? "خدمة مجانية" : "Free service"}` : ""}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      {locale === "ar" ? "ملاحظات" : "Notes"}
+                    </label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={4}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      style={{ textAlign: isRTL ? 'right' : 'left' }}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
