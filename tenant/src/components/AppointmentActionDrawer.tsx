@@ -312,8 +312,7 @@ export function AppointmentActionDrawer({
   ];
 
   const appointmentStepCount = appointmentStepLabels.length;
-
-  const getAppointmentStepError = (step: number) => {
+  function getAppointmentStepError(step: number) {
     if (step === 0) {
       if (customerMode === "existing" && !selectedCustomer) {
         return locale === "ar" ? "الرجاء اختيار عميل موجود." : "Please select an existing customer.";
@@ -359,7 +358,11 @@ export function AppointmentActionDrawer({
     }
 
     return "";
-  };
+  }
+
+  const currentAppointmentStepLabel = appointmentStepLabels[appointmentStep] || "";
+  const nextAppointmentStepLabel = appointmentStepLabels[appointmentStep + 1] || "";
+  const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
 
   const goToNextAppointmentStep = () => {
     const stepError = getAppointmentStepError(appointmentStep);
@@ -906,6 +909,17 @@ export function AppointmentActionDrawer({
                         {label}
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الخطوة الحالية" : "Current step"}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">{currentAppointmentStepLabel}</p>
+                    </div>
+                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                      {appointmentStep + 1} / {appointmentStepCount}
+                    </div>
                   </div>
                 </div>
 
@@ -1745,10 +1759,12 @@ export function AppointmentActionDrawer({
                   <button
                     type="button"
                     onClick={goToNextAppointmentStep}
-                    disabled={saving}
+                    disabled={saving || Boolean(currentAppointmentStepError)}
                     className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {locale === "ar" ? "التالي" : "Next"}
+                    {locale === "ar"
+                      ? `التالي${nextAppointmentStepLabel ? `: ${nextAppointmentStepLabel}` : ""}`
+                      : `Next${nextAppointmentStepLabel ? `: ${nextAppointmentStepLabel}` : ""}`}
                   </button>
                 ) : (
                   <button
