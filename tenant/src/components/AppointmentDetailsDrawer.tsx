@@ -1315,6 +1315,7 @@ export function AppointmentDetailsDrawer({
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {getManualStatusOptions(appointment.status)
+                  .filter((option) => option.value !== "pending")
                   .filter((option) => option.value !== appointment.status)
                   .map((option) => (
                     <button
