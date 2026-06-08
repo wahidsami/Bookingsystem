@@ -413,6 +413,7 @@ export function AppointmentDetailsDrawer({
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleValue, setRescheduleValue] = useState("");
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const [actionNotice, setActionNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     if (!open || !appointmentId) {
@@ -430,6 +431,7 @@ export function AppointmentDetailsDrawer({
       setRescheduleValue("");
       setRescheduleSubmitting(false);
       setError("");
+      setActionNotice(null);
       setLoading(false);
       return;
     }
@@ -637,7 +639,10 @@ export function AppointmentDetailsDrawer({
       });
 
       if (!response?.success) {
-        alert(response?.message || (locale === "ar" ? "تعذر إعادة الجدولة." : "Failed to reschedule."));
+        setActionNotice({
+          kind: "error",
+          message: response?.message || (locale === "ar" ? "تعذر إعادة الجدولة." : "Failed to reschedule.")
+        });
         return;
       }
 
@@ -648,9 +653,16 @@ export function AppointmentDetailsDrawer({
 
       setRescheduleOpen(false);
       setRescheduleValue("");
+      setActionNotice({
+        kind: "success",
+        message: locale === "ar" ? "تمت إعادة الجدولة بنجاح." : "Rescheduled successfully."
+      });
     } catch (err: any) {
       console.error("Failed to reschedule from drawer:", err);
-      alert(err?.message || (locale === "ar" ? "تعذر إعادة الجدولة." : "Failed to reschedule."));
+      setActionNotice({
+        kind: "error",
+        message: err?.message || (locale === "ar" ? "تعذر إعادة الجدولة." : "Failed to reschedule.")
+      });
     } finally {
       setRescheduleSubmitting(false);
     }
@@ -667,11 +679,12 @@ export function AppointmentDetailsDrawer({
       const effectivePaymentStatus = resolveEffectivePaymentStatus(appointment);
       const isPaid = effectivePaymentStatus === "fully_paid" || effectivePaymentStatus === "paid";
       if (!isPaid) {
-        alert(
-          locale === "ar"
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
             ? "لا يمكنك تغيير الحالة إلى مكتمل إلا بعد سداد مبلغ الحجز بالكامل."
             : "You can not change to completed unless the booking amount is paid."
-        );
+        });
         return;
       }
     }
@@ -683,7 +696,10 @@ export function AppointmentDetailsDrawer({
       }
     } catch (err) {
       console.error("Failed to update appointment status from drawer:", err);
-      alert((err as any)?.message || (locale === "ar" ? "تعذر تحديث الحالة." : "Failed to update status."));
+      setActionNotice({
+        kind: "error",
+        message: (err as any)?.message || (locale === "ar" ? "تعذر تحديث الحالة." : "Failed to update status.")
+      });
     } finally {
       setStatusUpdating(false);
     }
@@ -712,6 +728,379 @@ export function AppointmentDetailsDrawer({
     return options;
   };
 
+  const renderAppointmentWorkspace = () => {
+    if (!appointment) return null;
+
+    const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
+    const currentStatusOptions = getManualStatusOptions(appointment.status);
+
+    return (
+      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          {appointment.user ? (
+            <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
+                    {(appointment.user.photo || appointment.user.profileImage) ? (
+                      <img
+                        src={avatarUrl(appointment.user.photo || appointment.user.profileImage || undefined)}
+                        alt={`${appointment.user.firstName} ${appointment.user.lastName}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      `${appointment.user.firstName?.[0] || ""}${appointment.user.lastName?.[0] || ""}`.toUpperCase() || "?"
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {appointment.user.firstName} {appointment.user.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {locale === "ar" ? "عرض بيانات العميل في نفس اللوحة" : "View customer data in this drawer"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerTab("overview");
+                    setViewMode("customer");
+                  }}
+                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90"
+                >
+                  {locale === "ar" ? "فتح الملف" : "Open profile"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+              {locale === "ar" ? "ملخص الموعد" : "Appointment summary"}
+            </p>
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الوقت" : "Time"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الخدمة" : "Service"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">{serviceName}</p>
+                {appointment.serviceVariantName ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {locale === "ar" ? "النوع" : "Variant"}: {appointment.serviceVariantName}
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الموظف" : "Employee"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.staff.name}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "السعر" : "Price"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    <Currency amount={Number(appointment.price || 0)} />
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الحالة المالية" : "Payment status"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {getPaymentStatusLabel(currentPaymentStatus, locale)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {cleanAppointmentNotes && (
+            <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "ملاحظات" : "Notes"}
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
+            </div>
+          )}
+
+          {groupGuest ? (
+            <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
+                {locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details"}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-indigo-950">{groupGuest.fullName}</p>
+              {groupGuest.phone ? (
+                <p className="mt-1 text-sm text-indigo-900">{groupGuest.phone}</p>
+              ) : null}
+              {groupGuest.serviceName ? (
+                <p className="mt-1 text-sm text-indigo-900">
+                  {locale === "ar" ? "الخدمة" : "Service"}: {groupGuest.serviceName}
+                </p>
+              ) : null}
+              {groupGuest.isFree ? (
+                <p className="mt-1 text-sm font-semibold text-emerald-700">
+                  {locale === "ar" ? "خدمة مجانية" : "Free service"}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                {getStatusLabel(appointment.status, locale)}
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                {getPaymentStatusLabel(currentPaymentStatus, locale)}
+              </span>
+              {latestRescheduleAudit?.toStartTime ? (
+                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                  {locale === "ar"
+                    ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
+                    : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+                </span>
+              ) : null}
+              {latestCancellationAudit ? (
+                <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                  {locale === "ar"
+                    ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+                    : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4 rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "الجدولة" : "Schedule"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-gray-900">
+                {locale === "ar" ? "الإجراءات السريعة" : "Quick actions"}
+              </p>
+              <Link
+                href={`/${locale}/dashboard/appointments/${appointment.id}`}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100"
+                onClick={onClose}
+              >
+                {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
+              </Link>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={handleRebook}
+                className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+              >
+                {locale === "ar" ? "إعادة الحجز" : "Rebook"}
+              </button>
+              <button
+                type="button"
+                onClick={handleReschedule}
+                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm font-semibold text-gray-900">
+              {locale === "ar" ? "الحالة" : "Status"}
+            </p>
+            <div className="mt-3">
+              <select
+                value={appointment.status}
+                disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                onChange={(event) => {
+                  const nextStatus = event.target.value as AppointmentItem["status"];
+                  if (nextStatus === appointment.status) return;
+                  if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
+                    void handleQuickStatusUpdate(nextStatus);
+                    return;
+                  }
+                }}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {currentStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-gray-500">
+                {locale === "ar"
+                  ? "يمكن تحديث الحالة يدويًا من هنا، أو تتغير تلقائيًا عند تأكيد العميل."
+                  : "Status can be changed manually here, and will also update automatically when customer confirms."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCustomerWorkspace = () => {
+    if (!customerProfile && !customerLoading) {
+      return (
+        <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+          {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("appointment")}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                >
+                  {locale === "ar" ? "رجوع" : "Back"}
+                </button>
+
+                <div className={`mt-4 flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
+                    {customerProfile?.profileImage ? (
+                      <img
+                        src={avatarUrl(customerProfile.profileImage)}
+                        alt={customerFullName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      `${customerProfile?.firstName?.[0] || ""}${customerProfile?.lastName?.[0] || ""}`.toUpperCase() || "?"
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">{customerFullName}</p>
+                    <p className="text-xs text-gray-500">
+                      {locale === "ar" ? "مساحة العميل" : "Customer workspace"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
+                </p>
+                <p className="mt-1 text-lg font-bold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
+                </p>
+                <p className="mt-1 text-lg font-bold text-gray-900">
+                  <Currency amount={Number(customerProfile?.totalSpent || 0)} />
+                </p>
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "أول زيارة" : "First visit"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "آخر زيارة" : "Last visit"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(["overview", "appointments", "transactions"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setCustomerTab(tab)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    customerTab === tab
+                      ? "bg-primary text-white"
+                      : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {tab === "overview"
+                    ? (locale === "ar" ? "نظرة عامة" : "Overview")
+                    : tab === "appointments"
+                      ? (locale === "ar" ? "المواعيد" : "Appointments")
+                      : (locale === "ar" ? "المدفوعات" : "Transactions")}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
+            <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "ملاحظات" : "Notes"}
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
+              </p>
+              {customerProfile?.tags && customerProfile.tags.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {customerProfile.tags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {customerLoading ? (
+            <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
+              <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+            </div>
+          ) : customerProfile ? (
+            <>
+              {customerTab === "overview" && renderOverview()}
+              {customerTab === "appointments" && renderAppointments()}
+              {customerTab === "transactions" && renderTransactions()}
+            </>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+              {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
   if (!open) {
     return null;
   }
@@ -1144,38 +1533,95 @@ export function AppointmentDetailsDrawer({
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                {viewMode === "customer"
-                  ? (locale === "ar" ? "مساحة العميل" : "Customer workspace")
-                  : (locale === "ar" ? "تفاصيل الموعد" : "Appointment Details")}
-              </p>
-              <h3 className="mt-1 text-xl font-bold text-gray-900">
-                {loading
-                  ? (locale === "ar" ? "جارٍ التحميل..." : "Loading...")
-                  : viewMode === "customer"
-                    ? (customerFullName || serviceName)
-                    : serviceName}
-              </h3>
-              {appointment && (
-                <p className="mt-1 text-sm text-gray-500">
-                  {appointment.bookingNumber || appointment.bookingReference || appointment.id.slice(0, 8).toUpperCase()}
+          <div className="border-b border-gray-100 px-5 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                  {viewMode === "customer"
+                    ? (locale === "ar" ? "مساحة العميل" : "Customer workspace")
+                    : (locale === "ar" ? "تفاصيل الموعد" : "Appointment Details")}
                 </p>
-              )}
+                <h3 className="mt-1 text-xl font-bold text-gray-900">
+                  {loading
+                    ? (locale === "ar" ? "جارٍ التحميل..." : "Loading...")
+                    : viewMode === "customer"
+                      ? (customerFullName || serviceName)
+                      : serviceName}
+                </h3>
+                {appointment && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {appointment.bookingNumber || appointment.bookingReference || appointment.id.slice(0, 8).toUpperCase()}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
-              </svg>
-            </button>
+
+            {appointment && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الوقت الحالي" : "Current time"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
+                  </p>
+                </div>
+                {viewMode === "appointment" ? (
+                  <div className="min-w-[220px]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "الحالة" : "Status"}
+                    </p>
+                    <select
+                      value={appointment.status}
+                      disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                      onChange={(event) => {
+                        const nextStatus = event.target.value as AppointmentItem["status"];
+                        if (nextStatus === appointment.status) return;
+                        if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
+                          void handleQuickStatusUpdate(nextStatus);
+                          return;
+                        }
+                      }}
+                      className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {getManualStatusOptions(appointment.status).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                    {getStatusLabel(appointment.status, locale)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-5">
+            {actionNotice && (
+              <div
+                className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
+                  actionNotice.kind === "success"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {actionNotice.message}
+              </div>
+            )}
+
             {error && (
               <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -1188,267 +1634,7 @@ export function AppointmentDetailsDrawer({
               </div>
             ) : appointment ? (
               <div className="space-y-4">
-                {viewMode === "appointment" ? (
-                  <>
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                          {getStatusLabel(appointment.status, locale)}
-                        </span>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                          {getPaymentStatusLabel(resolveEffectivePaymentStatus(appointment), locale)}
-                        </span>
-                        {latestRescheduleAudit?.toStartTime ? (
-                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                            {locale === "ar"
-                              ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
-                              : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
-                          </span>
-                        ) : null}
-                        {latestCancellationAudit ? (
-                          <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                            {locale === "ar"
-                              ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
-                              : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "الوقت" : "Time"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">
-                            {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "الخدمة" : "Service"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">{serviceName}</p>
-                        </div>
-                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "الموظف" : "Employee"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.staff.name}</p>
-                        </div>
-                        <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {locale === "ar" ? "السعر" : "Price"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-900">
-                            <Currency amount={Number(appointment.price || 0)} />
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {appointment.user ? (
-                      <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                          <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
-                              {(appointment.user.photo || appointment.user.profileImage) ? (
-                                <img
-                                  src={avatarUrl(appointment.user.photo || appointment.user.profileImage || undefined)}
-                                  alt={`${appointment.user.firstName} ${appointment.user.lastName}`}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                `${appointment.user.firstName?.[0] || ""}${appointment.user.lastName?.[0] || ""}`.toUpperCase() || "?"
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">
-                                {appointment.user.firstName} {appointment.user.lastName}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {locale === "ar" ? "عرض بيانات العميل في نفس اللوحة" : "View customer data in this drawer"}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomerTab("overview");
-                              setViewMode("customer");
-                            }}
-                            className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90"
-                          >
-                            {locale === "ar" ? "فتح الملف" : "Open profile"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {cleanAppointmentNotes && (
-                      <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                          {locale === "ar" ? "ملاحظات" : "Notes"}
-                        </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
-                      </div>
-                    )}
-                    {groupGuest ? (
-                      <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
-                          {locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details"}
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-indigo-950">{groupGuest.fullName}</p>
-                        {groupGuest.phone ? (
-                          <p className="mt-1 text-sm text-indigo-900">{groupGuest.phone}</p>
-                        ) : null}
-                        {groupGuest.serviceName ? (
-                          <p className="mt-1 text-sm text-indigo-900">
-                            {locale === "ar" ? "الخدمة" : "Service"}: {groupGuest.serviceName}
-                          </p>
-                        ) : null}
-                        {groupGuest.isFree ? (
-                          <p className="mt-1 text-sm font-semibold text-emerald-700">
-                            {locale === "ar" ? "خدمة مجانية" : "Free service"}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={handleRebook}
-                        className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-                      >
-                        {locale === "ar" ? "إعادة الحجز" : "Rebook"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleReschedule}
-                        className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                      >
-                        {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
-                      </button>
-                    </div>
-
-                    <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                        {locale === "ar" ? "تحديث الحالة" : "Update status"}
-                      </p>
-                      <div className="mt-3">
-                        <select
-                          value={appointment.status}
-                          disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
-                          onChange={(event) => {
-                            const nextStatus = event.target.value as AppointmentItem["status"];
-                            if (nextStatus === appointment.status) return;
-                            if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
-                              void handleQuickStatusUpdate(nextStatus);
-                              return;
-                            }
-                          }}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {getManualStatusOptions(appointment.status).map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="mt-2 text-xs text-gray-500">
-                          {locale === "ar"
-                            ? "يمكن تحديث الحالة يدويًا من هنا، أو تتغير تلقائيًا عند تأكيد العميل."
-                            : "Status can be changed manually here, and will also update automatically when customer confirms."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
-                        </p>
-                        <Link
-                          href={`/${locale}/dashboard/appointments/${appointment.id}`}
-                          className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100"
-                          onClick={onClose}
-                        >
-                          {locale === "ar" ? "عرض" : "View"}
-                        </Link>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                      <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("appointment")}
-                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                        >
-                          {locale === "ar" ? "رجوع" : "Back"}
-                        </button>
-                        <div className={`${isRTL ? "text-right" : "text-left"}`}>
-                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                            {locale === "ar" ? "مساحة العميل" : "Customer workspace"}
-                          </p>
-                          <h4 className="mt-1 text-lg font-bold text-gray-900">{customerFullName}</h4>
-                        </div>
-                        <div className="h-12 w-12 overflow-hidden rounded-full bg-primary/10 ring-1 ring-gray-200">
-                          {customerProfile?.profileImage ? (
-                            <img
-                              src={avatarUrl(customerProfile.profileImage)}
-                              alt={customerFullName}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-sm font-bold text-primary">
-                              {(customerProfile?.firstName?.[0] || "")}{(customerProfile?.lastName?.[0] || "")}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {(["overview", "appointments", "transactions"] as const).map((tab) => (
-                          <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setCustomerTab(tab)}
-                            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                              customerTab === tab
-                                ? "bg-primary text-white"
-                                : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-                            }`}
-                          >
-                            {tab === "overview"
-                              ? (locale === "ar" ? "نظرة عامة" : "Overview")
-                              : tab === "appointments"
-                                ? (locale === "ar" ? "المواعيد" : "Appointments")
-                                : (locale === "ar" ? "المدفوعات" : "Transactions")}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {customerLoading ? (
-                      <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
-                        <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
-                      </div>
-                    ) : customerProfile ? (
-                      <>
-                        {customerTab === "overview" && renderOverview()}
-                        {customerTab === "appointments" && renderAppointments()}
-                        {customerTab === "transactions" && renderTransactions()}
-                      </>
-                    ) : (
-                      <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-                        {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
-                      </div>
-                    )}
-                  </>
-                )}
+                {viewMode === "appointment" ? renderAppointmentWorkspace() : renderCustomerWorkspace()}
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
