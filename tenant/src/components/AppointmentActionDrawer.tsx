@@ -195,6 +195,7 @@ export function AppointmentActionDrawer({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [errorDebug, setErrorDebug] = useState<any>(null);
+  const [appointmentStep, setAppointmentStep] = useState(0);
 
   const [customerMode, setCustomerMode] = useState<"existing" | "new" | "guest">("existing");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -246,6 +247,7 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
+      setAppointmentStep(0);
       setCustomerMode(prefill?.customer ? "existing" : "existing");
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
       setCustomers([]);
@@ -300,6 +302,80 @@ export function AppointmentActionDrawer({
     setBreakType((existingBreak?.type as any) || "other");
     setBreakLabel(existingBreak?.label || "");
   }, [open, mode, defaultStaffId, defaultDate, defaultTime, prefill, existingBreak]);
+
+  const appointmentStepLabels = [
+    locale === "ar" ? "العميل" : "Customer",
+    locale === "ar" ? "الخدمة والموعد" : "Service & Time",
+    locale === "ar" ? "حجز جماعي" : "Group",
+    locale === "ar" ? "الدفع" : "Payment",
+    locale === "ar" ? "المراجعة" : "Review"
+  ];
+
+  const appointmentStepCount = appointmentStepLabels.length;
+
+  const getAppointmentStepError = (step: number) => {
+    if (step === 0) {
+      if (customerMode === "existing" && !selectedCustomer) {
+        return locale === "ar" ? "الرجاء اختيار عميل موجود." : "Please select an existing customer.";
+      }
+
+      if (customerMode === "new" && (!newCustomer.firstName.trim() || !newCustomer.lastName.trim())) {
+        return locale === "ar" ? "الرجاء إدخال الاسم الأول والأخير للعميل." : "Please enter customer first and last name.";
+      }
+
+      if (customerMode === "guest" && (!newCustomer.firstName.trim() || !newCustomer.lastName.trim())) {
+        return locale === "ar" ? "الرجاء إدخال اسم الضيف." : "Please enter guest name.";
+      }
+    }
+
+    if (step === 1 && !selectedServiceId) {
+      return locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.";
+    }
+
+    if (step === 1) {
+      if (!appointmentDate || !appointmentTime) {
+        return locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.";
+      }
+
+      if (assignedEmployees.length > 0 && !selectedStaffId) {
+        return locale === "ar" ? "الرجاء اختيار مقدم الخدمة." : "Please choose a service provider.";
+      }
+    }
+
+    if (step === 2 && includeGroupGuest) {
+      if (!groupGuest.firstName.trim() || !groupGuest.lastName.trim()) {
+        return locale === "ar" ? "الرجاء إدخال الاسم الكامل للضيف الإضافي." : "Please enter the additional guest full name.";
+      }
+
+      if (!groupGuest.serviceId.trim()) {
+        return locale === "ar" ? "الرجاء اختيار خدمة الضيف الإضافي." : "Please choose the additional guest service.";
+      }
+    }
+
+    if (step === 3) {
+      if (!paymentMethod) {
+        return locale === "ar" ? "الرجاء اختيار طريقة الدفع." : "Please choose a payment method.";
+      }
+    }
+
+    return "";
+  };
+
+  const goToNextAppointmentStep = () => {
+    const stepError = getAppointmentStepError(appointmentStep);
+    if (stepError) {
+      setError(stepError);
+      return;
+    }
+
+    setError("");
+    setAppointmentStep((current) => Math.min(current + 1, appointmentStepCount - 1));
+  };
+
+  const goToPreviousAppointmentStep = () => {
+    setError("");
+    setAppointmentStep((current) => Math.max(current - 1, 0));
+  };
 
   useEffect(() => {
     if (!open || mode !== "appointment" || customerMode !== "existing" || !showCustomerPicker) {
@@ -757,7 +833,39 @@ export function AppointmentActionDrawer({
 
             {mode === "appointment" ? (
               <div className="space-y-5">
-                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                <div className={`rounded-3xl border border-gray-200 bg-gray-50 p-4 ${appointmentStep === 0 ? "" : "hidden"}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {locale === "ar" ? "إنشاء موعد" : "Create Appointment"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {locale === "ar" ? "خطوة بخطوة مع نفس منطق الحجز." : "A guided flow using the same booking logic."}
+                      </p>
+                    </div>
+                    <div className="text-xs font-semibold text-gray-500">
+                      {appointmentStep + 1}/{appointmentStepCount}
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-5 gap-2">
+                    {appointmentStepLabels.map((label, index) => (
+                      <div
+                        key={label}
+                        className={`rounded-2xl px-3 py-2 text-center text-[11px] font-semibold transition ${
+                          index === appointmentStep
+                            ? 'bg-primary text-white'
+                            : index < appointmentStep
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-white text-gray-500 ring-1 ring-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`rounded-3xl border border-gray-200 bg-gray-50 p-4 ${appointmentStep === 0 ? "" : "hidden"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "العميل" : "Customer"}</p>
@@ -1021,7 +1129,7 @@ export function AppointmentActionDrawer({
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 1 ? "" : "hidden"}`}>
                   <h4 className="text-base font-semibold text-gray-900">
                     {locale === "ar" ? "الخدمة والموعد" : "Service and Time"}
                   </h4>
@@ -1113,7 +1221,7 @@ export function AppointmentActionDrawer({
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 3 ? "" : "hidden"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h4 className="text-base font-semibold text-gray-900">
@@ -1177,7 +1285,7 @@ export function AppointmentActionDrawer({
                   ) : null}
                 </div>
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 2 ? "" : "hidden"}`}>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <h4 className="text-base font-semibold text-gray-900">
@@ -1261,7 +1369,7 @@ export function AppointmentActionDrawer({
               </div>
             ) : (
               <div className="space-y-5">
-                <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 4 ? "" : "hidden"}`}>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     {locale === "ar" ? "الموظف" : "Employee"}
                   </label>
@@ -1395,7 +1503,40 @@ export function AppointmentActionDrawer({
           </div>
 
           <div className="border-t border-gray-100 px-5 py-4">
-            {mode === "blocked_time" && existingBreak ? (
+            {mode === "appointment" ? (
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={goToPreviousAppointmentStep}
+                  disabled={appointmentStep === 0 || saving}
+                  className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {locale === "ar" ? "السابق" : "Previous"}
+                </button>
+
+                {appointmentStep < appointmentStepCount - 1 ? (
+                  <button
+                    type="button"
+                    onClick={goToNextAppointmentStep}
+                    disabled={saving}
+                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {locale === "ar" ? "التالي" : "Next"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAppointmentSubmit}
+                    disabled={saving}
+                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {saving
+                      ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                      : (locale === "ar" ? "حفظ الموعد" : "Save Appointment")}
+                  </button>
+                )}
+              </div>
+            ) : mode === "blocked_time" && existingBreak ? (
               <div className="flex gap-3">
                 <button
                   type="button"
