@@ -733,6 +733,41 @@ export function AppointmentDetailsDrawer({
 
     const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
     const currentStatusOptions = getManualStatusOptions(appointment.status);
+    const serviceSubtotal = Number(appointment.rawPrice ?? appointment.price ?? 0);
+    const serviceDiscount = Math.max(serviceSubtotal - Number(appointment.price || 0), 0);
+    const serviceTax = Number(appointment.taxAmount || 0);
+    const servicePaid = Math.max(serviceSubtotal - Number(appointment.remainderAmount ?? 0), 0);
+    const serviceRemaining = Number(appointment.remainderAmount ?? Math.max(0, Number(appointment.price || 0) - servicePaid));
+    const serviceTimeline = [
+      {
+        label: locale === "ar" ? "إنشاء الموعد" : "Appointment created",
+        value: formatDateTime(appointment.createdAt || appointment.startTime, locale),
+        tone: "bg-gray-50 text-gray-700 ring-gray-200"
+      },
+      {
+        label: locale === "ar" ? "الحالة الحالية" : "Current status",
+        value: getStatusLabel(appointment.status, locale),
+        tone: "bg-blue-50 text-blue-700 ring-blue-200"
+      },
+      latestRescheduleAudit
+        ? {
+            label: locale === "ar" ? "إعادة الجدولة" : "Reschedule",
+            value: locale === "ar"
+              ? `${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || appointment.startTime, locale)} → ${formatDateTime(latestRescheduleAudit.toStartTime || appointment.startTime, locale)}`
+              : `${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || appointment.startTime, locale)} → ${formatDateTime(latestRescheduleAudit.toStartTime || appointment.startTime, locale)}`,
+            tone: "bg-sky-50 text-sky-700 ring-sky-200"
+          }
+        : null,
+      latestCancellationAudit
+        ? {
+            label: locale === "ar" ? "الإلغاء" : "Cancellation",
+            value: locale === "ar"
+              ? `${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+              : `${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`,
+            tone: "bg-rose-50 text-rose-700 ring-rose-200"
+          }
+        : null
+    ].filter(Boolean) as Array<{ label: string; value: string; tone: string }>;
 
     return (
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -826,6 +861,83 @@ export function AppointmentDetailsDrawer({
             </div>
           </div>
 
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+              {locale === "ar" ? "بطاقة الخدمة" : "Service card"}
+            </p>
+            <div className="mt-3 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{serviceName}</p>
+                  {appointment.serviceVariantName ? (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {locale === "ar" ? "النوع" : "Variant"}: {appointment.serviceVariantName}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="text-right">
+                  <Currency amount={Number(appointment.price || 0)} className="text-base font-bold text-gray-900" />
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "المدة" : "Duration"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {appointment.serviceVariantDuration || appointment.service.duration || 0} {locale === "ar" ? "دقيقة" : "min"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الحالة" : "Status"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{getStatusLabel(appointment.status, locale)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+              {locale === "ar" ? "الملخص المالي" : "Financial summary"}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الإجمالي" : "Subtotal"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceSubtotal} /></p>
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الخصم" : "Discount"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceDiscount} /></p>
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "الضريبة" : "Tax"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceTax} /></p>
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "المتبقي" : "Remaining"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceRemaining} /></p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-2xl bg-primary/5 px-4 py-3 ring-1 ring-primary/10">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-gray-900">
+                  {locale === "ar" ? "المبلغ المدفوع" : "Paid"}
+                </p>
+                <Currency amount={servicePaid} className="text-base font-bold text-gray-900" />
+              </div>
+            </div>
+          </div>
+
           {cleanAppointmentNotes && (
             <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -890,6 +1002,25 @@ export function AppointmentDetailsDrawer({
               <p className="mt-1 text-sm font-semibold text-gray-900">
                 {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
               </p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-gray-900">
+                {locale === "ar" ? "الخط الزمني" : "Activity timeline"}
+              </p>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                {serviceTimeline.length}
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {serviceTimeline.map((entry) => (
+                <div key={`${entry.label}-${entry.value}`} className={`rounded-2xl px-4 py-3 ring-1 ${entry.tone}`}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">{entry.label}</p>
+                  <p className="mt-1 text-sm font-semibold">{entry.value}</p>
+                </div>
+              ))}
             </div>
           </div>
 
