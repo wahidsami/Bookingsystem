@@ -202,10 +202,6 @@ export function AppointmentActionDrawer({
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
-  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
-  const [pickerLoading, setPickerLoading] = useState(false);
-  const [pickerCustomers, setPickerCustomers] = useState<CustomerItem[]>([]);
-  const [pickerSearch, setPickerSearch] = useState("");
 
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
     firstName: "",
@@ -258,10 +254,6 @@ export function AppointmentActionDrawer({
         email: prefill.customer.email || "",
         phone: prefill.customer.phone || ""
       } : null);
-      setShowCustomerPicker(false);
-      setPickerLoading(false);
-      setPickerCustomers([]);
-      setPickerSearch("");
       setNewCustomer({
         firstName: "",
         lastName: "",
@@ -385,7 +377,6 @@ export function AppointmentActionDrawer({
     setCustomerMode("guest");
     setCustomerSearch("");
     setSelectedCustomer(null);
-    setShowCustomerPicker(false);
     setNewCustomer({
       firstName: locale === "ar" ? "ضيف" : "Walk",
       lastName: locale === "ar" ? "مؤقت" : "In Customer",
@@ -398,55 +389,15 @@ export function AppointmentActionDrawer({
   };
 
   useEffect(() => {
-    if (!open || mode !== "appointment" || customerMode !== "existing" || !showCustomerPicker) {
-      return;
-    }
-
-    const query = pickerSearch.trim();
-    const timer = setTimeout(async () => {
-      try {
-        setPickerLoading(true);
-        const response = await tenantApi.getCustomers({ search: query || undefined, limit: 100 });
-        if (response.success) {
-          setPickerCustomers(response.data?.customers || []);
-        } else {
-          setPickerCustomers([]);
-        }
-      } catch (err) {
-        console.error("Failed to load customers for picker:", err);
-        setPickerCustomers([]);
-      } finally {
-        setPickerLoading(false);
-      }
-    }, 200);
-
-    return () => clearTimeout(timer);
-  }, [open, mode, customerMode, showCustomerPicker, pickerSearch]);
-
-  useEffect(() => {
-    if (!open || mode !== "appointment") {
+    if (!open || mode !== "appointment" || appointmentStep !== 0 || customerMode !== "existing") {
       return;
     }
 
     const query = customerSearch.trim();
-    if (customerMode !== "existing") {
-      setCustomers([]);
-      return;
-    }
-
-    if (selectedCustomer && query === `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim()) {
-      return;
-    }
-
-    if (query.length < 1) {
-      setCustomers([]);
-      return;
-    }
-
     const timer = setTimeout(async () => {
       try {
         setCustomerLoading(true);
-        const response = await tenantApi.getCustomers({ search: query, limit: 10 });
+        const response = await tenantApi.getCustomers({ search: query || undefined, limit: 100 });
         if (response.success) {
           setCustomers(response.data?.customers || []);
         } else {
@@ -461,7 +412,7 @@ export function AppointmentActionDrawer({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [open, mode, customerSearch, customerMode, selectedCustomer]);
+  }, [open, mode, appointmentStep, customerSearch, customerMode]);
 
   const selectedService = useMemo(
     () => services.find((service) => service.id === selectedServiceId) || null,
@@ -880,127 +831,26 @@ export function AppointmentActionDrawer({
 
             {mode === "appointment" ? (
               <div className="space-y-5">
-                <div className={`rounded-3xl border border-gray-200 bg-gray-50 p-4 ${appointmentStep === 0 ? "" : "hidden"}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {locale === "ar" ? "إنشاء موعد" : "Create Appointment"}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar" ? "خطوة بخطوة مع نفس منطق الحجز." : "A guided flow using the same booking logic."}
-                      </p>
+                <div className={`rounded-2xl border border-gray-200 bg-white p-3 ${appointmentStep === 0 ? "" : "hidden"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {appointmentStepLabels.map((label, index) => (
+                        <div
+                          key={label}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${
+                            index === appointmentStep
+                              ? "bg-primary text-white"
+                              : index < appointmentStep
+                                ? "bg-primary/10 text-primary"
+                                : "bg-gray-50 text-gray-500 ring-1 ring-gray-200"
+                          }`}
+                        >
+                          {label}
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-xs font-semibold text-gray-500">
-                      {appointmentStep + 1}/{appointmentStepCount}
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-5 gap-2">
-                    {appointmentStepLabels.map((label, index) => (
-                      <div
-                        key={label}
-                        className={`rounded-2xl px-3 py-2 text-center text-[11px] font-semibold transition ${
-                          index === appointmentStep
-                            ? 'bg-primary text-white'
-                            : index < appointmentStep
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-white text-gray-500 ring-1 ring-gray-200'
-                        }`}
-                      >
-                        {label}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الخطوة الحالية" : "Current step"}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{currentAppointmentStepLabel}</p>
-                    </div>
-                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold text-primary">
                       {appointmentStep + 1} / {appointmentStepCount}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="sticky top-0 z-10 rounded-3xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {locale === "ar" ? "ملخص الحجز" : "Booking summary"}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar"
-                          ? "يبقى هذا الملخص ظاهرًا أثناء التنقل بين الخطوات."
-                          : "This summary stays visible while you move through the steps."}
-                      </p>
-                    </div>
-                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                      {locale === "ar" ? "خطوة بخطوة" : "Step by step"}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "العميل" : "Customer"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {selectedCustomerName || (locale === "ar" ? "غير محدد" : "Not selected")}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {customerModeLabel}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الخدمة" : "Service"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {selectedServiceName || (locale === "ar" ? "غير محددة" : "Not selected")}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {selectedVariantName || `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الموعد" : "Schedule"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {appointmentSummaryTimeLabel}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {selectedStaff?.name || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الدفع" : "Payment"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {paymentMethodLabel || (locale === "ar" ? "غير محدد" : "Not selected")}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {locale === "ar" ? "طريقة الحجز" : "Booking method"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الإجمالي" : "Total"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        <Currency amount={displayTotalPrice} />
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {includeGroupGuest
-                          ? (locale === "ar" ? "يشمل خدمة الضيف" : "Includes guest service")
-                          : (locale === "ar" ? "خدمة أساسية فقط" : "Main service only")}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1010,31 +860,8 @@ export function AppointmentActionDrawer({
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "العميل" : "Customer"}</p>
                       <p className="text-xs text-gray-500">
-                        {locale === "ar" ? "ابحث عن عميل موجود أو أضف عميلًا جديدًا." : "Search for an existing customer or add a new one."}
+                        {locale === "ar" ? "ابحث عن عميل أو اختر عميلًا من القائمة." : "Search for a customer or pick one from the list."}
                       </p>
-                    </div>
-                    <div className={`inline-flex rounded-full border border-gray-200 bg-white p-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                      <button
-                        type="button"
-                        onClick={() => setCustomerMode("existing")}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${customerMode === "existing" ? 'bg-primary text-white' : 'text-gray-700'}`}
-                      >
-                        {locale === "ar" ? "موجود" : "Existing"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCustomerMode("new")}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${customerMode === "new" ? 'bg-primary text-white' : 'text-gray-700'}`}
-                      >
-                        {locale === "ar" ? "جديد" : "New"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCustomerMode("guest")}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${customerMode === "guest" ? 'bg-primary text-white' : 'text-gray-700'}`}
-                      >
-                        {locale === "ar" ? "ضيف" : "Guest"}
-                      </button>
                     </div>
                   </div>
 
@@ -1048,219 +875,37 @@ export function AppointmentActionDrawer({
                     </svg>
                     <span>{locale === "ar" ? "عميل حضوري" : "Walk In Customer"}</span>
                   </button>
+                  <div className="mt-4 space-y-3">
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => {
+                        setSelectedCustomer(null);
+                        setCustomerSearch(e.target.value);
+                        setCustomerMode("existing");
+                        setAppointmentStep(0);
+                      }}
+                      placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      style={{ textAlign: isRTL ? "right" : "left" }}
+                    />
 
-                  {customerMode === "existing" ? (
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={customerSearch}
-                          onChange={(e) => {
-                            setSelectedCustomer(null);
-                            setCustomerSearch(e.target.value);
-                          }}
-                          placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          style={{ textAlign: isRTL ? 'right' : 'left' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomerPicker(true)}
-                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-gray-300 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
-                          title={locale === "ar" ? "اختيار من كل العملاء" : "Pick from all customers"}
-                          aria-label={locale === "ar" ? "اختيار من كل العملاء" : "Pick from all customers"}
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
-                            <path d="M6.25 7.25a2.75 2.75 0 115.5 0 2.75 2.75 0 01-5.5 0zM10.5 11.5a4.5 4.5 0 00-4.5 4.5.75.75 0 001.5 0 3 3 0 013-3h2.5a.75.75 0 000-1.5h-2.5z" />
-                            <path d="M13.25 8.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zm2.893 6.198a3.25 3.25 0 00-2.893-1.698h-.75a.75.75 0 000 1.5h.75c.664 0 1.294.322 1.688.863a.75.75 0 001.205-.865z" />
-                          </svg>
-                        </button>
-                      </div>
-
-                      {customerLoading ? (
-                        <div className="text-xs text-gray-500">{locale === "ar" ? "جارٍ البحث..." : "Searching..."}</div>
-                      ) : customers.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          {customers.map((customer) => {
-                            const active = selectedCustomer?.id === customer.id;
-                            return (
-                              <button
-                                key={customer.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCustomer(customer);
-                                  setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
-                                }}
-                                className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? 'border-primary bg-purple-50' : 'border-gray-200 bg-white hover:border-purple-300'}`}
-                              >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
-                                  {getInitials(customer.firstName, customer.lastName)}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate font-semibold text-gray-900">
-                                    {customer.firstName} {customer.lastName}
-                                  </p>
-                                  <p className="truncate text-xs text-gray-500">{customer.email}</p>
-                                  <p className="truncate text-xs text-gray-500">{customer.phone}</p>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : customerSearch.trim().length >= 1 ? (
-                        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-600">
-                          {locale === "ar"
-                            ? "لا يوجد عميل مطابق. يمكنك إنشاء عميل جديد من التبويب المجاور."
-                            : "No customer found. You can create a new one from the adjacent tab."}
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-600">
-                          {locale === "ar"
-                            ? "ابدأ بالبحث عن عميل موجود بالاسم أو الهاتف أو البريد."
-                            : "Start by searching for an existing customer by name, phone, or email."}
-                        </div>
-                      )}
-
-                      {selectedCustomer && (
-                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                              {getInitials(selectedCustomer.firstName, selectedCustomer.lastName)}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-900">
-                                {selectedCustomer.firstName} {selectedCustomer.lastName}
-                              </p>
-                              <p className="text-sm text-gray-600">{selectedCustomer.email}</p>
-                              <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : customerMode === "new" ? (
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <input
-                        value={newCustomer.firstName}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, firstName: e.target.value }))}
-                        placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
-                      <input
-                        value={newCustomer.lastName}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, lastName: e.target.value }))}
-                        placeholder={locale === "ar" ? "الاسم الأخير" : "Last name"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
-                      <input
-                        type="email"
-                        value={newCustomer.email}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, email: e.target.value }))}
-                        placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
-                      <input
-                        type="tel"
-                        value={newCustomer.phone}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))}
-                        placeholder={locale === "ar" ? "رقم الهاتف" : "Phone"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
-                      <select
-                        value={newCustomer.gender}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, gender: e.target.value }))}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      >
-                        <option value="">{locale === "ar" ? "الجنس" : "Gender"}</option>
-                        <option value="male">{locale === "ar" ? "ذكر" : "Male"}</option>
-                        <option value="female">{locale === "ar" ? "أنثى" : "Female"}</option>
-                        <option value="other">{locale === "ar" ? "آخر" : "Other"}</option>
-                      </select>
-                      <input
-                        type="date"
-                        value={newCustomer.dateOfBirth}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
-                        aria-label={locale === "ar" ? "تاريخ الميلاد" : "Date of birth"}
-                        title={locale === "ar" ? "تاريخ الميلاد (اختياري)" : "Date of birth (optional)"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <input
-                        value={newCustomer.firstName}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, firstName: e.target.value }))}
-                        placeholder={locale === "ar" ? "اسم الضيف الأول" : "Guest first name"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
-                      <input
-                        value={newCustomer.lastName}
-                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, lastName: e.target.value }))}
-                        placeholder={locale === "ar" ? "اسم الضيف الأخير" : "Guest last name"}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
-                      />
-                      <p className="sm:col-span-2 text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                        {locale === "ar"
-                          ? "وضع الضيف يسمح بالحجز بدون بريد إلكتروني أو رقم جوال."
-                          : "Guest mode allows booking without email or mobile number."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {showCustomerPicker && (
-                  <div className="fixed inset-0 z-[70]">
-                    <div className="absolute inset-0 bg-slate-950/35" onClick={() => setShowCustomerPicker(false)} />
-                    <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <h5 className="text-base font-semibold text-gray-900">
-                          {locale === "ar" ? "اختيار عميل" : "Select Customer"}
-                        </h5>
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomerPicker(false)}
-                          className="rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50"
-                        >
-                          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
-                          </svg>
-                        </button>
-                      </div>
-
-                      <input
-                        type="text"
-                        value={pickerSearch}
-                        onChange={(e) => setPickerSearch(e.target.value)}
-                        placeholder={locale === "ar" ? "ابحث داخل كل العملاء..." : "Search all customers..."}
-                        className="mb-3 w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? "right" : "left" }}
-                      />
-
-                      <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
-                        {pickerLoading ? (
-                          <p className="text-sm text-gray-500">{locale === "ar" ? "جارٍ التحميل..." : "Loading customers..."}</p>
-                        ) : pickerCustomers.length === 0 ? (
-                          <p className="rounded-2xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
-                            {locale === "ar" ? "لا يوجد عملاء لعرضهم." : "No customers to show."}
-                          </p>
-                        ) : (
-                          pickerCustomers.map((customer) => (
+                    {customerLoading ? (
+                      <div className="text-xs text-gray-500">{locale === "ar" ? "جارٍ البحث..." : "Searching..."}</div>
+                    ) : customers.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {customers.map((customer) => {
+                          const active = selectedCustomer?.id === customer.id;
+                          return (
                             <button
                               key={customer.id}
                               type="button"
                               onClick={() => {
                                 setSelectedCustomer(customer);
+                                setCustomerMode("existing");
                                 setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
-                                setShowCustomerPicker(false);
                               }}
-                              className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-purple-50"
+                              className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"}`}
                             >
                               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
                                 {getInitials(customer.firstName, customer.lastName)}
@@ -1269,16 +914,28 @@ export function AppointmentActionDrawer({
                                 <p className="truncate font-semibold text-gray-900">
                                   {customer.firstName} {customer.lastName}
                                 </p>
-                                <p className="truncate text-xs text-gray-500">{customer.email || "-"}</p>
-                                <p className="truncate text-xs text-gray-500">{customer.phone || "-"}</p>
+                                <p className="truncate text-xs text-gray-500">{customer.email}</p>
+                                <p className="truncate text-xs text-gray-500">{customer.phone}</p>
                               </div>
                             </button>
-                          ))
-                        )}
+                          );
+                        })}
                       </div>
-                    </div>
+                    ) : customerSearch.trim().length >= 1 ? (
+                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-600">
+                        {locale === "ar"
+                          ? "لا يوجد عميل مطابق. يمكنك استخدام عميل حضوري بدلاً من ذلك."
+                          : "No customer found. You can use Walk In instead."}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-600">
+                        {locale === "ar"
+                          ? "ابدأ بالبحث عن عميل موجود بالاسم أو الهاتف أو البريد."
+                          : "Start by searching for an existing customer by name, phone, or email."}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 1 ? "" : "hidden"}`}>
                   <h4 className="text-base font-semibold text-gray-900">
