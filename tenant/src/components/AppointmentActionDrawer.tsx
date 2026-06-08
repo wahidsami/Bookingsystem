@@ -1847,9 +1847,7 @@ export function AppointmentActionDrawer({
               >
                 {saving
                   ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
-                  : (mode === "appointment"
-                    ? (locale === "ar" ? "حفظ الموعد" : "Save Appointment")
-                    : (locale === "ar" ? "حفظ الوقت المحجوز" : "Save Blocked Time"))}
+                  : (locale === "ar" ? "حفظ الوقت المحجوز" : "Save Blocked Time")}
               </button>
             )}
           </div>
