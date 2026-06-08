@@ -1099,7 +1099,7 @@ export function AppointmentDetailsDrawer({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => void handleMarkPaid(appointment.paymentMethod || "cash")}
+                  onClick={() => void handleMarkFullyPaid(appointment.paymentMethod || "cash")}
                   disabled={paymentUpdating || !canMarkPaid}
                   className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -1333,7 +1333,7 @@ export function AppointmentDetailsDrawer({
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => void handleMarkPaid(appointment.paymentMethod || "cash")}
+                onClick={() => void handleMarkFullyPaid(appointment.paymentMethod || "cash")}
                 disabled={paymentUpdating || !canMarkPaid}
                 className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
