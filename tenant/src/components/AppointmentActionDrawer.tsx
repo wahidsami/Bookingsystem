@@ -535,6 +535,31 @@ export function AppointmentActionDrawer({
     ? (groupGuest.isFree ? 0 : toSafeMoneyNumber(selectedGuestService?.finalPrice ?? 0))
     : 0;
   const displayTotalPrice = toSafeMoneyNumber(displayServicePrice + guestServicePrice);
+  const groupedServices = useMemo(() => {
+    const groupMap = new Map<string, { heading: string | null; items: ServiceItem[] }>();
+
+    services.forEach((service) => {
+      const parentLabel = (service.parentName || service.parentService || "").trim();
+      const categoryLabel = (service.category || "").trim();
+      const groupHeading = parentLabel || categoryLabel || null;
+      const groupKey = groupHeading ? `group:${groupHeading}` : `service:${service.id}`;
+
+      if (!groupMap.has(groupKey)) {
+        groupMap.set(groupKey, { heading: groupHeading, items: [] });
+      }
+
+      groupMap.get(groupKey)?.items.push(service);
+    });
+
+    return Array.from(groupMap.values()).map((group) => ({
+      ...group,
+      items: group.items.slice().sort((a, b) => {
+        const aName = locale === "ar" ? a.name_ar : a.name_en;
+        const bName = locale === "ar" ? b.name_ar : b.name_en;
+        return aName.localeCompare(bName);
+      })
+    }));
+  }, [services, locale]);
 
   const handleAppointmentSubmit = async () => {
     setError("");
@@ -951,8 +976,8 @@ export function AppointmentActionDrawer({
                       </h4>
                       <p className="text-xs text-gray-500">
                         {locale === "ar"
-                          ? "اختر الخدمة من البطاقات الأفقية، ثم انتقل إلى تحديد الموعد."
-                          : "Choose a service from the horizontal cards, then continue to scheduling."}
+                          ? "اختر الخدمة من البطاقات العمودية، ثم انتقل إلى تحديد الموعد."
+                          : "Choose a service from the vertical list, then continue to scheduling."}
                       </p>
                     </div>
                     <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
@@ -960,73 +985,89 @@ export function AppointmentActionDrawer({
                     </div>
                   </div>
 
-                  <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-                    {services.map((service) => {
-                      const active = service.id === selectedServiceId;
-                      const serviceName = locale === "ar" ? service.name_ar : service.name_en;
-                      const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
-                      return (
-                        <button
-                          key={service.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedServiceId(service.id);
-                            setSelectedVariantId("");
-                            setPaymentMethod("");
-                          }}
-                          className={`group flex min-w-[240px] max-w-[240px] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border text-left transition ${
-                            active
-                              ? "border-primary bg-purple-50 ring-2 ring-primary/20"
-                              : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
-                          }`}
-                        >
-                          <div className="h-28 w-full overflow-hidden bg-gray-100">
-                            {service.image ? (
-                              <img
-                                src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
-                                alt={serviceName}
-                                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-gray-300">
-                                <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                  <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex-1 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {serviceParent
-                                    ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
-                                    : locale === "ar"
-                                      ? "بدون فئة"
-                                      : "No category"}
-                                </p>
-                              </div>
-                              {active && (
-                                <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                  {locale === "ar" ? "محدد" : "Selected"}
-                                </span>
-                              )}
+                  <div className="mt-4 space-y-5">
+                    {groupedServices.map((group) => (
+                      <div key={group.heading || group.items[0]?.id} className="space-y-3">
+                        {group.heading ? (
+                          <div className="flex items-center gap-3">
+                            <div className="h-px flex-1 bg-gray-200" />
+                            <div className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-600">
+                              {group.heading}
                             </div>
-
-                            <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
-                              <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                ⏱ {displayDuration && active ? `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}` : `${service.duration} ${locale === "ar" ? "دقيقة" : "min"}`}
-                              </span>
-                              <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
-                              </span>
-                            </div>
+                            <div className="h-px flex-1 bg-gray-200" />
                           </div>
-                        </button>
-                      );
-                    })}
+                        ) : null}
+
+                        <div className="space-y-3">
+                          {group.items.map((service) => {
+                            const active = service.id === selectedServiceId;
+                            const serviceName = locale === "ar" ? service.name_ar : service.name_en;
+                            const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
+                            return (
+                              <button
+                                key={service.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedServiceId(service.id);
+                                  setSelectedVariantId("");
+                                  setPaymentMethod("");
+                                }}
+                                className={`group flex w-full items-stretch overflow-hidden rounded-3xl border text-left transition ${
+                                  active
+                                    ? "border-primary bg-purple-50 ring-2 ring-primary/20"
+                                    : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
+                                }`}
+                              >
+                                <div className="h-28 w-28 shrink-0 overflow-hidden bg-gray-100 sm:h-32 sm:w-32">
+                                  {service.image ? (
+                                    <img
+                                      src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
+                                      alt={serviceName}
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                      <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1 p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
+                                      <p className="mt-1 text-xs text-gray-500">
+                                        {serviceParent
+                                          ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
+                                          : locale === "ar"
+                                            ? "بدون فئة"
+                                            : "No category"}
+                                      </p>
+                                    </div>
+                                    {active && (
+                                      <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                        {locale === "ar" ? "محدد" : "Selected"}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
+                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                      ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                    </span>
+                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                      <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
+                                    </span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   {selectedService && (
