@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { TenantLayout } from "@/components/TenantLayout";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import { tenantApi, getImageUrl, API_BASE_URL } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -111,6 +112,7 @@ export default function AppointmentDetailsPage() {
   const searchParams = useSearchParams();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
+  const dialog = useAppDialog();
   const { id } = params;
 
   const [loading, setLoading] = useState(true);
@@ -165,11 +167,19 @@ export default function AppointmentDetailsPage() {
       if (response.success) {
         loadAppointment();
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to update status:", err);
-      alert(err.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     } finally {
       setUpdating(false);
     }
@@ -184,11 +194,19 @@ export default function AppointmentDetailsPage() {
       if (response.success) {
         loadAppointment();
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to update payment:", err);
-      alert(err.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     } finally {
       setUpdating(false);
     }
@@ -207,11 +225,19 @@ export default function AppointmentDetailsPage() {
       if (response.success) {
         loadAppointment();
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to record remainder:", err);
-      alert(err.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     } finally {
       setUpdating(false);
     }
@@ -287,11 +313,19 @@ export default function AppointmentDetailsPage() {
         setRescheduleSelectedSlot(null);
         loadAppointment();
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر الجدولة" : "Reschedule failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to reschedule", err);
-      alert(err.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر الجدولة" : "Reschedule failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     } finally {
       setRescheduleSubmitting(false);
     }
