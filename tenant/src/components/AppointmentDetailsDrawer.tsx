@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Currency } from "@/components/Currency";
@@ -218,6 +219,44 @@ function formatDateTime(value: string, locale: string) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+interface WorkspacePanelProps {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}
+
+function WorkspacePanel({ title, subtitle, children, action, className = "" }: WorkspacePanelProps) {
+  return (
+    <section className={`rounded-3xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{title}</p>
+          {subtitle ? <p className="mt-1 text-sm text-gray-500">{subtitle}</p> : null}
+        </div>
+        {action}
+      </div>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+interface MetricTileProps {
+  label: string;
+  value: ReactNode;
+  className?: string;
+}
+
+function MetricTile({ label, value, className = "" }: MetricTileProps) {
+  return (
+    <div className={`rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200 ${className}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</p>
+      <div className="mt-1 text-sm font-semibold text-gray-900">{value}</div>
+    </div>
+  );
 }
 
 type RescheduleAuditEntry = {
@@ -943,19 +982,11 @@ export function AppointmentDetailsDrawer({
             </div>
           ) : null}
 
-          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-              {locale === "ar" ? "ملخص الموعد" : "Appointment summary"}
-            </p>
-            <div className="mt-3 space-y-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الوقت" : "Time"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
-                </p>
-              </div>
+          <WorkspacePanel
+            title={locale === "ar" ? "ملخص الموعد" : "Appointment summary"}
+            subtitle={formatDateTime(appointment.startTime, locale)}
+          >
+            <div className="space-y-3">
               <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                   {locale === "ar" ? "الخدمة" : "Service"}
@@ -968,31 +999,21 @@ export function AppointmentDetailsDrawer({
                 ) : null}
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الموظف" : "Employee"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.staff.name}</p>
-                </div>
-                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "السعر" : "Price"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    <Currency amount={Number(appointment.price || 0)} />
-                  </p>
-                </div>
+                <MetricTile
+                  label={locale === "ar" ? "الموظف" : "Employee"}
+                  value={appointment.staff.name}
+                />
+                <MetricTile
+                  label={locale === "ar" ? "السعر" : "Price"}
+                  value={<Currency amount={Number(appointment.price || 0)} />}
+                />
               </div>
-              <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الحالة المالية" : "Payment status"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  {getPaymentStatusLabel(currentPaymentStatus, locale)}
-                </p>
-              </div>
+              <MetricTile
+                label={locale === "ar" ? "الحالة المالية" : "Payment status"}
+                value={getPaymentStatusLabel(currentPaymentStatus, locale)}
+              />
             </div>
-          </div>
+          </WorkspacePanel>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -1031,35 +1052,12 @@ export function AppointmentDetailsDrawer({
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-              {locale === "ar" ? "الملخص المالي" : "Financial summary"}
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الإجمالي" : "Subtotal"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceSubtotal} /></p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الخصم" : "Discount"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceDiscount} /></p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "الضريبة" : "Tax"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceTax} /></p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "المتبقي" : "Remaining"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900"><Currency amount={serviceRemaining} /></p>
-              </div>
+          <WorkspacePanel title={locale === "ar" ? "الملخص المالي" : "Financial summary"}>
+            <div className="grid grid-cols-2 gap-3">
+              <MetricTile label={locale === "ar" ? "الإجمالي" : "Subtotal"} value={<Currency amount={serviceSubtotal} />} />
+              <MetricTile label={locale === "ar" ? "الخصم" : "Discount"} value={<Currency amount={serviceDiscount} />} />
+              <MetricTile label={locale === "ar" ? "الضريبة" : "Tax"} value={<Currency amount={serviceTax} />} />
+              <MetricTile label={locale === "ar" ? "المتبقي" : "Remaining"} value={<Currency amount={serviceRemaining} />} />
             </div>
             <div className="mt-3 rounded-2xl bg-primary/5 px-4 py-3 ring-1 ring-primary/10">
               <div className="flex items-center justify-between gap-3">
@@ -1069,7 +1067,7 @@ export function AppointmentDetailsDrawer({
                 <Currency amount={servicePaid} className="text-base font-bold text-gray-900" />
               </div>
             </div>
-          </div>
+          </WorkspacePanel>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -1425,81 +1423,55 @@ export function AppointmentDetailsDrawer({
           return (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">
-                    <Currency amount={customerWalletBalance} />
-                  </p>
-                </div>
-                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "إجمالي المعاملات" : "Transactions total"}
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">
-                    {customerTransactionsSummary?.totalTransactions ?? customerTransactions.length}
-                  </p>
-                </div>
-                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الصافي" : "Net total"}
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">
-                    <Currency amount={customerTransactionsSummary?.netTotal ?? paymentSnapshot.recordedPaymentsTotal} />
-                  </p>
-                </div>
+                <MetricTile
+                  label={locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
+                  value={<Currency amount={customerWalletBalance} />}
+                />
+                <MetricTile
+                  label={locale === "ar" ? "إجمالي المعاملات" : "Transactions total"}
+                  value={customerTransactionsSummary?.totalTransactions ?? customerTransactions.length}
+                />
+                <MetricTile
+                  label={locale === "ar" ? "الصافي" : "Net total"}
+                  value={<Currency amount={customerTransactionsSummary?.netTotal ?? paymentSnapshot.recordedPaymentsTotal} />}
+                />
               </div>
-              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "حركة المحفظة" : "Wallet activity"}
-                </p>
+              <WorkspacePanel title={locale === "ar" ? "حركة المحفظة" : "Wallet activity"}>
                 <p className="mt-2 text-sm text-gray-600">
                   {locale === "ar"
                     ? "تعرض هذه المساحة رصيد المحفظة وسجل التحركات المتاح من النظام الحالي."
                     : "This section shows the wallet balance and the available transaction movements from the current system."}
                 </p>
-              </div>
+              </WorkspacePanel>
             </div>
           );
         case "loyalty":
           return (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "نقاط الولاء" : "Loyalty points"}
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">{customerLoyaltyPoints}</p>
-                </div>
-                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "شريحة الولاء" : "Loyalty tier"}
-                  </p>
-                  <p className="mt-2 text-xl font-bold capitalize text-gray-900">{customerProfile?.loyaltyTier || "-"}</p>
-                </div>
+                <MetricTile
+                  label={locale === "ar" ? "نقاط الولاء" : "Loyalty points"}
+                  value={customerLoyaltyPoints}
+                />
+                <MetricTile
+                  label={locale === "ar" ? "شريحة الولاء" : "Loyalty tier"}
+                  value={<span className="capitalize">{customerProfile?.loyaltyTier || "-"}</span>}
+                />
               </div>
-              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "تفاصيل الولاء" : "Loyalty details"}
-                </p>
+              <WorkspacePanel title={locale === "ar" ? "تفاصيل الولاء" : "Loyalty details"}>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "إجمالي الإنفاق" : "Total spent"}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      <Currency amount={Number(customerProfile?.totalSpent || 0)} />
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
-                  </div>
+                  <MetricTile
+                    label={locale === "ar" ? "إجمالي الإنفاق" : "Total spent"}
+                    value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
+                    className="bg-white"
+                  />
+                  <MetricTile
+                    label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
+                    value={customerProfile?.totalBookings ?? 0}
+                    className="bg-white"
+                  />
                 </div>
-              </div>
+              </WorkspacePanel>
             </div>
           );
         case "reviews":
@@ -1537,17 +1509,21 @@ export function AppointmentDetailsDrawer({
     return (
       <div className="grid gap-4 xl:grid-cols-[300px_176px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+          <WorkspacePanel
+            title={locale === "ar" ? "مساحة العميل" : "Customer workspace"}
+            subtitle={customerFullName}
+            action={
+              <button
+                type="button"
+                onClick={() => setViewMode("appointment")}
+                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+              >
+                {locale === "ar" ? "رجوع" : "Back"}
+              </button>
+            }
+          >
             <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
               <div className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("appointment")}
-                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                >
-                  {locale === "ar" ? "رجوع" : "Back"}
-                </button>
-
                 <div className={`mt-4 flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
                     {customerProfile?.profileImage ? (
@@ -1571,69 +1547,35 @@ export function AppointmentDetailsDrawer({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
-                </p>
-                <p className="mt-1 text-lg font-bold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
-                </p>
-                <p className="mt-1 text-lg font-bold text-gray-900">
-                  <Currency amount={Number(customerProfile?.totalSpent || 0)} />
-                </p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "أول زيارة" : "First visit"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  {customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "آخر زيارة" : "Last visit"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  {customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
-                </p>
-              </div>
+              <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
+              <MetricTile
+                label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
+                value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
+              />
+              <MetricTile
+                label={locale === "ar" ? "أول زيارة" : "First visit"}
+                value={customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
+              />
+              <MetricTile
+                label={locale === "ar" ? "آخر زيارة" : "Last visit"}
+                value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
+              />
             </div>
 
-            <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "ملف العميل" : "Customer profile"}
-              </p>
+            <WorkspacePanel title={locale === "ar" ? "ملف العميل" : "Customer profile"} className="mt-4 bg-gray-50">
               <div className="mt-3 grid grid-cols-1 gap-3">
-                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "البريد الإلكتروني" : "Email"}
-                  </p>
-                  <p className="mt-1 break-all text-sm font-semibold text-gray-900">{customerProfile?.email || "-"}</p>
-                </div>
-                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الهاتف" : "Phone"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{customerProfile?.phone || "-"}</p>
-                </div>
-                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "اللغة" : "Language"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold capitalize text-gray-900">{customerProfile?.preferredLanguage || "-"}</p>
-                </div>
+                <MetricTile label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={customerProfile?.email || "-"} className="bg-white" />
+                <MetricTile label={locale === "ar" ? "الهاتف" : "Phone"} value={customerProfile?.phone || "-"} className="bg-white" />
+                <MetricTile
+                  label={locale === "ar" ? "اللغة" : "Language"}
+                  value={customerProfile?.preferredLanguage || "-"}
+                  className="bg-white"
+                />
               </div>
-            </div>
+            </WorkspacePanel>
 
             {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
-              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {locale === "ar" ? "ملاحظات" : "Notes"}
-                </p>
+              <WorkspacePanel title={locale === "ar" ? "ملاحظات" : "Notes"}>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
                   {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
                 </p>
@@ -1646,9 +1588,9 @@ export function AppointmentDetailsDrawer({
                     ))}
                   </div>
                 )}
-              </div>
+              </WorkspacePanel>
             )}
-          </div>
+          </WorkspacePanel>
         </div>
 
         <div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
@@ -1693,70 +1635,33 @@ export function AppointmentDetailsDrawer({
   const renderOverview = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
-          </p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
-          </p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">
-            <Currency amount={Number(customerProfile?.totalSpent || 0)} />
-          </p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "أول زيارة" : "First visit"}
-          </p>
-          <p className="mt-2 text-sm font-semibold text-gray-900">
-            {customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "آخر زيارة" : "Last visit"}
-          </p>
-          <p className="mt-2 text-sm font-semibold text-gray-900">
-            {customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
-          </p>
-        </div>
+        <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
+        <MetricTile
+          label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
+          value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
+        />
+        <MetricTile
+          label={locale === "ar" ? "أول زيارة" : "First visit"}
+          value={customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
+        />
+        <MetricTile
+          label={locale === "ar" ? "آخر زيارة" : "Last visit"}
+          value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "البريد الإلكتروني" : "Email"}
-          </p>
-          <p className="mt-2 break-all text-sm font-semibold text-gray-900">{customerProfile?.email || "-"}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "الهاتف" : "Phone"}
-          </p>
-          <p className="mt-2 text-sm font-semibold text-gray-900">{customerProfile?.phone || "-"}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "النوع" : "Gender"}
-          </p>
-          <p className="mt-2 text-sm font-semibold capitalize text-gray-900">{customerProfile?.gender || "-"}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "اللغة المفضلة" : "Preferred language"}
-          </p>
-          <p className="mt-2 text-sm font-semibold capitalize text-gray-900">{customerProfile?.preferredLanguage || "-"}</p>
-        </div>
+        <MetricTile label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={customerProfile?.email || "-"} />
+        <MetricTile label={locale === "ar" ? "الهاتف" : "Phone"} value={customerProfile?.phone || "-"} />
+        <MetricTile label={locale === "ar" ? "النوع" : "Gender"} value={customerProfile?.gender || "-"} />
+        <MetricTile
+          label={locale === "ar" ? "اللغة المفضلة" : "Preferred language"}
+          value={customerProfile?.preferredLanguage || "-"}
+        />
       </div>
 
       {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
-        <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {locale === "ar" ? "ملاحظات" : "Notes"}
-          </p>
+        <WorkspacePanel title={locale === "ar" ? "ملاحظات" : "Notes"}>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
             {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
           </p>
@@ -1769,7 +1674,7 @@ export function AppointmentDetailsDrawer({
               ))}
             </div>
           )}
-        </div>
+        </WorkspacePanel>
       )}
     </div>
   );
