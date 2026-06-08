@@ -323,6 +323,8 @@ export function AppointmentActionDrawer({
       return;
     }
 
+    setAppointmentStep(4);
+
     const breakDateValue =
       getLocalDateKeyFromValue(existingBreak?.specificDate) ||
       getLocalDateKeyFromValue(existingBreak?.startDateTime) ||
