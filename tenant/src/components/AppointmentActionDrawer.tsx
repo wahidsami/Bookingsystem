@@ -976,8 +976,8 @@ export function AppointmentActionDrawer({
                       </h4>
                       <p className="text-xs text-gray-500">
                         {locale === "ar"
-                          ? "اختر الخدمة من البطاقات العمودية، ثم انتقل إلى تحديد الموعد."
-                          : "Choose a service from the vertical list, then continue to scheduling."}
+                          ? "اختر الخدمة من القائمة العمودية، ثم اختر النسخة إن وجدت."
+                          : "Choose a service from the vertical list, then pick a variant if it exists."}
                       </p>
                     </div>
                     <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
@@ -1000,12 +1000,13 @@ export function AppointmentActionDrawer({
 
                         <div className="space-y-3">
                           {group.items.map((service) => {
-                            const active = service.id === selectedServiceId;
-                            const serviceName = locale === "ar" ? service.name_ar : service.name_en;
-                            const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
-                            return (
+                          const active = service.id === selectedServiceId;
+                          const serviceName = locale === "ar" ? service.name_ar : service.name_en;
+                          const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
+                          const serviceVariantsForCard = parseArrayValue<ServiceVariant>(service.variants).filter((variant) => variant.isActive !== false);
+                          return (
+                            <div key={service.id} className="space-y-2">
                               <button
-                                key={service.id}
                                 type="button"
                                 onClick={() => {
                                   setSelectedServiceId(service.id);
@@ -1063,6 +1064,50 @@ export function AppointmentActionDrawer({
                                   </div>
                                 </div>
                               </button>
+
+                              {serviceVariantsForCard.length > 0 ? (
+                                <div className="ms-4 space-y-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-3 sm:ms-8">
+                                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                    {locale === "ar" ? "النسخ" : "Variants"}
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    {serviceVariantsForCard.map((variant) => {
+                                      const activeVariant = active && selectedVariantId === variant.id;
+                                      return (
+                                        <button
+                                          key={variant.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedServiceId(service.id);
+                                            setSelectedVariantId(variant.id);
+                                            setPaymentMethod("");
+                                          }}
+                                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                                            activeVariant
+                                              ? "border-primary bg-white ring-2 ring-primary/20"
+                                              : "border-gray-200 bg-white hover:border-primary/40"
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                              <div className="text-sm font-semibold text-gray-900">
+                                                {variant.description}
+                                              </div>
+                                              <div className="mt-1 text-xs text-gray-500">
+                                                {variant.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                              </div>
+                                            </div>
+                                            <div className="text-sm font-bold text-primary">
+                                              <Currency amount={toSafeMoneyNumber(variant.finalPrice ?? 0)} />
+                                            </div>
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
                             );
                           })}
                         </div>
@@ -1106,21 +1151,6 @@ export function AppointmentActionDrawer({
                       : "Review the provider, date, and time if you need to change them."}
                   </p>
                   <div className="mt-4 grid grid-cols-1 gap-4">
-                    <select
-                      value={selectedVariantId}
-                      onChange={(e) => setSelectedVariantId(e.target.value)}
-                      disabled={!selectedService || serviceVariants.length === 0}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary disabled:bg-gray-100"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    >
-                      <option value="">{locale === "ar" ? "الخدمة الأساسية" : "Base service"}</option>
-                      {serviceVariants.map((variant) => (
-                        <option key={variant.id} value={variant.id}>
-                          {variant.description} - {variant.duration} {locale === "ar" ? "دقيقة" : "min"}
-                        </option>
-                      ))}
-                    </select>
-
                     <select
                       value={selectedStaffId}
                       onChange={(e) => setSelectedStaffId(e.target.value)}
