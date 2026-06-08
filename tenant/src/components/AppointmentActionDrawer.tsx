@@ -558,6 +558,12 @@ export function AppointmentActionDrawer({
       : paymentMethod === "booking-fee"
         ? (locale === "ar" ? "عربون الحجز" : "Booking Fee")
         : paymentMethod;
+  const customerModeLabel = customerMode === "existing"
+    ? (locale === "ar" ? "عميل موجود" : "Existing customer")
+    : customerMode === "new"
+      ? (locale === "ar" ? "عميل جديد" : "New customer")
+      : (locale === "ar" ? "ضيف" : "Guest");
+  const appointmentSummaryTimeLabel = `${appointmentDate || "-"} ${appointmentTime ? formatTime12Hour(appointmentTime, locale) : "-"}`;
   const selectedGuestService = useMemo(
     () => services.find((service) => service.id === groupGuest.serviceId) || null,
     [services, groupGuest.serviceId]
@@ -900,6 +906,88 @@ export function AppointmentActionDrawer({
                         {label}
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {locale === "ar" ? "ملخص الحجز" : "Booking summary"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {locale === "ar"
+                          ? "يبقى هذا الملخص ظاهرًا أثناء التنقل بين الخطوات."
+                          : "This summary stays visible while you move through the steps."}
+                      </p>
+                    </div>
+                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                      {locale === "ar" ? "خطوة بخطوة" : "Step by step"}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "العميل" : "Customer"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {selectedCustomerName || (locale === "ar" ? "غير محدد" : "Not selected")}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {customerModeLabel}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الخدمة" : "Service"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {selectedServiceName || (locale === "ar" ? "غير محددة" : "Not selected")}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {selectedVariantName || `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الموعد" : "Schedule"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {appointmentSummaryTimeLabel}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {selectedStaff?.name || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الدفع" : "Payment"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {paymentMethodLabel || (locale === "ar" ? "غير محدد" : "Not selected")}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {locale === "ar" ? "طريقة الحجز" : "Booking method"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {locale === "ar" ? "الإجمالي" : "Total"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        <Currency amount={displayTotalPrice} />
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {includeGroupGuest
+                          ? (locale === "ar" ? "يشمل خدمة الضيف" : "Includes guest service")
+                          : (locale === "ar" ? "خدمة أساسية فقط" : "Main service only")}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
