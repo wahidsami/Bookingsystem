@@ -1409,8 +1409,12 @@ export function AppointmentDetailsDrawer({
       { key: "reviews", label: locale === "ar" ? "التقييمات" : "Reviews" }
     ];
 
+    const fallbackTab = customerTab === "wallet" || customerTab === "loyalty" || customerTab === "reviews"
+      ? customerTab
+      : customerTab;
+
     const renderCustomerTabContent = () => {
-      switch (customerTab) {
+      switch (fallbackTab) {
         case "overview":
           return renderOverview();
         case "appointments":
