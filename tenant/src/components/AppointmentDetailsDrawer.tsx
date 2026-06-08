@@ -142,6 +142,7 @@ interface CustomerProfile {
   email: string;
   phone: string;
   profileImage?: string | null;
+  walletBalance?: number;
   gender?: string | null;
   dateOfBirth?: string | null;
   preferredLanguage?: string;
@@ -169,6 +170,13 @@ interface CustomerProfile {
   allOrders?: CustomerOrderHistoryItem[];
   recentAppointments?: CustomerAppointmentHistoryItem[];
   recentOrders?: CustomerOrderHistoryItem[];
+  reviews?: Array<{
+    id: string;
+    rating?: number | null;
+    serviceName?: string | null;
+    comment?: string | null;
+    date?: string | null;
+  }>;
 }
 
 interface AppointmentDetailsDrawerProps {
@@ -406,7 +414,7 @@ export function AppointmentDetailsDrawer({
   const [customerTransactionsLoading, setCustomerTransactionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
   const [statusUpdating, setStatusUpdating] = useState(false);
-  const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
+  const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions" | "wallet" | "loyalty" | "reviews">("overview");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
@@ -1100,8 +1108,141 @@ export function AppointmentDetailsDrawer({
       );
     }
 
+    const customerWalletBalance = Number(customerProfile?.walletBalance || 0);
+    const customerLoyaltyPoints = Number(customerProfile?.loyaltyPoints || 0);
+    const customerReviews = customerProfile?.reviews || [];
+    const customerTabs: Array<{ key: typeof customerTab; label: string }> = [
+      { key: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+      { key: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
+      { key: "transactions", label: locale === "ar" ? "المعاملات" : "Transactions" },
+      { key: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
+      { key: "loyalty", label: locale === "ar" ? "الولاء" : "Loyalty" },
+      { key: "reviews", label: locale === "ar" ? "التقييمات" : "Reviews" }
+    ];
+
+    const renderCustomerTabContent = () => {
+      switch (customerTab) {
+        case "overview":
+          return renderOverview();
+        case "appointments":
+          return renderAppointments();
+        case "transactions":
+          return renderTransactions();
+        case "wallet":
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">
+                    <Currency amount={customerWalletBalance} />
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "إجمالي المعاملات" : "Transactions total"}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">
+                    {customerTransactionsSummary?.totalTransactions ?? customerTransactions.length}
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الصافي" : "Net total"}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">
+                    <Currency amount={customerTransactionsSummary?.netTotal ?? paymentSnapshot.recordedPaymentsTotal} />
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "حركة المحفظة" : "Wallet activity"}
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  {locale === "ar"
+                    ? "تعرض هذه المساحة رصيد المحفظة وسجل التحركات المتاح من النظام الحالي."
+                    : "This section shows the wallet balance and the available transaction movements from the current system."}
+                </p>
+              </div>
+            </div>
+          );
+        case "loyalty":
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "نقاط الولاء" : "Loyalty points"}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">{customerLoyaltyPoints}</p>
+                </div>
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "شريحة الولاء" : "Loyalty tier"}
+                  </p>
+                  <p className="mt-2 text-xl font-bold capitalize text-gray-900">{customerProfile?.loyaltyTier || "-"}</p>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "تفاصيل الولاء" : "Loyalty details"}
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "إجمالي الإنفاق" : "Total spent"}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">
+                      <Currency amount={Number(customerProfile?.totalSpent || 0)} />
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        case "reviews":
+          return (
+            <div className="space-y-4">
+              {customerReviews.length > 0 ? (
+                customerReviews.map((review) => (
+                  <div key={review.id} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {review.serviceName || (locale === "ar" ? "تقييم عميل" : "Customer review")}
+                        </p>
+                        {review.date ? <p className="mt-1 text-xs text-gray-500">{formatDateTime(review.date, locale)}</p> : null}
+                      </div>
+                      <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                        {review.rating ?? 0}/5
+                      </div>
+                    </div>
+                    {review.comment ? <p className="mt-3 text-sm leading-6 text-gray-700">{review.comment}</p> : null}
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+                  {locale === "ar"
+                    ? "لا توجد تقييمات متاحة لهذا العميل بعد."
+                    : "No reviews are available for this customer yet."}
+                </div>
+              )}
+            </div>
+          );
+      }
+    };
+
     return (
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[300px_176px_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
@@ -1169,47 +1310,71 @@ export function AppointmentDetailsDrawer({
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(["overview", "appointments", "transactions"] as const).map((tab) => (
+            <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "ملف العميل" : "Customer profile"}
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-3">
+                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                  </p>
+                  <p className="mt-1 break-all text-sm font-semibold text-gray-900">{customerProfile?.email || "-"}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الهاتف" : "Phone"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{customerProfile?.phone || "-"}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "اللغة" : "Language"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold capitalize text-gray-900">{customerProfile?.preferredLanguage || "-"}</p>
+                </div>
+              </div>
+            </div>
+
+            {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "ملاحظات" : "Notes"}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                  {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
+                </p>
+                {customerProfile?.tags && customerProfile.tags.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {customerProfile.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
+          <div className="space-y-2">
+            {customerTabs.map((tab) => (
                 <button
-                  key={tab}
+                  key={tab.key}
                   type="button"
-                  onClick={() => setCustomerTab(tab)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    customerTab === tab
+                  onClick={() => setCustomerTab(tab.key)}
+                  className={`w-full rounded-2xl px-3 py-2 text-left text-sm font-semibold transition ${
+                    customerTab === tab.key
                       ? "bg-primary text-white"
-                      : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                      : "bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100"
                   }`}
                 >
-                  {tab === "overview"
-                    ? (locale === "ar" ? "نظرة عامة" : "Overview")
-                    : tab === "appointments"
-                      ? (locale === "ar" ? "المواعيد" : "Appointments")
-                      : (locale === "ar" ? "المدفوعات" : "Transactions")}
+                  {tab.label}
                 </button>
-              ))}
-            </div>
+            ))}
           </div>
-
-          {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
-            <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "ملاحظات" : "Notes"}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
-              </p>
-              {customerProfile?.tags && customerProfile.tags.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {customerProfile.tags.map((tag) => (
-                    <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="space-y-4">
@@ -1218,11 +1383,7 @@ export function AppointmentDetailsDrawer({
               <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
             </div>
           ) : customerProfile ? (
-            <>
-              {customerTab === "overview" && renderOverview()}
-              {customerTab === "appointments" && renderAppointments()}
-              {customerTab === "transactions" && renderTransactions()}
-            </>
+            renderCustomerTabContent()
           ) : (
             <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
               {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
