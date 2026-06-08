@@ -1841,7 +1841,7 @@ export function AppointmentActionDrawer({
             ) : (
               <button
                 type="button"
-                onClick={mode === "appointment" ? handleAppointmentSubmit : handleBreakSubmit}
+                onClick={handleBreakSubmit}
                 disabled={saving}
                 className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
               >
