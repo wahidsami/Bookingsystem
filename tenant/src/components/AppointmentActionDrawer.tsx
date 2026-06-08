@@ -377,6 +377,23 @@ export function AppointmentActionDrawer({
     setAppointmentStep((current) => Math.max(current - 1, 0));
   };
 
+  const handleWalkInCustomer = () => {
+    setError("");
+    setCustomerMode("guest");
+    setCustomerSearch("");
+    setSelectedCustomer(null);
+    setShowCustomerPicker(false);
+    setNewCustomer({
+      firstName: locale === "ar" ? "ضيف" : "Walk",
+      lastName: locale === "ar" ? "مؤقت" : "In Customer",
+      email: "",
+      phone: "",
+      gender: "",
+      dateOfBirth: ""
+    });
+    setAppointmentStep(1);
+  };
+
   useEffect(() => {
     if (!open || mode !== "appointment" || customerMode !== "existing" || !showCustomerPicker) {
       return;
@@ -918,6 +935,17 @@ export function AppointmentActionDrawer({
                       </button>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleWalkInCustomer}
+                    className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary/50 hover:bg-primary/10"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path d="M10 3a2 2 0 100 4 2 2 0 000-4zM5.5 8.5A1.5 1.5 0 004 10v3.25A2.75 2.75 0 006.75 16h6.5A2.75 2.75 0 0016 13.25V10a1.5 1.5 0 00-1.5-1.5H5.5z" />
+                    </svg>
+                    <span>{locale === "ar" ? "عميل حضوري" : "Walk In Customer"}</span>
+                  </button>
 
                   {customerMode === "existing" ? (
                     <div className="mt-4 space-y-3">
