@@ -38,6 +38,7 @@ export interface AppointmentItem {
     name: string;
     photo?: string;
   };
+  paymentTransactions?: PaymentTransaction[];
   user?: {
     id: string;
     firstName: string;
@@ -48,6 +49,21 @@ export interface AppointmentItem {
     profileImage?: string | null;
   };
   createdAt?: string;
+}
+
+interface PaymentTransaction {
+  id: string;
+  type: "deposit" | "remainder" | "full" | "refund";
+  amount: number;
+  paymentMethod: "online" | "cash" | "card_pos" | "wallet" | "bank_transfer";
+  status: "pending" | "completed" | "failed" | "refunded" | "cancelled";
+  transactionRef?: string | null;
+  notes?: string | null;
+  processedAt: string;
+  processor?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface CustomerAppointmentHistoryItem {
@@ -414,7 +430,9 @@ export function AppointmentDetailsDrawer({
   const [customerTransactionsLoading, setCustomerTransactionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [paymentUpdating, setPaymentUpdating] = useState(false);
   const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions" | "wallet" | "loyalty" | "reviews">("overview");
+  const [recordRemainderMethod, setRecordRemainderMethod] = useState("cash");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
@@ -431,7 +449,9 @@ export function AppointmentDetailsDrawer({
       setCustomerTransactionsSummary(null);
       setCustomerTransactionsLoading(false);
       setViewMode("appointment");
+      setPaymentUpdating(false);
       setCustomerTab("overview");
+      setRecordRemainderMethod("cash");
       setTransactionTypeFilter("all");
       setTransactionStatusFilter("all");
       setExpandedTransactionId(null);
@@ -454,6 +474,7 @@ export function AppointmentDetailsDrawer({
       setCustomerTransactions([]);
       setCustomerTransactionsSummary(null);
       setCustomerTransactionsLoading(false);
+      setPaymentUpdating(false);
       setExpandedTransactionId(null);
       const response = await tenantApi.getAppointment(appointmentId);
         if (!cancelled) {
@@ -713,6 +734,106 @@ export function AppointmentDetailsDrawer({
     }
   };
 
+  const refreshAppointment = async () => {
+    if (!appointment) return;
+    const refreshed = await tenantApi.getAppointment(appointment.id);
+    if (refreshed?.success && refreshed?.appointment) {
+      setAppointment(refreshed.appointment);
+    }
+  };
+
+  const handleMarkFullyPaid = async (paymentMethod = "cash") => {
+    if (!appointment || paymentUpdating) return;
+    try {
+      setPaymentUpdating(true);
+      const response = await tenantApi.updatePaymentStatus(appointment.id, "fully_paid", paymentMethod);
+      if (!response?.success) {
+        setActionNotice({
+          kind: "error",
+          message: response?.message || (locale === "ar" ? "تعذر تحديث الدفع." : "Failed to update payment.")
+        });
+        return;
+      }
+      await refreshAppointment();
+      setActionNotice({
+        kind: "success",
+        message: locale === "ar" ? "تم تسجيل الموعد كمدفوع بالكامل." : "Marked as fully paid."
+      });
+    } catch (err: any) {
+      console.error("Failed to mark appointment as fully paid:", err);
+      setActionNotice({
+        kind: "error",
+        message: err?.message || (locale === "ar" ? "تعذر تحديث الدفع." : "Failed to update payment.")
+      });
+    } finally {
+      setPaymentUpdating(false);
+    }
+  };
+
+  const handleCollectRemainder = async () => {
+    if (!appointment || paymentUpdating) return;
+    const remainderAmount = Number(appointment.remainderAmount || 0);
+    if (remainderAmount <= 0) return;
+    try {
+      setPaymentUpdating(true);
+      const response = await tenantApi.recordRemainderPayment(appointment.id, {
+        amount: remainderAmount,
+        paymentMethod: recordRemainderMethod,
+        notes: locale === "ar" ? "تم تحصيل المتبقي من داخل لوحة التفاصيل." : "Collected remainder from the details drawer."
+      });
+      if (!response?.success) {
+        setActionNotice({
+          kind: "error",
+          message: response?.message || (locale === "ar" ? "تعذر تسجيل الدفعة المتبقية." : "Failed to record remainder payment.")
+        });
+        return;
+      }
+      await refreshAppointment();
+      setActionNotice({
+        kind: "success",
+        message: locale === "ar" ? "تم تسجيل الدفعة المتبقية." : "Remainder payment recorded."
+      });
+    } catch (err: any) {
+      console.error("Failed to record remainder payment from drawer:", err);
+      setActionNotice({
+        kind: "error",
+        message: err?.message || (locale === "ar" ? "تعذر تسجيل الدفعة المتبقية." : "Failed to record remainder payment.")
+      });
+    } finally {
+      setPaymentUpdating(false);
+    }
+  };
+
+  const handleMarkRefunded = async () => {
+    if (!appointment || paymentUpdating) return;
+    try {
+      setPaymentUpdating(true);
+      const response = await tenantApi.updatePaymentStatus(appointment.id, "refunded", appointment.paymentMethod || undefined, {
+        notes: locale === "ar" ? "تم وضع علامة مسترد من داخل لوحة التفاصيل." : "Marked refunded from the details drawer."
+      });
+      if (!response?.success) {
+        setActionNotice({
+          kind: "error",
+          message: response?.message || (locale === "ar" ? "تعذر تحديث حالة الدفع إلى مسترد." : "Failed to mark payment as refunded.")
+        });
+        return;
+      }
+      await refreshAppointment();
+      setActionNotice({
+        kind: "success",
+        message: locale === "ar" ? "تم تحديث حالة الدفع إلى مسترد." : "Payment marked as refunded."
+      });
+    } catch (err: any) {
+      console.error("Failed to mark appointment as refunded:", err);
+      setActionNotice({
+        kind: "error",
+        message: err?.message || (locale === "ar" ? "تعذر تحديث حالة الدفع إلى مسترد." : "Failed to mark payment as refunded.")
+      });
+    } finally {
+      setPaymentUpdating(false);
+    }
+  };
+
   const getManualStatusOptions = (currentStatus: AppointmentItem["status"]) => {
     const options: Array<{ value: AppointmentItem["status"]; label: string }> = [];
     const push = (value: AppointmentItem["status"], label: string) => {
@@ -746,6 +867,10 @@ export function AppointmentDetailsDrawer({
     const serviceTax = Number(appointment.taxAmount || 0);
     const servicePaid = Math.max(serviceSubtotal - Number(appointment.remainderAmount ?? 0), 0);
     const serviceRemaining = Number(appointment.remainderAmount ?? Math.max(0, Number(appointment.price || 0) - servicePaid));
+    const appointmentPaymentTransactions = appointment.paymentTransactions || [];
+    const canCollectRemainder = currentPaymentStatus === "deposit_paid" && Number(appointment.remainderAmount || 0) > 0;
+    const canMarkPaid = currentPaymentStatus === "pending";
+    const canMarkRefunded = !["refunded", "partially_refunded"].includes(currentPaymentStatus);
     const serviceTimeline = [
       {
         label: locale === "ar" ? "إنشاء الموعد" : "Appointment created",
@@ -943,6 +1068,130 @@ export function AppointmentDetailsDrawer({
                 </p>
                 <Currency amount={servicePaid} className="text-base font-bold text-gray-900" />
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "التحصيل" : "Payment actions"}
+              </p>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                {getPaymentStatusLabel(currentPaymentStatus, locale)}
+              </span>
+            </div>
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "باقي التحصيل" : "Remaining due"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    <Currency amount={Number(appointment.remainderAmount || 0)} />
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "طريقة الدفع" : "Payment method"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.paymentMethod || "-"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => void handleMarkPaid(appointment.paymentMethod || "cash")}
+                  disabled={paymentUpdating || !canMarkPaid}
+                  className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {locale === "ar" ? "تسجيل كمدفوع بالكامل" : "Mark fully paid"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleMarkRefunded()}
+                  disabled={paymentUpdating || !canMarkRefunded}
+                  className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {locale === "ar" ? "تسجيل كمرتجع" : "Mark refunded"}
+                </button>
+              </div>
+
+              {canCollectRemainder ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+                  <p className="text-sm font-semibold text-amber-900">
+                    {locale === "ar" ? "تحصيل المتبقي داخل المركز" : "Collect remainder at center"}
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                    <select
+                      value={recordRemainderMethod}
+                      onChange={(event) => setRecordRemainderMethod(event.target.value)}
+                      className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900"
+                    >
+                      <option value="cash">{locale === "ar" ? "نقدًا" : "Cash"}</option>
+                      <option value="card_pos">{locale === "ar" ? "بطاقة POS" : "Card POS"}</option>
+                      <option value="wallet">{locale === "ar" ? "المحفظة" : "Wallet"}</option>
+                      <option value="bank_transfer">{locale === "ar" ? "تحويل بنكي" : "Bank transfer"}</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleCollectRemainder()}
+                      disabled={paymentUpdating}
+                      className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {locale === "ar" ? "تسجيل الدفعة" : "Record payment"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "سجل الدفع" : "Payment history"}
+              </p>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                {appointmentPaymentTransactions.length}
+              </span>
+            </div>
+            <div className="mt-3 space-y-3">
+              {appointmentPaymentTransactions.length > 0 ? appointmentPaymentTransactions.map((transaction) => (
+                <div key={transaction.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {transaction.type === "deposit"
+                          ? (locale === "ar" ? "دفعة مقدمة" : "Deposit")
+                          : transaction.type === "remainder"
+                            ? (locale === "ar" ? "المتبقي" : "Remainder")
+                            : transaction.type === "refund"
+                              ? (locale === "ar" ? "استرداد" : "Refund")
+                              : (locale === "ar" ? "دفعة كاملة" : "Full payment")}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {formatDateTime(transaction.processedAt, locale)}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {transaction.paymentMethod}
+                        {transaction.transactionRef ? ` • ${transaction.transactionRef}` : ""}
+                      </p>
+                      {transaction.notes ? <p className="mt-2 text-sm text-gray-700">{transaction.notes}</p> : null}
+                    </div>
+                    <div className="text-right">
+                      <Currency amount={Number(transaction.amount || 0)} className="text-sm font-bold text-gray-900" />
+                      <p className="mt-2 text-xs font-semibold text-gray-500">
+                        {transaction.status}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                  {locale === "ar" ? "لا توجد معاملات دفع لهذا الموعد بعد." : "No payment transactions have been recorded for this appointment yet."}
+                </div>
+              )}
             </div>
           </div>
 
