@@ -180,6 +180,7 @@ exports.purchaseForSelf = async (req, res) => {
             await tx.rollback();
             return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
         }
+        const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
 
         const purchaseAmount = Number(giftPackage.priceAmount || 0);
         const totalCredit = Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0);
@@ -217,7 +218,7 @@ exports.purchaseForSelf = async (req, res) => {
             type: 'tenant_gift_credit',
             referenceType: 'tenant_gift_card_transaction',
             referenceId: giftTx.id,
-            metadata: { packageId: giftPackage.id, packageTitle: giftPackage.title_en },
+            metadata: { packageId: giftPackage.id, packageTitle },
             transaction: tx
         });
 
@@ -261,6 +262,7 @@ exports.sendGift = async (req, res) => {
             await tx.rollback();
             return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
         }
+        const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
 
         const sender = await db.PlatformUser.findByPk(senderId, { transaction: tx });
         if (!sender) throw new Error('Sender not found');
@@ -311,7 +313,7 @@ exports.sendGift = async (req, res) => {
                         expiresAt,
                         metadata: {
                             packageId: giftPackage.id,
-                            packageTitle: giftPackage.title_en,
+                            packageTitle,
                             senderPlatformUserId: senderId
                         }
                     }, { transaction: tx });

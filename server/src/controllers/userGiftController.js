@@ -204,6 +204,7 @@ exports.rechargeFromGiftPackage = async (req, res) => {
             await transaction.rollback();
             return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
         }
+        const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Gift card';
 
         const totalCredit = Number.parseFloat(giftPackage.walletCreditAmount || 0) + Number.parseFloat(giftPackage.bonusAmount || 0);
         const purchaseAmount = Number.parseFloat(giftPackage.priceAmount || 0);
@@ -240,7 +241,7 @@ exports.rechargeFromGiftPackage = async (req, res) => {
             referenceId: giftTx.id,
             metadata: {
                 packageId: giftPackage.id,
-                packageTitle: giftPackage.title_en
+                packageTitle
             },
             transaction
         });
@@ -278,6 +279,7 @@ exports.sendGiftPackage = async (req, res) => {
             await transaction.rollback();
             return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
         }
+        const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Gift card';
 
         const sender = await db.PlatformUser.findByPk(senderId, {
             attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
@@ -339,7 +341,7 @@ exports.sendGiftPackage = async (req, res) => {
                         expiresAt,
                         metadata: {
                             packageId: giftPackage.id,
-                            packageTitle: giftPackage.title_en,
+                            packageTitle,
                             senderPlatformUserId: senderId
                         }
                     }, { transaction });

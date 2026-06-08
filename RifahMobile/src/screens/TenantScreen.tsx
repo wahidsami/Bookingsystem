@@ -32,6 +32,8 @@ type TenantReview = {
 
 type TenantGiftPackage = {
     id: string;
+    title?: string | null;
+    description?: string | null;
     title_en: string;
     title_ar: string;
     description_en?: string | null;
@@ -39,7 +41,51 @@ type TenantGiftPackage = {
     priceAmount: number;
     walletCreditAmount: number;
     bonusAmount: number;
+    discountPreset?: string | null;
+    discountPercent?: number | string | null;
+    expirationPreset?: string | null;
+    endsAt?: string | null;
+    startsAt?: string | null;
+    createdAt?: string | null;
     imageUrl?: string | null;
+};
+
+const EXPIRATION_PRESETS: Record<string, { labelEn: string; labelAr: string; days?: number }> = {
+    '1_week': { labelEn: '1 week', labelAr: 'أسبوع واحد', days: 7 },
+    '2_weeks': { labelEn: '2 weeks', labelAr: 'أسبوعان', days: 14 },
+    '3_weeks': { labelEn: '3 weeks', labelAr: '3 أسابيع', days: 21 },
+    '1_month': { labelEn: '1 month', labelAr: 'شهر واحد', days: 30 },
+    '2_months': { labelEn: '2 months', labelAr: 'شهران', days: 60 },
+    '3_months': { labelEn: '3 months', labelAr: '3 أشهر', days: 90 },
+    '1_year': { labelEn: '1 year', labelAr: 'سنة واحدة', days: 365 },
+    never: { labelEn: 'Never', labelAr: 'بدون انتهاء' }
+};
+
+const getGiftPackageTitle = (pkg: TenantGiftPackage) => pkg.title || pkg.title_en || pkg.title_ar || '-';
+const getGiftPackageDescription = (pkg: TenantGiftPackage) => pkg.description || pkg.description_en || pkg.description_ar || '';
+const getGiftPackageDiscountPercent = (pkg: TenantGiftPackage) => {
+    if (pkg.discountPercent !== undefined && pkg.discountPercent !== null && `${pkg.discountPercent}`.trim() !== '') {
+        const parsed = Number(pkg.discountPercent);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    const wallet = Number(pkg.walletCreditAmount || 0);
+    const price = Number(pkg.priceAmount || 0);
+    if (wallet > 0 && price >= 0 && price <= wallet) {
+        return Number((100 - ((price / wallet) * 100)).toFixed(2));
+    }
+    return 0;
+};
+
+const getGiftPackageExpirationPreset = (pkg: TenantGiftPackage) => {
+    if (pkg.expirationPreset && EXPIRATION_PRESETS[pkg.expirationPreset]) return pkg.expirationPreset;
+    if (!pkg.endsAt) return 'never';
+    const startSource = pkg.createdAt || pkg.endsAt;
+    const start = new Date(startSource);
+    const end = new Date(pkg.endsAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'never';
+    const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    const matched = Object.entries(EXPIRATION_PRESETS).find(([key, value]) => key !== 'never' && value.days && Math.abs(value.days - diffDays) <= 2);
+    return matched?.[0] || 'never';
 };
 
 const { width } = Dimensions.get('window');
@@ -49,7 +95,7 @@ const TENANT_PAGE_UI = {
 };
 
 export function TenantScreen({ route, navigation }: TenantDetailsProps) {
-    const { tenantId, slug, selectedServiceId } = route.params; // Expect tenantId or slug from navigation
+    const { tenantId, slug, selectedServiceId, initialTab } = route.params; // Expect tenantId or slug from navigation
     const { t, isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const effectiveBottomPadding = useMemo(
@@ -184,8 +230,20 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 setShowAboutTab(true);
             }
 
+            const normalizedInitialTab = typeof initialTab === 'string' ? initialTab.trim() : '';
+            const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
+            if (isServicesEnabled) availableTabs.push('services');
+            if (isProductsEnabled) availableTabs.push('products');
+            if (showGiftsTab) availableTabs.push('gifts');
+            if (isReviewsEnabled) availableTabs.push('reviews');
+            if (isAboutEnabled) availableTabs.push('about');
+
+            if (normalizedInitialTab && availableTabs.includes(normalizedInitialTab as any)) {
+                setActiveTab(normalizedInitialTab as any);
+            }
+
             // Fallback for activeTab if the default 'services' is hidden
-            if (!isServicesEnabled) {
+            if ((!normalizedInitialTab || !availableTabs.includes(normalizedInitialTab as any)) && !isServicesEnabled) {
                 if (isProductsEnabled) setActiveTab('products');
                 else if (isReviewsEnabled) setActiveTab('reviews');
                 else if (isAboutEnabled) setActiveTab('about');
@@ -747,8 +805,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
                     const bonusAmount = Number(pkg.bonusAmount || 0);
                     const hasImage = !!pkg.imageUrl && !giftImageErrors[pkg.id];
-                    const localizedTitle = isRTL ? pkg.title_ar : pkg.title_en;
-                    const localizedDescription = (isRTL ? pkg.description_ar : pkg.description_en) || (isRTL ? pkg.description_en : pkg.description_ar) || '';
+                    const localizedTitle = getGiftPackageTitle(pkg);
+                    const localizedDescription = getGiftPackageDescription(pkg);
+                    const discountPercent = getGiftPackageDiscountPercent(pkg);
+                    const expirationPreset = getGiftPackageExpirationPreset(pkg);
+                    const expirationLabel = EXPIRATION_PRESETS[expirationPreset]?.[isRTL ? 'labelAr' : 'labelEn'] || (isRTL ? 'غير محدد' : 'Unspecified');
                     const badgeLabel = index === 0
                         ? (isRTL ? 'الأكثر طلباً' : 'Most Popular')
                         : bonusAmount > 0
@@ -804,6 +865,11 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                             {localizedDescription}
                                         </Text>
                                     ) : null}
+                                    <View style={styles.giftMetaRow}>
+                                        <View style={styles.giftMetaChip}><Text style={styles.giftMetaChipText}>{isRTL ? 'القيمة' : 'Value'} {formatRiyal(Number(pkg.walletCreditAmount || 0), isRTL ? 'ar' : 'en')}</Text></View>
+                                        <View style={styles.giftMetaChip}><Text style={styles.giftMetaChipText}>{isRTL ? 'الخصم' : 'Discount'} {discountPercent.toFixed(2)}%</Text></View>
+                                        <View style={styles.giftMetaChip}><Text style={styles.giftMetaChipText}>{expirationLabel}</Text></View>
+                                    </View>
 
                                     <View style={[styles.giftValueBlock, isRTL ? styles.giftValueBlockRtl : null]}>
                                         <View style={[styles.giftValueColumn, isRTL ? styles.giftValueColumnRtl : null]}>
@@ -825,6 +891,9 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                                 </Text>
                                             </View>
                                         ) : <View />}
+                                        <View style={styles.giftValidityPill}>
+                                            <Text style={styles.giftValidityText}>{expirationLabel}</Text>
+                                        </View>
                                         <View style={styles.giftArrowButton}>
                                             <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={18} color={colors.primary} />
                                         </View>
@@ -844,8 +913,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     <View style={{ flex: 1 }}>
                         <Text style={styles.giftInfoText}>
                             {isRTL
-                                ? 'جميع بطاقات الهدايا صالحة لمدة 12 شهرًا من تاريخ الشراء.'
-                                : 'All gift cards are valid for 12 months from the date of purchase.'}
+                                ? 'تختلف صلاحية كل بطاقة حسب نوعها المحدد من المركز.'
+                                : 'Each gift card follows the expiration selected by the center.'}
                         </Text>
                         <Text style={styles.giftInfoSubText}>
                             {isRTL ? 'تُطبق الشروط والأحكام.' : 'Terms & conditions apply.'}
@@ -2400,6 +2469,25 @@ const styles = StyleSheet.create({
         textAlign: 'right',
         alignSelf: 'stretch',
     },
+    giftMetaRow: {
+        marginTop: 10,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    giftMetaChip: {
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        backgroundColor: '#F4F0FF',
+        borderWidth: 1,
+        borderColor: '#E3D7FF',
+    },
+    giftMetaChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#5D36B0',
+    },
     giftValueBlock: {
         marginTop: 10,
         borderRadius: 16,
@@ -2474,6 +2562,17 @@ const styles = StyleSheet.create({
     giftBonusText: {
         color: '#19854A',
         fontSize: 14,
+        fontWeight: '700',
+    },
+    giftValidityPill: {
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        backgroundColor: '#EEF2FF',
+    },
+    giftValidityText: {
+        color: '#4F5B92',
+        fontSize: 12,
         fontWeight: '700',
     },
     giftArrowButton: {

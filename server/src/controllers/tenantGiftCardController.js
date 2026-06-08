@@ -22,6 +22,141 @@ const escapeCsvCell = (value) => {
   return str;
 };
 
+const GIFT_CARD_DISCOUNT_PRESETS = ['2', '5', '7', '10'];
+const GIFT_CARD_EXPIRATION_PRESETS = {
+  '1_week': 7,
+  '2_weeks': 14,
+  '3_weeks': 21,
+  '1_month': 30,
+  '2_months': 60,
+  '3_months': 90,
+  '1_year': 365
+};
+
+const normalizeText = (value) => `${value || ''}`.trim();
+const normalizeOptionalText = (value) => {
+  const text = normalizeText(value);
+  return text || null;
+};
+
+const calculateDiscountPercent = (walletCreditAmount, priceAmount) => {
+  const credit = Number(walletCreditAmount || 0);
+  const price = Number(priceAmount || 0);
+  if (!Number.isFinite(credit) || credit <= 0 || !Number.isFinite(price) || price < 0 || price > credit) {
+    return 0;
+  }
+  return Number((100 - ((price / credit) * 100)).toFixed(2));
+};
+
+const calculatePriceAmount = (walletCreditAmount, discountPercent) => {
+  const credit = Number(walletCreditAmount || 0);
+  const discount = Number(discountPercent || 0);
+  if (!Number.isFinite(credit) || credit <= 0 || !Number.isFinite(discount) || discount < 0) {
+    return 0;
+  }
+  return Number(Math.max(0, credit - (credit * (discount / 100))).toFixed(2));
+};
+
+const deriveDiscountPreset = (discountPercent) => {
+  const numeric = Number(discountPercent || 0);
+  const preset = GIFT_CARD_DISCOUNT_PRESETS.find((value) => Math.abs(Number(value) - numeric) < 0.01);
+  return preset || 'custom';
+};
+
+const resolveDiscountPercent = (payload = {}, fallbackPercent = null, fallbackPrice = null, fallbackCredit = null) => {
+  const explicitPreset = normalizeText(payload.discountPreset);
+  const explicitPercent = payload.discountPercent ?? payload.discountValue;
+
+  if (explicitPreset === 'custom') {
+    const customPercent = Number(explicitPercent);
+    return Number.isFinite(customPercent) ? customPercent : Number(fallbackPercent || 0);
+  }
+
+  if (GIFT_CARD_DISCOUNT_PRESETS.includes(explicitPreset)) {
+    return Number(explicitPreset);
+  }
+
+  if (explicitPercent !== undefined && explicitPercent !== null && `${explicitPercent}`.trim() !== '') {
+    const parsed = Number(explicitPercent);
+    return Number.isFinite(parsed) ? parsed : Number(fallbackPercent || 0);
+  }
+
+  const credit = Number(fallbackCredit || 0);
+  const price = Number(fallbackPrice || 0);
+  if (credit > 0 && price >= 0 && price <= credit) {
+    return calculateDiscountPercent(credit, price);
+  }
+
+  return Number(fallbackPercent || 0);
+};
+
+const resolveExpirationRange = (payload = {}, fallbackItem = null) => {
+  const preset = normalizeText(payload.expirationPreset || fallbackItem?.expirationPreset || 'never') || 'never';
+  if (preset === 'never') {
+    return { expirationPreset: 'never', startsAt: null, endsAt: null };
+  }
+
+  const days = GIFT_CARD_EXPIRATION_PRESETS[preset];
+  if (!days) {
+    return {
+      expirationPreset: normalizeText(fallbackItem?.expirationPreset || 'never') || 'never',
+      startsAt: fallbackItem?.startsAt ? parseDate(fallbackItem.startsAt) : new Date(),
+      endsAt: fallbackItem?.endsAt ? parseDate(fallbackItem.endsAt) : null
+    };
+  }
+
+  const startsAt = new Date();
+  const endsAt = new Date(startsAt.getTime() + (days * 24 * 60 * 60 * 1000));
+  return { expirationPreset: preset, startsAt, endsAt };
+};
+
+const resolveGiftCardPackageText = (payload = {}, fallbackItem = null) => {
+  const title = normalizeText(
+    payload.title ?? payload.title_en ?? payload.title_ar ?? fallbackItem?.title ?? fallbackItem?.title_en ?? fallbackItem?.title_ar
+  );
+  const description = normalizeOptionalText(
+    payload.description ?? payload.description_en ?? payload.description_ar ?? fallbackItem?.description ?? fallbackItem?.description_en ?? fallbackItem?.description_ar
+  );
+
+  return { title, description };
+};
+
+const deriveExpirationPresetFromDates = (item) => {
+  if (!item?.endsAt) return 'never';
+  const startSource = item.startsAt || item.createdAt || item.endsAt;
+  const start = parseDate(startSource);
+  const end = parseDate(item.endsAt);
+  if (!start || !end) return 'never';
+  const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const preset = Object.entries(GIFT_CARD_EXPIRATION_PRESETS).find(([key, value]) => key !== 'never' && Math.abs((value?.days || 0) - diffDays) <= 2);
+  return preset?.[0] || 'never';
+};
+
+const normalizeGiftCardPackage = (item) => ({
+  id: item.id,
+  tenantId: item.tenantId,
+  title: normalizeText(item.title || item.title_en || item.title_ar),
+  description: normalizeOptionalText(item.description || item.description_en || item.description_ar),
+  title_en: normalizeText(item.title_en || item.title || item.title_ar),
+  title_ar: normalizeText(item.title_ar || item.title || item.title_en),
+  description_en: normalizeOptionalText(item.description_en || item.description || item.description_ar),
+  description_ar: normalizeOptionalText(item.description_ar || item.description || item.description_en),
+  displayOrder: Number(item.displayOrder || 0),
+  discountPercent: item.discountPercent != null ? Number(item.discountPercent) : calculateDiscountPercent(item.walletCreditAmount, item.priceAmount),
+  priceAmount: Number(item.priceAmount || 0),
+  walletCreditAmount: Number(item.walletCreditAmount || 0),
+  bonusAmount: Number(item.bonusAmount || 0),
+  discountPreset: normalizeText(item.discountPreset) || deriveDiscountPreset(item.discountPercent != null ? Number(item.discountPercent) : calculateDiscountPercent(item.walletCreditAmount, item.priceAmount)),
+  expirationPreset: normalizeText(item.expirationPreset) || deriveExpirationPresetFromDates(item),
+  startsAt: item.startsAt || null,
+  endsAt: item.endsAt || null,
+  imageUrl: item.imageUrl || null,
+  thumbnailUrl: item.thumbnailUrl || null,
+  isActive: item.isActive !== false,
+  createdAt: item.createdAt || null,
+  updatedAt: item.updatedAt || null
+});
+
 const uploadStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const tenantId = ensureTenantId(req);
@@ -65,7 +200,7 @@ exports.listPackages = async (req, res) => {
       where: { tenantId },
       order: [['displayOrder', 'ASC'], ['createdAt', 'DESC']]
     });
-    return res.json({ success: true, packages: rows });
+    return res.json({ success: true, packages: rows.map(normalizeGiftCardPackage) });
   } catch (error) {
     console.error('tenant gift list packages error:', error);
     return res.status(500).json({ success: false, message: 'Failed to load gift card packages' });
@@ -76,35 +211,63 @@ exports.createPackage = async (req, res) => {
   try {
     const tenantId = ensureTenantId(req);
     const {
+      title,
       title_en,
       title_ar,
+      description,
       description_en,
       description_ar,
       displayOrder = 0,
-      priceAmount = 0,
+      priceAmount,
       walletCreditAmount = 0,
       bonusAmount = 0,
-      startsAt = null,
-      endsAt = null,
+      discountPreset,
+      discountPercent,
+      discountValue,
+      expirationPreset,
       isActive = true
     } = req.body || {};
 
-    if (!String(title_en || '').trim() || !String(title_ar || '').trim()) {
-      return res.status(400).json({ success: false, message: 'English and Arabic titles are required.' });
+    const text = resolveGiftCardPackageText({ title, title_en, title_ar, description, description_en, description_ar });
+    if (!text.title) {
+      return res.status(400).json({ success: false, message: 'Gift card title is required.' });
     }
+
+    const walletAmount = Number(walletCreditAmount || 0);
+    if (!Number.isFinite(walletAmount) || walletAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Gift card value must be greater than 0.' });
+    }
+
+    const percent = resolveDiscountPercent({
+      discountPreset,
+      discountPercent,
+      discountValue
+    }, 10, priceAmount, walletAmount);
+    if (!Number.isFinite(percent) || percent < 0 || percent >= 100) {
+      return res.status(400).json({ success: false, message: 'Discount percentage must be between 0 and 100.' });
+    }
+
+    const computedPrice = calculatePriceAmount(walletAmount, percent);
+    const discountPresetValue = deriveDiscountPreset(percent);
+    const expiration = resolveExpirationRange({ expirationPreset });
 
     const created = await db.TenantGiftCardPackage.create({
       tenantId,
-      title_en: String(title_en || '').trim(),
-      title_ar: String(title_ar || '').trim(),
-      description_en: description_en || null,
-      description_ar: description_ar || null,
+      title: text.title,
+      description: text.description,
+      title_en: text.title,
+      title_ar: text.title,
+      description_en: text.description,
+      description_ar: text.description,
       displayOrder: Number(displayOrder || 0),
-      priceAmount: Number(priceAmount || 0),
-      walletCreditAmount: Number(walletCreditAmount || 0),
+      discountPreset: discountPresetValue,
+      discountPercent: percent,
+      priceAmount: computedPrice,
+      walletCreditAmount: walletAmount,
       bonusAmount: Number(bonusAmount || 0),
-      startsAt: parseDate(startsAt),
-      endsAt: parseDate(endsAt),
+      expirationPreset: expiration.expirationPreset,
+      startsAt: expiration.startsAt,
+      endsAt: expiration.endsAt,
       isActive: isActive !== false
     });
 
@@ -116,7 +279,7 @@ exports.createPackage = async (req, res) => {
       await created.save();
     }
 
-    return res.status(201).json({ success: true, package: created });
+    return res.status(201).json({ success: true, package: normalizeGiftCardPackage(created) });
   } catch (error) {
     console.error('tenant gift create package error:', error);
     return res.status(500).json({ success: false, message: 'Failed to create gift card package' });
@@ -132,24 +295,48 @@ exports.updatePackage = async (req, res) => {
     }
 
     const payload = req.body || {};
-    if (payload.title_en !== undefined) item.title_en = String(payload.title_en || '').trim();
-    if (payload.title_ar !== undefined) item.title_ar = String(payload.title_ar || '').trim();
-    if (payload.description_en !== undefined) item.description_en = payload.description_en || null;
-    if (payload.description_ar !== undefined) item.description_ar = payload.description_ar || null;
     if (payload.displayOrder !== undefined) item.displayOrder = Number(payload.displayOrder || 0);
-    if (payload.priceAmount !== undefined) item.priceAmount = Number(payload.priceAmount || 0);
-    if (payload.walletCreditAmount !== undefined) item.walletCreditAmount = Number(payload.walletCreditAmount || 0);
     if (payload.bonusAmount !== undefined) item.bonusAmount = Number(payload.bonusAmount || 0);
-    if (payload.startsAt !== undefined) item.startsAt = parseDate(payload.startsAt);
-    if (payload.endsAt !== undefined) item.endsAt = parseDate(payload.endsAt);
     if (payload.isActive !== undefined) item.isActive = payload.isActive !== false;
 
-    if (!String(item.title_en || '').trim() || !String(item.title_ar || '').trim()) {
-      return res.status(400).json({ success: false, message: 'English and Arabic titles are required.' });
+    const text = resolveGiftCardPackageText(payload, item);
+    if (payload.title !== undefined || payload.title_en !== undefined || payload.title_ar !== undefined) {
+      item.title = text.title;
+      item.title_en = text.title;
+      item.title_ar = text.title;
+    }
+    if (payload.description !== undefined || payload.description_en !== undefined || payload.description_ar !== undefined) {
+      item.description = text.description;
+      item.description_en = text.description;
+      item.description_ar = text.description;
+    }
+
+    const pricingPayloadKeys = ['walletCreditAmount', 'priceAmount', 'discountPreset', 'discountPercent', 'discountValue'];
+    const hasPricingUpdate = pricingPayloadKeys.some((key) => payload[key] !== undefined);
+    if (hasPricingUpdate) {
+      const walletAmount = payload.walletCreditAmount !== undefined ? Number(payload.walletCreditAmount || 0) : Number(item.walletCreditAmount || 0);
+      if (!Number.isFinite(walletAmount) || walletAmount <= 0) {
+        return res.status(400).json({ success: false, message: 'Gift card value must be greater than 0.' });
+      }
+      const percent = resolveDiscountPercent(payload, Number(item.discountPercent || 0), payload.priceAmount ?? item.priceAmount, walletAmount);
+      if (!Number.isFinite(percent) || percent < 0 || percent >= 100) {
+        return res.status(400).json({ success: false, message: 'Discount percentage must be between 0 and 100.' });
+      }
+      item.walletCreditAmount = walletAmount;
+      item.discountPreset = deriveDiscountPreset(percent);
+      item.discountPercent = percent;
+      item.priceAmount = calculatePriceAmount(walletAmount, percent);
+    }
+
+    if (payload.expirationPreset !== undefined) {
+      const expiration = resolveExpirationRange({ expirationPreset: payload.expirationPreset }, item);
+      item.expirationPreset = expiration.expirationPreset;
+      item.startsAt = expiration.startsAt;
+      item.endsAt = expiration.endsAt;
     }
 
     await item.save();
-    return res.json({ success: true, package: item });
+    return res.json({ success: true, package: normalizeGiftCardPackage(item) });
   } catch (error) {
     console.error('tenant gift update package error:', error);
     return res.status(500).json({ success: false, message: 'Failed to update gift card package' });
@@ -165,7 +352,7 @@ exports.togglePackageActive = async (req, res) => {
     }
     item.isActive = req.body?.isActive !== false;
     await item.save();
-    return res.json({ success: true, package: item });
+    return res.json({ success: true, package: normalizeGiftCardPackage(item) });
   } catch (error) {
     console.error('tenant gift toggle active error:', error);
     return res.status(500).json({ success: false, message: 'Failed to update gift card package status' });
@@ -189,7 +376,7 @@ exports.uploadPackageImage = async (req, res) => {
     item.imageUrl = `/${normalizedPath}`;
     await item.save();
 
-    return res.json({ success: true, package: item, imageUrl: item.imageUrl });
+    return res.json({ success: true, package: normalizeGiftCardPackage(item), imageUrl: item.imageUrl });
   } catch (error) {
     console.error('tenant gift upload image error:', error);
     return res.status(500).json({ success: false, message: 'Failed to upload gift card image' });
@@ -250,7 +437,7 @@ exports.getTransactionsReport = async (req, res) => {
     const rows = await db.TenantGiftCardTransaction.findAll({
       where,
       include: [
-        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar', 'imageUrl'], required: false },
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title', 'title_en', 'title_ar', 'imageUrl'], required: false },
         { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
         { model: db.PlatformUser, as: 'recipient', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
         { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['id', 'grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
@@ -280,7 +467,7 @@ exports.exportTransactionsReportCsv = async (req, res) => {
     const rows = await db.TenantGiftCardTransaction.findAll({
       where,
       include: [
-        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['title_en', 'title_ar'], required: false },
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['title', 'title_en', 'title_ar'], required: false },
         { model: db.PlatformUser, as: 'sender', attributes: ['email', 'firstName', 'lastName'], required: false },
         { model: db.PlatformUser, as: 'recipient', attributes: ['email', 'firstName', 'lastName'], required: false },
         { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
@@ -292,6 +479,7 @@ exports.exportTransactionsReportCsv = async (req, res) => {
       'transaction_id',
       'status',
       'delivery_channel',
+      'package_title',
       'package_title_en',
       'package_title_ar',
       'purchase_amount',
@@ -315,6 +503,7 @@ exports.exportTransactionsReportCsv = async (req, res) => {
         escapeCsvCell(row.id),
         escapeCsvCell(row.status),
         escapeCsvCell(row.deliveryChannel),
+        escapeCsvCell(row.package?.title || row.package?.title_en || row.package?.title_ar || ''),
         escapeCsvCell(row.package?.title_en || ''),
         escapeCsvCell(row.package?.title_ar || ''),
         escapeCsvCell(Number(row.purchaseAmount || 0).toFixed(2)),

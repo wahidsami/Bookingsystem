@@ -25,6 +25,14 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.UUID,
             allowNull: false
         },
+        title: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        description: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
         title_en: {
             type: DataTypes.STRING,
             allowNull: false
@@ -46,6 +54,15 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 0
         },
+        discountPreset: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        discountPercent: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: true,
+            defaultValue: 0
+        },
         priceAmount: {
             type: DataTypes.DECIMAL(10, 2),
             allowNull: false
@@ -58,6 +75,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DECIMAL(10, 2),
             allowNull: false,
             defaultValue: 0
+        },
+        expirationPreset: {
+            type: DataTypes.STRING,
+            allowNull: true
         },
         imageUrl: {
             type: DataTypes.STRING,

@@ -12,6 +12,8 @@ import { useFocusEffect } from '@react-navigation/native';
 
 type GiftPackage = {
   id: string;
+  title?: string | null;
+  description?: string | null;
   title_en: string;
   title_ar: string;
   description_en?: string | null;
@@ -19,6 +21,50 @@ type GiftPackage = {
   priceAmount: number;
   walletCreditAmount: number;
   bonusAmount: number;
+  discountPreset?: string | null;
+  discountPercent?: number | string | null;
+  expirationPreset?: string | null;
+  endsAt?: string | null;
+  startsAt?: string | null;
+  createdAt?: string | null;
+};
+
+const EXPIRATION_PRESETS: Record<string, { labelEn: string; labelAr: string; days?: number }> = {
+  '1_week': { labelEn: '1 week', labelAr: 'أسبوع واحد', days: 7 },
+  '2_weeks': { labelEn: '2 weeks', labelAr: 'أسبوعان', days: 14 },
+  '3_weeks': { labelEn: '3 weeks', labelAr: '3 أسابيع', days: 21 },
+  '1_month': { labelEn: '1 month', labelAr: 'شهر واحد', days: 30 },
+  '2_months': { labelEn: '2 months', labelAr: 'شهران', days: 60 },
+  '3_months': { labelEn: '3 months', labelAr: '3 أشهر', days: 90 },
+  '1_year': { labelEn: '1 year', labelAr: 'سنة واحدة', days: 365 },
+  never: { labelEn: 'Never', labelAr: 'بدون انتهاء' }
+};
+
+const getGiftPackageTitle = (pkg: GiftPackage) => pkg.title || pkg.title_en || pkg.title_ar || '-';
+const getGiftPackageDescription = (pkg: GiftPackage) => pkg.description || pkg.description_en || pkg.description_ar || '';
+const getGiftPackageDiscountPercent = (pkg: GiftPackage) => {
+  if (pkg.discountPercent !== undefined && pkg.discountPercent !== null && `${pkg.discountPercent}`.trim() !== '') {
+    const parsed = Number(pkg.discountPercent);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  const wallet = Number(pkg.walletCreditAmount || 0);
+  const price = Number(pkg.priceAmount || 0);
+  if (wallet > 0 && price >= 0 && price <= wallet) {
+    return Number((100 - ((price / wallet) * 100)).toFixed(2));
+  }
+  return 0;
+};
+
+const getGiftPackageExpirationPreset = (pkg: GiftPackage) => {
+  if (pkg.expirationPreset && EXPIRATION_PRESETS[pkg.expirationPreset]) return pkg.expirationPreset;
+  if (!pkg.endsAt) return 'never';
+  const startSource = pkg.createdAt || pkg.endsAt;
+  const start = new Date(startSource);
+  const end = new Date(pkg.endsAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'never';
+  const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const matched = Object.entries(EXPIRATION_PRESETS).find(([key, value]) => key !== 'never' && value.days && Math.abs(value.days - diffDays) <= 2);
+  return matched?.[0] || 'never';
 };
 
 type GiftHistoryItem = {
@@ -535,36 +581,46 @@ export function GiftsScreen({ navigation, route }: any) {
 
               {loading ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} /> : null}
               {packages.map((pkg, index) => {
-                const title = language === 'ar' ? pkg.title_ar : pkg.title_en;
-                const desc = language === 'ar' ? pkg.description_ar : pkg.description_en;
+                const title = getGiftPackageTitle(pkg);
+                const desc = getGiftPackageDescription(pkg);
                 const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                const discountPercent = getGiftPackageDiscountPercent(pkg);
+                const expirationPreset = getGiftPackageExpirationPreset(pkg);
+                const expirationLabel = EXPIRATION_PRESETS[expirationPreset]?.[language === 'ar' ? 'labelAr' : 'labelEn'] || (language === 'ar' ? 'غير محدد' : 'Unspecified');
                 return (
                   <TouchableOpacity key={pkg.id} style={styles.giftCard} onPress={() => setSelected(pkg)} activeOpacity={0.95}>
                     <ImageBackground source={HERO_IMAGE} style={styles.giftHero} imageStyle={styles.giftHeroImage}>
                       {index === 0 ? <View style={styles.badgePill}><Text style={styles.badgeText}>{language === 'ar' ? 'الأكثر شعبية' : 'Most Popular'}</Text></View> : null}
                       <View style={styles.pricePill}><Text style={styles.pricePillText}>{sar(Number(pkg.priceAmount))}</Text></View>
                     </ImageBackground>
-                    <View style={styles.giftBody}>
-                      <Text style={styles.giftTitle}>{title}</Text>
-                      {!!desc ? <Text style={styles.giftDesc} numberOfLines={2}>{desc}</Text> : null}
-                      <View style={styles.payGetBlock}>
-                        <View>
-                          <Text style={styles.payGetLabel}>{language === 'ar' ? 'أنت تدفع' : 'You Pay'}</Text>
-                          <Text style={styles.payGetPay}>{sar(Number(pkg.priceAmount))}</Text>
+                      <View style={styles.giftBody}>
+                        <Text style={styles.giftTitle}>{title}</Text>
+                        {!!desc ? <Text style={styles.giftDesc} numberOfLines={2}>{desc}</Text> : null}
+                        <View style={styles.metaRow}>
+                          <View style={styles.metaPill}><Text style={styles.metaPillText}>{language === 'ar' ? 'القيمة' : 'Value'} {sar(Number(pkg.walletCreditAmount || 0))}</Text></View>
+                          <View style={styles.metaPill}><Text style={styles.metaPillText}>{language === 'ar' ? 'الخصم' : 'Discount'} {discountPercent.toFixed(2)}%</Text></View>
+                          <View style={styles.metaPill}><Text style={styles.metaPillText}>{expirationLabel}</Text></View>
                         </View>
+                        <View style={styles.payGetBlock}>
+                          <View>
+                            <Text style={styles.payGetLabel}>{language === 'ar' ? 'أنت تدفع' : 'You Pay'}</Text>
+                            <Text style={styles.payGetPay}>{sar(Number(pkg.priceAmount))}</Text>
+                          </View>
                         <Text style={styles.payGetArrow}>{isRTL ? '←' : '→'}</Text>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={[styles.payGetLabel, { color: '#0F8A4B' }]}>{language === 'ar' ? 'تحصل على' : 'You Get'}</Text>
                           <Text style={styles.payGetGet}>{sar(totalCredit)}</Text>
+                          </View>
                         </View>
+                        <View style={styles.footerRow}>
+                          {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {sar(Number(pkg.bonusAmount))} {language === 'ar' ? 'مكافأة' : 'Bonus'}</Text></View> : <View />}
+                          <View style={styles.validityRow}><AppIcon name="event" size={14} color={colors.textSecondary} /><Text style={styles.validityText}>{expirationLabel}</Text></View>
+                        </View>
+                        <TouchableOpacity style={styles.buyBtn} onPress={() => setSelected(pkg)}>
+                          <Text style={styles.buyBtnText}>{language === 'ar' ? 'شراء / إرسال هدية' : 'Buy / Send Gift'}</Text>
+                        </TouchableOpacity>
                       </View>
-                      {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {sar(Number(pkg.bonusAmount))} {language === 'ar' ? 'مكافأة' : 'Bonus'}</Text></View> : null}
-                      <View style={styles.validityRow}><AppIcon name="event" size={14} color={colors.textSecondary} /><Text style={styles.validityText}>{language === 'ar' ? 'صلاحية 12 شهر' : '12 months validity'}</Text></View>
-                      <TouchableOpacity style={styles.buyBtn} onPress={() => setSelected(pkg)}>
-                        <Text style={styles.buyBtnText}>{language === 'ar' ? 'شراء / إرسال هدية' : 'Buy / Send Gift'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
                 );
               })}
             </>
@@ -600,6 +656,18 @@ export function GiftsScreen({ navigation, route }: any) {
         <Pressable style={styles.modalBackdrop} onPress={() => { setSelected(null); setRecipientCheck(null); setRecipientDecision('none'); }}>
           <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
             <Text style={styles.modalTitle}>{language === 'ar' ? 'اختر الإجراء' : 'Choose action'}</Text>
+            {selected ? (
+              <View style={styles.selectedSummaryCard}>
+                <Text style={styles.selectedSummaryTitle}>{getGiftPackageTitle(selected)}</Text>
+                {!!getGiftPackageDescription(selected) ? <Text style={styles.selectedSummaryDesc}>{getGiftPackageDescription(selected)}</Text> : null}
+                <View style={styles.selectedSummaryRow}>
+                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{language === 'ar' ? 'القيمة' : 'Value'} {sar(Number(selected.walletCreditAmount || 0))}</Text></View>
+                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{language === 'ar' ? 'السعر' : 'Price'} {sar(Number(selected.priceAmount || 0))}</Text></View>
+                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{language === 'ar' ? 'الخصم' : 'Discount'} {getGiftPackageDiscountPercent(selected).toFixed(2)}%</Text></View>
+                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{EXPIRATION_PRESETS[getGiftPackageExpirationPreset(selected)]?.[language === 'ar' ? 'labelAr' : 'labelEn'] || (language === 'ar' ? 'غير محدد' : 'Unspecified')}</Text></View>
+                </View>
+              </View>
+            ) : null}
             <View style={styles.modeRow}>
               <TouchableOpacity style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]} onPress={() => { setMode('self'); setRecipientCheck(null); setRecipientDecision('none'); }}><Text style={[styles.modeText, mode === 'self' && styles.modeTextActive]}>{language === 'ar' ? 'إضافة لمحفظتي' : 'Add to my wallet'}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modeBtn, mode === 'send' && styles.modeBtnActive]} onPress={() => setMode('send')}><Text style={[styles.modeText, mode === 'send' && styles.modeTextActive]}>{language === 'ar' ? 'إرسال لشخص' : 'Send to someone'}</Text></TouchableOpacity>
@@ -704,11 +772,15 @@ const styles = StyleSheet.create({
   giftBody: { padding: spacing.md, gap: spacing.sm },
   giftTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
   giftDesc: { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  metaPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F4F0FF', borderWidth: 1, borderColor: '#E2D8FF' },
+  metaPillText: { fontSize: 10, color: '#5D36B0', fontWeight: '700' },
   payGetBlock: { borderRadius: 18, padding: spacing.sm, borderWidth: 1, borderColor: '#E8E0F8', backgroundColor: '#F8F5FF', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   payGetLabel: { fontSize: 9, color: colors.textSecondary, fontWeight: '600' },
   payGetPay: { fontSize: 12, color: colors.text, fontWeight: '800' },
   payGetArrow: { color: colors.primary, fontWeight: '700', fontSize: fontSize.lg },
   payGetGet: { fontSize: 12, color: '#0F8A4B', fontWeight: '800' },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
   bonusPill: { alignSelf: 'flex-start', backgroundColor: '#E8F7EE', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   bonusText: { color: '#0F8A4B', fontSize: 10, fontWeight: '700' },
   validityRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -727,6 +799,12 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(18, 13, 33, 0.55)' },
   modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md, borderWidth: 1, borderColor: '#E9DDFD' },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  selectedSummaryCard: { borderRadius: 20, backgroundColor: '#F7F3FF', borderWidth: 1, borderColor: '#E7DBFF', padding: spacing.md, gap: spacing.sm },
+  selectedSummaryTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.text },
+  selectedSummaryDesc: { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
+  selectedSummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  selectedSummaryPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2D8FF' },
+  selectedSummaryPillText: { fontSize: 10, color: '#5D36B0', fontWeight: '700' },
   modeRow: { flexDirection: 'row', gap: spacing.sm },
   modeBtn: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: '#D8C7FA', paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#FFFFFF' },
   modeBtnActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },

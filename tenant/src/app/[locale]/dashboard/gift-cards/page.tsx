@@ -7,18 +7,23 @@ import { TenantLayout } from '@/components/TenantLayout';
 
 type GiftPackage = {
   id: string;
+  title?: string | null;
+  description?: string | null;
   title_en: string;
   title_ar: string;
   description_en?: string | null;
   description_ar?: string | null;
   displayOrder: number;
+  discountPreset?: string | null;
+  discountPercent?: number | string | null;
   priceAmount: number;
   walletCreditAmount: number;
   bonusAmount: number;
-  startsAt?: string | null;
   endsAt?: string | null;
+  expirationPreset?: string | null;
   imageUrl?: string | null;
   isActive: boolean;
+  createdAt?: string | null;
 };
 
 type GiftTransaction = {
@@ -34,7 +39,7 @@ type GiftTransaction = {
   createdAt: string;
   sender?: { firstName?: string; lastName?: string; email?: string } | null;
   recipient?: { firstName?: string; lastName?: string; email?: string } | null;
-  package?: { title_en?: string; title_ar?: string } | null;
+  package?: { title?: string; title_en?: string; title_ar?: string } | null;
   settlement?: { status?: string; grossAmount?: number; platformFeeAmount?: number; netTenantPayableAmount?: number } | null;
 };
 
@@ -52,17 +57,72 @@ type GiftRedemption = {
 };
 
 const defaultForm = {
-  title_en: '',
-  title_ar: '',
-  description_en: '',
-  description_ar: '',
+  title: '',
+  description: '',
   displayOrder: 0,
-  priceAmount: 0,
   walletCreditAmount: 0,
+  discountPreset: '10',
+  customDiscountPercent: '',
   bonusAmount: 0,
-  startsAt: '',
-  endsAt: '',
+  expirationPreset: '1_month',
   isActive: true
+};
+
+const DISCOUNT_PRESET_VALUES = ['2', '5', '7', '10', 'custom'] as const;
+const EXPIRATION_PRESETS: Record<string, { labelEn: string; labelAr: string; days?: number }> = {
+  '1_week': { labelEn: '1 week', labelAr: 'أسبوع واحد', days: 7 },
+  '2_weeks': { labelEn: '2 weeks', labelAr: 'أسبوعان', days: 14 },
+  '3_weeks': { labelEn: '3 weeks', labelAr: '3 أسابيع', days: 21 },
+  '1_month': { labelEn: '1 month', labelAr: 'شهر واحد', days: 30 },
+  '2_months': { labelEn: '2 months', labelAr: 'شهران', days: 60 },
+  '3_months': { labelEn: '3 months', labelAr: '3 أشهر', days: 90 },
+  '1_year': { labelEn: '1 year', labelAr: 'سنة واحدة', days: 365 },
+  never: { labelEn: 'Never', labelAr: 'بدون انتهاء' }
+};
+
+const getPackageTitle = (item: GiftPackage) => item.title || item.title_en || item.title_ar || '-';
+const getPackageDescription = (item: GiftPackage) => item.description || item.description_en || item.description_ar || '';
+const getPackageDiscountPercent = (item: GiftPackage) => {
+  if (item.discountPercent !== undefined && item.discountPercent !== null && `${item.discountPercent}`.trim() !== '') {
+    const parsed = Number(item.discountPercent);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  const wallet = Number(item.walletCreditAmount || 0);
+  const price = Number(item.priceAmount || 0);
+  if (wallet > 0 && price >= 0 && price <= wallet) {
+    return Number((100 - ((price / wallet) * 100)).toFixed(2));
+  }
+  return 0;
+};
+
+const getPackageDiscountPreset = (item: GiftPackage) => {
+  const presetValue = item.discountPreset ? String(item.discountPreset) : '';
+  if (DISCOUNT_PRESET_VALUES.includes(presetValue as (typeof DISCOUNT_PRESET_VALUES)[number])) {
+    return presetValue;
+  }
+  const percent = getPackageDiscountPercent(item);
+  const preset = DISCOUNT_PRESET_VALUES.find((value) => value !== 'custom' && Math.abs(Number(value) - percent) < 0.01);
+  return preset || 'custom';
+};
+
+const getPackageExpirationPreset = (item: GiftPackage) => {
+  if (item.expirationPreset && EXPIRATION_PRESETS[item.expirationPreset]) return item.expirationPreset;
+  if (!item.endsAt) return 'never';
+  const startSource = item.createdAt || item.endsAt;
+  const start = new Date(startSource);
+  const end = new Date(item.endsAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'never';
+  const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const matched = Object.entries(EXPIRATION_PRESETS).find(([key, value]) => key !== 'never' && value.days && Math.abs(value.days - diffDays) <= 2);
+  return matched?.[0] || 'never';
+};
+
+const formatExpirationPreset = (preset: string, isArabic: boolean) => EXPIRATION_PRESETS[preset]?.[isArabic ? 'labelAr' : 'labelEn'] || (isArabic ? 'غير محدد' : 'Unspecified');
+const calculatePriceFromDiscount = (walletCreditAmount: number, discountPercent: number) => {
+  const credit = Number(walletCreditAmount || 0);
+  const discount = Number(discountPercent || 0);
+  const price = credit - (credit * (discount / 100));
+  return Number(Math.max(0, price).toFixed(2));
 };
 
 export default function TenantGiftCardsPage() {
@@ -117,26 +177,44 @@ export default function TenantGiftCardsPage() {
   };
 
   const startEdit = (item: GiftPackage) => {
+    const discountPreset = getPackageDiscountPreset(item);
+    const discountPercent = getPackageDiscountPercent(item);
     setEditingId(item.id);
     setForm({
-      title_en: item.title_en || '',
-      title_ar: item.title_ar || '',
-      description_en: item.description_en || '',
-      description_ar: item.description_ar || '',
+      title: getPackageTitle(item),
+      description: getPackageDescription(item),
       displayOrder: Number(item.displayOrder || 0),
-      priceAmount: Number(item.priceAmount || 0),
       walletCreditAmount: Number(item.walletCreditAmount || 0),
+      discountPreset,
+      customDiscountPercent: discountPreset === 'custom' ? String(discountPercent || '') : '',
       bonusAmount: Number(item.bonusAmount || 0),
-      startsAt: item.startsAt ? item.startsAt.slice(0, 16) : '',
-      endsAt: item.endsAt ? item.endsAt.slice(0, 16) : '',
+      expirationPreset: getPackageExpirationPreset(item),
       isActive: item.isActive !== false
     });
   };
 
   const submit = async () => {
     try {
-      if (!form.title_en.trim() || !form.title_ar.trim()) {
-        setError(isArabic ? 'الاسم مطلوب بالعربية والإنجليزية' : 'English and Arabic titles are required');
+      const resolvedTitle = form.title.trim();
+      const resolvedDescription = form.description.trim();
+      const discountPreset = form.discountPreset;
+      const discountPercent = discountPreset === 'custom'
+        ? Number(form.customDiscountPercent || 0)
+        : Number(discountPreset || 0);
+      if (!resolvedTitle) {
+        setError(isArabic ? 'العنوان مطلوب' : 'Title is required');
+        return;
+      }
+      if (!Number.isFinite(Number(form.walletCreditAmount)) || Number(form.walletCreditAmount) <= 0) {
+        setError(isArabic ? 'قيمة البطاقة يجب أن تكون أكبر من صفر' : 'Gift card value must be greater than 0');
+        return;
+      }
+      if (discountPreset === 'custom' && !String(form.customDiscountPercent || '').trim()) {
+        setError(isArabic ? 'أدخل نسبة الخصم المخصصة' : 'Enter a custom discount percentage');
+        return;
+      }
+      if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent >= 100) {
+        setError(isArabic ? 'نسبة الخصم يجب أن تكون بين 0 و 100' : 'Discount percentage must be between 0 and 100');
         return;
       }
       if (!editingId && !createImageFile) {
@@ -145,10 +223,24 @@ export default function TenantGiftCardsPage() {
       }
       setSaving(true);
       setError(null);
+      const walletCreditAmount = Number(form.walletCreditAmount || 0);
+      const priceAmount = calculatePriceFromDiscount(walletCreditAmount, discountPercent);
       const payload = {
-        ...form,
-        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
-        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null
+        title: resolvedTitle,
+        title_en: resolvedTitle,
+        title_ar: resolvedTitle,
+        description: resolvedDescription || null,
+        description_en: resolvedDescription || null,
+        description_ar: resolvedDescription || null,
+        displayOrder: Number(form.displayOrder || 0),
+        walletCreditAmount,
+        priceAmount,
+        discountPreset,
+        discountPercent,
+        discountValue: discountPercent,
+        bonusAmount: Number(form.bonusAmount || 0),
+        expirationPreset: form.expirationPreset || 'never',
+        isActive: form.isActive
       };
       if (editingId) await tenantApi.updateTenantGiftCardPackage(editingId, payload);
       else await tenantApi.createTenantGiftCardPackage(payload, createImageFile);
@@ -261,57 +353,83 @@ export default function TenantGiftCardsPage() {
             <h2 className="mb-4 text-lg font-semibold text-gray-900">{editingId ? (isArabic ? 'تعديل البطاقة' : 'Edit package') : (isArabic ? 'إضافة بطاقة جديدة' : 'Create package')}</h2>
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'العنوان (EN)' : 'Title (EN)'}</label>
-                <input className="input" placeholder="Title (EN)" value={form.title_en} onChange={(e) => setForm((p) => ({ ...p, title_en: e.target.value }))} />
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'العنوان' : 'Title'}</label>
+                <input className="input" placeholder={isArabic ? 'العنوان' : 'Title'} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'العنوان (AR)' : 'Title (AR)'}</label>
-                <input className="input" placeholder="العنوان (AR)" value={form.title_ar} onChange={(e) => setForm((p) => ({ ...p, title_ar: e.target.value }))} />
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الوصف' : 'Description'}</label>
+                <textarea className="input min-h-20" placeholder={isArabic ? 'الوصف' : 'Description'} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الوصف (EN)' : 'Description (EN)'}</label>
-                <textarea className="input min-h-20" placeholder="Description (EN)" value={form.description_en} onChange={(e) => setForm((p) => ({ ...p, description_en: e.target.value }))} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'ترتيب العرض' : 'Display order'}</label>
+                    <input className="input" type="number" placeholder={isArabic ? 'الترتيب' : 'Display order'} value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الحالة' : 'Status'}</label>
+                    <label className="flex h-11 items-center gap-2 rounded-xl border border-gray-200 px-3">
+                      <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
+                      <span>{isArabic ? 'فعالة' : 'Active'}</span>
+                    </label>
+                  </div>
+                </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الوصف (AR)' : 'Description (AR)'}</label>
-                <textarea className="input min-h-20" placeholder="الوصف (AR)" value={form.description_ar} onChange={(e) => setForm((p) => ({ ...p, description_ar: e.target.value }))} />
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'قيمة البطاقة (SAR)' : 'Gift card value (SAR)'}</label>
+                <input className="input" type="number" step="0.01" placeholder={isArabic ? 'القيمة' : 'Value'} value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الخصم' : 'Discount'}</label>
+                <select
+                  className="input"
+                  value={form.discountPreset}
+                  onChange={(e) => setForm((p) => ({ ...p, discountPreset: e.target.value, customDiscountPercent: e.target.value === 'custom' ? p.customDiscountPercent : '' }))}
+                >
+                  <option value="2">2%</option>
+                  <option value="5">5%</option>
+                  <option value="7">7%</option>
+                  <option value="10">10%</option>
+                  <option value="custom">{isArabic ? 'مخصص' : 'Custom'}</option>
+                </select>
+                {form.discountPreset === 'custom' ? (
+                  <input
+                    className="input mt-2"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="99.99"
+                    placeholder={isArabic ? 'أدخل نسبة مخصصة' : 'Enter custom percentage'}
+                    value={form.customDiscountPercent}
+                    onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))}
+                  />
+                ) : null}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'ترتيب العرض' : 'Display order'}</label>
-                  <input className="input" type="number" placeholder={isArabic ? 'الترتيب' : 'Display order'} value={form.displayOrder} onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))} />
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'سعر البطاقة' : 'Package price'}</label>
+                  <div className="input flex items-center justify-between gap-2 bg-gray-50 text-gray-800">
+                    <span>{Number(form.walletCreditAmount || 0) > 0 ? `${calculatePriceFromDiscount(Number(form.walletCreditAmount || 0), form.discountPreset === 'custom' ? Number(form.customDiscountPercent || 0) : Number(form.discountPreset || 0)).toFixed(2)} SAR` : '-'}</span>
+                    <span className="text-[11px] font-medium text-gray-500">{isArabic ? 'محسوب تلقائياً' : 'Auto-calculated'}</span>
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الحالة' : 'Status'}</label>
-                  <label className="flex h-11 items-center gap-2 rounded-xl border border-gray-200 px-3">
-                    <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
-                    <span>{isArabic ? 'فعالة' : 'Active'}</span>
-                  </label>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الصلاحية' : 'Expiration'}</label>
+                  <select className="input" value={form.expirationPreset} onChange={(e) => setForm((p) => ({ ...p, expirationPreset: e.target.value }))}>
+                    <option value="1_week">{isArabic ? 'أسبوع واحد' : '1 week'}</option>
+                    <option value="2_weeks">{isArabic ? 'أسبوعان' : '2 weeks'}</option>
+                    <option value="3_weeks">{isArabic ? '3 أسابيع' : '3 weeks'}</option>
+                    <option value="1_month">{isArabic ? 'شهر واحد' : '1 month'}</option>
+                    <option value="2_months">{isArabic ? 'شهران' : '2 months'}</option>
+                    <option value="3_months">{isArabic ? '3 أشهر' : '3 months'}</option>
+                    <option value="1_year">{isArabic ? 'سنة واحدة' : '1 year'}</option>
+                    <option value="never">{isArabic ? 'بدون انتهاء' : 'Never'}</option>
+                  </select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'سعر البطاقة (SAR)' : 'Package price (SAR)'}</label>
-                  <input className="input" type="number" step="0.01" placeholder={isArabic ? 'السعر' : 'Price'} value={form.priceAmount} onChange={(e) => setForm((p) => ({ ...p, priceAmount: Number(e.target.value || 0) }))} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'الرصيد المضاف للمحفظة' : 'Wallet credit amount'}</label>
-                  <input className="input" type="number" step="0.01" placeholder={isArabic ? 'الرصيد' : 'Credit'} value={form.walletCreditAmount} onChange={(e) => setForm((p) => ({ ...p, walletCreditAmount: Number(e.target.value || 0) }))} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'البونص الإضافي' : 'Bonus amount'}</label>
-                  <input className="input" type="number" step="0.01" placeholder={isArabic ? 'البونص' : 'Bonus'} value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'تاريخ البداية' : 'Start date'}</label>
-                  <input className="input" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((p) => ({ ...p, startsAt: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'تاريخ النهاية' : 'End date'}</label>
-                  <input className="input" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((p) => ({ ...p, endsAt: e.target.value }))} />
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{isArabic ? 'البونص الإضافي (اختياري)' : 'Bonus amount (optional)'}</label>
+                <input className="input" type="number" step="0.01" min="0" placeholder={isArabic ? 'البونص' : 'Bonus'} value={form.bonusAmount} onChange={(e) => setForm((p) => ({ ...p, bonusAmount: Number(e.target.value || 0) }))} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-gray-600">
@@ -350,22 +468,33 @@ export default function TenantGiftCardsPage() {
                       <div className="flex flex-wrap items-start gap-4">
                         <img
                           src={getImageUrl(pkg.imageUrl)}
-                          alt={pkg.title_en}
+                          alt={getPackageTitle(pkg)}
                           className="h-20 w-32 rounded-lg border border-gray-200 bg-white object-cover"
                         />
                         <div className="min-w-56 flex-1">
-                          <p className="text-base font-semibold text-gray-900">{isArabic ? pkg.title_ar : pkg.title_en}</p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {isArabic ? 'العنوان الإنجليزي:' : 'English title:'} {pkg.title_en || '-'}
-                          </p>
-                          <div className="mt-3 grid gap-2 text-xs text-gray-600 sm:grid-cols-3">
-                            <p>{isArabic ? 'السعر:' : 'Price:'} <span className="font-semibold text-gray-900">{Number(pkg.priceAmount).toFixed(2)} SAR</span></p>
-                            <p>{isArabic ? 'الرصيد:' : 'Credit:'} <span className="font-semibold text-emerald-700">{Number(pkg.walletCreditAmount).toFixed(2)} SAR</span></p>
-                            <p>{isArabic ? 'البونص:' : 'Bonus:'} <span className="font-semibold text-indigo-700">{Number(pkg.bonusAmount).toFixed(2)} SAR</span></p>
+                          <p className="text-base font-semibold text-gray-900">{getPackageTitle(pkg)}</p>
+                          {getPackageDescription(pkg) ? (
+                            <p className="mt-1 text-xs text-gray-500 line-clamp-2">{getPackageDescription(pkg)}</p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                            <span className="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">
+                              {isArabic ? 'القيمة' : 'Value'} {Number(pkg.walletCreditAmount).toFixed(2)} SAR
+                            </span>
+                            <span className="rounded-full bg-rose-50 px-2 py-1 font-medium text-rose-700">
+                              {isArabic ? 'السعر' : 'Price'} {Number(pkg.priceAmount).toFixed(2)} SAR
+                            </span>
+                            <span className="rounded-full bg-indigo-50 px-2 py-1 font-medium text-indigo-700">
+                              {isArabic ? 'الخصم' : 'Discount'} {getPackageDiscountPercent(pkg).toFixed(2)}%
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">
+                              {formatExpirationPreset(getPackageExpirationPreset(pkg), isArabic)}
+                            </span>
+                            {Number(pkg.bonusAmount || 0) > 0 ? (
+                              <span className="rounded-full bg-amber-50 px-2 py-1 font-medium text-amber-700">
+                                + {Number(pkg.bonusAmount).toFixed(2)} SAR {isArabic ? 'بونص' : 'bonus'}
+                              </span>
+                            ) : null}
                           </div>
-                          <p className="mt-2 text-xs font-medium text-gray-700">
-                            {isArabic ? 'إجمالي الرصيد:' : 'Total credited:'} {Number(pkg.walletCreditAmount + pkg.bonusAmount).toFixed(2)} SAR
-                          </p>
                         </div>
                         <div className="ml-auto flex min-w-[220px] flex-col items-end gap-2">
                           <span className={`rounded-full px-2 py-1 text-xs ${pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
@@ -485,7 +614,7 @@ export default function TenantGiftCardsPage() {
               </thead>
               <tbody>
                 {transactions.map((tx) => {
-                  const packageTitle = isArabic ? (tx.package?.title_ar || tx.package?.title_en || '-') : (tx.package?.title_en || tx.package?.title_ar || '-');
+                  const packageTitle = tx.package?.title || tx.package?.title_en || tx.package?.title_ar || '-';
                   const recipientLabel = personLabel(tx.recipient) !== '-' ? personLabel(tx.recipient) : (tx.recipientEmail || tx.recipientPhone || '-');
                   const destination = tx.recipient
                     ? `${isArabic ? 'محفظة المستخدم' : 'User wallet'} (${recipientLabel})`
