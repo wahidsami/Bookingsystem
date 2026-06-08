@@ -1387,7 +1387,9 @@ export function AppointmentDetailsDrawer({
   };
 
   const renderCustomerWorkspace = () => {
-    if (!customerProfile && !customerLoading) {
+    const customerWorkspaceLoading = customerLoading || (viewMode === "customer" && !!appointment?.user?.id && !customerProfile);
+
+    if (!customerProfile && !customerWorkspaceLoading) {
       return (
         <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
           {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
@@ -1407,12 +1409,8 @@ export function AppointmentDetailsDrawer({
       { key: "reviews", label: locale === "ar" ? "التقييمات" : "Reviews" }
     ];
 
-    const fallbackTab = customerTab === "wallet" || customerTab === "loyalty" || customerTab === "reviews"
-      ? customerTab
-      : customerTab;
-
     const renderCustomerTabContent = () => {
-      switch (fallbackTab) {
+      switch (customerTab) {
         case "overview":
           return renderOverview();
         case "appointments":
@@ -1613,7 +1611,7 @@ export function AppointmentDetailsDrawer({
         </div>
 
         <div className="space-y-4">
-          {customerLoading ? (
+          {customerWorkspaceLoading ? (
             <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
               <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
             </div>
