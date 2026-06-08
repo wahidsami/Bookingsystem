@@ -741,8 +741,9 @@ export function AppointmentDetailsDrawer({
     onRebook(appointment);
   };
 
-  const handleQuickStatusUpdate = async (nextStatus: "confirmed" | "checked_in" | "in_service" | "completed" | "no_show" | "cancelled") => {
+  const handleQuickStatusUpdate = async (nextStatus: AppointmentItem["status"]) => {
     if (!appointment || statusUpdating) return;
+    if (nextStatus === "pending") return;
     if (nextStatus === "completed") {
       const effectivePaymentStatus = resolveEffectivePaymentStatus(appointment);
       const isPaid = effectivePaymentStatus === "fully_paid" || effectivePaymentStatus === "paid";
