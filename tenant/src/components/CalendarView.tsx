@@ -1201,7 +1201,7 @@ export function CalendarView({
                             height: `${pixelsPerHour}px`
                           }}
                         >
-                          <div className="grid h-full grid-cols-12">
+                          <div className="flex h-full flex-col">
                             {Array.from({ length: SUBSLOTS_PER_HOUR }, (_, subslotIndex) => {
                               const minute = subslotIndex * SNAP_MINUTES;
                               const exactStart = buildDateTimeForSlot(dateColumn || selectedDate, slot.hour, minute);
@@ -1220,14 +1220,17 @@ export function CalendarView({
                                   key={`slot-${dateKey}-${activeStaffId || 'all'}-${slot.hour}-${minute}`}
                                   type="button"
                                   tabIndex={-1}
-                                  className={`h-full w-full cursor-pointer border-0 p-0 outline-none transition ${
+                                  className={`w-full cursor-pointer border-0 p-0 outline-none transition ${
                                     isHovered
                                       ? 'opacity-100 ring-1 ring-primary/25'
                                       : 'opacity-0 hover:opacity-100'
                                   }`}
-                                  style={isHovered ? {
-                                    backgroundImage: 'repeating-linear-gradient(135deg, rgba(124, 58, 237, 0.16) 0, rgba(124, 58, 237, 0.16) 6px, rgba(255, 255, 255, 0.04) 6px, rgba(255, 255, 255, 0.04) 12px)'
-                                  } : undefined}
+                                  style={{
+                                    height: `${pixelsPerHour / SUBSLOTS_PER_HOUR}px`,
+                                    ...(isHovered ? {
+                                      backgroundImage: 'repeating-linear-gradient(135deg, rgba(124, 58, 237, 0.16) 0, rgba(124, 58, 237, 0.16) 6px, rgba(255, 255, 255, 0.04) 6px, rgba(255, 255, 255, 0.04) 12px)'
+                                    } : {})
+                                  }}
                                   aria-label={slotLabel}
                                   title={slotLabel}
                                   onMouseEnter={() => handleSlotHover({
