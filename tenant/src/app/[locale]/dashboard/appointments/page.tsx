@@ -6,6 +6,7 @@ import { CalendarView } from "@/components/CalendarView";
 import { AppointmentActionDrawer, type AppointmentActionDrawerPrefill } from "@/components/AppointmentActionDrawer";
 import { AppointmentDetailsDrawer, type AppointmentItem } from "@/components/AppointmentDetailsDrawer";
 import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklyScheduleEditor";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
@@ -162,6 +163,7 @@ function resolveDisplayHoursFromWorkingHours(workingHours: any): { startHour: nu
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
+  const dialog = useAppDialog();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
   const advancedDragEnabled = process.env.NEXT_PUBLIC_APPOINTMENTS_ADVANCED_DRAG !== "0";
@@ -637,11 +639,19 @@ export default function AppointmentsPage() {
           loadAppointments();
         }
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to update status:", err);
-      alert(err.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     }
   };
 
@@ -655,11 +665,19 @@ export default function AppointmentsPage() {
           loadAppointments();
         }
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to reassign appointment staff:", err);
-      alert(err.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err.message || t("updateError"),
+        tone: "danger"
+      });
     }
   };
 
@@ -717,11 +735,19 @@ export default function AppointmentsPage() {
         }
         setPendingDropChange(null);
       } else {
-        alert(response.message || t("updateError"));
+        await dialog.alert({
+          title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+          message: response.message || t("updateError"),
+          tone: "danger"
+        });
       }
     } catch (err: any) {
       console.error("Failed to apply drag/drop appointment change:", err);
-      alert(err?.message || t("updateError"));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحديث" : "Update failed",
+        message: err?.message || t("updateError"),
+        tone: "danger"
+      });
     } finally {
       setDropChangeSaving(false);
     }
@@ -947,7 +973,11 @@ export default function AppointmentsPage() {
       });
     } catch (error) {
       console.error("Failed to load staff shifts for modal:", error);
-      alert(locale === "ar" ? "تعذر تحميل ورديات الموظف." : "Failed to load staff shifts.");
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحميل" : "Load failed",
+        message: locale === "ar" ? "تعذر تحميل ورديات الموظف." : "Failed to load staff shifts.",
+        tone: "danger"
+      });
       setShowShiftEditorModal(false);
       setShiftEditorStaffId(null);
       setShiftOriginal([]);
@@ -1027,10 +1057,18 @@ export default function AppointmentsPage() {
       setShiftEditorStaffId(null);
       setShiftDraft([]);
       setShiftOriginal([]);
-      alert(locale === "ar" ? "تم حفظ التعديلات على الورديات." : "Shift changes saved.");
+      await dialog.alert({
+        title: locale === "ar" ? "تم الحفظ" : "Saved",
+        message: locale === "ar" ? "تم حفظ التعديلات على الورديات." : "Shift changes saved.",
+        tone: "success"
+      });
     } catch (error: any) {
       console.error("Failed to save shift editor changes:", error);
-      alert(error?.message || (locale === "ar" ? "تعذر حفظ الورديات." : "Failed to save shifts."));
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر الحفظ" : "Save failed",
+        message: error?.message || (locale === "ar" ? "تعذر حفظ الورديات." : "Failed to save shifts."),
+        tone: "danger"
+      });
     } finally {
       setShiftSaving(false);
     }
