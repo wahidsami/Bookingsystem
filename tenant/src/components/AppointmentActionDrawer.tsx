@@ -359,7 +359,6 @@ export function AppointmentActionDrawer({
 
   const currentAppointmentStepLabel = appointmentStepLabels[appointmentStep] || "";
   const nextAppointmentStepLabel = appointmentStepLabels[appointmentStep + 1] || "";
-  const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
 
   const goToNextAppointmentStep = () => {
     const stepError = getAppointmentStepError(appointmentStep);
@@ -560,6 +559,7 @@ export function AppointmentActionDrawer({
       })
     }));
   }, [services, locale]);
+  const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
 
   const handleAppointmentSubmit = async () => {
     setError("");
