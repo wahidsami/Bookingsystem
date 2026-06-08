@@ -1310,6 +1310,46 @@ export function AppointmentDetailsDrawer({
                 {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
               </button>
             </div>
+
+            <div className="mt-3 rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                {locale === "ar" ? "تغيير الحالة" : "Status shortcuts"}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {getManualStatusOptions(appointment.status)
+                  .filter((option) => option.value !== appointment.status)
+                  .map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => void handleQuickStatusUpdate(option.value)}
+                      disabled={statusUpdating}
+                      className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => void handleMarkPaid(appointment.paymentMethod || "cash")}
+                disabled={paymentUpdating || !canMarkPaid}
+                className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {locale === "ar" ? "تسجيل كمدفوع بالكامل" : "Mark fully paid"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleMarkRefunded()}
+                disabled={paymentUpdating || !canMarkRefunded}
+                className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {locale === "ar" ? "تسجيل كمرتجع" : "Mark refunded"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
