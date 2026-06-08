@@ -131,6 +131,7 @@ export function CalendarView({
   onDropAppointmentChange,
   onAppointmentClick,
   onGridContextMenu,
+  onGridTimeSlotClick,
   onStaffHeaderMenuRequest,
   onBreakClick,
   onAppointmentSettingsClick,
