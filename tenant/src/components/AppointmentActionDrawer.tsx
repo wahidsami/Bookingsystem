@@ -130,6 +130,51 @@ function getTodayDateKey() {
   return new Date().toISOString().split("T")[0];
 }
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getRoundedUpFiveMinuteTime(date = new Date()) {
+  const next = new Date(date);
+  next.setSeconds(0, 0);
+  const minutes = next.getMinutes();
+  const rounded = Math.ceil((minutes + 1) / 5) * 5;
+  next.setMinutes(rounded);
+  return next;
+}
+
+function getTimeGuardMessage(locale: string, suggestedTimeLabel: string) {
+  return locale === "ar"
+    ? `لا يمكنك حجز الموعد في هذا الوقت اليوم لأنه قد مضى، جرّب وقتًا بعد ${suggestedTimeLabel}.`
+    : `You can not book the appointment on this time today because it was passed, try something after ${suggestedTimeLabel}.`;
+}
+
+function getPastTodayTimeWarning(dateKey: string, timeKey: string, locale: string) {
+  if (!dateKey || !timeKey) {
+    return "";
+  }
+
+  const selected = new Date(`${dateKey}T${timeKey}:00`);
+  if (Number.isNaN(selected.getTime())) {
+    return "";
+  }
+
+  const now = new Date();
+  const isToday = dateKey === getLocalDateKey(now);
+  if (!isToday || selected.getTime() >= now.getTime()) {
+    return "";
+  }
+
+  const suggestedTimeLabel = formatTime12Hour(
+    getRoundedUpFiveMinuteTime(now).toTimeString().slice(0, 5),
+    locale
+  );
+  return getTimeGuardMessage(locale, suggestedTimeLabel);
+}
+
 function getLocalDateKeyFromValue(value?: string | null) {
   if (!value) {
     return "";
@@ -331,6 +376,11 @@ export function AppointmentActionDrawer({
     if (step === 2) {
       if (!appointmentDate || !appointmentTime) {
         return locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.";
+      }
+
+      const timeGuardMessage = getPastTodayTimeWarning(appointmentDate, appointmentTime, locale);
+      if (timeGuardMessage) {
+        return timeGuardMessage;
       }
 
       if (assignedEmployees.length > 0 && !selectedStaffId) {
@@ -597,6 +647,12 @@ export function AppointmentActionDrawer({
 
     if (!appointmentDate || !appointmentTime) {
       setError(locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.");
+      return;
+    }
+
+    const timeGuardMessage = getPastTodayTimeWarning(appointmentDate, appointmentTime, locale);
+    if (timeGuardMessage) {
+      setError(timeGuardMessage);
       return;
     }
 
