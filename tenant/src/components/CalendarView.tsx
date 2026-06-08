@@ -1232,7 +1232,6 @@ export function CalendarView({
                                     } : {})
                                   }}
                                   aria-label={slotLabel}
-                                  title={slotLabel}
                                   onMouseEnter={() => handleSlotHover({
                                     hour: slot.hour,
                                     minute,
