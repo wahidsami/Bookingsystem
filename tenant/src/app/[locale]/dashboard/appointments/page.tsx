@@ -164,8 +164,7 @@ function getPastTodayTimeWarning(dateKey: string, timeKey: string, locale: strin
   if (Number.isNaN(selected.getTime())) return "";
 
   const now = new Date();
-  const isToday = dateKey === getLocalDateKey(now);
-  if (!isToday || selected.getTime() >= now.getTime()) return "";
+  if (selected.getTime() >= now.getTime()) return "";
 
   const suggestedTimeLabel = formatTimeLabel(getRoundedUpFiveMinuteTime(now), locale);
   return getPastTimeBlockWarning(locale, suggestedTimeLabel);

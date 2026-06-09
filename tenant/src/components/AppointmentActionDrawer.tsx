@@ -163,8 +163,7 @@ function getPastTodayTimeWarning(dateKey: string, timeKey: string, locale: strin
   }
 
   const now = new Date();
-  const isToday = dateKey === getLocalDateKey(now);
-  if (!isToday || selected.getTime() >= now.getTime()) {
+  if (selected.getTime() >= now.getTime()) {
     return "";
   }
 
