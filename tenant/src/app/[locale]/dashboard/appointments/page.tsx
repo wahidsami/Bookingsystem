@@ -135,6 +135,42 @@ function parseClockToMinutes(value?: string | null) {
   return (hours * 60) + minutes;
 }
 
+function getRoundedUpFiveMinuteTime(date = new Date()) {
+  const next = new Date(date);
+  next.setSeconds(0, 0);
+  const minutes = next.getMinutes();
+  const rounded = Math.ceil((minutes + 1) / 5) * 5;
+  next.setMinutes(rounded);
+  return next;
+}
+
+function formatTimeLabel(value: Date, locale: string) {
+  return value.toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function getPastTimeBlockWarning(locale: string, suggestedTimeLabel: string) {
+  return locale === "ar"
+    ? `لا يمكنك حجز الموعد الآن. جرّب خانة بعد ${suggestedTimeLabel}.`
+    : `You can not book an appointment now. Try a tile slot after ${suggestedTimeLabel}.`;
+}
+
+function getPastTodayTimeWarning(dateKey: string, timeKey: string, locale: string) {
+  if (!dateKey || !timeKey) return "";
+
+  const selected = new Date(`${dateKey}T${timeKey}:00`);
+  if (Number.isNaN(selected.getTime())) return "";
+
+  const now = new Date();
+  const isToday = dateKey === getLocalDateKey(now);
+  if (!isToday || selected.getTime() >= now.getTime()) return "";
+
+  const suggestedTimeLabel = formatTimeLabel(getRoundedUpFiveMinuteTime(now), locale);
+  return getPastTimeBlockWarning(locale, suggestedTimeLabel);
+}
+
 function resolveDisplayHoursFromWorkingHours(workingHours: any): { startHour: number; endHour: number } {
   const fallback = { startHour: 6, endHour: 22 };
   if (!workingHours || typeof workingHours !== "object") return fallback;
@@ -848,6 +884,16 @@ export default function AppointmentsPage() {
     const start = new Date(payload.startTime);
     const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
     const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+
+    if (getPastTodayTimeWarning(date, time, locale)) {
+      void dialog.alert({
+        title: locale === "ar" ? "لا يمكن الحجز" : "Booking not allowed",
+        message: getPastTodayTimeWarning(date, time, locale),
+        tone: "default"
+      });
+      return;
+    }
+
     openQuickAppointmentDrawer({
       staffId: payload.staffId,
       date,
@@ -880,6 +926,16 @@ export default function AppointmentsPage() {
     const start = new Date(boardContextMenu.startTime);
     const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
     const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+
+    if (getPastTodayTimeWarning(date, time, locale)) {
+      void dialog.alert({
+        title: locale === "ar" ? "لا يمكن الحجز" : "Booking not allowed",
+        message: getPastTodayTimeWarning(date, time, locale),
+        tone: "default"
+      });
+      return;
+    }
+
     openQuickAppointmentDrawer({
       staffId: boardContextMenu.staffId,
       date,
@@ -1456,22 +1512,25 @@ export default function AppointmentsPage() {
             }}
             onClick={(event) => event.stopPropagation()}
           >
-            {!isContextSlotBlocked ? (
-              <button
-                type="button"
-                onClick={handleOpenAppointmentFromMenu}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-              >
-                <PlusIcon className="h-4 w-4 text-primary" />
-                <span>{locale === 'ar' ? 'إضافة موعد جديد' : 'Add new appointment'}</span>
-              </button>
-            ) : (
-              <div className="rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 bg-rose-50">
+            <button
+              type="button"
+              onClick={handleOpenAppointmentFromMenu}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
+                isContextSlotBlocked
+                  ? "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                  : "text-gray-800 hover:bg-gray-50"
+              }`}
+            >
+              <PlusIcon className={`h-4 w-4 ${isContextSlotBlocked ? "text-rose-500" : "text-primary"}`} />
+              <span>{locale === 'ar' ? 'إضافة موعد جديد' : 'Add new appointment'}</span>
+            </button>
+            {isContextSlotBlocked ? (
+              <div className="mt-1 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 bg-rose-50">
                 {locale === 'ar'
-                  ? 'هذه الفترة محجوزة ولا يمكن إضافة موعد فيها'
-                  : 'This time slot is blocked and cannot accept appointments'}
+                  ? 'هذه الفترة في الماضي. جرّب خانة بعد الوقت الحالي.'
+                  : 'This slot is in the past. Try a tile after the current time.'}
               </div>
-            )}
+            ) : null}
             <button
               type="button"
               onClick={handleOpenBlockedTimeFromMenu}
