@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import { getImageUrl, tenantApi } from '@/lib/api';
 import { TenantLayout } from '@/components/TenantLayout';
 import {
@@ -627,20 +628,26 @@ export default function CustomerDetailPage() {
                 <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {t('wallet') || 'Wallet'}
                 </h3>
-                <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                <Link
+                  href={`/${locale}/dashboard/customers/${customer.id}/wallet`}
+                  className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition"
+                >
                   {t('liveBalance') || 'Live balance'}
-                </span>
+                </Link>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
+                <Link
+                  href={`/${locale}/dashboard/customers/${customer.id}/wallet`}
+                  className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                     {t('currentBalance') || 'Current balance'}
                   </p>
                   <p className="mt-2 text-2xl font-bold text-emerald-700">
                     {formatMoney(customer.walletBalance ?? customer.walletSummary?.currentBalance ?? 0)}
                   </p>
-                </div>
+                </Link>
                 <div className="rounded-2xl bg-blue-50 p-4 border border-blue-100">
                   <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                     {t('walletLedger') || 'Wallet entries'}
@@ -665,6 +672,15 @@ export default function CustomerDetailPage() {
                     {customer.walletSummary?.receivedGiftCardCount || 0}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <Link
+                  href={`/${locale}/dashboard/customers/${customer.id}/wallet`}
+                  className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
+                >
+                  {locale === 'ar' ? 'فتح سجل المحفظة' : 'Open wallet history'}
+                </Link>
               </div>
 
               <div className="mt-5 space-y-4">
