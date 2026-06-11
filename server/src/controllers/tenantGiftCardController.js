@@ -437,7 +437,7 @@ exports.getTransactionsReport = async (req, res) => {
     const rows = await db.TenantGiftCardTransaction.findAll({
       where,
       include: [
-        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title', 'title_en', 'title_ar', 'imageUrl'], required: false },
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar', 'imageUrl'], required: false },
         { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
         { model: db.PlatformUser, as: 'recipient', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
         { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['id', 'grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
@@ -467,7 +467,7 @@ exports.exportTransactionsReportCsv = async (req, res) => {
     const rows = await db.TenantGiftCardTransaction.findAll({
       where,
       include: [
-        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['title', 'title_en', 'title_ar'], required: false },
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['title_en', 'title_ar'], required: false },
         { model: db.PlatformUser, as: 'sender', attributes: ['email', 'firstName', 'lastName'], required: false },
         { model: db.PlatformUser, as: 'recipient', attributes: ['email', 'firstName', 'lastName'], required: false },
         { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
@@ -503,7 +503,7 @@ exports.exportTransactionsReportCsv = async (req, res) => {
         escapeCsvCell(row.id),
         escapeCsvCell(row.status),
         escapeCsvCell(row.deliveryChannel),
-        escapeCsvCell(row.package?.title || row.package?.title_en || row.package?.title_ar || ''),
+        escapeCsvCell(row.package?.title_en || row.package?.title_ar || ''),
         escapeCsvCell(row.package?.title_en || ''),
         escapeCsvCell(row.package?.title_ar || ''),
         escapeCsvCell(Number(row.purchaseAmount || 0).toFixed(2)),

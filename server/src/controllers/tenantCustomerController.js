@@ -584,13 +584,13 @@ exports.getCustomer = async (req, res) => {
                     ]
                 },
                 include: [
-                    {
-                        model: db.GiftCardPackage,
-                        as: 'package',
-                        required: false,
-                        attributes: ['id', 'title', 'title_en', 'title_ar', 'priceAmount', 'walletCreditAmount', 'bonusAmount']
-                    }
-                ],
+                {
+                    model: db.GiftCardPackage,
+                    as: 'package',
+                    required: false,
+                    attributes: ['id', 'title_en', 'title_ar', 'priceAmount', 'walletCreditAmount', 'bonusAmount']
+                }
+            ],
                 order: [['createdAt', 'DESC']],
                 ...(walletHistoryMode ? {} : { limit: 10 })
             })
@@ -706,7 +706,7 @@ exports.getCustomer = async (req, res) => {
         const mappedGiftCardTransactions = giftCardTransactions.map((tx) => ({
             id: tx.id,
             packageId: tx.packageId,
-            packageTitle: tx.package?.title_en || tx.package?.title_ar || tx.package?.title || 'Gift card',
+            packageTitle: tx.package?.title_en || tx.package?.title_ar || 'Gift card',
             purchaseAmount: parseFloat(tx.purchaseAmount || 0),
             creditAmount: parseFloat(tx.creditAmount || 0),
             bonusAmount: parseFloat(tx.bonusAmount || 0),
