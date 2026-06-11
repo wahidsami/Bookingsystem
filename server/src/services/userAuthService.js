@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../models');
 const emailService = require('../utils/emailService');
 const { getCustomerAppResetUrl } = require('../utils/url');
+const { linkPendingGiftRecipients } = require('./giftRecipientLinkingService');
 
 // Use environment variables, with validation to happen at startup
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -218,6 +219,18 @@ class UserAuthService {
 
         // Save refresh token
         await user.update({ refreshToken: tokens.refreshToken });
+
+        // Link any gift transactions that were sent to this email/phone before the user signed up.
+        await linkPendingGiftRecipients({
+            platformUserId: user.id,
+            email: normalizedEmail,
+            phone
+        }).catch((error) => {
+            console.error('[UserAuthService] Failed to reconcile gift recipients after registration', {
+                userId: user.id,
+                error: error?.message || error
+            });
+        });
 
         // TODO: Send verification email
         // await emailService.sendVerificationEmail(user.email, emailVerificationToken);
@@ -546,6 +559,17 @@ class UserAuthService {
                 phoneVerified: true,
                 emailVerificationToken: null,
                 phoneVerificationCode: null,
+            });
+
+            await linkPendingGiftRecipients({
+                platformUserId: user.id,
+                email: normalizedEmail,
+                phone: normalizedPhone
+            }).catch((error) => {
+                console.error('[UserAuthService] Failed to reconcile gift recipients after Google onboarding', {
+                    userId: user.id,
+                    error: error?.message || error
+                });
             });
         } else {
             if (user.phone !== normalizedPhone) {

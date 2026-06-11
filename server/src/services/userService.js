@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const { linkPendingGiftRecipients } = require('./giftRecipientLinkingService');
 
 class UserService {
     /**
@@ -56,6 +57,18 @@ class UserService {
             }
 
             user = await db.PlatformUser.create(userData);
+
+            // Link any pending gifts that were sent to this email/phone before the account existed.
+            await linkPendingGiftRecipients({
+                platformUserId: user.id,
+                email: userData.email,
+                phone: userData.phone
+            }).catch((error) => {
+                console.error('[UserService] Failed to reconcile gift recipients after platform user creation', {
+                    userId: user.id,
+                    error: error?.message || error
+                });
+            });
         } else {
             // Update info if provided and missing
             const updates = {};
