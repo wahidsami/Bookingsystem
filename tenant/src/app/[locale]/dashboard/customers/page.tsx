@@ -39,7 +39,7 @@ interface Customer {
   cancellationCount: number;
   tags: string[];
   notes: string;
-  customerType?: 'service_only' | 'product_only' | 'both';
+  customerType?: 'service_only' | 'product_only' | 'both' | 'walk_in';
   totalOrders?: number;
   totalProductsPurchased?: number;
 }
@@ -289,6 +289,7 @@ export default function CustomersPage() {
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">{t('allTypes')}</option>
+                <option value="walk_in">{locale === 'ar' ? 'عملاء حضوري' : 'Walk-ins'}</option>
                 <option value="service_only">{t('servicesOnly')}</option>
                 <option value="product_only">{t('productsOnly')}</option>
                 <option value="both">{t('both')}</option>

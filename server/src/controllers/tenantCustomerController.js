@@ -52,6 +52,12 @@ function getCustomerName(user) {
     return fullName || user?.email || user?.phone || 'Guest Customer';
 }
 
+function isWalkInPlaceholderCustomer(user) {
+    const normalizedFirst = `${user?.firstName || ''}`.trim().toLowerCase();
+    const normalizedLast = `${user?.lastName || ''}`.trim();
+    return (normalizedFirst === 'customer' || normalizedFirst === 'عميل') && /^\d{3}$/.test(normalizedLast);
+}
+
 function formatPaymentMethodLabel(paymentMethod) {
     if (paymentMethod && typeof paymentMethod === 'object') {
         if (paymentMethod.cardBrand && paymentMethod.cardLast4) {
@@ -227,7 +233,7 @@ exports.getCustomers = async (req, res) => {
         const safePage = Math.max(parseInt(page, 10) || 1, 1);
         const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
         const offset = (safePage - 1) * safeLimit;
-        const customerType = req.query.customerType || ''; // 'service_only', 'product_only', 'both', or ''
+        const customerType = req.query.customerType || ''; // 'service_only', 'product_only', 'both', 'walk_in', or ''
 
         // Find all platform users who have appointments OR orders with this tenant
         const whereClause = {};
@@ -332,6 +338,8 @@ exports.getCustomers = async (req, res) => {
             allCustomers = allCustomers.filter(c => (!c.appointments || c.appointments.length === 0) && c.orders.length > 0);
         } else if (customerType === 'both') {
             allCustomers = allCustomers.filter(c => c.appointments.length > 0 && c.orders.length > 0);
+        } else if (customerType === 'walk_in') {
+            allCustomers = allCustomers.filter(c => isWalkInPlaceholderCustomer(c));
         }
 
         // Enrich with customer insights

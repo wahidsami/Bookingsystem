@@ -58,7 +58,7 @@ interface CustomerDetail {
   // Custom
   tags: string[];
   notes: string;
-  customerType?: 'service_only' | 'product_only' | 'both';
+  customerType?: 'service_only' | 'product_only' | 'both' | 'walk_in';
   walletSummary?: {
     currentBalance: number;
     walletLedgerCount: number;

@@ -242,6 +242,8 @@ That is the main customer record used by:
 
 There is also a legacy `Customer` model that remains in the system for older appointment records and migration compatibility.
 
+Walk-in bookings are saved as normal `PlatformUser` customer records too. When the tenant admin creates a guest or walk-in appointment without a real customer profile, the system uses a placeholder display name such as `Customer 001` or `عميل 001`, and that record appears in the tenant Customers section like any other customer. The tenant can later edit the name, birthdate, email, and phone from the customer details page.
+
 ---
 
 ## 7) PlatformUser Model: General Customer Data
