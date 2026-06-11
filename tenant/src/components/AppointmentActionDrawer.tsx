@@ -365,9 +365,6 @@ export function AppointmentActionDrawer({
         return locale === "ar" ? "الرجاء إدخال الاسم الأول والأخير للعميل." : "Please enter customer first and last name.";
       }
 
-      if (customerMode === "guest" && (!newCustomer.firstName.trim() || !newCustomer.lastName.trim())) {
-        return locale === "ar" ? "الرجاء إدخال اسم الضيف." : "Please enter guest name.";
-      }
     }
 
     if (step === 1 && !selectedServiceId) {
@@ -433,8 +430,8 @@ export function AppointmentActionDrawer({
     setCustomerSearch("");
     setSelectedCustomer(null);
     setNewCustomer({
-      firstName: locale === "ar" ? "ضيف" : "Walk",
-      lastName: locale === "ar" ? "مؤقت" : "In Customer",
+      firstName: locale === "ar" ? "عميل" : "Customer",
+      lastName: "001",
       email: "",
       phone: "",
       gender: "",
@@ -639,11 +636,12 @@ export function AppointmentActionDrawer({
       }
     }
 
-    if (customerMode === "guest") {
-      if (!newCustomer.firstName.trim() || !newCustomer.lastName.trim()) {
-        setError(locale === "ar" ? "الرجاء إدخال اسم الضيف." : "Please enter guest name.");
-        return;
-      }
+    if (customerMode === "guest" && !newCustomer.firstName.trim() && !newCustomer.lastName.trim()) {
+      setNewCustomer((current) => ({
+        ...current,
+        firstName: locale === "ar" ? "عميل" : "Customer",
+        lastName: "001"
+      }));
     }
 
     if (!appointmentDate || !appointmentTime) {
@@ -728,8 +726,12 @@ export function AppointmentActionDrawer({
         customer: customerMode === "new" || customerMode === "guest"
           ? {
               ...newCustomer,
-              firstName: newCustomer.firstName.trim(),
-              lastName: newCustomer.lastName.trim(),
+              firstName: customerMode === "guest"
+                ? (newCustomer.firstName.trim() || (locale === "ar" ? "عميل" : "Customer"))
+                : newCustomer.firstName.trim(),
+              lastName: customerMode === "guest"
+                ? (newCustomer.lastName.trim() || "001")
+                : newCustomer.lastName.trim(),
               email: customerMode === "guest" ? "" : newCustomer.email.trim(),
               phone: customerMode === "guest" ? "" : newCustomer.phone.trim(),
               isGuest: customerMode === "guest"

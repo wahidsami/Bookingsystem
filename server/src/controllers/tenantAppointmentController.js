@@ -241,8 +241,9 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
 
     const normalizedCustomer = customer || {};
     const isGuest = normalizedCustomer.isGuest === true;
-    const firstName = `${normalizedCustomer.firstName || ''}`.trim() || (isGuest ? 'Guest' : '');
-    const lastName = `${normalizedCustomer.lastName || ''}`.trim() || (isGuest ? 'Customer' : '');
+    const guestPlaceholderSuffix = `${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+    const firstName = `${normalizedCustomer.firstName || ''}`.trim() || (isGuest ? 'Customer' : '');
+    const lastName = `${normalizedCustomer.lastName || ''}`.trim() || (isGuest ? guestPlaceholderSuffix : '');
     let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
     let phone = `${normalizedCustomer.phone || ''}`.trim();
     const password = `${normalizedCustomer.password || ''}`;
