@@ -1495,8 +1495,19 @@ class TenantApiClient {
     return this.get(`/tenant/customers${query ? `?${query}` : ''}`);
   }
 
-  async getCustomer(id: string): Promise<any> {
-    return this.get(`/tenant/customers/${id}`);
+  async getCustomer(id: string, params?: {
+    walletHistory?: 'full';
+    includeWalletHistory?: boolean;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.walletHistory) queryParams.append('walletHistory', params.walletHistory);
+    if (params?.includeWalletHistory) queryParams.append('includeWalletHistory', '1');
+    const query = queryParams.toString();
+    return this.get(`/tenant/customers/${id}${query ? `?${query}` : ''}`);
+  }
+
+  async getCustomerWalletHistory(id: string): Promise<any> {
+    return this.getCustomer(id, { walletHistory: 'full' });
   }
 
   async getCustomerHistory(id: string, params?: {

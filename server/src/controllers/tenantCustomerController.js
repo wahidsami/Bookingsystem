@@ -506,6 +506,7 @@ exports.getCustomer = async (req, res) => {
     try {
         const tenantId = req.tenant.id;
         const { id } = req.params;
+        const walletHistoryMode = `${req.query.walletHistory || ''}`.toLowerCase() === 'full' || req.query.includeWalletHistory === '1';
 
         // Get platform user
         const customer = await db.PlatformUser.findByPk(id, {
@@ -573,7 +574,7 @@ exports.getCustomer = async (req, res) => {
                     tenantId
                 },
                 order: [['createdAt', 'DESC']],
-                limit: 10
+                ...(walletHistoryMode ? {} : { limit: 10 })
             }),
             db.GiftCardTransaction.findAll({
                 where: {
@@ -591,7 +592,7 @@ exports.getCustomer = async (req, res) => {
                     }
                 ],
                 order: [['createdAt', 'DESC']],
-                limit: 10
+                ...(walletHistoryMode ? {} : { limit: 10 })
             })
         ]);
 

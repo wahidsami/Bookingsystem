@@ -1635,11 +1635,16 @@ export function AppointmentDetailsDrawer({
   const renderOverview = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile
-          label={locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
-          value={<Currency amount={Number(customerProfile?.walletBalance || 0)} />}
-          className="bg-gradient-to-br from-primary/10 to-white ring-primary/20"
-        />
+        <Link
+          href={`/${locale}/dashboard/customers/${customerProfile?.id || ""}/wallet`}
+          className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/400"
+        >
+          <MetricTile
+            label={locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
+            value={<Currency amount={Number(customerProfile?.walletBalance || 0)} />}
+            className="bg-gradient-to-br from-primary/10 to-white ring-primary/20 transition hover:-translate-y-0.5 hover:shadow-md"
+          />
+        </Link>
         <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
         <MetricTile
           label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
