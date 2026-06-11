@@ -54,10 +54,47 @@ interface CustomerDetail {
   // Loyalty
   loyaltyTier: string;
   loyaltyPoints: number;
+  walletBalance?: number;
   // Custom
   tags: string[];
   notes: string;
   customerType?: 'service_only' | 'product_only' | 'both';
+  walletSummary?: {
+    currentBalance: number;
+    walletLedgerCount: number;
+    sentGiftCardCount: number;
+    receivedGiftCardCount: number;
+  };
+  walletLedgerEntries?: {
+    id: string;
+    type: string;
+    direction: 'credit' | 'debit';
+    amount: number;
+    currency: string;
+    balanceBefore: number;
+    balanceAfter: number;
+    referenceType?: string | null;
+    referenceId?: string | null;
+    metadata?: Record<string, any>;
+    createdAt: string;
+  }[];
+  giftCardTransactions?: {
+    id: string;
+    packageTitle: string;
+    purchaseAmount: number;
+    creditAmount: number;
+    bonusAmount: number;
+    totalCreditAmount: number;
+    status: string;
+    deliveryChannel: string;
+    senderPlatformUserId?: string | null;
+    recipientPlatformUserId?: string | null;
+    recipientEmail?: string | null;
+    recipientPhone?: string | null;
+    deliveryMode?: string | null;
+    createdAt: string;
+    claimedAt?: string | null;
+  }[];
   // Recent
   recentAppointments: any[];
   recentOrders?: any[];
@@ -149,6 +186,15 @@ export default function CustomerDetailPage() {
       case 'no_show': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const formatMoney = (amount?: number | null) => {
+    const value = Number(amount || 0);
+    return new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
+      style: 'currency',
+      currency: 'SAR',
+      maximumFractionDigits: 2
+    }).format(value);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -374,11 +420,11 @@ export default function CustomerDetailPage() {
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-gray-600 text-sm whitespace-pre-wrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    {notes || t('noNotes') || 'No notes yet.'}
-                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-gray-600 text-sm whitespace-pre-wrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      {notes || t('noNotes') || 'No notes yet.'}
+                    </p>
                   {tags.length > 0 && (
                     <div className="flex gap-2 flex-wrap" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                       {tags.map((tag) => (
@@ -394,6 +440,131 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Wallet & Gifts */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  {t('wallet') || 'Wallet'}
+                </h3>
+                <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                  {t('liveBalance') || 'Live balance'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {t('currentBalance') || 'Current balance'}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-emerald-700">
+                    {formatMoney(customer.walletBalance ?? customer.walletSummary?.currentBalance ?? 0)}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-blue-50 p-4 border border-blue-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                    {t('walletLedger') || 'Wallet entries'}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-blue-700">
+                    {customer.walletSummary?.walletLedgerCount || customer.walletLedgerEntries?.length || 0}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-purple-50 p-4 border border-purple-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+                    {t('giftCardsSent') || 'Gift cards sent'}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-purple-700">
+                    {customer.walletSummary?.sentGiftCardCount || 0}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                    {t('giftCardsReceived') || 'Gift cards received'}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-amber-700">
+                    {customer.walletSummary?.receivedGiftCardCount || 0}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t('walletHistory') || 'Wallet history'}
+                  </h4>
+                  {customer.walletLedgerEntries && customer.walletLedgerEntries.length > 0 ? (
+                    <div className="space-y-2">
+                      {customer.walletLedgerEntries.slice(0, 5).map((entry) => (
+                        <div key={entry.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex items-center justify-between gap-3">
+                          <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {entry.type.split('_').join(' ')}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(entry.createdAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <div className={`text-sm font-bold ${entry.direction === 'credit' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {entry.direction === 'credit' ? '+' : '-'}{formatMoney(entry.amount)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      {t('noWalletHistory') || 'No wallet history yet.'}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {t('giftCardHistory') || 'Gift card history'}
+                  </h4>
+                  {customer.giftCardTransactions && customer.giftCardTransactions.length > 0 ? (
+                    <div className="space-y-2">
+                      {customer.giftCardTransactions.slice(0, 5).map((tx) => {
+                        const isSent = tx.senderPlatformUserId === customerId;
+                        return (
+                          <div key={tx.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex items-center justify-between gap-3">
+                            <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {tx.packageTitle}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {isSent ? (t('sent') || 'Sent') : (t('received') || 'Received')}
+                                {' • '}
+                                {new Date(tx.createdAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-gray-900">
+                                {formatMoney(tx.totalCreditAmount)}
+                              </div>
+                              <div className="text-xs text-gray-500">{tx.status}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      {t('noGiftCardsYet') || 'No gift cards yet.'}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

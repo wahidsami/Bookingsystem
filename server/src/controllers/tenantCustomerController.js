@@ -503,7 +503,7 @@ exports.getCustomer = async (req, res) => {
         const customer = await db.PlatformUser.findByPk(id, {
             attributes: [
                 'id', 'firstName', 'lastName', 'email', 'phone',
-                'profileImage', 'gender', 'dateOfBirth', 'preferredLanguage',
+                'profileImage', 'gender', 'dateOfBirth', 'preferredLanguage', 'walletBalance',
                 'createdAt'
             ]
         });
@@ -557,6 +557,35 @@ exports.getCustomer = async (req, res) => {
             ],
             order: [['createdAt', 'DESC']]
         });
+
+        const [walletLedgerEntries, giftCardTransactions] = await Promise.all([
+            db.TenantWalletLedgerEntry.findAll({
+                where: {
+                    platformUserId: id,
+                    tenantId
+                },
+                order: [['createdAt', 'DESC']],
+                limit: 10
+            }),
+            db.GiftCardTransaction.findAll({
+                where: {
+                    [Op.or]: [
+                        { senderPlatformUserId: id },
+                        { recipientPlatformUserId: id }
+                    ]
+                },
+                include: [
+                    {
+                        model: db.GiftCardPackage,
+                        as: 'package',
+                        required: false,
+                        attributes: ['id', 'title', 'title_en', 'title_ar', 'priceAmount', 'walletCreditAmount', 'bonusAmount']
+                    }
+                ],
+                order: [['createdAt', 'DESC']],
+                limit: 10
+            })
+        ]);
 
         // Get or create customer insight
         let insight = await db.CustomerInsight.findOne({
@@ -649,9 +678,44 @@ exports.getCustomer = async (req, res) => {
         const customerJson = customer.toJSON();
         // Ensure profileImage is properly formatted
         customerJson.profileImage = buildPublicAssetUrl(customerJson.profileImage);
+        const currentWalletBalance = parseFloat(customerJson.walletBalance || 0);
+
+        const mappedWalletLedgerEntries = walletLedgerEntries.map((entry) => ({
+            id: entry.id,
+            type: entry.type,
+            direction: entry.direction,
+            amount: parseFloat(entry.amount || 0),
+            currency: entry.currency || 'SAR',
+            balanceBefore: parseFloat(entry.balanceBefore || 0),
+            balanceAfter: parseFloat(entry.balanceAfter || 0),
+            referenceType: entry.referenceType || null,
+            referenceId: entry.referenceId || null,
+            metadata: entry.metadata || {},
+            createdAt: entry.createdAt
+        }));
+
+        const mappedGiftCardTransactions = giftCardTransactions.map((tx) => ({
+            id: tx.id,
+            packageId: tx.packageId,
+            packageTitle: tx.package?.title_en || tx.package?.title_ar || tx.package?.title || 'Gift card',
+            purchaseAmount: parseFloat(tx.purchaseAmount || 0),
+            creditAmount: parseFloat(tx.creditAmount || 0),
+            bonusAmount: parseFloat(tx.bonusAmount || 0),
+            totalCreditAmount: parseFloat(tx.totalCreditAmount || 0),
+            status: tx.status,
+            deliveryChannel: tx.deliveryChannel,
+            senderPlatformUserId: tx.senderPlatformUserId || null,
+            recipientPlatformUserId: tx.recipientPlatformUserId || null,
+            recipientEmail: tx.recipientEmail || null,
+            recipientPhone: tx.recipientPhone || null,
+            deliveryMode: tx.deliveryMode || null,
+            createdAt: tx.createdAt,
+            claimedAt: tx.claimedAt || null
+        }));
 
         const customerData = {
             ...customerJson,
+            walletBalance: currentWalletBalance,
             // Stats
             totalBookings: appointments.length,
             totalOrders: orders.length,
@@ -689,6 +753,14 @@ exports.getCustomer = async (req, res) => {
             tags: insight?.tags || [],
             notes: insight?.notes || '',
             customerType: customerType,
+            walletSummary: {
+                currentBalance: currentWalletBalance,
+                walletLedgerCount: mappedWalletLedgerEntries.length,
+                sentGiftCardCount: mappedGiftCardTransactions.filter((tx) => tx.senderPlatformUserId === id).length,
+                receivedGiftCardCount: mappedGiftCardTransactions.filter((tx) => tx.recipientPlatformUserId === id).length
+            },
+            walletLedgerEntries: mappedWalletLedgerEntries,
+            giftCardTransactions: mappedGiftCardTransactions,
             // All appointments (complete history)
             allAppointments: appointments.map(a => ({
                 ...normalizeAppointmentPaymentState(a, 'appointment'),
