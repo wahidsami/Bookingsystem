@@ -219,6 +219,12 @@ export default function CustomerDetailPage() {
     }
   };
 
+  const isWalkInCustomer = (firstName: string, lastName: string) => {
+    const normalizedFirst = `${firstName || ''}`.trim().toLowerCase();
+    const normalizedLast = `${lastName || ''}`.trim();
+    return (normalizedFirst === 'customer' || normalizedFirst === 'عميل') && /^\d{3}$/.test(normalizedLast);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -297,9 +303,16 @@ export default function CustomerDetailPage() {
             {isRTL ? <ArrowRightIcon className="w-5 h-5" /> : <ArrowLeftIcon className="w-5 h-5" />}
           </button>
           <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {customer.firstName} {customer.lastName}
-            </h1>
+            <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {customer.firstName} {customer.lastName}
+              </h1>
+              {isWalkInCustomer(customer.firstName, customer.lastName) && (
+                <span className="inline-flex px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800">
+                  {locale === 'ar' ? 'عميل حضوري' : 'Walk-in'}
+                </span>
+              )}
+            </div>
             <p className="text-gray-500">{t('customerDetails')}</p>
           </div>
         </div>
@@ -355,9 +368,16 @@ export default function CustomerDetailPage() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  {customer.firstName} {customer.lastName}
-                </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {customer.firstName} {customer.lastName}
+                    </h2>
+                    {isWalkInCustomer(customer.firstName, customer.lastName) && (
+                      <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800">
+                        {locale === 'ar' ? 'عميل حضوري' : 'Walk-in'}
+                      </span>
+                    )}
+                  </div>
                 <div className="mt-2 flex flex-col items-center gap-2">
                   <span className={`px-3 py-1 text-sm font-medium rounded-full border ${getLoyaltyColor(customer.loyaltyTier)}`}>
                     {t(customer.loyaltyTier)} • {customer.loyaltyPoints} {t('points')}

@@ -158,6 +158,12 @@ export default function CustomersPage() {
     }
   };
 
+  const isWalkInCustomer = (customer: Customer) => {
+    const firstName = `${customer.firstName || ''}`.trim().toLowerCase();
+    const lastName = `${customer.lastName || ''}`.trim();
+    return (firstName === 'customer' || firstName === 'عميل') && /^\d{3}$/.test(lastName);
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
@@ -371,9 +377,16 @@ export default function CustomersPage() {
                               )}
                             </div>
                             <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                              <p className="font-medium text-gray-900">
-                                {customer.firstName} {customer.lastName}
-                              </p>
+                              <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                <p className="font-medium text-gray-900">
+                                  {customer.firstName} {customer.lastName}
+                                </p>
+                                {isWalkInCustomer(customer) && (
+                                  <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800">
+                                    {locale === 'ar' ? 'عميل حضوري' : 'Walk-in'}
+                                  </span>
+                                )}
+                              </div>
                               {customer.tags.length > 0 && (
                                 <div className="flex gap-1 mt-1" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                   {customer.tags.slice(0, 2).map((tag, i) => (
