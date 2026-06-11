@@ -224,7 +224,7 @@ async function inspectStaffSlotAvailability({ tenantId, serviceId, staffId, star
     };
 }
 
-async function resolveAppointmentCustomer({ platformUserId, customer, transaction }) {
+async function resolveAppointmentCustomer({ platformUserId, customer, transaction, tenantId }) {
     if (platformUserId) {
         const existingUser = await db.PlatformUser.findByPk(platformUserId, { transaction });
         if (!existingUser) {
@@ -241,8 +241,10 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
 
     const normalizedCustomer = customer || {};
     const isGuest = normalizedCustomer.isGuest === true;
-    const firstName = `${normalizedCustomer.firstName || ''}`.trim() || (isGuest ? 'Customer' : '');
-    const lastName = `${normalizedCustomer.lastName || ''}`.trim() || (isGuest ? '001' : '');
+    const rawFirstName = `${normalizedCustomer.firstName || ''}`.trim();
+    const rawLastName = `${normalizedCustomer.lastName || ''}`.trim();
+    const firstName = rawFirstName || (isGuest ? 'Customer' : '');
+    const lastName = rawLastName || (isGuest ? '001' : '');
     let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
     let phone = `${normalizedCustomer.phone || ''}`.trim();
     const password = `${normalizedCustomer.password || ''}`;
@@ -257,7 +259,24 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         phone = `+9665${String(Date.now()).slice(-8)}`;
     }
 
-    if (!firstName || !lastName) {
+    const isDefaultWalkInPlaceholder = isGuest && (
+        (rawFirstName === '' && rawLastName === '') ||
+        (rawFirstName === 'Customer' && (rawLastName === '' || rawLastName === '001')) ||
+        (rawFirstName === 'عميل' && (rawLastName === '' || rawLastName === '001'))
+    );
+
+    const resolvedWalkInName = isDefaultWalkInPlaceholder && tenantId
+        ? await getNextWalkInCustomerDisplayName({
+            tenantId,
+            transaction,
+            placeholderFirstName: rawFirstName === 'عميل' ? 'عميل' : 'Customer'
+        })
+        : null;
+
+    const finalFirstName = resolvedWalkInName?.firstName || firstName;
+    const finalLastName = resolvedWalkInName?.lastName || lastName;
+
+    if (!finalFirstName || !finalLastName) {
         throw new Error('Customer first and last name are required when no existing customer is selected');
     }
 
@@ -271,8 +290,8 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         }
 
         const updates = {};
-        if (!existingUser.firstName && firstName) updates.firstName = firstName;
-        if (!existingUser.lastName && lastName) updates.lastName = lastName;
+        if (!existingUser.firstName && finalFirstName) updates.firstName = finalFirstName;
+        if (!existingUser.lastName && finalLastName) updates.lastName = finalLastName;
         if (!existingUser.gender && normalizedCustomer.gender) updates.gender = normalizedCustomer.gender;
         if (!existingUser.dateOfBirth && normalizedCustomer.dateOfBirth) updates.dateOfBirth = normalizedCustomer.dateOfBirth;
 
@@ -289,14 +308,64 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         email,
         phone,
         password: generatedPassword,
-        firstName,
-        lastName,
+        firstName: finalFirstName,
+        lastName: finalLastName,
         gender: normalizedCustomer.gender || null,
         dateOfBirth: normalizedCustomer.dateOfBirth || null,
         emailVerified: false,
         phoneVerified: false,
         isActive: true
     }, { transaction });
+}
+
+async function getNextWalkInCustomerDisplayName({ tenantId, transaction, placeholderFirstName = 'Customer' }) {
+    const placeholderArabicName = 'عميل';
+
+    const appointments = await db.Appointment.findAll({
+        include: [
+            {
+                model: db.Service,
+                as: 'service',
+                where: { tenantId },
+                required: true,
+                attributes: []
+            },
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                required: true,
+                attributes: ['firstName', 'lastName']
+            }
+        ],
+        attributes: ['id'],
+        transaction
+    });
+
+    let maxSuffix = 0;
+    appointments.forEach((appointment) => {
+        const currentFirstName = `${appointment.user?.firstName || ''}`.trim();
+        const currentLastName = `${appointment.user?.lastName || ''}`.trim();
+
+        const isPlaceholderName =
+            currentFirstName === 'Customer' ||
+            currentFirstName === placeholderArabicName ||
+            currentFirstName === placeholderFirstName;
+
+        if (!isPlaceholderName) {
+            return;
+        }
+
+        const suffix = parseInt(currentLastName, 10);
+        if (Number.isFinite(suffix) && suffix > maxSuffix) {
+            maxSuffix = suffix;
+        }
+    });
+
+    const nextSuffix = String(maxSuffix + 1).padStart(3, '0');
+    return {
+        firstName: placeholderFirstName,
+        lastName: nextSuffix
+    };
 }
 
 async function sendAppointmentInviteEmail({ to, customerName, tenantName, inviteLink, startTime, serviceName, locale = 'en' }) {
@@ -445,7 +514,8 @@ exports.createAppointment = async (req, res) => {
         const customerUser = await resolveAppointmentCustomer({
             platformUserId,
             customer,
-            transaction
+            transaction,
+            tenantId
         });
 
         const explicitStaffId = staffId || requestedStaffId || null;
