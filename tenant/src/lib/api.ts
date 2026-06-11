@@ -1535,6 +1535,18 @@ class TenantApiClient {
     return this.patch(`/tenant/customers/${id}/notes`, data);
   }
 
+  async updateCustomerProfile(id: string, data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    gender?: string | null;
+    dateOfBirth?: string | null;
+    preferredLanguage?: string;
+  }): Promise<any> {
+    return this.patch(`/tenant/customers/${id}/profile`, data);
+  }
+
   async exportCustomers(): Promise<Blob> {
     const accessToken = this.getAccessToken();
     const headers: HeadersInit = {};

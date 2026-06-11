@@ -842,6 +842,115 @@ exports.getCustomer = async (req, res) => {
 };
 
 /**
+ * Update core customer profile fields (tenant-specific)
+ */
+exports.updateCustomerProfile = async (req, res) => {
+    try {
+        const tenantId = req.tenant.id;
+        const { id } = req.params;
+        const {
+            firstName,
+            lastName,
+            email,
+            phone,
+            gender,
+            dateOfBirth,
+            preferredLanguage
+        } = req.body || {};
+
+        const customer = await db.PlatformUser.findByPk(id);
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Customer not found'
+            });
+        }
+
+        const updates = {};
+        if (typeof firstName === 'string') {
+            const value = firstName.trim();
+            if (value) updates.firstName = value;
+        }
+        if (typeof lastName === 'string') {
+            const value = lastName.trim();
+            if (value) updates.lastName = value;
+        }
+        if (typeof email === 'string') {
+            const value = email.trim().toLowerCase();
+            if (value) updates.email = value;
+        }
+        if (typeof phone === 'string') {
+            const value = phone.trim();
+            if (value) updates.phone = value;
+        }
+        if (gender !== undefined) {
+            updates.gender = gender || null;
+        }
+        if (dateOfBirth !== undefined) {
+            updates.dateOfBirth = dateOfBirth || null;
+        }
+        if (preferredLanguage !== undefined) {
+            updates.preferredLanguage = preferredLanguage || 'en';
+        }
+
+        if (updates.email || updates.phone) {
+            const conflictWhere = {
+                id: { [Op.ne]: id }
+            };
+            if (updates.email) conflictWhere.email = updates.email;
+            if (updates.phone) conflictWhere.phone = updates.phone;
+
+            const conflict = await db.PlatformUser.findOne({ where: conflictWhere });
+            if (conflict) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Another customer already uses this email or phone number'
+                });
+            }
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return res.json({
+                success: true,
+                message: 'No profile changes provided',
+                data: {
+                    id: customer.id
+                }
+            });
+        }
+
+        await customer.update(updates);
+
+        logTenantAppointmentAudit('customer_profile_updated', {
+            tenantId,
+            customerId: customer.id,
+            updates: Object.keys(updates)
+        });
+
+        const updatedCustomer = await db.PlatformUser.findByPk(id, {
+            attributes: [
+                'id', 'firstName', 'lastName', 'email', 'phone',
+                'profileImage', 'gender', 'dateOfBirth', 'preferredLanguage',
+                'createdAt'
+            ]
+        });
+
+        res.json({
+            success: true,
+            message: 'Customer profile updated',
+            data: updatedCustomer
+        });
+    } catch (error) {
+        console.error('Update customer profile error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update customer profile',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Update customer notes and tags (tenant-specific)
  */
 exports.updateCustomerNotes = async (req, res) => {

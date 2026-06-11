@@ -114,6 +114,16 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    gender: '',
+    dateOfBirth: '',
+    preferredLanguage: 'en'
+  });
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -128,6 +138,15 @@ export default function CustomerDetailPage() {
       const response = await tenantApi.getCustomer(customerId);
       if (response.success) {
         setCustomer(response.data);
+        setProfileDraft({
+          firstName: response.data.firstName || '',
+          lastName: response.data.lastName || '',
+          email: response.data.email || '',
+          phone: response.data.phone || '',
+          gender: response.data.gender || '',
+          dateOfBirth: response.data.dateOfBirth || '',
+          preferredLanguage: response.data.preferredLanguage || 'en'
+        });
         setNotes(response.data.notes || '');
         setTags(response.data.tags || []);
       }
@@ -152,6 +171,29 @@ export default function CustomerDetailPage() {
       setEditingNotes(false);
     } catch (err) {
       console.error('Failed to save notes:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setSaving(true);
+      const response = await tenantApi.updateCustomerProfile(customerId, {
+        firstName: profileDraft.firstName.trim(),
+        lastName: profileDraft.lastName.trim(),
+        email: profileDraft.email.trim(),
+        phone: profileDraft.phone.trim(),
+        gender: profileDraft.gender || null,
+        dateOfBirth: profileDraft.dateOfBirth || null,
+        preferredLanguage: profileDraft.preferredLanguage || 'en'
+      });
+      if (response.success) {
+        setEditingProfile(false);
+        await loadCustomer();
+      }
+    } catch (err) {
+      console.error('Failed to save profile:', err);
     } finally {
       setSaving(false);
     }
@@ -268,8 +310,27 @@ export default function CustomerDetailPage() {
           <div className="space-y-6">
             {/* Profile Card */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-start justify-between gap-3 mb-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {t('profile') || 'Profile'}
+                  </p>
+                  <h3 className="text-lg font-semibold text-gray-900 mt-1">
+                    {editingProfile ? (t('editProfile') || 'Edit profile') : (t('customerOverview') || 'Customer overview')}
+                  </h3>
+                </div>
+                {!editingProfile && (
+                  <button
+                    onClick={() => setEditingProfile(true)}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
+                    {t('edit') || 'Edit'}
+                  </button>
+                )}
+              </div>
+
               <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center mb-4 relative">
+                <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center mb-4 relative overflow-hidden">
                   {customer.profileImage ? (
                     <>
                       <img
@@ -282,7 +343,7 @@ export default function CustomerDetailPage() {
                           if (fallback) fallback.style.display = 'flex';
                         }}
                       />
-                      <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center hidden">
+                      <div className="w-24 h-24 rounded-full bg-primary-100 items-center justify-center hidden">
                         <span className="text-primary-600 font-semibold text-2xl">
                           {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
                         </span>
@@ -314,30 +375,128 @@ export default function CustomerDetailPage() {
                 </div>
               </div>
 
-              {/* Contact Info */}
-              <div className="mt-6 space-y-3 border-t border-gray-200 pt-6">
-                {customer.email && (
-                  <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <EnvelopeIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-600">{customer.email}</span>
+              <div className="mt-6 space-y-4 border-t border-gray-200 pt-6">
+                {editingProfile ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={profileDraft.firstName}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, firstName: e.target.value })}
+                        placeholder={t('firstName') || 'First name'}
+                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <input
+                        type="text"
+                        value={profileDraft.lastName}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, lastName: e.target.value })}
+                        placeholder={t('lastName') || 'Last name'}
+                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <input
+                        type="email"
+                        value={profileDraft.email}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })}
+                        placeholder={t('email') || 'Email'}
+                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <input
+                        type="tel"
+                        value={profileDraft.phone}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, phone: e.target.value })}
+                        placeholder={t('phone') || 'Mobile'}
+                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <input
+                        type="date"
+                        value={profileDraft.dateOfBirth}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, dateOfBirth: e.target.value })}
+                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                      <select
+                        value={profileDraft.gender}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, gender: e.target.value })}
+                        className="w-full p-3 border border-gray-300 rounded-lg bg-white"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      >
+                        <option value="">{t('gender') || 'Gender'}</option>
+                        <option value="male">{t('male') || 'Male'}</option>
+                        <option value="female">{t('female') || 'Female'}</option>
+                        <option value="other">{t('other') || 'Other'}</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={profileDraft.preferredLanguage}
+                        onChange={(e) => setProfileDraft({ ...profileDraft, preferredLanguage: e.target.value })}
+                        placeholder={t('preferredLanguage') || 'Preferred language'}
+                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                      />
+                    </div>
+                    <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <button
+                        onClick={handleSaveProfile}
+                        disabled={saving}
+                        className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {saving ? (t('saving') || 'Saving...') : (t('save') || 'Save')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingProfile(false);
+                          setProfileDraft({
+                            firstName: customer.firstName || '',
+                            lastName: customer.lastName || '',
+                            email: customer.email || '',
+                            phone: customer.phone || '',
+                            gender: customer.gender || '',
+                            dateOfBirth: customer.dateOfBirth || '',
+                            preferredLanguage: customer.preferredLanguage || 'en'
+                          });
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        {t('cancel') || 'Cancel'}
+                      </button>
+                    </div>
                   </div>
-                )}
-                {customer.phone && (
-                  <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <PhoneIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-600">{customer.phone}</span>
-                  </div>
-                )}
-                {customer.gender && (
-                  <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <UserIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-600 capitalize">{customer.gender}</span>
-                  </div>
-                )}
-                {customer.dateOfBirth && (
-                  <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <CalendarIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-600">{formatDate(customer.dateOfBirth)}</span>
+                ) : (
+                  <div className="space-y-3">
+                    {customer.email && (
+                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <EnvelopeIcon className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-600">{customer.email}</span>
+                      </div>
+                    )}
+                    {customer.phone && (
+                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <PhoneIcon className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-600">{customer.phone}</span>
+                      </div>
+                    )}
+                    {customer.gender && (
+                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <UserIcon className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-600 capitalize">{customer.gender}</span>
+                      </div>
+                    )}
+                    {customer.dateOfBirth && (
+                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <CalendarIcon className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-600">{formatDate(customer.dateOfBirth)}</span>
+                      </div>
+                    )}
+                    {customer.preferredLanguage && (
+                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                        <ClockIcon className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-600">{customer.preferredLanguage.toUpperCase()}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
