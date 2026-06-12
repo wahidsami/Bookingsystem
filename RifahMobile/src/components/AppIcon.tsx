@@ -6,6 +6,7 @@ import CalendarIcon from '../../assets/icons/icon_calendar.svg';
 import CartIcon from '../../assets/icons/icon_cart.svg';
 import UserIcon from '../../assets/icons/icon_user.svg';
 import SettingsIcon from '../../assets/icons/icon_settings.svg';
+import WalletIcon from '../../assets/icons/icon_wallet.svg';
 import LocationIcon from '../../assets/icons/icon_location.svg';
 import MessageIcon from '../../assets/icons/icon_message.svg';
 import SparklesIcon from '../../assets/icons/icon_sparkles.svg';
@@ -64,6 +65,7 @@ type IconName =
   | 'sparkles'
   | 'file'
   | 'folder'
+  | 'wallet'
   | 'logout'
   | 'lock'
   | 'globe'
@@ -77,6 +79,8 @@ type IconName =
   | 'cash'
   | 'clock'
   | 'warning'
+  | 'info'
+  | 'event'
   | 'image'
   | 'notifications_off'
   | 'phone'
@@ -92,7 +96,12 @@ type IconName =
   | 'twitter'
   | 'linkedin'
   | 'snapchat'
-  | 'website';
+  | 'website'
+  | 'storefront'
+  | 'card_giftcard'
+  | 'account_balance_wallet'
+  | 'receipt_long'
+  | 'verified_user';
 
 type Props = {
   name: IconName;
@@ -117,6 +126,7 @@ const iconMap = {
   sparkles: SparklesIcon,
   file: FileIcon,
   folder: FolderIcon,
+  wallet: WalletIcon,
   logout: LogoutIcon,
   lock: LockIcon,
   globe: GlobeIcon,
@@ -130,6 +140,8 @@ const iconMap = {
   cash: CashIcon,
   clock: ClockIcon,
   warning: WarningIcon,
+  info: WarningIcon,
+  event: CalendarIcon,
   image: ImagePlaceholderIcon,
   notifications_off: NotificationsOffIcon,
   phone: PhoneIcon,
@@ -146,6 +158,11 @@ const iconMap = {
   linkedin: LinkedinIcon,
   snapchat: SnapchatIcon,
   website: WebsiteIcon,
+  storefront: BrowseIcon,
+  card_giftcard: SparklesIcon,
+  account_balance_wallet: WalletIcon,
+  receipt_long: FileIcon,
+  verified_user: UserIcon,
 } as const;
 
 export function AppIcon({ name, size = 22, color = '#7F50D2' }: Props) {
