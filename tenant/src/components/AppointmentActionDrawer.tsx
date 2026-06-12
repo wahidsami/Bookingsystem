@@ -592,6 +592,7 @@ export function AppointmentActionDrawer({
     ? (groupGuest.isFree ? 0 : toSafeMoneyNumber(selectedGuestService?.finalPrice ?? 0))
     : 0;
   const displayTotalPrice = toSafeMoneyNumber(displayServicePrice + guestServicePrice);
+  const queuedServiceCount = queuedServices.length;
   const groupedServices = useMemo(() => {
     const groupMap = new Map<string, { heading: string | null; items: ServiceItem[] }>();
 
@@ -618,6 +619,40 @@ export function AppointmentActionDrawer({
     }));
   }, [services, locale]);
   const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
+
+  const makeQueueKey = (serviceId: string, variantId?: string | null, staffId?: string | null) =>
+    `${serviceId}::${variantId || ""}::${staffId || ""}`;
+
+  const queueService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
+    const trimmedServiceId = `${serviceId || ""}`.trim();
+    if (!trimmedServiceId) {
+      return false;
+    }
+
+    const normalizedVariantId = variantId || null;
+    const normalizedStaffId = staffId || null;
+    const nextKey = makeQueueKey(trimmedServiceId, normalizedVariantId, normalizedStaffId);
+
+    let added = false;
+    setQueuedServices((current) => {
+      const exists = current.some((item) => makeQueueKey(item.serviceId, item.variantId, item.staffId) === nextKey);
+      if (exists) {
+        return current;
+      }
+
+      added = true;
+      return [
+        ...current,
+        {
+          serviceId: trimmedServiceId,
+          variantId: normalizedVariantId,
+          staffId: normalizedStaffId
+        }
+      ];
+    });
+
+    return added;
+  };
 
   const buildSequentialBookingItems = () => {
     const draftItems: BookingDraftItem[] = [...queuedServices];
@@ -670,14 +705,13 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    setQueuedServices((current) => [
-      ...current,
-      {
-        serviceId: selectedServiceId,
-        variantId: selectedVariantId || null,
-        staffId: selectedStaffId || null
-      }
-    ]);
+    const added = queueService(selectedServiceId, selectedVariantId || null, selectedStaffId || null);
+    if (!added) {
+      setError(locale === "ar" ? "هذه الخدمة مضافة بالفعل." : "This service is already added.");
+      return;
+    }
+
+    setError("");
   };
 
   const handleRemoveQueuedService = (index: number) => {
@@ -1115,12 +1149,16 @@ export function AppointmentActionDrawer({
                       </h4>
                       <p className="text-xs text-gray-500">
                         {locale === "ar"
-                          ? "اختر الخدمة من القائمة العمودية، ثم اختر النسخة إن وجدت."
-                          : "Choose a service from the vertical list, then pick a variant if it exists."}
+                          ? "اختر خدمة، أضفها إلى نفس الحجز، ثم كرر الخطوة لإضافة خدمات أخرى."
+                          : "Choose a service, add it to the same booking, then repeat to add more services."}
                       </p>
                     </div>
                     <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                      {selectedServiceName || (locale === "ar" ? "لم تُحدَّد خدمة" : "No service selected")}
+                      {queuedServiceCount > 0
+                        ? locale === "ar"
+                          ? `${queuedServiceCount} خدمة مضافة`
+                          : `${queuedServiceCount} service${queuedServiceCount === 1 ? "" : "s"} added`
+                        : selectedServiceName || (locale === "ar" ? "لم تُحدَّد خدمة" : "No service selected")}
                     </div>
                   </div>
 
@@ -1138,11 +1176,12 @@ export function AppointmentActionDrawer({
                         ) : null}
 
                         <div className="space-y-3">
-                          {group.items.map((service) => {
+                        {group.items.map((service) => {
                           const active = service.id === selectedServiceId;
                           const serviceName = locale === "ar" ? service.name_ar : service.name_en;
                           const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
                           const serviceVariantsForCard = parseArrayValue<ServiceVariant>(service.variants).filter((variant) => variant.isActive !== false);
+                          const queuedCountForService = queuedServices.filter((item) => item.serviceId === service.id).length;
                           return (
                             <div key={service.id} className="space-y-2">
                               <button
@@ -1186,11 +1225,56 @@ export function AppointmentActionDrawer({
                                             : "No category"}
                                       </p>
                                     </div>
-                                    {active && (
-                                      <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                        {locale === "ar" ? "محدد" : "Selected"}
-                                      </span>
-                                    )}
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                      {queuedCountForService > 0 ? (
+                                        <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                          {locale === "ar"
+                                            ? `مضافة ×${queuedCountForService}`
+                                            : `Added x${queuedCountForService}`}
+                                        </span>
+                                      ) : null}
+                                      {active && (
+                                        <span className="rounded-full bg-gray-900 px-2.5 py-1 text-[10px] font-semibold text-white">
+                                          {locale === "ar" ? "معاينة" : "Preview"}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          const added = queueService(
+                                            service.id,
+                                            active ? (selectedVariantId || null) : null,
+                                            active ? (selectedStaffId || null) : null
+                                          );
+
+                                          if (!added) {
+                                            setError(locale === "ar" ? "هذه الخدمة مضافة بالفعل." : "This service is already added.");
+                                            return;
+                                          }
+
+                                          setError("");
+                                          setSelectedServiceId(service.id);
+                                          if (!active) {
+                                            setSelectedVariantId("");
+                                            setPaymentMethod("");
+                                          }
+                                        }}
+                                        className={`rounded-full px-3 py-1 text-[10px] font-semibold transition ${
+                                          queuedCountForService > 0
+                                            ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                            : "bg-primary text-white hover:bg-primary/90"
+                                        }`}
+                                      >
+                                        {queuedCountForService > 0
+                                          ? locale === "ar"
+                                            ? "إضافة نسخة أخرى"
+                                            : "Add another"
+                                          : locale === "ar"
+                                            ? "إضافة"
+                                            : "Add"}
+                                      </button>
+                                    </div>
                                   </div>
 
                                   <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
