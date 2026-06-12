@@ -1183,7 +1183,7 @@ export function AppointmentActionDrawer({
                           return (
                             <div
                               key={service.id}
-                              className={`group flex w-full items-stretch overflow-hidden rounded-3xl border text-left transition ${
+                              className={`group overflow-hidden rounded-3xl border text-left transition ${
                                 active
                                   ? "border-primary bg-purple-50 ring-2 ring-primary/20"
                                   : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
@@ -1195,42 +1195,46 @@ export function AppointmentActionDrawer({
                                 setPaymentMethod("");
                               }}
                             >
-                              <div className="h-28 w-28 shrink-0 overflow-hidden bg-gray-100 sm:h-32 sm:w-32">
-                                {service.image ? (
-                                  <img
-                                    src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
-                                    alt={serviceName}
-                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-gray-300">
-                                    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                      <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
-                                    </svg>
-                                  </div>
-                                )}
-                              </div>
+                              <div className="grid gap-0 lg:grid-cols-[160px_minmax(0,1fr)]">
+                                <div className="relative h-32 w-full overflow-hidden bg-gray-100 lg:h-full lg:min-h-[168px]">
+                                  {service.image ? (
+                                    <img
+                                      src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
+                                      alt={serviceName}
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                      <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/25 to-transparent" />
+                                </div>
 
-                              <div className="min-w-0 flex-1 p-4">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                      {serviceParent
-                                        ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
-                                        : locale === "ar"
-                                          ? "بدون فئة"
-                                          : "No category"}
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-wrap items-center justify-end gap-2">
-                                    {isQueued ? (
-                                      <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                        {locale === "ar" ? "مضافة" : "Selected"}
-                                      </span>
-                                    ) : null}
+                                <div className="min-w-0 p-4 sm:p-5">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
+                                        {isQueued ? (
+                                          <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                            {locale === "ar" ? "مضافة" : "Added"}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      <p className="mt-1 text-xs text-gray-500">
+                                        {serviceParent
+                                          ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
+                                          : locale === "ar"
+                                            ? "بدون فئة"
+                                            : "No category"}
+                                      </p>
+                                    </div>
+
                                     <label
-                                      className="flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1 text-[10px] font-semibold text-gray-700 ring-1 ring-gray-200"
+                                      className="flex shrink-0 items-center gap-2 rounded-full bg-gray-50 px-3 py-2 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200"
                                       onClick={(event) => event.stopPropagation()}
                                     >
                                       <input
@@ -1256,63 +1260,71 @@ export function AppointmentActionDrawer({
                                       <span>{isQueued ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "إضافة" : "Add")}</span>
                                     </label>
                                   </div>
-                                </div>
 
-                                <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
-                                  <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                    ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                  </span>
-                                  <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                    <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
-                                  </span>
+                                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
+                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                      ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                    </span>
+                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                      <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
+                                    </span>
+                                  </div>
+
+                                  {serviceVariantsForCard.length > 0 ? (
+                                    <div className="mt-4 border-t border-gray-100 pt-4">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                          {locale === "ar" ? "النسخ" : "Variants"}
+                                        </div>
+                                        {queuedItem?.variantId ? (
+                                          <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold text-primary">
+                                            {locale === "ar" ? "نسخة مختارة" : "Variant selected"}
+                                          </div>
+                                        ) : null}
+                                      </div>
+
+                                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                        {serviceVariantsForCard.map((variant) => {
+                                          const activeVariant = active && selectedVariantId === variant.id;
+                                          return (
+                                            <button
+                                              key={variant.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedServiceId(service.id);
+                                                setSelectedVariantId(variant.id);
+                                                setPaymentMethod("");
+                                                if (isQueued) {
+                                                  updateQueuedService(service.id, variant.id, selectedStaffId || queuedItem?.staffId || null);
+                                                }
+                                              }}
+                                              className={`rounded-2xl border px-3 py-3 text-left transition ${
+                                                activeVariant
+                                                  ? "border-primary bg-white ring-2 ring-primary/20"
+                                                  : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
+                                              }`}
+                                            >
+                                              <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <div className="truncate text-sm font-semibold text-gray-900">
+                                                    {variant.description}
+                                                  </div>
+                                                  <div className="mt-1 text-xs text-gray-500">
+                                                    {variant.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                                  </div>
+                                                </div>
+                                                <div className="shrink-0 text-sm font-bold text-primary">
+                                                  <Currency amount={toSafeMoneyNumber(variant.finalPrice ?? 0)} />
+                                                </div>
+                                              </div>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
-
-                              {serviceVariantsForCard.length > 0 ? (
-                                <div className="ms-4 space-y-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-3 sm:ms-8">
-                                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                    {locale === "ar" ? "النسخ" : "Variants"}
-                                  </div>
-                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    {serviceVariantsForCard.map((variant) => {
-                                      const activeVariant = active && selectedVariantId === variant.id;
-                                      return (
-                                        <button
-                                          key={variant.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setSelectedServiceId(service.id);
-                                            setSelectedVariantId(variant.id);
-                                            setPaymentMethod("");
-                                            if (isQueued) {
-                                              updateQueuedService(service.id, variant.id, selectedStaffId || queuedItem?.staffId || null);
-                                            }
-                                          }}
-                                          className={`rounded-2xl border px-3 py-3 text-left transition ${
-                                            activeVariant
-                                              ? "border-primary bg-white ring-2 ring-primary/20"
-                                              : "border-gray-200 bg-white hover:border-primary/40"
-                                          }`}
-                                        >
-                                          <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                              <div className="text-sm font-semibold text-gray-900">
-                                                {variant.description}
-                                              </div>
-                                              <div className="mt-1 text-xs text-gray-500">
-                                                {variant.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                              </div>
-                                            </div>
-                                            <div className="text-sm font-bold text-primary">
-                                              <Currency amount={toSafeMoneyNumber(variant.finalPrice ?? 0)} />
-                                            </div>
-                                          </div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ) : null}
                             </div>
                             );
                           })}
