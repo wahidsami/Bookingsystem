@@ -21,7 +21,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 type FullService = Service & { employees?: Staff[]; variants?: ServiceVariant[] };
 
 export function ServiceDetailsScreen({ route, navigation }: any) {
-    const { tenant, service, tenantId } = route.params;
+    const { tenant, service, tenantId, bookingSessionId, bookingReference } = route.params;
     const { isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [loading, setLoading] = useState(true);
@@ -104,6 +104,8 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
             tenant,
             selectedStaff: provider || undefined,
             selectedVariant: variant || selectedVariant || undefined,
+            bookingSessionId: bookingSessionId || undefined,
+            bookingReference: bookingReference || undefined,
         });
     };
 

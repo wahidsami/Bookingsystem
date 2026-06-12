@@ -601,6 +601,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             tenant,
             tenantId: tenant?.id || tenantId,
             service,
+            bookingSessionId: route.params?.bookingSessionId || null,
+            bookingReference: route.params?.bookingReference || null,
         });
     };
 

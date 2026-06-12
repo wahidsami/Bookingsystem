@@ -134,6 +134,8 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
   });
 
   const representative = group?.items?.[0];
+  const bookingSessionId = group?.bookingSessionId || representative?.bookingSessionId || null;
+  const bookingReference = group?.bookingReference || representative?.bookingReference || null;
   const guest = useMemo(() => parseGroupGuestFromNotes(representative?.notes), [representative?.notes]);
   const subtotalAmount = useMemo(
     () => group?.items?.reduce((sum, item) => sum + Number(item.price || 0), 0) || 0,
@@ -288,6 +290,26 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
           : `Could not open WhatsApp or the phone dialer for ${phone}.`
       );
     }
+  };
+
+  const handleAddService = () => {
+    const tenant = representative?.tenant || group?.tenant || null;
+    if (!tenant?.id) {
+      showFeedback(
+        language === 'ar' ? 'المنشأة غير متاحة' : 'Center unavailable',
+        language === 'ar' ? 'تعذر فتح صفحة الخدمات لهذا الموعد.' : 'Could not open the services page for this appointment.'
+      );
+      return;
+    }
+
+    navigation.navigate('Tenant', {
+      tenantId: tenant.id,
+      tenant,
+      slug: tenant.slug,
+      initialTab: 'services',
+      bookingSessionId,
+      bookingReference,
+    });
   };
 
   const handleCancelSubmit = async () => {
@@ -552,6 +574,12 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
               )}
             </View>
 
+            {activeTab === 'upcoming' && group?.status !== 'cancelled' ? (
+              <TouchableOpacity style={styles.addServiceBtn} onPress={handleAddService}>
+                <Text style={styles.addServiceBtnText}>{language === 'ar' ? 'إضافة خدمة' : 'Add service'}</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
               style={styles.contactBtn}
               onPress={handleContactCenter}
@@ -784,6 +812,8 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: colors.error, fontWeight: '700', fontSize: 12, textAlign: 'center' },
   primaryActionCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
   secondaryBtnPlaceholder: { flex: 1 },
+  addServiceBtn: { minHeight: 46, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
+  addServiceBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   contactBtn: { minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#D7DAEA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   contactBtnText: { color: '#4B5072', fontWeight: '700' },
   policyNote: { marginBottom: spacing.md, borderRadius: 14, borderWidth: 1, borderColor: '#E8EAF4', backgroundColor: '#FFFFFF', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

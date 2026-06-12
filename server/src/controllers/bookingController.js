@@ -217,7 +217,10 @@ const createBooking = async (req, res) => {
             notes,
             paymentMethod,
             variantId,
-            groupGuest
+            groupGuest,
+            bookingSessionId,
+            bookingReference,
+            bookingItemIndex
         } = req.body;
         const platformUserId = req.userId; // From auth middleware
         const bookingItems = Array.isArray(req.body.items) ? req.body.items : [];
@@ -282,7 +285,10 @@ const createBooking = async (req, res) => {
                 platformUserId,
                 items: normalizedItems,
                 notes: normalizedNotes || null,
-                paymentMethod: normalizedItems[0]?.paymentMethod || 'at-center'
+                paymentMethod: normalizedItems[0]?.paymentMethod || 'at-center',
+                bookingSessionId,
+                bookingReference,
+                bookingItemIndex
             });
 
             const fullAppointments = await db.Appointment.findAll({
@@ -346,7 +352,10 @@ const createBooking = async (req, res) => {
             tenantId: finalTenantId,
             startTime,
             notes: normalizedNotes,
-            paymentMethod
+            paymentMethod,
+            bookingSessionId,
+            bookingReference,
+            bookingItemIndex
         });
 
         // Load related data with platform user

@@ -890,6 +890,7 @@ exports.createPublicBooking = async (req, res) => {
         });
 
         const bookingItems = Array.isArray(req.body.items) ? req.body.items : [];
+        const { bookingSessionId, bookingReference, bookingItemIndex } = req.body || {};
         if (bookingItems.length > 0) {
             const normalizedItems = bookingItems.map((item, index) => {
                 const rawStartTime = item.startTime
@@ -918,7 +919,10 @@ exports.createPublicBooking = async (req, res) => {
                 platformUserId: platformUser.id,
                 items: normalizedItems,
                 notes: specialRequests || null,
-                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center'
+                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center',
+                bookingSessionId,
+                bookingReference,
+                bookingItemIndex
             });
 
             res.json({

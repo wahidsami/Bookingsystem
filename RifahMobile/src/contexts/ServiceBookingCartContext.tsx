@@ -13,6 +13,8 @@ export interface ServiceBookingCartItem {
     staff?: Staff | null;
     requestedStaffId?: string | null;
     staffId?: string | null;
+    bookingSessionId?: string | null;
+    bookingReference?: string | null;
     startTime: string;
     notes?: string;
     paymentMethod: ServiceBookingPaymentMethod;

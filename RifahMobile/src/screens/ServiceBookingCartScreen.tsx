@@ -18,6 +18,15 @@ export function ServiceBookingCartScreen({ navigation }: any) {
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
     const { items, itemCount, cartTenant, cartTenantId, totalPrice, payableNowTotal, paymentGroups, removeItem, clearCart } = useServiceBookingCart();
     const [loading, setLoading] = useState(false);
+    const sharedBookingSessionId = items.length > 0
+        ? items[0].bookingSessionId || null
+        : null;
+    const sharedBookingReference = items.length > 0
+        ? items[0].bookingReference || null
+        : null;
+    const hasSharedBookingSession = items.length > 0
+        && items.every((item) => (item.bookingSessionId || null) === sharedBookingSessionId)
+        && items.every((item) => (item.bookingReference || null) === sharedBookingReference);
 
     const groupedByPayment = useMemo(() => paymentGroups.filter((group) => group.count > 0), [paymentGroups]);
 
@@ -72,6 +81,8 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                 appointments?: Array<{ id: string }>;
             }>('/bookings/create', {
                 tenantId: cartTenantId || items[0]?.tenantId,
+                bookingSessionId: hasSharedBookingSession && sharedBookingSessionId ? sharedBookingSessionId : undefined,
+                bookingReference: hasSharedBookingSession && sharedBookingReference ? sharedBookingReference : undefined,
                 items: items.map((item) => ({
                     serviceId: item.service.id,
                     variantId: item.variant?.id || null,

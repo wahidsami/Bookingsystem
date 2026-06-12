@@ -31,6 +31,93 @@ const formatNotificationDate = (value) => {
 
 class BookingService {
 
+    async loadBookingSessionContext({ bookingSessionId, bookingReference, tenantId, platformUserId, transaction }) {
+        let session = null;
+
+        if (bookingSessionId) {
+            session = await db.BookingSession.findByPk(bookingSessionId, { transaction });
+        } else if (bookingReference) {
+            session = await db.BookingSession.findOne({
+                where: {
+                    bookingReference,
+                    ...(tenantId ? { tenantId } : {})
+                },
+                transaction
+            });
+        }
+
+        if (!session) {
+            return null;
+        }
+
+        if (tenantId && session.tenantId !== tenantId) {
+            throw new Error('Unauthorized booking session');
+        }
+
+        if (session.platformUserId && platformUserId && session.platformUserId !== platformUserId) {
+            throw new Error('Booking session does not belong to this customer');
+        }
+
+        if (session.status === 'cancelled') {
+            throw new Error('Cancelled booking sessions cannot be modified');
+        }
+
+        return session;
+    }
+
+    async syncBookingSessionTotals(sessionId, transaction) {
+        if (!sessionId) {
+            return null;
+        }
+
+        const appointments = await db.Appointment.findAll({
+            where: { bookingSessionId: sessionId },
+            attributes: ['id', 'rawPrice', 'taxAmount', 'platformFee', 'price'],
+            transaction
+        });
+
+        const paymentMethods = new Set();
+        const totals = appointments.reduce((acc, appointment) => {
+            const method = `${appointment.paymentMethod || ''}`.trim().toLowerCase();
+            if (method) {
+                paymentMethods.add(method);
+            }
+            acc.subtotal += parseFloat(appointment.rawPrice || 0);
+            acc.taxAmount += parseFloat(appointment.taxAmount || 0);
+            acc.platformFee += parseFloat(appointment.platformFee || 0);
+            acc.totalAmount += parseFloat(appointment.price || 0);
+            acc.itemCount += 1;
+            return acc;
+        }, {
+            subtotal: 0,
+            taxAmount: 0,
+            platformFee: 0,
+            totalAmount: 0,
+            itemCount: 0
+        });
+
+        const session = await db.BookingSession.findByPk(sessionId, { transaction });
+        if (!session) {
+            return null;
+        }
+
+        const distinctMethods = Array.from(paymentMethods.values());
+        const paymentMethod = distinctMethods.length > 1
+            ? 'mixed'
+            : (distinctMethods[0] || session.paymentMethod || null);
+
+        await session.update({
+            itemCount: totals.itemCount,
+            subtotal: parseFloat(totals.subtotal.toFixed(2)),
+            taxAmount: parseFloat(totals.taxAmount.toFixed(2)),
+            platformFee: parseFloat(totals.platformFee.toFixed(2)),
+            totalAmount: parseFloat(totals.totalAmount.toFixed(2)),
+            paymentMethod
+        }, { transaction });
+
+        return session;
+    }
+
     /**
      * Unified booking creation method
      * This is the single source of truth for all booking creation
@@ -47,7 +134,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -104,6 +191,21 @@ class BookingService {
         });
         const tenantPaymentSettings = await getTenantPaymentSettings(tenantId, { transaction: finalTransaction });
         assertServicePaymentMethodAllowed(normalizedPaymentMethod, tenantPaymentSettings, service.paymentOptions);
+
+        const existingSession = await this.loadBookingSessionContext({
+            bookingSessionId,
+            bookingReference,
+            tenantId,
+            platformUserId,
+            transaction: finalTransaction
+        });
+        if ((bookingSessionId || bookingReference) && !existingSession) {
+            throw new Error('Booking session not found');
+        }
+        const resolvedBookingReference = existingSession?.bookingReference || bookingReference || null;
+        const resolvedBookingItemIndex = Number.isInteger(bookingItemIndex)
+            ? bookingItemIndex
+            : (existingSession ? Number(existingSession.itemCount || 0) : 0);
 
         const bookingSettings = tenantSettings?.bookingSettings || {};
         const allowAnyStaff = bookingSettings.allowAnyStaff !== false; // Default true
@@ -262,9 +364,9 @@ class BookingService {
                 serviceVariantName: serviceVariant?.description || null,
                 serviceVariantDescription: serviceVariant?.description || null,
                 serviceVariantDuration: serviceVariant?.duration || null,
-                bookingSessionId: bookingSessionId || null,
-                bookingReference: bookingReference || null,
-                bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex : 0,
+                bookingSessionId: existingSession?.id || bookingSessionId || null,
+                bookingReference: resolvedBookingReference || null,
+                bookingItemIndex: resolvedBookingItemIndex,
                 status: initialAppointmentStatus,
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING,
                 paymentMethod: normalizedPaymentMethod,
@@ -311,6 +413,10 @@ class BookingService {
             } catch (usageError) {
                 console.error('Failed to update usage:', usageError);
                 // Don't fail booking if usage tracking fails
+            }
+
+            if (!skipBookingSessionSync && (existingSession?.id || bookingSessionId)) {
+                await this.syncBookingSessionTotals(existingSession?.id || bookingSessionId, finalTransaction);
             }
 
             // Commit transaction if we created it
@@ -397,7 +503,7 @@ class BookingService {
      * Each item is still persisted as a normal appointment row.
      */
     async createBookingSession(data, options = {}) {
-        const { tenantId, platformUserId, items, notes, paymentMethod } = data;
+        const { tenantId, platformUserId, items, notes, paymentMethod, bookingSessionId, bookingReference, bookingItemIndex } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;
         const finalTransaction = transaction || await db.sequelize.transaction();
@@ -422,31 +528,43 @@ class BookingService {
             const sessionPaymentMethod = distinctMethods.length > 1
                 ? 'mixed'
                 : (distinctMethods[0] || `${paymentMethod || 'at-center'}`.trim().toLowerCase());
-            let session = null;
-            let createAttempts = 0;
-            while (!session && createAttempts < 3) {
-                createAttempts += 1;
-                const generatedBookingReference = await db.BookingSession.generateBookingReference();
-                try {
-                    session = await db.BookingSession.create({
-                        bookingReference: generatedBookingReference,
-                        tenantId,
-                        platformUserId,
-                        status: 'confirmed',
-                        itemCount: items.length,
-                        subtotal: 0,
-                        taxAmount: 0,
-                        platformFee: 0,
-                        totalAmount: 0,
-                        paymentMethod: sessionPaymentMethod,
-                        notes: normalizedNotes || null
-                    }, { transaction: finalTransaction });
-                } catch (createError) {
-                    const isUniqueReferenceConflict = createError?.name === 'SequelizeUniqueConstraintError'
-                        && Array.isArray(createError?.errors)
-                        && createError.errors.some((err) => `${err?.path || ''}`.toLowerCase().includes('bookingreference'));
-                    if (!isUniqueReferenceConflict || createAttempts >= 3) {
-                        throw createError;
+            let session = await this.loadBookingSessionContext({
+                bookingSessionId,
+                bookingReference,
+                tenantId,
+                platformUserId,
+                transaction: finalTransaction
+            });
+            if ((bookingSessionId || bookingReference) && !session) {
+                throw new Error('Booking session not found');
+            }
+
+            if (!session) {
+                let createAttempts = 0;
+                while (!session && createAttempts < 3) {
+                    createAttempts += 1;
+                    const generatedBookingReference = await db.BookingSession.generateBookingReference();
+                    try {
+                        session = await db.BookingSession.create({
+                            bookingReference: generatedBookingReference,
+                            tenantId,
+                            platformUserId,
+                            status: 'confirmed',
+                            itemCount: 0,
+                            subtotal: 0,
+                            taxAmount: 0,
+                            platformFee: 0,
+                            totalAmount: 0,
+                            paymentMethod: sessionPaymentMethod,
+                            notes: normalizedNotes || null
+                        }, { transaction: finalTransaction });
+                    } catch (createError) {
+                        const isUniqueReferenceConflict = createError?.name === 'SequelizeUniqueConstraintError'
+                            && Array.isArray(createError?.errors)
+                            && createError.errors.some((err) => `${err?.path || ''}`.toLowerCase().includes('bookingreference'));
+                        if (!isUniqueReferenceConflict || createAttempts >= 3) {
+                            throw createError;
+                        }
                     }
                 }
             }
@@ -475,7 +593,8 @@ class BookingService {
                     assignmentMode: item.assignmentMode,
                     bookingSessionId: session.id,
                     bookingReference: session.bookingReference,
-                    bookingItemIndex: index
+                    bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex + index : (Number(session.itemCount || 0) + index),
+                    skipBookingSessionSync: true
                 }, { transaction: finalTransaction });
 
                 appointments.push(appointment);
@@ -494,13 +613,7 @@ class BookingService {
                 }
             }
 
-            await session.update({
-                itemCount: appointments.length,
-                subtotal: parseFloat(subtotal.toFixed(2)),
-                taxAmount: parseFloat(taxAmount.toFixed(2)),
-                platformFee: parseFloat(platformFee.toFixed(2)),
-                totalAmount: parseFloat(totalAmount.toFixed(2))
-            }, { transaction: finalTransaction });
+            session = await this.syncBookingSessionTotals(session.id, finalTransaction) || session;
 
             const paymentSummary = {
                 atCenterAmount: parseFloat(atCenterAmount.toFixed(2)),

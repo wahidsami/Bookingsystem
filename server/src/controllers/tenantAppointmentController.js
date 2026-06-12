@@ -585,7 +585,10 @@ exports.createAppointment = async (req, res) => {
                 platformUserId: customerUser.id,
                 items: normalizedItems,
                 notes: notes || null,
-                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center'
+                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center',
+                bookingSessionId,
+                bookingReference,
+                bookingItemIndex
             }, { transaction });
 
             const fullAppointments = await db.Appointment.findAll({

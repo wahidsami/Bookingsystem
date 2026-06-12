@@ -45,6 +45,8 @@ const MIN_CART_LEAD_MINUTES = 60;
 
 export function BookingFlow({ route, navigation }: BookingProps) {
     const { service, tenant } = route.params;
+    const bookingSessionId = route.params?.bookingSessionId || null;
+    const bookingReference = route.params?.bookingReference || null;
     const { t, isRTL, language } = useLanguage();
     const { ensureAuthenticated } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
@@ -333,6 +335,8 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 notes: bookingNote.trim() || undefined,
                 paymentMethod: selectedPaymentMethod,
                 variantId: selectedVariant?.id || undefined,
+                bookingSessionId: bookingSessionId || undefined,
+                bookingReference: bookingReference || undefined,
                 groupGuest: includeGuest ? {
                     firstName: guestFirstName.trim(),
                     lastName: guestLastName.trim(),
@@ -426,6 +430,8 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             startTime: selectedTime.startTime,
             notes: bookingNote.trim() || undefined,
             paymentMethod: selectedPaymentMethod,
+            bookingSessionId: bookingSessionId || undefined,
+            bookingReference: bookingReference || undefined,
             totalPrice: servicePrice,
             payableNowAmount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : selectedPaymentMethod === 'online-full' ? servicePrice : 0,
         };
@@ -783,7 +789,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     <View style={styles.successModalCard}>
                         <Text style={styles.successModalTitle}>{bookingSuccessDialog.title}</Text>
                         <Text style={styles.successModalMessage}>{bookingSuccessDialog.message}</Text>
-                        <View style={styles.successModalActions}>
+                        <View style={[styles.successModalActions, isRTL && styles.successModalActionsRtl]}>
                             <TouchableOpacity
                                 style={[styles.successModalBtn, styles.successModalBtnSecondary]}
                                 onPress={() => bookingSuccessDialog.onPayLater?.()}
@@ -1185,7 +1191,7 @@ const styles = StyleSheet.create({
     },
     successModalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(17, 24, 39, 0.45)',
+        backgroundColor: 'rgba(18, 13, 33, 0.55)',
         justifyContent: 'center',
         padding: spacing.lg,
     },
@@ -1193,9 +1199,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderRadius: borderRadius.xl,
         borderWidth: 1,
-        borderColor: '#EADDFE',
+        borderColor: '#E9DDFD',
         padding: spacing.lg,
         gap: spacing.md,
+        shadowColor: '#1F123F',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.18,
+        shadowRadius: 18,
+        elevation: 8,
     },
     successModalTitle: {
         fontSize: fontSize.lg,
@@ -1210,6 +1221,9 @@ const styles = StyleSheet.create({
     successModalActions: {
         flexDirection: 'row',
         gap: spacing.sm,
+    },
+    successModalActionsRtl: {
+        flexDirection: 'row-reverse',
     },
     successModalBtn: {
         flex: 1,
