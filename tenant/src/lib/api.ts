@@ -1117,14 +1117,27 @@ class TenantApiClient {
   }
 
   async createAppointment(data: {
-    serviceId: string;
+    serviceId?: string;
     variantId?: string | null;
     staffId?: string | null;
     requestedStaffId?: string | null;
-    startTime: string;
+    startTime?: string;
     notes?: string;
     paymentMethod?: string;
     platformUserId?: string;
+    bookingSessionId?: string | null;
+    bookingReference?: string | null;
+    bookingItemIndex?: number;
+    items?: Array<{
+      serviceId: string;
+      variantId?: string | null;
+      staffId?: string | null;
+      requestedStaffId?: string | null;
+      startTime: string;
+      notes?: string;
+      paymentMethod?: string;
+      assignmentMode?: string;
+    }>;
     customer?: {
       firstName: string;
       lastName: string;

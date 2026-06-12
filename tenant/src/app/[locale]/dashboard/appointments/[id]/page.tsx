@@ -848,10 +848,17 @@ export default function AppointmentDetailsPage() {
                   }}
                   disabled={updating}
                   className="w-full btn btn-secondary"
-                >
+                  >
                   {t("reschedule") || "Reschedule"}
                 </button>
               )}
+              <button
+                onClick={() => router.push(`/${locale}/dashboard/appointments?appendFrom=${appointment.id}`)}
+                disabled={updating}
+                className="w-full btn btn-secondary"
+              >
+                {locale === "ar" ? "إضافة خدمة" : "Add service"}
+              </button>
               {(appointment.status === 'pending' || appointment.status === 'confirmed' || appointment.status === 'checked_in' || appointment.status === 'in_service') && (
                 <button
                   onClick={() => handleStatusUpdate('cancelled')}

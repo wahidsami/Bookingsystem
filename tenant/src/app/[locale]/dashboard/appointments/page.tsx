@@ -9,7 +9,7 @@ import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklySchedul
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import {
@@ -53,6 +53,8 @@ interface User {
 interface Appointment {
   id: string;
   bookingNumber?: string | null;
+  bookingReference?: string | null;
+  bookingSessionId?: string | null;
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
@@ -198,6 +200,7 @@ function resolveDisplayHoursFromWorkingHours(workingHours: any): { startHour: nu
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
+  const searchParams = useSearchParams();
   const dialog = useAppDialog();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
@@ -313,6 +316,61 @@ export default function AppointmentsPage() {
     loadEmployees();
     loadBoardDisplayHours();
   }, []);
+
+  useEffect(() => {
+    const appendFrom = searchParams.get("appendFrom");
+    if (!appendFrom) {
+      return;
+    }
+
+    if (!services.length || !employees.length) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const openAppendDrawer = async () => {
+      try {
+        const response = await tenantApi.getAppointment(appendFrom);
+        if (!response?.success || !response?.appointment || cancelled) {
+          return;
+        }
+
+        const source = response.appointment;
+        const start = new Date(source.startTime);
+        setDrawerPrefill({
+          customer: source.user
+            ? {
+                id: source.user.id,
+                firstName: source.user.firstName,
+                lastName: source.user.lastName,
+                email: source.user.email,
+                phone: source.user.phone
+              }
+            : undefined,
+          staffId: source.staff?.id,
+          date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
+          time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+          bookingSessionId: source.bookingSessionId || null,
+          bookingReference: source.bookingReference || source.bookingNumber || null,
+          paymentMethod: source.paymentMethod || undefined,
+          notes: source.notes || undefined
+        });
+        setQuickDrawerMode('appointment');
+        setSelectedBreak(null);
+        setShowQuickDrawer(true);
+        setShowAppointmentDetailsDrawer(false);
+      } catch (error) {
+        console.warn("Failed to open append-service drawer:", error);
+      }
+    };
+
+    void openAppendDrawer();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, services.length, employees.length]);
 
   const loadBoardDisplayHours = async () => {
     try {
@@ -788,7 +846,7 @@ export default function AppointmentsPage() {
     }
   };
 
-  const openQuickAppointmentDrawer = (prefill?: { staffId?: string; date?: string; time?: string }) => {
+  const openQuickAppointmentDrawer = (prefill?: AppointmentActionDrawerPrefill) => {
     setDrawerPrefill(prefill || {});
     setQuickDrawerMode('appointment');
     setSelectedBreak(null);
@@ -836,6 +894,32 @@ export default function AppointmentsPage() {
       staffId: appointment.staff?.id,
       date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
       time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      paymentMethod: appointment.paymentMethod || undefined,
+      notes: appointment.notes || undefined
+    });
+    setQuickDrawerMode('appointment');
+    setSelectedBreak(null);
+    setShowQuickDrawer(true);
+    setShowAppointmentDetailsDrawer(false);
+  };
+
+  const handleAddServiceAppointment = (appointment: AppointmentItem) => {
+    const start = new Date(appointment.startTime);
+    setDrawerPrefill({
+      customer: appointment.user
+        ? {
+            id: appointment.user.id,
+            firstName: appointment.user.firstName,
+            lastName: appointment.user.lastName,
+            email: appointment.user.email,
+            phone: appointment.user.phone
+          }
+        : undefined,
+      staffId: appointment.staff?.id,
+      date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
+      time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      bookingSessionId: appointment.bookingSessionId || null,
+      bookingReference: appointment.bookingReference || appointment.bookingNumber || null,
       paymentMethod: appointment.paymentMethod || undefined,
       notes: appointment.notes || undefined
     });
@@ -1882,6 +1966,7 @@ export default function AppointmentsPage() {
           setSelectedAppointmentId(null);
         }}
         onRebook={handleRebookAppointment}
+        onAddService={handleAddServiceAppointment}
       />
 
       <AppointmentActionDrawer

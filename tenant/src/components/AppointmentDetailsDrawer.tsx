@@ -11,6 +11,7 @@ export interface AppointmentItem {
   id: string;
   bookingNumber?: string | null;
   bookingReference?: string | null;
+  bookingSessionId?: string | null;
   startTime: string;
   endTime: string;
   status: "pending" | "confirmed" | "checked_in" | "in_service" | "completed" | "cancelled" | "no_show";
@@ -203,6 +204,7 @@ interface AppointmentDetailsDrawerProps {
   isRTL: boolean;
   onClose: () => void;
   onRebook: (appointment: AppointmentItem) => void;
+  onAddService?: (appointment: AppointmentItem) => void;
 }
 
 function avatarUrl(path: string | undefined | null): string {
@@ -457,7 +459,8 @@ export function AppointmentDetailsDrawer({
   locale,
   isRTL,
   onClose,
-  onRebook
+  onRebook,
+  onAddService
 }: AppointmentDetailsDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1301,6 +1304,15 @@ export function AppointmentDetailsDrawer({
               >
                 {locale === "ar" ? "إعادة الحجز" : "Rebook"}
               </button>
+              {onAddService ? (
+                <button
+                  type="button"
+                  onClick={() => onAddService(appointment)}
+                  className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                >
+                  {locale === "ar" ? "إضافة خدمة" : "Add service"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleReschedule}

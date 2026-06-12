@@ -481,6 +481,35 @@ async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, group
     };
 }
 
+async function syncBookingSessionTotals(sessionId, transaction) {
+    if (!sessionId) {
+        return null;
+    }
+
+    const appointments = await db.Appointment.findAll({
+        where: { bookingSessionId: sessionId },
+        transaction
+    });
+
+    const subtotal = appointments.reduce((sum, appointment) => sum + Number(appointment.rawPrice || 0), 0);
+    const taxAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.taxAmount || 0), 0);
+    const platformFee = appointments.reduce((sum, appointment) => sum + Number(appointment.platformFee || 0), 0);
+    const totalAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.price || 0), 0);
+
+    await db.BookingSession.update({
+        itemCount: appointments.length,
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        taxAmount: parseFloat(taxAmount.toFixed(2)),
+        platformFee: parseFloat(platformFee.toFixed(2)),
+        totalAmount: parseFloat(totalAmount.toFixed(2))
+    }, {
+        where: { id: sessionId },
+        transaction
+    });
+
+    return db.BookingSession.findByPk(sessionId, { transaction });
+}
+
 /**
  * Create a new appointment from the tenant dashboard
  * POST /api/v1/tenant/appointments
@@ -500,7 +529,11 @@ exports.createAppointment = async (req, res) => {
             platformUserId,
             customer,
             assignmentMode,
-            groupGuest
+            groupGuest,
+            items,
+            bookingSessionId,
+            bookingReference,
+            bookingItemIndex
         } = req.body || {};
 
         if (!serviceId || !startTime) {
@@ -517,6 +550,140 @@ exports.createAppointment = async (req, res) => {
             transaction,
             tenantId
         });
+
+        const bookingItems = Array.isArray(items) ? items : [];
+        if (bookingItems.length > 0) {
+            const normalizedItems = bookingItems.map((item, index) => {
+                const itemServiceId = `${item?.serviceId || ''}`.trim();
+                const rawStartTime = item?.startTime || null;
+                const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
+
+                if (!itemServiceId) {
+                    throw new Error(`serviceId is required for booking item ${index + 1}`);
+                }
+
+                if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
+                    throw new Error(`Invalid start time for booking item ${index + 1}`);
+                }
+
+                const itemPaymentMethod = `${item?.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase();
+
+                return {
+                    serviceId: itemServiceId,
+                    variantId: item?.variantId || null,
+                    staffId: item?.staffId || null,
+                    requestedStaffId: item?.requestedStaffId || item?.staffId || null,
+                    startTime: parsedStartTime.toISOString(),
+                    notes: item?.notes || notes || null,
+                    paymentMethod: itemPaymentMethod,
+                    assignmentMode: item?.assignmentMode || (item?.staffId ? 'tenant_reassigned' : 'auto_assigned')
+                };
+            });
+
+            const { session, appointments, paymentSummary } = await bookingService.createBookingSession({
+                tenantId,
+                platformUserId: customerUser.id,
+                items: normalizedItems,
+                notes: notes || null,
+                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center'
+            }, { transaction });
+
+            const fullAppointments = await db.Appointment.findAll({
+                where: {
+                    bookingSessionId: session.id
+                },
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        attributes: ['id', 'name_en', 'name_ar', 'duration', 'category', 'image', 'paymentOptions'],
+                        required: true
+                    },
+                    {
+                        model: db.Staff,
+                        as: 'staff',
+                        attributes: ['id', 'name', 'photo', 'phone', 'email'],
+                        required: true
+                    },
+                    {
+                        model: db.PlatformUser,
+                        as: 'user',
+                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'gender', ['profileImage', 'photo']],
+                        required: false
+                    },
+                    {
+                        model: db.Tenant,
+                        as: 'tenant',
+                        attributes: ['id', 'name', 'name_ar', 'name_en'],
+                        required: false
+                    },
+                    {
+                        model: db.BookingSession,
+                        as: 'bookingSession',
+                        required: false
+                    }
+                ],
+                order: [['bookingItemIndex', 'ASC']],
+                transaction
+            });
+
+            await transaction.commit();
+            return res.status(201).json({
+                success: true,
+                message: 'Booking created successfully',
+                bookingSession: {
+                    id: session.id,
+                    bookingReference: session.bookingReference,
+                    paymentMethod: session.paymentMethod,
+                    itemCount: session.itemCount,
+                    subtotal: session.subtotal,
+                    taxAmount: session.taxAmount,
+                    platformFee: session.platformFee,
+                    totalAmount: session.totalAmount,
+                    paymentSummary
+                },
+                appointments: fullAppointments,
+                appointment: fullAppointments[0] || null
+            });
+        }
+
+        let existingSession = null;
+        let resolvedBookingReference = bookingReference || null;
+        let resolvedBookingItemIndex = Number.isInteger(bookingItemIndex) ? bookingItemIndex : null;
+        if (bookingSessionId) {
+            existingSession = await db.BookingSession.findByPk(bookingSessionId, {
+                transaction
+            });
+
+            if (!existingSession) {
+                await transaction.rollback();
+                return res.status(404).json({
+                    success: false,
+                    message: 'Booking session not found'
+                });
+            }
+
+            if (existingSession.tenantId !== tenantId) {
+                await transaction.rollback();
+                return res.status(403).json({
+                    success: false,
+                    message: 'Unauthorized booking session'
+                });
+            }
+
+            if (existingSession.platformUserId && existingSession.platformUserId !== customerUser.id) {
+                await transaction.rollback();
+                return res.status(403).json({
+                    success: false,
+                    message: 'Booking session does not belong to this customer'
+                });
+            }
+
+            resolvedBookingReference = existingSession.bookingReference;
+            if (!Number.isInteger(resolvedBookingItemIndex)) {
+                resolvedBookingItemIndex = Number(existingSession.itemCount || 0);
+            }
+        }
 
         const explicitStaffId = staffId || requestedStaffId || null;
         if (explicitStaffId) {
@@ -576,7 +743,10 @@ exports.createAppointment = async (req, res) => {
             notes: normalizedNotes,
             paymentMethod,
             assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
-            skipAdvanceValidation: true
+            skipAdvanceValidation: true,
+            bookingSessionId: existingSession?.id || null,
+            bookingReference: resolvedBookingReference || undefined,
+            bookingItemIndex: resolvedBookingItemIndex
         }, { transaction });
 
         const groupGuestPrice = await calculateGroupGuestPriceAdjustment({
@@ -637,6 +807,30 @@ exports.createAppointment = async (req, res) => {
         appointment.inviteExpiresAt = inviteExpiresAt;
         await appointment.save({ transaction });
 
+        let bookingSession = existingSession;
+        if (!bookingSession) {
+            bookingSession = await db.BookingSession.create({
+                bookingReference: appointment.bookingNumber || appointment.bookingReference || await db.BookingSession.generateBookingReference(),
+                tenantId,
+                platformUserId: customerUser.id,
+                status: 'confirmed',
+                itemCount: 1,
+                subtotal: Number(appointment.rawPrice || 0),
+                taxAmount: Number(appointment.taxAmount || 0),
+                platformFee: Number(appointment.platformFee || 0),
+                totalAmount: Number(appointment.price || 0),
+                paymentMethod: appointment.paymentMethod || paymentMethod || null,
+                notes: normalizedNotes || null
+            }, { transaction });
+
+            appointment.bookingSessionId = bookingSession.id;
+            appointment.bookingReference = bookingSession.bookingReference;
+            appointment.bookingItemIndex = 0;
+            await appointment.save({ transaction });
+        }
+
+        bookingSession = await syncBookingSessionTotals(bookingSession.id, transaction);
+
         const fullAppointment = await db.Appointment.findByPk(appointment.id, {
             include: [
                 {
@@ -661,6 +855,11 @@ exports.createAppointment = async (req, res) => {
                     model: db.Tenant,
                     as: 'tenant',
                     attributes: ['id', 'name', 'name_ar', 'name_en'],
+                    required: false
+                },
+                {
+                    model: db.BookingSession,
+                    as: 'bookingSession',
                     required: false
                 }
             ],
@@ -749,7 +948,8 @@ exports.createAppointment = async (req, res) => {
                 token: inviteToken,
                 expiresAt: inviteExpiresAt.toISOString(),
                 link: inviteLink
-            }
+            },
+            bookingSession
         });
     } catch (error) {
         try {

@@ -76,6 +76,12 @@ interface ExistingBreakItem {
   endDateTime?: string | null;
 }
 
+interface BookingDraftItem {
+  serviceId: string;
+  variantId?: string | null;
+  staffId?: string | null;
+}
+
 export interface AppointmentActionDrawerPrefill {
   customer?: PrefillCustomer | null;
   serviceId?: string;
@@ -85,6 +91,8 @@ export interface AppointmentActionDrawerPrefill {
   time?: string;
   paymentMethod?: string;
   notes?: string;
+  bookingSessionId?: string | null;
+  bookingReference?: string | null;
 }
 
 type DrawerMode = "appointment" | "blocked_time";
@@ -269,6 +277,7 @@ export function AppointmentActionDrawer({
   const [notes, setNotes] = useState("");
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
   const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
+  const [queuedServices, setQueuedServices] = useState<BookingDraftItem[]>([]);
 
   const [breakEmployeeId, setBreakEmployeeId] = useState("");
   const [breakDate, setBreakDate] = useState(getTodayDateKey());
@@ -319,6 +328,7 @@ export function AppointmentActionDrawer({
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
       setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
+      setQueuedServices([]);
       return;
     }
 
@@ -609,14 +619,81 @@ export function AppointmentActionDrawer({
   }, [services, locale]);
   const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
 
+  const buildSequentialBookingItems = () => {
+    const draftItems: BookingDraftItem[] = [...queuedServices];
+    if (selectedServiceId) {
+      const lastQueuedItem = draftItems[draftItems.length - 1];
+      const isDuplicateOfLastQueuedItem =
+        Boolean(lastQueuedItem)
+        && lastQueuedItem.serviceId === selectedServiceId
+        && (lastQueuedItem.variantId || null) === (selectedVariantId || null)
+        && (lastQueuedItem.staffId || null) === (selectedStaffId || null);
+
+      if (!isDuplicateOfLastQueuedItem) {
+        draftItems.push({
+          serviceId: selectedServiceId,
+          variantId: selectedVariantId || null,
+          staffId: selectedStaffId || null
+        });
+      }
+    }
+
+    if (draftItems.length === 0) {
+      return [];
+    }
+
+    const startCursor = new Date(`${appointmentDate}T${appointmentTime}`);
+    let cursor = new Date(startCursor);
+
+    return draftItems.map((item) => {
+      const service = services.find((entry) => entry.id === item.serviceId) || null;
+      const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
+      const duration = variant?.duration ?? service?.duration ?? 30;
+      const startTime = new Date(cursor);
+      cursor = new Date(cursor.getTime() + duration * 60000);
+
+      return {
+        serviceId: item.serviceId,
+        variantId: item.variantId || null,
+        staffId: item.staffId || null,
+        requestedStaffId: item.staffId || null,
+        startTime: startTime.toISOString(),
+        paymentMethod,
+        assignmentMode: item.staffId ? "tenant_reassigned" : "auto_assigned"
+      };
+    });
+  };
+
+  const handleQueueSelectedService = () => {
+    if (!selectedServiceId) {
+      setError(locale === "ar" ? "الرجاء اختيار الخدمة أولًا." : "Please select a service first.");
+      return;
+    }
+
+    setQueuedServices((current) => [
+      ...current,
+      {
+        serviceId: selectedServiceId,
+        variantId: selectedVariantId || null,
+        staffId: selectedStaffId || null
+      }
+    ]);
+  };
+
+  const handleRemoveQueuedService = (index: number) => {
+    setQueuedServices((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
   const handleAppointmentSubmit = async () => {
     setError("");
     setErrorDebug(null);
     setSuccess("");
 
     if (!selectedServiceId) {
-      setError(locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.");
-      return;
+      if (queuedServices.length === 0) {
+        setError(locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.");
+        return;
+      }
     }
 
     if (customerMode === "existing" && !selectedCustomer) {
@@ -700,14 +777,17 @@ export function AppointmentActionDrawer({
         throw new Error(locale === "ar" ? "تاريخ أو وقت غير صالح." : "Invalid date or time.");
       }
 
+      const bookingItems = buildSequentialBookingItems();
+      if (bookingItems.length === 0) {
+        throw new Error(locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please choose at least one service.");
+      }
+
       const payload = {
-        serviceId: selectedServiceId,
-        variantId: selectedVariantId || null,
-        staffId: selectedStaffId || null,
-        requestedStaffId: selectedStaffId || null,
-        startTime: startTime.toISOString(),
         notes: notes.trim() || undefined,
         paymentMethod,
+        bookingSessionId: prefill?.bookingSessionId || undefined,
+        bookingReference: prefill?.bookingReference || undefined,
+        items: bookingItems,
         groupGuest: includeGroupGuest ? {
           firstName: groupGuest.firstName.trim(),
           lastName: groupGuest.lastName.trim(),
@@ -1196,8 +1276,60 @@ export function AppointmentActionDrawer({
                           </div>
                         </div>
                       </div>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-xs text-gray-500">
+                          {locale === "ar"
+                            ? "يمكنك إضافة هذه الخدمة إلى نفس الحجز ثم اختيار خدمة أخرى."
+                            : "Add this service to the same booking, then pick another one."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleQueueSelectedService}
+                          className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90"
+                        >
+                          {locale === "ar" ? "إضافة للخطة" : "Add to booking"}
+                        </button>
+                      </div>
                     </div>
                   )}
+                  {queuedServices.length > 0 ? (
+                    <div className="mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {locale === "ar" ? "الخدمات المضافة" : "Queued services"}
+                        </p>
+                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-primary ring-1 ring-primary/20">
+                          {queuedServices.length}
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {queuedServices.map((item, index) => {
+                          const service = services.find((entry) => entry.id === item.serviceId);
+                          const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
+                          const label = locale === "ar"
+                            ? (service?.name_ar || service?.name_en || "")
+                            : (service?.name_en || service?.name_ar || "");
+                          return (
+                            <div key={`${item.serviceId}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-gray-900">{label || item.serviceId}</p>
+                                <p className="truncate text-xs text-gray-500">
+                                  {variant?.description || `${service?.duration || 30} ${locale === "ar" ? "دقيقة" : "min"}`}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveQueuedService(index)}
+                                className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
+                              >
+                                {locale === "ar" ? "حذف" : "Remove"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 2 ? "" : "hidden"}`}>
