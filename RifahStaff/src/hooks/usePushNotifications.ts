@@ -64,12 +64,12 @@ export function usePushNotifications() {
                 || type.startsWith('booking_')
                 || appointmentId
             ) {
-                router.push('/(tabs)/appointments');
+                router.push('/appointments' as never);
                 return;
             }
 
             // Route non-appointment events to the dedicated notifications tab.
-            router.push('/(tabs)/notifications');
+            router.push('/notifications' as never);
         });
 
         return () => {

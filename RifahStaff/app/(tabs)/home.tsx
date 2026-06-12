@@ -26,17 +26,17 @@ export default function HomeScreen() {
                 <ActionButton
                     icon="calendar-outline"
                     label="Appointments"
-                    onPress={() => router.push('/(tabs)/appointments')}
+                    onPress={() => router.push('/appointments' as never)}
                 />
                 <ActionButton
                     icon="mail-outline"
                     label="Messages"
-                    onPress={() => router.push('/(tabs)/messages')}
+                    onPress={() => router.push('/messages' as never)}
                 />
                 <ActionButton
                     icon="notifications-outline"
                     label="Notifications"
-                    onPress={() => router.push('/(tabs)/notifications')}
+                    onPress={() => router.push('/notifications' as never)}
                 />
             </View>
         </View>
