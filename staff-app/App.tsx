@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -71,6 +71,30 @@ const getCustomerName = (appointment: StaffAppointment) => {
 
 const getServiceName = (appointment: StaffAppointment) =>
   appointment.service?.name_en || appointment.service?.name_ar || 'Service';
+
+const getAppointmentGroupKey = (appointment: StaffAppointment) =>
+  appointment.bookingSessionId || appointment.bookingReference || `appointment:${appointment.id}`;
+
+type StaffAppointmentGroup = {
+  key: string;
+  bookingSessionId: string | null;
+  bookingReference: string | null;
+  primary: StaffAppointment;
+  items: StaffAppointment[];
+  serviceCount: number;
+  totalPrice: number;
+};
+
+const getAppointmentPrice = (appointment: StaffAppointment) =>
+  Number(appointment.price || appointment.service?.finalPrice || appointment.service?.rawPrice || 0);
+
+const getGroupServiceLabel = (group: StaffAppointmentGroup) => {
+  if (group.items.length <= 1) {
+    return getServiceName(group.primary);
+  }
+
+  return `${getServiceName(group.primary)} + ${group.items.length - 1} more`;
+};
 
 const formatAppointmentStatus = (status: StaffAppointment['status']) => ({
   pending: 'Pending',
@@ -302,6 +326,52 @@ export default function App() {
   const selectedAppointment =
     appointments.find((appointment) => appointment.id === selectedAppointmentId) || null;
 
+  const appointmentGroups = useMemo(() => {
+    const grouped = new Map<string, StaffAppointmentGroup>();
+
+    appointments.forEach((appointment) => {
+      const key = getAppointmentGroupKey(appointment);
+      const existing = grouped.get(key);
+
+      if (existing) {
+        existing.items.push(appointment);
+        if (Number(appointment.bookingItemIndex ?? Number.MAX_SAFE_INTEGER) < Number(existing.primary.bookingItemIndex ?? Number.MAX_SAFE_INTEGER)) {
+          existing.primary = appointment;
+        }
+        existing.totalPrice += getAppointmentPrice(appointment);
+        existing.serviceCount = existing.items.length;
+        return;
+      }
+
+      grouped.set(key, {
+        key,
+        bookingSessionId: appointment.bookingSessionId || null,
+        bookingReference: appointment.bookingReference || null,
+        primary: appointment,
+        items: [appointment],
+        serviceCount: 1,
+        totalPrice: getAppointmentPrice(appointment),
+      });
+    });
+
+    return Array.from(grouped.values())
+      .map((group) => ({
+        ...group,
+        items: [...group.items].sort((left, right) => {
+          const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+          const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+          if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+          return new Date(left.startTime).getTime() - new Date(right.startTime).getTime();
+        }),
+      }))
+      .sort((left, right) => new Date(left.primary.startTime).getTime() - new Date(right.primary.startTime).getTime());
+  }, [appointments]);
+
+  const selectedAppointmentGroup = useMemo(() => {
+    if (!selectedAppointment) return null;
+    return appointmentGroups.find((group) => group.items.some((appointment) => appointment.id === selectedAppointment.id)) || null;
+  }, [appointmentGroups, selectedAppointment]);
+
   const getAvailableActions = (appointment: StaffAppointment) => {
     switch (appointment.status) {
       case 'pending':
@@ -526,63 +596,112 @@ export default function App() {
               {appointments.length === 0 ? (
                 <Text style={styles.emptyText}>No appointments assigned for this date.</Text>
               ) : (
-                appointments.map((appointment) => {
-                  const isSelected = selectedAppointmentId === appointment.id;
+                appointmentGroups.map((group) => {
+                  const isSelected = !!selectedAppointmentId && group.items.some((appointment) => appointment.id === selectedAppointmentId);
 
                   return (
                     <Pressable
-                      key={appointment.id}
+                      key={group.key}
                       style={[styles.listItem, isSelected ? styles.listItemSelected : null]}
-                      onPress={() => setSelectedAppointmentId(appointment.id)}
+                      onPress={() => setSelectedAppointmentId(group.primary.id)}
                     >
                       <View style={styles.listItemHeader}>
-                        <Text style={styles.listItemTitle}>{getCustomerName(appointment)}</Text>
+                        <Text style={styles.listItemTitle}>{getCustomerName(group.primary)}</Text>
                         <Text style={styles.listItemBadge}>
-                          {formatAppointmentStatus(appointment.status)}
+                          {group.items.length > 1 ? `${group.items.length} services` : formatAppointmentStatus(group.primary.status)}
                         </Text>
                       </View>
-                      <Text style={styles.listItemText}>{getServiceName(appointment)}</Text>
+                      <Text style={styles.listItemText}>{getGroupServiceLabel(group)}</Text>
                       <Text style={styles.listItemText}>
-                        {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
+                        {formatTime(group.primary.startTime)} - {formatTime(group.primary.endTime)}
                       </Text>
                       <Text style={styles.listItemText}>
-                        {appointment.paymentStatus || 'pending payment'} •{' '}
-                        {formatMoney(appointment.price || appointment.service?.finalPrice || appointment.service?.rawPrice)}
+                        {group.primary.paymentStatus || 'pending payment'} • {formatMoney(group.totalPrice)}
                       </Text>
+                      {group.bookingReference ? (
+                        <Text style={styles.listItemText}>Reference: {group.bookingReference}</Text>
+                      ) : null}
+                      {group.items.length > 1 ? (
+                        <Text style={styles.groupHintText}>Tap to review every service in this booking.</Text>
+                      ) : null}
                     </Pressable>
                   );
                 })
               )}
             </View>
 
-            {selectedAppointment ? (
+            {selectedAppointmentGroup ? (
               <View style={styles.panel}>
                 <Text style={styles.panelTitle}>Appointment detail</Text>
-                <Text style={styles.profileLine}>Customer: {getCustomerName(selectedAppointment)}</Text>
-                <Text style={styles.profileLine}>Service: {getServiceName(selectedAppointment)}</Text>
+                {selectedAppointmentGroup.items.length > 1 ? (
+                  <View style={styles.groupSummaryCard}>
+                    <Text style={styles.groupSummaryTitle}>Multi-service booking</Text>
+                    <Text style={styles.profileLine}>{selectedAppointmentGroup.serviceCount} services in this booking</Text>
+                    <Text style={styles.profileLine}>
+                      Booking reference: {selectedAppointmentGroup.bookingReference || 'Not set'}
+                    </Text>
+                    <Text style={styles.profileLine}>
+                      Booking session: {selectedAppointmentGroup.bookingSessionId || 'Not set'}
+                    </Text>
+                    <Text style={styles.profileLine}>
+                      Total booking value: {formatMoney(selectedAppointmentGroup.totalPrice)}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Text style={styles.profileLine}>Customer: {getCustomerName(selectedAppointmentGroup.primary)}</Text>
+                <Text style={styles.profileLine}>Service: {getServiceName(selectedAppointmentGroup.primary)}</Text>
                 <Text style={styles.profileLine}>
-                  Time: {formatTime(selectedAppointment.startTime)} - {formatTime(selectedAppointment.endTime)}
+                  Time: {formatTime(selectedAppointmentGroup.primary.startTime)} - {formatTime(selectedAppointmentGroup.primary.endTime)}
                 </Text>
                 <Text style={styles.profileLine}>
-                  Status: {formatAppointmentStatus(selectedAppointment.status)}
+                  Status: {formatAppointmentStatus(selectedAppointmentGroup.primary.status)}
                 </Text>
                 <Text style={styles.profileLine}>
-                  Payment: {selectedAppointment.paymentStatus || 'pending'} ({formatMoney(selectedAppointment.price || selectedAppointment.service?.finalPrice || selectedAppointment.service?.rawPrice)})
+                  Payment: {selectedAppointmentGroup.primary.paymentStatus || 'pending'} ({formatMoney(selectedAppointmentGroup.primary.price || selectedAppointmentGroup.primary.service?.finalPrice || selectedAppointmentGroup.primary.service?.rawPrice)})
                 </Text>
-                <Text style={styles.profileLine}>Phone: {selectedAppointment.user?.phone || 'Not provided'}</Text>
-                <Text style={styles.profileLine}>Email: {selectedAppointment.user?.email || 'Not provided'}</Text>
-                <Text style={styles.profileLine}>Notes: {selectedAppointment.notes || 'No notes'}</Text>
+                <Text style={styles.profileLine}>Phone: {selectedAppointmentGroup.primary.user?.phone || 'Not provided'}</Text>
+                <Text style={styles.profileLine}>Email: {selectedAppointmentGroup.primary.user?.email || 'Not provided'}</Text>
+                <Text style={styles.profileLine}>Notes: {selectedAppointmentGroup.primary.notes || 'No notes'}</Text>
+
+                {selectedAppointmentGroup.items.length > 1 ? (
+                  <View style={styles.groupServicesSection}>
+                    <Text style={styles.groupServicesTitle}>Services in this booking</Text>
+                    {selectedAppointmentGroup.items.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        style={[
+                          styles.groupServiceCard,
+                          selectedAppointmentId === item.id ? styles.groupServiceCardSelected : null,
+                        ]}
+                        onPress={() => setSelectedAppointmentId(item.id)}
+                      >
+                        <View style={styles.listItemHeader}>
+                          <Text style={styles.groupServiceTitle}>{getServiceName(item)}</Text>
+                          <Text style={styles.listItemBadge}>{formatAppointmentStatus(item.status)}</Text>
+                        </View>
+                        <Text style={styles.groupServiceMeta}>
+                          {formatTime(item.startTime)} - {formatTime(item.endTime)} •{' '}
+                          {formatMoney(getAppointmentPrice(item))}
+                        </Text>
+                        <Text style={styles.groupServiceMeta}>
+                          Item #{Number.isFinite(Number(item.bookingItemIndex)) ? Number(item.bookingItemIndex) + 1 : 1}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
 
                 <View style={styles.actionRow}>
-                  {getAvailableActions(selectedAppointment).length ? (
-                    getAvailableActions(selectedAppointment).map((action) => (
+                  {getAvailableActions(selectedAppointmentGroup.primary).length ? (
+                    getAvailableActions(selectedAppointmentGroup.primary).map((action) => (
                       <Pressable
                         key={action.status}
                         style={styles.actionButton}
-                        onPress={() => handleAppointmentAction(selectedAppointment, action.status)}
-                        disabled={actionLoading === selectedAppointment.id}
+                        onPress={() => handleAppointmentAction(selectedAppointmentGroup.primary, action.status)}
+                        disabled={actionLoading === selectedAppointmentGroup.primary.id}
                       >
-                        {actionLoading === selectedAppointment.id ? (
+                        {actionLoading === selectedAppointmentGroup.primary.id ? (
                           <ActivityIndicator color="#fff" />
                         ) : (
                           <Text style={styles.actionButtonText}>{action.label}</Text>
@@ -996,6 +1115,59 @@ const styles = StyleSheet.create({
   listItemText: {
     marginTop: 6,
     fontSize: 14,
+    color: '#475569',
+  },
+  groupHintText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#0f766e',
+    fontWeight: '600',
+  },
+  groupSummaryCard: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#f0fdfa',
+    borderWidth: 1,
+    borderColor: '#99f6e4',
+  },
+  groupSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#115e59',
+    marginBottom: 8,
+  },
+  groupServicesSection: {
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  groupServicesTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  groupServiceCard: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  groupServiceCardSelected: {
+    borderColor: '#0f766e',
+    backgroundColor: '#f0fdfa',
+  },
+  groupServiceTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  groupServiceMeta: {
+    marginTop: 6,
+    fontSize: 13,
     color: '#475569',
   },
   profileLine: {

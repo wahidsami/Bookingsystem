@@ -44,6 +44,9 @@ export interface StaffAppointment {
   status: StaffAppointmentStatus;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
+  bookingSessionId?: string | null;
+  bookingReference?: string | null;
+  bookingItemIndex?: number | null;
   startTime: string;
   endTime: string;
   price?: number | string | null;
