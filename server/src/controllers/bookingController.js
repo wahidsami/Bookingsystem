@@ -545,18 +545,26 @@ const listBookings = async (req, res) => {
         const authenticatedUserId = req.userId; // From optional auth
 
         const where = {};
+        const ownershipFilters = [];
 
-        // If user is authenticated, default to their bookings
         if (authenticatedUserId) {
-            where.platformUserId = authenticatedUserId;
-        } else if (platformUserId) {
-            // Allow explicit platformUserId for admin/tenant views
-            where.platformUserId = platformUserId;
+            ownershipFilters.push({ platformUserId: authenticatedUserId });
+        }
+
+        // Allow explicit platformUserId for fallback clients or admin/tenant views
+        if (platformUserId && platformUserId !== authenticatedUserId) {
+            ownershipFilters.push({ platformUserId });
         }
 
         // Legacy support - filter by customerId if provided
         if (req.query.customerId) {
-            where.customerId = req.query.customerId;
+            ownershipFilters.push({ customerId: req.query.customerId });
+        }
+
+        if (ownershipFilters.length === 1) {
+            Object.assign(where, ownershipFilters[0]);
+        } else if (ownershipFilters.length > 1) {
+            where[Op.or] = ownershipFilters;
         }
 
         if (staffId) where.staffId = staffId;

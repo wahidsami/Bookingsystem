@@ -731,6 +731,39 @@ export const normalizeStaff = (staff: Partial<Staff> | null | undefined): Staff 
     specialization: toOptionalString(staff?.specialization),
 });
 
+const normalizeBookingStatus = (status: unknown): Booking['status'] => {
+    const raw = `${status || ''}`.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    switch (raw) {
+        case 'pending':
+        case 'awaiting_payment':
+        case 'awaiting_confirmation':
+        case 'booked':
+            return 'pending';
+        case 'confirmed':
+        case 'approved':
+            return 'confirmed';
+        case 'checked_in':
+        case 'checkin':
+            return 'checked_in';
+        case 'in_service':
+        case 'inservice':
+            return 'in_service';
+        case 'completed':
+        case 'done':
+        case 'finished':
+            return 'completed';
+        case 'cancelled':
+        case 'canceled':
+        case 'voided':
+            return 'cancelled';
+        case 'no_show':
+        case 'noshow':
+            return 'no_show';
+        default:
+            return 'pending';
+    }
+};
+
 const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Booking => {
     const normalizedService = appointment?.Service || appointment?.service
         ? normalizeService(appointment?.Service || appointment?.service)
@@ -758,7 +791,7 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
             : undefined,
         startTime: toStringValue(appointment?.startTime),
         endTime: toStringValue(appointment?.endTime),
-        status: (appointment?.status as Booking['status']) || 'pending',
+        status: normalizeBookingStatus(appointment?.status),
         price: toNumber(appointment?.price),
         paymentStatus: toOptionalString(appointment?.paymentStatus),
         paymentMethod: toOptionalString(appointment?.paymentMethod),
@@ -1412,23 +1445,41 @@ class ApiClient {
     /**
      * Get user bookings
      */
-    async getBookings(status?: 'upcoming' | 'completed' | 'cancelled' | 'no_show'): Promise<Booking[]> {
-        const response = await this.get<{ success: boolean; appointments: Booking[] }>('/bookings');
-        const normalized = (response.appointments || []).map((appointment) => normalizeBooking(appointment));
+    async getBookings(
+        status?: 'upcoming' | 'completed' | 'cancelled' | 'no_show',
+        platformUserId?: string
+    ): Promise<Booking[]> {
+        const currentUser = platformUserId ? null : await this.getUser().catch(() => null);
+        const resolvedPlatformUserId = platformUserId || currentUser?.id || null;
+        const query = resolvedPlatformUserId ? `?platformUserId=${encodeURIComponent(resolvedPlatformUserId)}` : '';
+        const response = await this.get<{
+            success: boolean;
+            appointments?: Booking[];
+            bookings?: Booking[];
+            data?: { appointments?: Booking[]; bookings?: Booking[] };
+        }>(`/bookings${query}`);
+        const rawAppointments = response.appointments
+            || response.bookings
+            || response.data?.appointments
+            || response.data?.bookings
+            || [];
+        const normalized = rawAppointments.map((appointment) => normalizeBooking(appointment));
 
         if (!status) {
             return normalized;
         }
 
+        const statusAlias = (value: Booking['status']) => normalizeBookingStatus(value);
+
         if (status === 'upcoming') {
-            return normalized.filter((appointment) => ['pending', 'confirmed', 'checked_in', 'in_service'].includes(appointment.status));
+            return normalized.filter((appointment) => ['pending', 'confirmed', 'checked_in', 'in_service'].includes(statusAlias(appointment.status)));
         }
 
-        if (status === 'completed') return normalized.filter((appointment) => appointment.status === 'completed');
-        if (status === 'cancelled') return normalized.filter((appointment) => appointment.status === 'cancelled');
-        if (status === 'no_show') return normalized.filter((appointment) => appointment.status === 'no_show');
+        if (status === 'completed') return normalized.filter((appointment) => statusAlias(appointment.status) === 'completed');
+        if (status === 'cancelled') return normalized.filter((appointment) => statusAlias(appointment.status) === 'cancelled');
+        if (status === 'no_show') return normalized.filter((appointment) => statusAlias(appointment.status) === 'no_show');
 
-        return normalized.filter((appointment) => appointment.status === status);
+        return normalized.filter((appointment) => statusAlias(appointment.status) === status);
     }
 
     /**
