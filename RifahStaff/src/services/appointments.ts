@@ -4,6 +4,9 @@ import { getRiyadhDateKey } from '../utils/riyadhDate';
 export interface Appointment {
     id: string;
     bookingNumber?: string;
+    bookingReference?: string | null;
+    bookingSessionId?: string | null;
+    bookingItemIndex?: number | null;
     startTime: string;
     endTime: string;
     status: 'pending' | 'confirmed' | 'started' | 'completed' | 'cancelled' | 'no_show';
@@ -56,6 +59,11 @@ const normalizeAppointment = (appointment: any): Appointment => {
     return {
         id: toText(appointment?.id),
         bookingNumber: toText(appointment?.bookingNumber || appointment?.id),
+        bookingReference: appointment?.bookingReference || null,
+        bookingSessionId: appointment?.bookingSessionId || null,
+        bookingItemIndex: Number.isFinite(Number(appointment?.bookingItemIndex))
+            ? Number(appointment.bookingItemIndex)
+            : null,
         startTime: toText(appointment?.startTime),
         endTime: toText(appointment?.endTime),
         status: normalizedStatus,

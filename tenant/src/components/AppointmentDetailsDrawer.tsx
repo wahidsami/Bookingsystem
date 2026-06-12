@@ -1284,6 +1284,34 @@ export function AppointmentDetailsDrawer({
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            {appointment.bookingSessionId || appointment.bookingReference ? (
+              <div className="mb-4 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                      {locale === "ar" ? "جلسة حجز متعددة الخدمات" : "Multi-service booking session"}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">
+                      {appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {locale === "ar"
+                        ? "يمكنك إضافة خدمة أخرى إلى نفس جلسة الحجز من هنا."
+                        : "You can append another service to this same booking session from here."}
+                    </p>
+                  </div>
+                  {onAddService ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddService(appointment)}
+                      className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                    >
+                      {locale === "ar" ? "إضافة خدمة" : "Add service"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-gray-900">
                 {locale === "ar" ? "الإجراءات السريعة" : "Quick actions"}
@@ -1308,7 +1336,7 @@ export function AppointmentDetailsDrawer({
                 <button
                   type="button"
                   onClick={() => onAddService(appointment)}
-                  className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                  className="rounded-2xl bg-primary/10 px-4 py-3 text-sm font-semibold text-primary ring-1 ring-primary/20 transition hover:bg-primary/15"
                 >
                   {locale === "ar" ? "إضافة خدمة" : "Add service"}
                 </button>

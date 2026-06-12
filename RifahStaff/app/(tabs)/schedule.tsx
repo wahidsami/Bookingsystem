@@ -39,6 +39,15 @@ import {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const getAppointmentGroupKey = (appointment: Appointment) =>
+    appointment.bookingSessionId || appointment.bookingReference || appointment.bookingNumber || appointment.id;
+
+const getAppointmentPrice = (appointment: Appointment) =>
+    Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
+
+const getAppointmentServiceLabel = (appointment: Appointment) =>
+    appointment.service?.name_en || appointment.service?.name_ar || 'Service';
+
 const parseClockToMinutes = (value?: string | null): number | null => {
     if (!value) return null;
     const [hoursRaw, minutesRaw] = `${value}`.split(':');
@@ -163,6 +172,34 @@ export default function ScheduleScreen() {
         [viewportWidth]
     );
     const weekSnapInterval = weekColumnWidth + weekColumnGap;
+
+    const appointmentGroups = useMemo(() => {
+        const grouped = new Map<string, Appointment[]>();
+        appointments.forEach((appointment) => {
+            const key = getAppointmentGroupKey(appointment);
+            const current = grouped.get(key) || [];
+            current.push(appointment);
+            grouped.set(key, current);
+        });
+
+        return Array.from(grouped.entries())
+            .map(([key, items]) => {
+                const sortedItems = [...items].sort((left, right) => {
+                    const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+                    const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+                    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+                    return new Date(left.startTime).getTime() - new Date(right.startTime).getTime();
+                });
+                return {
+                    key,
+                    items: sortedItems,
+                    primary: sortedItems[0],
+                    count: sortedItems.length,
+                    totalPrice: sortedItems.reduce((sum, item) => sum + getAppointmentPrice(item), 0),
+                };
+            })
+            .sort((left, right) => new Date(left.primary.startTime).getTime() - new Date(right.primary.startTime).getTime());
+    }, [appointments]);
 
     const baseWeekStartKey = useMemo(() => getRiyadhWeekStartKey(), []);
     const weekStartKey = useMemo(() => addRiyadhDays(baseWeekStartKey, weekOffset * 7), [baseWeekStartKey, weekOffset]);
@@ -643,9 +680,11 @@ export default function ScheduleScreen() {
                                                     const isStarted = appointment.status === 'started';
                                                     const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
                                                     const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
-                                                    const serviceLabel = appointment.service?.name_en || 'Service';
+                                                    const serviceLabel = getAppointmentServiceLabel(appointment);
                                                     const customerLabel = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || 'Client';
                                                     const compactHeader = `${formatTime(appointment.startTime)} • ${isStarted ? 'In Service' : 'Upcoming'}`;
+                                                    const group = appointmentGroups.find((item) => item.items.some((entry) => entry.id === appointment.id));
+                                                    const groupCount = group?.count || 1;
 
                                                     return (
                                                         <TouchableOpacity
@@ -676,7 +715,7 @@ export default function ScheduleScreen() {
                                                                     <View style={styles.gridAppointmentHeader}>
                                                                         <View style={{ flex: 1 }}>
                                                                             <Text style={[styles.gridAppointmentTitle, compactGridCards && styles.gridAppointmentTitleCompact]} numberOfLines={1}>
-                                                                                {serviceLabel}
+                                                                                {groupCount > 1 ? `${serviceLabel} + ${groupCount - 1} more` : serviceLabel}
                                                                             </Text>
                                                                             <Text style={[styles.gridAppointmentTime, compactGridCards && styles.gridAppointmentTimeCompact]}>
                                                                                 {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
@@ -710,10 +749,10 @@ export default function ScheduleScreen() {
                                                                     {!compactGridCards ? (
                                                                         <View style={styles.gridAppointmentFooter}>
                                                                             <Text style={[styles.gridAppointmentPrice, compactGridCards && styles.gridAppointmentPriceCompact]}>
-                                                                                SAR {Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0).toFixed(2)}
+                                                                                SAR {getAppointmentPrice(appointment).toFixed(2)}
                                                                             </Text>
                                                                             <Text style={[styles.gridAppointmentAction, compactGridCards && styles.gridAppointmentActionCompact, isStarted && { color: '#047857' }]} numberOfLines={1}>
-                                                                                {isStarted ? 'In Service' : 'Upcoming'}
+                                                                                {groupCount > 1 ? `${groupCount} services` : (isStarted ? 'In Service' : 'Upcoming')}
                                                                             </Text>
                                                                         </View>
                                                                     ) : null}
@@ -1119,7 +1158,32 @@ export default function ScheduleScreen() {
                             </View>
                         </View>
 
-                        <Text style={styles.appointmentServiceName}>{appointment.service?.name_en || 'Service'}</Text>
+                        <Text style={styles.appointmentServiceName}>
+                            {getAppointmentServiceLabel(appointment)}
+                        </Text>
+
+                        {(() => {
+                            const group = appointmentGroups.find((item) => item.items.some((entry) => entry.id === appointment.id));
+                            if (!group || group.count <= 1) {
+                                return null;
+                            }
+
+                            return (
+                                <View style={styles.groupSummaryCard}>
+                                    <Text style={styles.groupSummaryTitle}>
+                                        {group.count} services in this booking
+                                    </Text>
+                                    {group.items.map((item) => (
+                                        <View key={item.id} style={styles.groupServiceRow}>
+                                            <Text style={styles.groupServiceRowTitle}>{getAppointmentServiceLabel(item)}</Text>
+                                            <Text style={styles.groupServiceRowMeta}>
+                                                {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            );
+                        })()}
 
                         {canSeeBookingNotes && appointment.notes ? (
                             <View style={styles.appointmentNotesContainer}>
@@ -1139,6 +1203,15 @@ export default function ScheduleScreen() {
                                 <Ionicons name="person-circle-outline" size={16} color="#6d28d9" style={styles.appointmentClientButtonIcon} />
                                 <Text style={styles.appointmentClientButtonText}>Appointment Details</Text>
                             </TouchableOpacity>
+                        ) : null}
+
+                        {appointment.bookingSessionId || appointment.bookingReference ? (
+                            <View style={styles.bookingSessionInfoCard}>
+                                <Text style={styles.bookingSessionInfoLabel}>Booking session</Text>
+                                <Text style={styles.bookingSessionInfoValue}>
+                                    {appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8)}
+                                </Text>
+                            </View>
                         ) : null}
 
                         {!isCompleted && appointment.status !== 'cancelled' ? (
@@ -2440,6 +2513,57 @@ const styles = StyleSheet.create({
     appointmentServiceName: {
         fontSize: 15,
         color: '#4b5563',
+    },
+    groupSummaryCard: {
+        marginTop: 10,
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: '#f5f3ff',
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+    },
+    groupSummaryTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#6d28d9',
+        marginBottom: 8,
+    },
+    groupServiceRow: {
+        paddingTop: 8,
+        marginTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#ede9fe',
+    },
+    groupServiceRowTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    groupServiceRowMeta: {
+        fontSize: 12,
+        color: '#6b7280',
+        marginTop: 3,
+    },
+    bookingSessionInfoCard: {
+        marginTop: 12,
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: '#ecfeff',
+        borderWidth: 1,
+        borderColor: '#a5f3fc',
+    },
+    bookingSessionInfoLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#0e7490',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+    },
+    bookingSessionInfoValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#155e75',
+        marginTop: 4,
     },
     appointmentMetaRow: {
         flexDirection: 'row',
