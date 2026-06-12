@@ -50,7 +50,14 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const { t, isRTL, language } = useLanguage();
     const { ensureAuthenticated } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
-    const { addItem, updateItem } = useServiceBookingCart();
+    const {
+        itemCount,
+        cartTenantId,
+        totalPrice: cartTotalPrice,
+        payableNowTotal: cartPayableNowTotal,
+        addItem,
+        updateItem,
+    } = useServiceBookingCart();
     const [step, setStep] = useState<BookingStep>('staff');
     const [loading, setLoading] = useState(false);
     const [bookingSuccessDialog, setBookingSuccessDialog] = useState<{
@@ -238,6 +245,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
         amountLabel: string;
         icon: 'browse' | 'card' | 'cash';
     }>;
+    const hasCartForCurrentTenant = itemCount > 0 && cartTenantId === tenant.id;
     const stepIndex = step === 'staff' ? 0 : step === 'datetime' ? 1 : 2;
     const stepTitles = [
         language === 'ar' ? 'المتخصص' : 'Specialist',
@@ -710,6 +718,46 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     );
                 })}
             </View>
+
+            {hasCartForCurrentTenant ? (
+                <View style={styles.cartSummaryCard}>
+                    <View style={styles.cartSummaryHeader}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.noteTitle}>
+                                {language === 'ar' ? 'سلة الحجز' : 'Booking Cart'}
+                            </Text>
+                            <Text style={styles.noteDescription}>
+                                {language === 'ar'
+                                    ? 'يمكنك تجميع أكثر من خدمة ثم مراجعة الإجمالي قبل إتمام الحجز.'
+                                    : 'Bundle multiple services, then review the total before checkout.'}
+                            </Text>
+                        </View>
+                        <View style={styles.cartPill}>
+                            <Text style={styles.cartPillText}>
+                                {itemCount} {language === 'ar' ? 'خدمة' : 'items'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.cartSummaryRow}>
+                        <Text style={styles.cartSummaryLabel}>{language === 'ar' ? 'إجمالي السلة' : 'Cart total'}</Text>
+                        <Text style={styles.cartSummaryValue}>{formatRiyal(cartTotalPrice, language)}</Text>
+                    </View>
+                    <View style={styles.cartSummaryRow}>
+                        <Text style={styles.cartSummaryLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Due now'}</Text>
+                        <Text style={styles.cartSummaryValue}>{formatRiyal(cartPayableNowTotal, language)}</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.cartSummaryButton}
+                        onPress={() => navigation.navigate('ServiceBookingCart')}
+                    >
+                        <AppIcon name="bookings" size={16} color={colors.primary} />
+                        <Text style={styles.cartSummaryButtonText}>
+                            {language === 'ar' ? 'عرض السلة' : 'View Cart'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
         </View>
     );
 
@@ -761,7 +809,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                     <>
                         <TouchableOpacity style={styles.secondaryButton} onPress={handleAddToCart} disabled={loading}>
                             <Text style={styles.secondaryButtonText}>
-                                {language === 'ar' ? 'إضافة للسلة' : 'Add to Cart'}
+                                {language === 'ar' ? 'إضافة إلى السلة' : 'Add to Booking Cart'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.primaryButton} onPress={handleBooking} disabled={loading}>
@@ -1150,6 +1198,67 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: colors.textSecondary,
         lineHeight: 20,
+    },
+    cartSummaryCard: {
+        backgroundColor: '#F7F0FF',
+        borderRadius: 24,
+        padding: spacing.lg,
+        gap: spacing.md,
+        borderWidth: 1,
+        borderColor: '#E8D9FF',
+    },
+    cartSummaryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: spacing.sm,
+    },
+    cartPill: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: '#E2D5FF',
+    },
+    cartPillText: {
+        color: colors.primary,
+        fontWeight: '800',
+        fontSize: fontSize.xs,
+    },
+    cartSummaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    cartSummaryLabel: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        flex: 1,
+        paddingRight: spacing.sm,
+    },
+    cartSummaryValue: {
+        fontSize: fontSize.md,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+    cartSummaryButton: {
+        marginTop: spacing.xs,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 48,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#D8C8FF',
+        backgroundColor: '#FFFFFF',
+    },
+    cartSummaryButtonText: {
+        color: colors.primary,
+        fontWeight: '800',
+        fontSize: fontSize.md,
     },
     footer: {
         padding: spacing.lg,
