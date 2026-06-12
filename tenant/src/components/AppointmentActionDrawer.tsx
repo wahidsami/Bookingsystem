@@ -1652,54 +1652,59 @@ export function AppointmentActionDrawer({
                                       key={`guest-${service.id}`}
                                       type="button"
                                       onClick={() => setGroupGuest((prev) => ({ ...prev, serviceId: service.id }))}
-                                      className={`group flex w-full items-stretch overflow-hidden rounded-3xl border text-left transition ${
+                                      className={`group overflow-hidden rounded-3xl border text-left transition ${
                                         active
                                           ? "border-primary bg-purple-50 ring-2 ring-primary/20"
                                           : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
                                       }`}
                                     >
-                                      <div className="h-24 w-24 shrink-0 overflow-hidden bg-gray-100 sm:h-28 sm:w-28">
-                                        {service.image ? (
-                                          <img
-                                            src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
-                                            alt={serviceName}
-                                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                                          />
-                                        ) : (
-                                          <div className="flex h-full w-full items-center justify-center text-gray-300">
-                                            <svg className="h-9 w-9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                              <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
-                                            </svg>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      <div className="min-w-0 flex-1 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="min-w-0">
-                                            <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
-                                            <p className="mt-1 text-xs text-gray-500">
-                                              {serviceParent
-                                                ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
-                                                : locale === "ar"
-                                                  ? "بدون فئة"
-                                                  : "No category"}
-                                            </p>
-                                          </div>
-                                          {active && (
-                                            <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                              {locale === "ar" ? "محدد" : "Selected"}
-                                            </span>
+                                      <div className="grid gap-0 lg:grid-cols-[148px_minmax(0,1fr)]">
+                                        <div className="relative h-28 w-full overflow-hidden bg-gray-100 lg:h-full lg:min-h-[148px]">
+                                          {service.image ? (
+                                            <img
+                                              src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
+                                              alt={serviceName}
+                                              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                            />
+                                          ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                              <svg className="h-9 w-9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
+                                              </svg>
+                                            </div>
                                           )}
+                                          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/20 to-transparent" />
                                         </div>
 
-                                        <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
-                                          <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                            ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                          </span>
-                                          <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                            <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
-                                          </span>
+                                        <div className="min-w-0 p-4 sm:p-5">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
+                                                {active && (
+                                                  <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                                    {locale === "ar" ? "محدد" : "Selected"}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <p className="mt-1 text-xs text-gray-500">
+                                                {serviceParent
+                                                  ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
+                                                  : locale === "ar"
+                                                    ? "بدون فئة"
+                                                    : "No category"}
+                                              </p>
+                                            </div>
+                                          </div>
+
+                                          <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
+                                            <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                              ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                            </span>
+                                            <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                              <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     </button>
