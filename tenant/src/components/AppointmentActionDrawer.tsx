@@ -377,8 +377,8 @@ export function AppointmentActionDrawer({
 
     }
 
-    if (step === 1 && !selectedServiceId) {
-      return locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.";
+    if (step === 1 && queuedServices.length === 0) {
+      return locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please select at least one service.";
     }
 
     if (step === 2) {
@@ -544,10 +544,10 @@ export function AppointmentActionDrawer({
 
       return {
         ...prev,
-        serviceId: selectedServiceId || ""
+        serviceId: queuedServices[0]?.serviceId || selectedServiceId || ""
       };
     });
-  }, [includeGroupGuest, selectedServiceId]);
+  }, [includeGroupGuest, queuedServices, selectedServiceId]);
 
   const selectedVariant = useMemo(
     () => serviceVariants.find((variant) => variant.id === selectedVariantId) || null,
@@ -620,10 +620,22 @@ export function AppointmentActionDrawer({
   }, [services, locale]);
   const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
 
-  const makeQueueKey = (serviceId: string, variantId?: string | null, staffId?: string | null) =>
-    `${serviceId}::${variantId || ""}::${staffId || ""}`;
+  const findQueuedServiceIndex = (serviceId: string) =>
+    queuedServices.findIndex((item) => item.serviceId === serviceId);
 
-  const queueService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
+  const getServicePriceForQueueItem = (item: BookingDraftItem) => {
+    const service = services.find((entry) => entry.id === item.serviceId) || null;
+    const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
+    return toSafeMoneyNumber(variant?.finalPrice ?? service?.finalPrice ?? 0);
+  };
+
+  const queuedServicesSubtotal = useMemo(
+    () => toSafeMoneyNumber(queuedServices.reduce((sum, item) => sum + getServicePriceForQueueItem(item), 0)),
+    [queuedServices, services]
+  );
+  const queuedServicesTotal = toSafeMoneyNumber(queuedServicesSubtotal + guestServicePrice);
+
+  const toggleQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
     const trimmedServiceId = `${serviceId || ""}`.trim();
     if (!trimmedServiceId) {
       return false;
@@ -631,52 +643,53 @@ export function AppointmentActionDrawer({
 
     const normalizedVariantId = variantId || null;
     const normalizedStaffId = staffId || null;
-    const nextKey = makeQueueKey(trimmedServiceId, normalizedVariantId, normalizedStaffId);
+    const existingIndex = findQueuedServiceIndex(trimmedServiceId);
 
-    let added = false;
     setQueuedServices((current) => {
-      const exists = current.some((item) => makeQueueKey(item.serviceId, item.variantId, item.staffId) === nextKey);
-      if (exists) {
-        return current;
+      const next = [...current];
+      const currentIndex = next.findIndex((item) => item.serviceId === trimmedServiceId);
+
+      if (currentIndex >= 0) {
+        next.splice(currentIndex, 1);
+        return next;
       }
 
-      added = true;
-      return [
-        ...current,
-        {
-          serviceId: trimmedServiceId,
-          variantId: normalizedVariantId,
-          staffId: normalizedStaffId
-        }
-      ];
+      next.push({
+        serviceId: trimmedServiceId,
+        variantId: normalizedVariantId,
+        staffId: normalizedStaffId
+      });
+      return next;
     });
 
-    return added;
+    return existingIndex < 0;
+  };
+
+  const updateQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
+    const trimmedServiceId = `${serviceId || ""}`.trim();
+    if (!trimmedServiceId) {
+      return;
+    }
+
+    setQueuedServices((current) =>
+      current.map((item) =>
+        item.serviceId === trimmedServiceId
+          ? {
+              ...item,
+              variantId: variantId || null,
+              staffId: staffId || null,
+            }
+          : item
+      )
+    );
   };
 
   const buildSequentialBookingItems = () => {
-    const draftItems: BookingDraftItem[] = [...queuedServices];
-    if (selectedServiceId) {
-      const lastQueuedItem = draftItems[draftItems.length - 1];
-      const isDuplicateOfLastQueuedItem =
-        Boolean(lastQueuedItem)
-        && lastQueuedItem.serviceId === selectedServiceId
-        && (lastQueuedItem.variantId || null) === (selectedVariantId || null)
-        && (lastQueuedItem.staffId || null) === (selectedStaffId || null);
-
-      if (!isDuplicateOfLastQueuedItem) {
-        draftItems.push({
-          serviceId: selectedServiceId,
-          variantId: selectedVariantId || null,
-          staffId: selectedStaffId || null
-        });
-      }
-    }
-
-    if (draftItems.length === 0) {
+    if (queuedServices.length === 0) {
       return [];
     }
 
+    const draftItems: BookingDraftItem[] = [...queuedServices];
     const startCursor = new Date(`${appointmentDate}T${appointmentTime}`);
     let cursor = new Date(startCursor);
 
@@ -699,21 +712,6 @@ export function AppointmentActionDrawer({
     });
   };
 
-  const handleQueueSelectedService = () => {
-    if (!selectedServiceId) {
-      setError(locale === "ar" ? "الرجاء اختيار الخدمة أولًا." : "Please select a service first.");
-      return;
-    }
-
-    const added = queueService(selectedServiceId, selectedVariantId || null, selectedStaffId || null);
-    if (!added) {
-      setError(locale === "ar" ? "هذه الخدمة مضافة بالفعل." : "This service is already added.");
-      return;
-    }
-
-    setError("");
-  };
-
   const handleRemoveQueuedService = (index: number) => {
     setQueuedServices((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
@@ -723,11 +721,9 @@ export function AppointmentActionDrawer({
     setErrorDebug(null);
     setSuccess("");
 
-    if (!selectedServiceId) {
-      if (queuedServices.length === 0) {
-        setError(locale === "ar" ? "الرجاء اختيار الخدمة." : "Please select a service.");
-        return;
-      }
+    if (queuedServices.length === 0) {
+      setError(locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please select at least one service.");
+      return;
     }
 
     if (customerMode === "existing" && !selectedCustomer) {
@@ -1181,112 +1177,96 @@ export function AppointmentActionDrawer({
                           const serviceName = locale === "ar" ? service.name_ar : service.name_en;
                           const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
                           const serviceVariantsForCard = parseArrayValue<ServiceVariant>(service.variants).filter((variant) => variant.isActive !== false);
-                          const queuedCountForService = queuedServices.filter((item) => item.serviceId === service.id).length;
+                          const queuedIndexForService = findQueuedServiceIndex(service.id);
+                          const isQueued = queuedIndexForService >= 0;
+                          const queuedItem = isQueued ? queuedServices[queuedIndexForService] : null;
                           return (
-                            <div key={service.id} className="space-y-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedServiceId(service.id);
-                                  setSelectedVariantId("");
-                                  setPaymentMethod("");
-                                }}
-                                className={`group flex w-full items-stretch overflow-hidden rounded-3xl border text-left transition ${
-                                  active
-                                    ? "border-primary bg-purple-50 ring-2 ring-primary/20"
-                                    : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
-                                }`}
-                              >
-                                <div className="h-28 w-28 shrink-0 overflow-hidden bg-gray-100 sm:h-32 sm:w-32">
-                                  {service.image ? (
-                                    <img
-                                      src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
-                                      alt={serviceName}
-                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                                    />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-gray-300">
-                                      <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                </div>
+                            <div
+                              key={service.id}
+                              className={`group flex w-full items-stretch overflow-hidden rounded-3xl border text-left transition ${
+                                active
+                                  ? "border-primary bg-purple-50 ring-2 ring-primary/20"
+                                  : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
+                              }`}
+                              onClick={() => {
+                                setSelectedServiceId(service.id);
+                                setSelectedVariantId(queuedItem?.variantId || "");
+                                setSelectedStaffId(queuedItem?.staffId || "");
+                                setPaymentMethod("");
+                              }}
+                            >
+                              <div className="h-28 w-28 shrink-0 overflow-hidden bg-gray-100 sm:h-32 sm:w-32">
+                                {service.image ? (
+                                  <img
+                                    src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
+                                    alt={serviceName}
+                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                      <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
 
-                                <div className="min-w-0 flex-1 p-4">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
-                                      <p className="mt-1 text-xs text-gray-500">
-                                        {serviceParent
-                                          ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
-                                          : locale === "ar"
-                                            ? "بدون فئة"
-                                            : "No category"}
-                                      </p>
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2">
-                                      {queuedCountForService > 0 ? (
-                                        <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                          {locale === "ar"
-                                            ? `مضافة ×${queuedCountForService}`
-                                            : `Added x${queuedCountForService}`}
-                                        </span>
-                                      ) : null}
-                                      {active && (
-                                        <span className="rounded-full bg-gray-900 px-2.5 py-1 text-[10px] font-semibold text-white">
-                                          {locale === "ar" ? "معاينة" : "Preview"}
-                                        </span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          const added = queueService(
-                                            service.id,
-                                            active ? (selectedVariantId || null) : null,
-                                            active ? (selectedStaffId || null) : null
-                                          );
+                              <div className="min-w-0 flex-1 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                      {serviceParent
+                                        ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
+                                        : locale === "ar"
+                                          ? "بدون فئة"
+                                          : "No category"}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-end gap-2">
+                                    {isQueued ? (
+                                      <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                                        {locale === "ar" ? "مضافة" : "Selected"}
+                                      </span>
+                                    ) : null}
+                                    <label
+                                      className="flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1 text-[10px] font-semibold text-gray-700 ring-1 ring-gray-200"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isQueued}
+                                        onChange={() => {
+                                          const selectedVariantForService = active ? (selectedVariantId || queuedItem?.variantId || null) : (queuedItem?.variantId || null);
+                                          const selectedStaffForService = active ? (selectedStaffId || queuedItem?.staffId || null) : (queuedItem?.staffId || null);
+                                          const added = toggleQueuedService(service.id, selectedVariantForService, selectedStaffForService);
 
-                                          if (!added) {
-                                            setError(locale === "ar" ? "هذه الخدمة مضافة بالفعل." : "This service is already added.");
-                                            return;
-                                          }
-
-                                          setError("");
                                           setSelectedServiceId(service.id);
-                                          if (!active) {
-                                            setSelectedVariantId("");
-                                            setPaymentMethod("");
+                                          setSelectedVariantId(selectedVariantForService || "");
+                                          setSelectedStaffId(selectedStaffForService || "");
+                                          setPaymentMethod("");
+                                          setError("");
+
+                                          if (!added && !isQueued) {
+                                            setError(locale === "ar" ? "تعذر إضافة الخدمة." : "Unable to add the service.");
                                           }
                                         }}
-                                        className={`rounded-full px-3 py-1 text-[10px] font-semibold transition ${
-                                          queuedCountForService > 0
-                                            ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                            : "bg-primary text-white hover:bg-primary/90"
-                                        }`}
-                                      >
-                                        {queuedCountForService > 0
-                                          ? locale === "ar"
-                                            ? "إضافة نسخة أخرى"
-                                            : "Add another"
-                                          : locale === "ar"
-                                            ? "إضافة"
-                                            : "Add"}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
-                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                      ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                    </span>
-                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                      <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
-                                    </span>
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                      />
+                                      <span>{isQueued ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "إضافة" : "Add")}</span>
+                                    </label>
                                   </div>
                                 </div>
-                              </button>
+
+                                <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
+                                  <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                    ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
+                                  </span>
+                                  <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
+                                    <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
+                                  </span>
+                                </div>
+                              </div>
 
                               {serviceVariantsForCard.length > 0 ? (
                                 <div className="ms-4 space-y-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-3 sm:ms-8">
@@ -1304,6 +1284,9 @@ export function AppointmentActionDrawer({
                                             setSelectedServiceId(service.id);
                                             setSelectedVariantId(variant.id);
                                             setPaymentMethod("");
+                                            if (isQueued) {
+                                              updateQueuedService(service.id, variant.id, selectedStaffId || queuedItem?.staffId || null);
+                                            }
                                           }}
                                           className={`rounded-2xl border px-3 py-3 text-left transition ${
                                             activeVariant
@@ -1338,44 +1321,67 @@ export function AppointmentActionDrawer({
                     ))}
                   </div>
 
-                  {selectedService && (
-                    <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {locale === "ar" ? "الخدمة المحددة" : "Selected service"}
+                  <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {locale === "ar" ? "الخدمات المحددة" : "Selected services"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {queuedServices.length > 0
+                            ? (locale === "ar"
+                              ? `${queuedServices.length} خدمات في الحجز الحالي`
+                              : `${queuedServices.length} services in the current booking`)
+                            : (selectedVariantName || `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`)}
+                        </p>
+                        {queuedServices.length === 0 && selectedServiceParentLabel ? (
+                          <p className="mt-1 text-xs text-gray-500">
+                            {locale === "ar" ? "الفئة" : "Category"}: {selectedServiceParentLabel}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {selectedVariantName || `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
-                          </p>
-                          {selectedServiceParentLabel ? (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {locale === "ar" ? "الفئة" : "Category"}: {selectedServiceParentLabel}
-                            </p>
-                          ) : null}
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-primary">
+                          <Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} />
                         </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-primary">
-                            <Currency amount={displayServicePrice} />
+                      </div>
+                    </div>
+
+                    {queuedServices.length > 0 ? (
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl bg-white p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                            {locale === "ar" ? "الإجمالي الفرعي" : "Subtotal"}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            <Currency amount={queuedServicesSubtotal} />
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                            {locale === "ar" ? "خدمات مختارة" : "Selected services"}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {queuedServices.length}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                            {locale === "ar" ? "الإجمالي النهائي" : "Final total"}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-primary">
+                            <Currency amount={queuedServicesTotal} />
                           </div>
                         </div>
                       </div>
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-xs text-gray-500">
-                          {locale === "ar"
-                            ? "يمكنك إضافة هذه الخدمة إلى نفس الحجز ثم اختيار خدمة أخرى."
-                            : "Add this service to the same booking, then pick another one."}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleQueueSelectedService}
-                          className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90"
-                        >
-                          {locale === "ar" ? "إضافة للخطة" : "Add to booking"}
-                        </button>
+                    ) : (
+                      <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-500">
+                        {locale === "ar"
+                          ? "استخدم مربعات الاختيار لتجميع الخدمات واحتساب الإجمالي تلقائياً."
+                          : "Use the checkboxes to bundle services and calculate the total automatically."}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   {queuedServices.length > 0 ? (
                     <div className="mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4">
                       <div className="flex items-center justify-between gap-3">
@@ -1740,14 +1746,30 @@ export function AppointmentActionDrawer({
 
                     <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الخدمة" : "Service"}
+                        {locale === "ar" ? "الخدمات" : "Services"}
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">{selectedServiceName || "-"}</div>
-                      {selectedVariantName ? (
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {queuedServices.length > 0
+                          ? queuedServices
+                            .map((item) => {
+                              const service = services.find((entry) => entry.id === item.serviceId);
+                              const label = locale === "ar"
+                                ? (service?.name_ar || service?.name_en || "")
+                                : (service?.name_en || service?.name_ar || "");
+                              return label || item.serviceId;
+                            })
+                            .join(", ")
+                          : (selectedServiceName || "-")}
+                      </div>
+                      {queuedServices.length === 0 && selectedVariantName ? (
                         <div className="mt-1 text-xs text-gray-500">{selectedVariantName}</div>
                       ) : null}
                       <div className="mt-1 text-xs text-gray-500">
-                        {displayDuration} {locale === "ar" ? "دقيقة" : "min"}
+                        {queuedServices.length > 0
+                          ? (locale === "ar"
+                            ? `${queuedServices.length} خدمات محددة`
+                            : `${queuedServices.length} selected services`)
+                          : `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
                       </div>
                     </div>
 
@@ -1769,7 +1791,7 @@ export function AppointmentActionDrawer({
                       </div>
                       <div className="mt-1 text-sm font-semibold text-gray-900">{paymentMethodLabel || "-"}</div>
                       <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                        <span><Currency amount={displayServicePrice} /></span>
+                        <span><Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} /></span>
                         {includeGroupGuest ? (
                           <>
                             <span>+</span>
@@ -1785,10 +1807,10 @@ export function AppointmentActionDrawer({
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "سعر الخدمة الأساسية" : "Base service"}
+                        {locale === "ar" ? "الإجمالي الفرعي" : "Subtotal"}
                       </div>
                       <div className="mt-1 text-sm font-semibold text-gray-900">
-                        <Currency amount={displayServicePrice} />
+                        <Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} />
                       </div>
                     </div>
 
@@ -1813,7 +1835,7 @@ export function AppointmentActionDrawer({
                         {locale === "ar" ? "الإجمالي النهائي" : "Final total"}
                       </div>
                       <div className="mt-1 text-sm font-semibold text-primary">
-                        <Currency amount={displayTotalPrice} />
+                        <Currency amount={queuedServices.length > 0 ? queuedServicesTotal : displayTotalPrice} />
                       </div>
                     </div>
                   </div>
