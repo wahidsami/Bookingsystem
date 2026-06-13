@@ -89,6 +89,7 @@ export interface AppointmentActionDrawerPrefill {
   staffId?: string;
   date?: string;
   time?: string;
+  startStep?: number;
   paymentMethod?: string;
   notes?: string;
   bookingSessionId?: string | null;
@@ -300,7 +301,7 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
-      setAppointmentStep(0);
+      setAppointmentStep(prefill?.startStep ?? 0);
       setCustomerMode(prefill?.customer ? "existing" : "existing");
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
       setCustomers([]);

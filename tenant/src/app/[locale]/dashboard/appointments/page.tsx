@@ -338,11 +338,11 @@ export default function AppointmentsPage() {
 
         const source = response.appointment;
         const start = new Date(source.startTime);
-        setDrawerPrefill({
-          customer: source.user
-            ? {
-                id: source.user.id,
-                firstName: source.user.firstName,
+      setDrawerPrefill({
+        customer: source.user
+          ? {
+              id: source.user.id,
+              firstName: source.user.firstName,
                 lastName: source.user.lastName,
                 email: source.user.email,
                 phone: source.user.phone
@@ -350,12 +350,13 @@ export default function AppointmentsPage() {
             : undefined,
           staffId: source.staff?.id,
           date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
-          time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
-          bookingSessionId: source.bookingSessionId || null,
-          bookingReference: source.bookingReference || source.bookingNumber || null,
-          paymentMethod: source.paymentMethod || undefined,
-          notes: source.notes || undefined
-        });
+        time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+        bookingSessionId: source.bookingSessionId || null,
+        bookingReference: source.bookingReference || source.bookingNumber || null,
+        startStep: 1,
+        paymentMethod: source.paymentMethod || undefined,
+        notes: source.notes || undefined
+      });
         setQuickDrawerMode('appointment');
         setSelectedBreak(null);
         setShowQuickDrawer(true);
@@ -920,6 +921,7 @@ export default function AppointmentsPage() {
       time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
       bookingSessionId: appointment.bookingSessionId || null,
       bookingReference: appointment.bookingReference || appointment.bookingNumber || null,
+      startStep: 1,
       paymentMethod: appointment.paymentMethod || undefined,
       notes: appointment.notes || undefined
     });
