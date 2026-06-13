@@ -568,9 +568,26 @@ export function AppointmentDetailsDrawer({
     const loadCustomer = async () => {
       try {
         setCustomerLoading(true);
-        const response = await tenantApi.getCustomer(customerId);
-        if (!cancelled && response.success) {
-          setCustomerProfile(response.data || null);
+        const [customerResult, transactionsResult] = await Promise.allSettled([
+          tenantApi.getCustomer(customerId),
+          tenantApi.getCustomerTransactions(customerId, { limit: 100 })
+        ]);
+
+        if (!cancelled && customerResult.status === "fulfilled" && customerResult.value.success) {
+          setCustomerProfile(customerResult.value.data || null);
+        }
+
+        if (!cancelled && customerResult.status === "rejected") {
+          console.error("Failed to load customer profile:", customerResult.reason);
+        }
+
+        if (!cancelled && transactionsResult.status === "fulfilled" && transactionsResult.value.success) {
+          setCustomerTransactions(transactionsResult.value.data?.transactions || []);
+          setCustomerTransactionsSummary(transactionsResult.value.data?.summary || null);
+        }
+
+        if (!cancelled && transactionsResult.status === "rejected") {
+          console.error("Failed to load customer transactions:", transactionsResult.reason);
         }
       } catch (err) {
         if (!cancelled) {
@@ -594,6 +611,10 @@ export function AppointmentDetailsDrawer({
 
   useEffect(() => {
     if (!open || viewMode !== "customer" || customerTab !== "transactions" || !appointment?.user?.id || !customerProfile) {
+      return;
+    }
+
+    if (customerTransactions.length > 0 && customerTransactionsSummary) {
       return;
     }
 
