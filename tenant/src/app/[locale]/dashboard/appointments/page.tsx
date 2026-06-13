@@ -2006,7 +2006,7 @@ export default function AppointmentsPage() {
                                 key={result.id}
                                 type="button"
                                 onClick={() => handleOpenAppointmentDetails(result.id)}
-                                className="flex w-full items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:bg-gray-100"
+                                className="flex w-full items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-left transition hover:bg-gray-100"
                               >
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-gray-900">{customerName}</p>
@@ -2014,9 +2014,17 @@ export default function AppointmentsPage() {
                                     {serviceName || (locale === "ar" ? "خدمة" : "Service")}
                                     {result.bookingNumber ? ` • ${result.bookingNumber}` : ""}
                                   </p>
-                                  <p className="mt-1 text-xs text-gray-500">
-                                    {formatDateTime(result.startTime).date} • {formatDateTime(result.startTime).time} • {getStatusLabel(result.status, locale)}
-                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                                    <span className="rounded-full bg-white px-2 py-1 ring-1 ring-gray-200">
+                                      {formatDateTime(result.startTime).date}
+                                    </span>
+                                    <span className="rounded-full bg-white px-2 py-1 ring-1 ring-gray-200">
+                                      {formatDateTime(result.startTime).time}
+                                    </span>
+                                    <span className="rounded-full bg-white px-2 py-1 ring-1 ring-gray-200">
+                                      {getStatusLabel(result.status, locale)}
+                                    </span>
+                                  </div>
                                 </div>
                                 <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200">
                                   {getPaymentStatusLabel(result.paymentStatus, locale)}
@@ -2050,13 +2058,21 @@ export default function AppointmentsPage() {
                                 key={customer.id}
                                 type="button"
                                 onClick={() => router.push(`/${locale}/dashboard/customers/${customer.id}`)}
-                                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:bg-gray-100"
+                                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-left transition hover:bg-gray-100"
                               >
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-gray-900">{customerName}</p>
                                   <p className="mt-1 truncate text-xs text-gray-500">
                                     {customer.email || customer.phone || (locale === "ar" ? "ملف العميل" : "Customer profile")}
                                   </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                                    <span className="rounded-full bg-white px-2 py-1 ring-1 ring-gray-200">
+                                      {customer.totalBookings ?? 0} {locale === "ar" ? "حجز" : "bookings"}
+                                    </span>
+                                    <span className="rounded-full bg-white px-2 py-1 ring-1 ring-gray-200">
+                                      <Currency amount={Number(customer.totalSpent || 0)} />
+                                    </span>
+                                  </div>
                                 </div>
                                 <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200">
                                   {locale === "ar" ? "فتح" : "Open"}
