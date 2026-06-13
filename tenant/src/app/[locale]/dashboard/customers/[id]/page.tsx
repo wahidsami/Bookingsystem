@@ -318,6 +318,27 @@ export default function CustomerDetailPage() {
           </div>
         </div>
 
+        {isWalkInCustomer(customer.firstName, customer.lastName) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              <p className="text-sm font-semibold text-amber-900">
+                {locale === 'ar' ? 'هذا سجل عميل حضوري' : 'This is a walk-in customer record'}
+              </p>
+              <p className="text-sm text-amber-800 mt-1">
+                {locale === 'ar'
+                  ? 'يمكنك تعديل الاسم والبريد والهاتف وتاريخ الميلاد والجنس واللغة المفضلة من بطاقة الملف.'
+                  : 'You can update the name, email, phone, date of birth, gender, and preferred language from the profile card.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setEditingProfile(true)}
+              className="inline-flex items-center justify-center px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              {locale === 'ar' ? 'تعديل الآن' : 'Edit now'}
+            </button>
+          </div>
+        )}
+
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Customer Info & Notes */}

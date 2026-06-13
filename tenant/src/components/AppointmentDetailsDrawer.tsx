@@ -946,7 +946,7 @@ export function AppointmentDetailsDrawer({
     ].filter(Boolean) as Array<{ label: string; value: string; tone: string }>;
 
     return (
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <div className="space-y-4">
           {appointment.user ? (
             <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -1283,7 +1283,7 @@ export function AppointmentDetailsDrawer({
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="sticky top-4 z-20 rounded-3xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
             {appointment.bookingSessionId || appointment.bookingReference ? (
               <div className="mb-4 rounded-2xl border border-primary/15 bg-primary/5 p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -1547,7 +1547,7 @@ export function AppointmentDetailsDrawer({
     };
 
     return (
-      <div className="grid gap-4 xl:grid-cols-[300px_176px_minmax(0,1fr)]">
+      <div className="grid gap-5 xl:grid-cols-[340px_220px_minmax(0,1fr)]">
         <div className="space-y-4">
           <WorkspacePanel
             title={locale === "ar" ? "مساحة العميل" : "Customer workspace"}
@@ -1633,7 +1633,7 @@ export function AppointmentDetailsDrawer({
           </WorkspacePanel>
         </div>
 
-        <div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="sticky top-4 z-10 rounded-3xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
           <div className="space-y-2">
             {customerTabs.map((tab) => (
                 <button
@@ -2069,11 +2069,11 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[64rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[76rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col">
-          <div className="border-b border-gray-100 px-5 py-5">
+            <div className="border-b border-gray-100 px-6 py-5 lg:px-8">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
@@ -2149,7 +2149,7 @@ export function AppointmentDetailsDrawer({
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
             {actionNotice && (
               <div
                 className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${

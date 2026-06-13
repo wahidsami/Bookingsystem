@@ -17,6 +17,7 @@ import {
   ChevronDownIcon,
   CalendarDaysIcon,
   FunnelIcon,
+  MagnifyingGlassIcon,
   PlusIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
@@ -232,6 +233,7 @@ export default function AppointmentsPage() {
   const [selectedBreak, setSelectedBreak] = useState<EmployeeBreak | null>(null);
   const [showAppointmentDetailsDrawer, setShowAppointmentDetailsDrawer] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [appointmentSearch, setAppointmentSearch] = useState("");
   const [gridHourHeight, setGridHourHeight] = useState(() => {
     if (typeof window === "undefined") {
       return 240;
@@ -301,15 +303,50 @@ export default function AppointmentsPage() {
     Boolean(filterStaffId) ||
     Boolean(filterServiceId) ||
     Boolean(filterStatus) ||
-    Boolean(filterPaymentStatus);
+    Boolean(filterPaymentStatus) ||
+    Boolean(appointmentSearch.trim());
   const activeFilterCount = [
     startDate !== defaultMonthRange.start,
     endDate !== defaultMonthRange.end,
     Boolean(filterStaffId),
     Boolean(filterServiceId),
     Boolean(filterStatus),
-    Boolean(filterPaymentStatus)
+    Boolean(filterPaymentStatus),
+    Boolean(appointmentSearch.trim())
   ].filter(Boolean).length;
+
+  const visibleAppointments = useMemo(() => {
+    const query = appointmentSearch.trim().toLowerCase();
+    if (!query) {
+      return appointments;
+    }
+
+    return appointments.filter((appointment) => {
+      const userName = appointment.user ? `${appointment.user.firstName} ${appointment.user.lastName}`.trim() : "";
+      const serviceName = locale === "ar" ? appointment.service?.name_ar : appointment.service?.name_en;
+      const haystack = [
+        appointment.bookingNumber,
+        appointment.bookingReference,
+        appointment.id,
+        appointment.status,
+        appointment.paymentStatus,
+        appointment.paymentMethod,
+        appointment.notes,
+        appointment.user?.firstName,
+        appointment.user?.lastName,
+        appointment.user?.email,
+        appointment.user?.phone,
+        userName,
+        serviceName,
+        appointment.staff?.name
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [appointments, appointmentSearch, locale]);
 
   useEffect(() => {
     loadServices();
@@ -1051,6 +1088,7 @@ export default function AppointmentsPage() {
     setFilterServiceId("");
     setFilterStatus("");
     setFilterPaymentStatus("");
+    setAppointmentSearch("");
   };
 
   const getWeekRangeFromDateKey = (dateKey: string) => {
@@ -1773,6 +1811,38 @@ export default function AppointmentsPage() {
         </div>
       )}
 
+      <div className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="rounded-3xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+          <label className="flex items-center gap-3">
+            <MagnifyingGlassIcon className="h-5 w-5 flex-shrink-0 text-gray-400" />
+            <input
+              type="search"
+              value={appointmentSearch}
+              onChange={(event) => setAppointmentSearch(event.target.value)}
+              placeholder={locale === "ar" ? "ابحث بالعميل أو الخدمة أو رقم الحجز" : "Search customer, service, or booking"}
+              className="w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+            />
+            {appointmentSearch ? (
+              <button
+                type="button"
+                onClick={() => setAppointmentSearch("")}
+                className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100"
+              >
+                {locale === "ar" ? "مسح" : "Clear"}
+              </button>
+            ) : null}
+          </label>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {locale === "ar" ? "النتائج" : "Results"}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {visibleAppointments.length} / {appointments.length}
+          </p>
+        </div>
+      </div>
+
       {(viewMode === 'list' || viewMode === 'cancelled') && (
         <div className="mb-4 flex justify-end">
           <button
@@ -1792,11 +1862,15 @@ export default function AppointmentsPage() {
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="mt-4 text-gray-600">{t("loading")}</p>
         </div>
-      ) : (viewMode === 'list' || viewMode === 'cancelled') && appointments.length === 0 ? (
+      ) : (viewMode === 'list' || viewMode === 'cancelled') && visibleAppointments.length === 0 ? (
         <div className="card text-center py-12">
           <div className="text-6xl mb-4">📅</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noAppointments")}</h3>
-          <p className="text-gray-600 mb-2">{t("noAppointmentsDesc")}</p>
+          <p className="text-gray-600 mb-2">
+            {appointmentSearch
+              ? (locale === 'ar' ? 'لا توجد مواعيد تطابق البحث الحالي.' : 'No appointments match the current search.')
+              : t("noAppointmentsDesc")}
+          </p>
           <p className="text-sm text-gray-500">
             {locale === 'ar' ? 'القائمة معروضة حسب تاريخ البداية والنهاية أعلاه. غيّر النطاق لرؤية حجوزات أخرى.' : 'List is filtered by the start/end dates above. Try a wider date range to see more appointments.'}
           </p>
@@ -1804,7 +1878,7 @@ export default function AppointmentsPage() {
       ) : (viewMode === 'list' || viewMode === 'cancelled') ? (
         /* List View */
         <div className="space-y-4">
-          {appointments.map((appointment) => {
+          {visibleAppointments.map((appointment) => {
             const start = formatDateTime(appointment.startTime);
             const end = formatDateTime(appointment.endTime);
             const userName = appointment.user
@@ -1925,7 +1999,7 @@ export default function AppointmentsPage() {
       ) : (
         /* Calendar View */
         <CalendarView
-          appointments={appointments}
+          appointments={visibleAppointments}
           breaks={breaks}
           employees={employees}
           selectedDate={selectedDate}

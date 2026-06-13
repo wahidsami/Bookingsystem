@@ -17,6 +17,7 @@ import {
   StarIcon,
   PhoneIcon,
   EnvelopeIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import { Currency } from '@/components/Currency';
 
@@ -343,6 +344,9 @@ export default function CustomersPage() {
                       <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
                         {t('lastVisit')}
                       </th>
+                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
+                        {locale === 'ar' ? 'الإجراء' : 'Action'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -455,6 +459,22 @@ export default function CustomersPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                           {formatDate(customer.lastVisit)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/${locale}/dashboard/customers/${customer.id}`);
+                            }}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                          >
+                            <PencilSquareIcon className="w-4 h-4" />
+                            <span className="text-sm font-medium">
+                              {isWalkInCustomer(customer)
+                                ? (locale === 'ar' ? 'تعديل الحضوري' : 'Edit walk-in')
+                                : (locale === 'ar' ? 'عرض/تعديل' : 'View / Edit')}
+                            </span>
+                          </button>
                         </td>
                       </tr>
                     ))}
