@@ -104,6 +104,34 @@ function buildDateRangeWhere(field, startDate, endDate) {
     };
 }
 
+async function createAppointmentEventSafe({
+    appointmentId,
+    tenantId,
+    platformUserId,
+    actorType,
+    actorId,
+    eventType,
+    payload,
+    occurredAt,
+    transaction
+}) {
+    try {
+        if (!db.AppointmentEvent || !appointmentId || !tenantId || !eventType) return;
+        await db.AppointmentEvent.create({
+            appointmentId,
+            tenantId,
+            platformUserId: platformUserId || null,
+            actorType: actorType || 'tenant',
+            actorId: actorId || null,
+            eventType,
+            payload: payload || {},
+            occurredAt: occurredAt || new Date()
+        }, transaction ? { transaction } : undefined);
+    } catch (error) {
+        console.warn('Tenant appointment event logging warning:', error.message);
+    }
+}
+
 function parseBoardDate(value) {
     if (!value || typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
         return null;
@@ -1527,6 +1555,19 @@ exports.getAppointment = async (req, res) => {
                         }
                     ],
                     required: false
+                },
+                {
+                    model: db.AppointmentEvent,
+                    as: 'events',
+                    include: [
+                        {
+                            model: db.PlatformUser,
+                            as: 'user',
+                            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
+                            required: false
+                        }
+                    ],
+                    required: false
                 }
             ]
         });
@@ -1538,9 +1579,16 @@ exports.getAppointment = async (req, res) => {
             });
         }
 
+        const responseAppointment = appointment.toJSON();
+        responseAppointment.events = Array.isArray(responseAppointment.events)
+            ? responseAppointment.events
+                .slice()
+                .sort((a, b) => new Date(a.occurredAt || a.createdAt || 0) - new Date(b.occurredAt || b.createdAt || 0))
+            : [];
+
         res.json({
             success: true,
-            appointment
+            appointment: responseAppointment
         });
     } catch (error) {
         console.error('Get appointment error:', error);
@@ -1612,6 +1660,7 @@ exports.updateAppointmentStatus = async (req, res) => {
         const totalPaid = parseFloat(appointment.totalPaid || 0);
         const isSettledByAmount = Number.isFinite(totalPrice) && totalPrice > 0 && Number.isFinite(totalPaid) && totalPaid >= totalPrice;
         const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
+        const previousStatus = appointment.status;
 
         if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
             await transaction.rollback();
@@ -1637,6 +1686,21 @@ exports.updateAppointmentStatus = async (req, res) => {
         }
 
         await appointment.save({ transaction });
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'tenant',
+            actorId: req.userId || null,
+            eventType: 'tenant_status_changed',
+            payload: {
+                fromStatus: previousStatus,
+                toStatus: normalizedStatus,
+                notes: notes || null
+            },
+            occurredAt: new Date(),
+            transaction
+        });
         await transaction.commit();
 
         try {
@@ -1825,6 +1889,7 @@ exports.updatePaymentStatus = async (req, res) => {
 
         const previousTotalPaid = parseFloat(appointment.totalPaid || 0);
         const previousPaymentStatus = appointment.paymentStatus;
+        const previousPaymentMethod = appointment.paymentMethod || null;
         logTenantAppointmentAudit('payment_update_requested', {
             requestId,
             tenantId,
@@ -1881,6 +1946,28 @@ exports.updatePaymentStatus = async (req, res) => {
 
         const nextTotalPaid = parseFloat(appointment.totalPaid || 0);
         const paymentDelta = parseFloat((nextTotalPaid - previousTotalPaid).toFixed(2));
+
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'tenant',
+            actorId: req.userId || null,
+            eventType: 'tenant_payment_status_changed',
+            payload: {
+                fromPaymentStatus: previousPaymentStatus,
+                toPaymentStatus: paymentStatus,
+                previousTotalPaid,
+                nextTotalPaid,
+                paymentDelta,
+                fromPaymentMethod: previousPaymentMethod,
+                toPaymentMethod: appointment.paymentMethod || null,
+                transactionRef: transactionRef || null,
+                notes: notes || null
+            },
+            occurredAt: new Date(),
+            transaction
+        });
 
         if (paymentDelta > 0) {
             const transactionType = paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
@@ -2125,6 +2212,20 @@ exports.reassignAppointmentStaff = async (req, res) => {
         const previousStaffId = appointment.staffId;
         appointment.staffId = staffId;
         await appointment.save({ transaction });
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'tenant',
+            actorId: req.userId || null,
+            eventType: 'tenant_reassigned',
+            payload: {
+                fromStaffId: previousStaffId || null,
+                toStaffId: staffId
+            },
+            occurredAt: new Date(),
+            transaction
+        });
 
         await transaction.commit();
         logTenantAppointmentAudit('reassign_committed', {
@@ -2355,6 +2456,24 @@ exports.rescheduleAppointment = async (req, res) => {
         appointment.customerReminderSentAt = null;
         appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'tenant',
+            actorId: req.userId || null,
+            eventType: 'tenant_rescheduled',
+            payload: {
+                fromStaffId: previousStaffId || null,
+                toStaffId: requestedStaffId || null,
+                fromStartTime: previousStartTime ? new Date(previousStartTime).toISOString() : null,
+                fromEndTime: previousEndTime ? new Date(previousEndTime).toISOString() : null,
+                toStartTime: requestedStart.toISOString(),
+                toEndTime: requestedEnd.toISOString()
+            },
+            occurredAt: new Date(),
+            transaction
+        });
         await transaction.commit();
         logTenantAppointmentAudit('reschedule_committed', {
             requestId,
@@ -2582,8 +2701,11 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             });
         }
 
-        const changedStaff = appointment.staffId !== staffId;
-        const changedTime = currentStart.getTime() !== requestedStart.getTime();
+        const previousStaffId = appointment.staffId;
+        const previousStartTime = currentStart;
+        const previousEndTime = currentEnd;
+        const changedStaff = previousStaffId !== staffId;
+        const changedTime = previousStartTime.getTime() !== requestedStart.getTime();
 
         appointment.staffId = staffId;
         appointment.requestedStaffId = staffId;
@@ -2593,6 +2715,26 @@ exports.reassignRescheduleAppointment = async (req, res) => {
         appointment.customerReminderSentAt = null;
         appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'tenant',
+            actorId: req.userId || null,
+            eventType: 'tenant_reassign_reschedule',
+            payload: {
+                changedStaff,
+                changedTime,
+                fromStaffId: previousStaffId || null,
+                toStaffId: staffId,
+                fromStartTime: previousStartTime.toISOString(),
+                fromEndTime: previousEndTime.toISOString(),
+                toStartTime: requestedStart.toISOString(),
+                toEndTime: requestedEnd.toISOString()
+            },
+            occurredAt: new Date(),
+            transaction
+        });
 
         await transaction.commit();
         logTenantAppointmentAudit('reassign_reschedule_committed', {

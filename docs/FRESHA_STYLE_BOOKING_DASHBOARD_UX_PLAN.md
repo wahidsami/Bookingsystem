@@ -11,6 +11,7 @@ Bring the tenant booking dashboard closer to the Fresha operating model without 
 ## Current Status
 - Phase 1 is implemented in the tenant dashboard.
 - Phase 2 is mostly implemented, with search and drawer prefetch in place.
+- Structured `appointment_events` are now exposed in the drawer timeline, with note parsing as fallback.
 - Phase 3 remains conditional and should only happen if the current model proves limiting.
 - Phase 4 remains as the guardrail and polish pass.
 
@@ -45,9 +46,9 @@ Still to validate:
 
 ### Phase 3: Data model only if required
 Pending and conditional:
-- Reuse the current session/appointment model if it already supports multi-service bookings.
-- Add a normalized service-item layer only if the UI needs first-class line items and the backend cannot infer them.
-- Add an action log table only if we need structured operational history beyond notes and status chips.
+- Reuse the current session/appointment model for multi-service bookings. Do not add a duplicate `appointment_services` table unless reporting needs prove it.
+- Use `appointment_events` for structured appointment action history. Do not add a separate action log table unless we outgrow the current event schema.
+- Add a normalized service-item layer only if the UI needs first-class line items and the backend cannot infer them from booking sessions.
 
 ### Phase 4: Guardrails and performance
 Pending:
@@ -58,8 +59,7 @@ Pending:
 
 ## What Is Left
 - Confirm the drawer and search experience on very large tenant datasets.
-- Decide whether service line items need a normalized backend representation.
-- Decide whether action history needs a dedicated table instead of relying on notes and status chips.
+- Decide whether booking-session reporting needs any additional index or projection support.
 - Add any remaining performance guardrails once real usage feedback comes in.
 
 ## Test Plan

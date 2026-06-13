@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Currency } from "@/components/Currency";
 import { getImageUrl, tenantApi } from "@/lib/api";
@@ -41,6 +41,7 @@ export interface AppointmentItem {
     photo?: string;
   };
   paymentTransactions?: PaymentTransaction[];
+  events?: AppointmentEventItem[];
   user?: {
     id: string;
     firstName: string;
@@ -51,6 +52,24 @@ export interface AppointmentItem {
     profileImage?: string | null;
   };
   createdAt?: string;
+}
+
+interface AppointmentEventItem {
+  id: string;
+  eventType: string;
+  actorType?: string;
+  actorId?: string | null;
+  payload?: Record<string, any>;
+  occurredAt?: string;
+  createdAt?: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+    photo?: string | null;
+  } | null;
 }
 
 interface PaymentTransaction {
@@ -718,6 +737,98 @@ export function AppointmentDetailsDrawer({
     return entries[entries.length - 1];
   }, [appointment?.notes]);
 
+  const timelineAuditEntries = useMemo(() => {
+    const rawEvents = Array.isArray(appointment?.events) ? appointment.events : [];
+    const safeCreatedAt = appointment?.createdAt || appointment?.startTime || new Date().toISOString();
+    const safeStartTime = appointment?.startTime || safeCreatedAt;
+    const structuredEvents = rawEvents
+      .map((event) => {
+        const timestamp = event.occurredAt || event.createdAt || safeCreatedAt;
+        const payload = event.payload || {};
+
+        if (event.eventType === "tenant_status_changed") {
+          return {
+            label: locale === "ar" ? "تغيير الحالة" : "Status changed",
+            value: locale === "ar"
+              ? `${payload.fromStatus || getStatusLabel(appointment?.status || "pending", locale)} → ${payload.toStatus || getStatusLabel(appointment?.status || "pending", locale)}`
+              : `${payload.fromStatus || getStatusLabel(appointment?.status || "pending", locale)} → ${payload.toStatus || getStatusLabel(appointment?.status || "pending", locale)}`,
+            tone: "bg-blue-50 text-blue-700 ring-blue-200",
+            timestamp
+          };
+        }
+
+        if (event.eventType === "tenant_payment_status_changed") {
+          return {
+            label: locale === "ar" ? "تحديث الدفع" : "Payment updated",
+            value: locale === "ar"
+              ? `${payload.fromPaymentStatus || "pending"} → ${payload.toPaymentStatus || "pending"}`
+              : `${payload.fromPaymentStatus || "pending"} → ${payload.toPaymentStatus || "pending"}`,
+            tone: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+            timestamp
+          };
+        }
+
+        if (event.eventType === "tenant_rescheduled" || event.eventType === "tenant_reassign_reschedule" || event.eventType === "customer_rescheduled") {
+          return {
+            label: locale === "ar" ? "إعادة الجدولة" : "Rescheduled",
+            value: locale === "ar"
+              ? `${formatDateTime(payload.toStartTime || timestamp, locale)}${payload.toStaffId ? ` • ${payload.toStaffId}` : ""}`
+              : `${formatDateTime(payload.toStartTime || timestamp, locale)}${payload.toStaffId ? ` • ${payload.toStaffId}` : ""}`,
+            tone: "bg-sky-50 text-sky-700 ring-sky-200",
+            timestamp
+          };
+        }
+
+        if (event.eventType === "customer_cancelled" || event.eventType === "tenant_cancelled") {
+          return {
+            label: locale === "ar" ? "إلغاء" : "Cancelled",
+            value: locale === "ar"
+              ? `${formatDateTime(timestamp, locale)}${payload.reasonText || payload.reasonCode ? ` • ${payload.reasonText || payload.reasonCode}` : ""}`
+              : `${formatDateTime(timestamp, locale)}${payload.reasonText || payload.reasonCode ? ` • ${payload.reasonText || payload.reasonCode}` : ""}`,
+            tone: "bg-rose-50 text-rose-700 ring-rose-200",
+            timestamp
+          };
+        }
+
+        return {
+          label: event.eventType.replace(/_/g, " "),
+          value: formatDateTime(timestamp, locale),
+          tone: "bg-gray-50 text-gray-700 ring-gray-200",
+          timestamp
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    if (structuredEvents.length > 0) {
+      return structuredEvents;
+    }
+
+    const fallbackEntries = [];
+    if (latestRescheduleAudit?.toStartTime) {
+      fallbackEntries.push({
+        label: locale === "ar" ? "إعادة الجدولة" : "Reschedule",
+        value: locale === "ar"
+          ? `${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || safeStartTime, locale)} → ${formatDateTime(latestRescheduleAudit.toStartTime || safeStartTime, locale)}`
+          : `${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || safeStartTime, locale)} → ${formatDateTime(latestRescheduleAudit.toStartTime || safeStartTime, locale)}`,
+        tone: "bg-sky-50 text-sky-700 ring-sky-200",
+        timestamp: latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || safeStartTime
+      });
+    }
+    if (latestCancellationAudit) {
+      fallbackEntries.push({
+        label: locale === "ar" ? "الإلغاء" : "Cancellation",
+        value: locale === "ar"
+          ? `${formatDateTime(latestCancellationAudit.at || safeCreatedAt, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+          : `${formatDateTime(latestCancellationAudit.at || safeCreatedAt, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`,
+        tone: "bg-rose-50 text-rose-700 ring-rose-200",
+        timestamp: latestCancellationAudit.at || safeCreatedAt
+      });
+    }
+
+    return fallbackEntries;
+  }, [appointment?.events, appointment?.createdAt, appointment?.startTime, appointment?.status, latestRescheduleAudit, latestCancellationAudit, locale]);
+
   const cleanAppointmentNotes = useMemo(() => {
     return sanitizeAppointmentNotes(stripRescheduleAuditMarkers(appointment?.notes));
   }, [appointment?.notes]);
@@ -956,24 +1067,7 @@ export function AppointmentDetailsDrawer({
         value: getStatusLabel(appointment.status, locale),
         tone: "bg-blue-50 text-blue-700 ring-blue-200"
       },
-      latestRescheduleAudit
-        ? {
-            label: locale === "ar" ? "إعادة الجدولة" : "Reschedule",
-            value: locale === "ar"
-              ? `${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || appointment.startTime, locale)} → ${formatDateTime(latestRescheduleAudit.toStartTime || appointment.startTime, locale)}`
-              : `${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime || appointment.startTime, locale)} → ${formatDateTime(latestRescheduleAudit.toStartTime || appointment.startTime, locale)}`,
-            tone: "bg-sky-50 text-sky-700 ring-sky-200"
-          }
-        : null,
-      latestCancellationAudit
-        ? {
-            label: locale === "ar" ? "الإلغاء" : "Cancellation",
-            value: locale === "ar"
-              ? `${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
-              : `${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`,
-            tone: "bg-rose-50 text-rose-700 ring-rose-200"
-          }
-        : null
+      ...timelineAuditEntries
     ].filter(Boolean) as Array<{ label: string; value: string; tone: string }>;
 
     return (
