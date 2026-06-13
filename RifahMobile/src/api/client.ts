@@ -1451,19 +1451,48 @@ class ApiClient {
     ): Promise<Booking[]> {
         const currentUser = platformUserId ? null : await this.getUser().catch(() => null);
         const resolvedPlatformUserId = platformUserId || currentUser?.id || null;
-        const query = resolvedPlatformUserId ? `?platformUserId=${encodeURIComponent(resolvedPlatformUserId)}` : '';
-        const response = await this.get<{
-            success: boolean;
+        const extractBookings = (response: {
             appointments?: Booking[];
             bookings?: Booking[];
             data?: { appointments?: Booking[]; bookings?: Booking[] };
-        }>(`/bookings${query}`);
-        const rawAppointments = response.appointments
-            || response.bookings
-            || response.data?.appointments
-            || response.data?.bookings
-            || [];
-        const normalized = rawAppointments.map((appointment) => normalizeBooking(appointment));
+        } | null | undefined): Booking[] => {
+            const rawAppointments = response?.appointments
+                || response?.bookings
+                || response?.data?.appointments
+                || response?.data?.bookings
+                || [];
+            return rawAppointments.map((appointment) => normalizeBooking(appointment));
+        };
+
+        const dedupeBookings = (items: Booking[]): Booking[] => {
+            const map = new Map<string, Booking>();
+            items.forEach((item) => {
+                if (!map.has(item.id)) {
+                    map.set(item.id, item);
+                }
+            });
+            return Array.from(map.values());
+        };
+
+        const loadBookingsFromPath = async (endpoint: string) => {
+            try {
+                return extractBookings(await this.get<{
+                    success: boolean;
+                    appointments?: Booking[];
+                    bookings?: Booking[];
+                    data?: { appointments?: Booking[]; bookings?: Booking[] };
+                }>(endpoint));
+            } catch (error) {
+                return [];
+            }
+        };
+
+        const fallbackQuery = resolvedPlatformUserId ? `?platformUserId=${encodeURIComponent(resolvedPlatformUserId)}` : '';
+        const [userScopedBookings, fallbackScopedBookings] = await Promise.all([
+            loadBookingsFromPath('/users/bookings'),
+            fallbackQuery ? loadBookingsFromPath(`/bookings${fallbackQuery}`) : Promise.resolve([]),
+        ]);
+        const normalized = dedupeBookings([...userScopedBookings, ...fallbackScopedBookings]);
 
         if (!status) {
             return normalized;
