@@ -63,6 +63,10 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
     }, [campaignId, notificationId]);
 
     const imageUrl = useMemo(() => getImageUrl(notification?.imageUrl), [notification?.imageUrl]);
+    const googleReviewUrl = useMemo(
+        () => notification?.data?.googleReviewUrl || notification?.data?.googleMapLink || notification?.data?.reviewUrl || '',
+        [notification?.data]
+    );
 
     const formatDateTime = (value?: string | null) => {
         if (!value) {
@@ -84,6 +88,29 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
             tenantId: notification.tenantId,
             selectedServiceId: notification.serviceId || undefined,
         });
+    };
+
+    const openTenantReviewsTab = () => {
+        if (!notification?.tenantId) {
+            return;
+        }
+
+        navigation.navigate('Tenant', {
+            tenantId: notification.tenantId,
+            initialTab: 'reviews',
+        });
+    };
+
+    const openGoogleReview = async () => {
+        if (!googleReviewUrl) {
+            return;
+        }
+
+        try {
+            await Linking.openURL(googleReviewUrl);
+        } catch (error) {
+            console.warn('Failed to open review URL:', error);
+        }
     };
 
     return (
@@ -136,12 +163,26 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
                             </View>
                         </View>
 
-                        {notification.tenantId ? (
+                        {notification.tenantId && googleReviewUrl ? (
+                            <TouchableOpacity style={styles.primaryButton} onPress={openGoogleReview}>
+                                <Text style={styles.primaryButtonText}>
+                                    {language === 'ar' ? 'قيّمنا' : 'Rate Us'}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : notification.tenantId ? (
                             <TouchableOpacity style={styles.primaryButton} onPress={openLinkedDestination}>
                                 <Text style={styles.primaryButtonText}>
                                     {notification.linkType === 'service'
                                         ? (language === 'ar' ? 'فتح صفحة المنشأة والخدمة' : 'Open Tenant & Service')
                                         : (language === 'ar' ? 'فتح صفحة المنشأة' : 'Open Tenant')}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
+
+                        {notification.tenantId ? (
+                            <TouchableOpacity style={styles.reviewTabButton} onPress={openTenantReviewsTab}>
+                                <Text style={styles.reviewTabButtonText}>
+                                    {language === 'ar' ? 'عرض التقييمات' : 'View Reviews'}
                                 </Text>
                             </TouchableOpacity>
                         ) : null}
@@ -300,5 +341,19 @@ const styles = StyleSheet.create({
         color: colors.text,
         fontSize: fontSize.md,
         fontWeight: '600',
+    },
+    reviewTabButton: {
+        marginTop: spacing.md,
+        backgroundColor: '#F5F0FF',
+        paddingVertical: spacing.md,
+        borderRadius: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#D9CCFA',
+    },
+    reviewTabButtonText: {
+        color: '#5F3DC4',
+        fontSize: fontSize.md,
+        fontWeight: '700',
     },
 });
