@@ -2069,7 +2069,7 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[56rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[64rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col">

@@ -985,7 +985,7 @@ export function AppointmentActionDrawer({
       />
 
       <aside
-        className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[34rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[42rem] bg-white shadow-2xl`}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
         <div className="flex h-full flex-col">
