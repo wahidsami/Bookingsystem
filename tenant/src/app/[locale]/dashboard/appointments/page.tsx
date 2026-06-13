@@ -434,6 +434,21 @@ export default function AppointmentsPage() {
   );
 
   useEffect(() => {
+    if (!showAddServicePicker) {
+      return;
+    }
+
+    if (addServicePickerSelectedId) {
+      const stillVisible = filteredServicesForPicker.some((service) => service.id === addServicePickerSelectedId);
+      if (stillVisible) {
+        return;
+      }
+    }
+
+    setAddServicePickerSelectedId(filteredServicesForPicker[0]?.id || "");
+  }, [showAddServicePicker, filteredServicesForPicker, addServicePickerSelectedId]);
+
+  useEffect(() => {
     loadServices();
     loadEmployees();
     loadBoardDisplayHours();
@@ -2330,6 +2345,12 @@ export default function AppointmentsPage() {
                   type="text"
                   value={addServicePickerQuery}
                   onChange={(event) => setAddServicePickerQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddServicePickerContinue();
+                    }
+                  }}
                   placeholder={locale === "ar" ? "ابحث في الخدمات..." : "Search services..."}
                   className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                 />
