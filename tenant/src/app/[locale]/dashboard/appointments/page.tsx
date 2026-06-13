@@ -27,6 +27,18 @@ interface Service {
   name_en: string;
   name_ar: string;
   duration: number;
+  category?: string | null;
+  parentName?: string | null;
+  parentService?: string | null;
+  finalPrice?: number;
+  variants?: string | Array<{
+    id: string;
+    description: string;
+    duration: number;
+    finalPrice: number;
+    isActive?: boolean;
+    name?: string | null;
+  }> | null;
   employees?: Array<{
     id: string;
     name: string;
@@ -2196,12 +2208,12 @@ export default function AppointmentsPage() {
                                       {formatDateTime(result.startTime).time}
                                     </span>
                                     <span className="rounded-full bg-white px-2 py-1 ring-1 ring-gray-200">
-                                      {getStatusLabel(result.status, locale)}
+                                      {getStatusLabel(result.status)}
                                     </span>
                                   </div>
                                 </div>
                                 <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200">
-                                  {getPaymentStatusLabel(result.paymentStatus, locale)}
+                                  {getPaymentStatusLabel(result.paymentStatus)}
                                 </span>
                               </button>
                             );
