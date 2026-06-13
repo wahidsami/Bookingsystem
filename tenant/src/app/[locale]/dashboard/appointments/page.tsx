@@ -198,6 +198,35 @@ function resolveDisplayHoursFromWorkingHours(workingHours: any): { startHour: nu
   return { startHour, endHour };
 }
 
+type DashboardPersistenceState = {
+  viewMode?: 'list' | 'calendar' | 'cancelled';
+  calendarScope?: 'day' | 'week' | 'month';
+  calendarFocusedStaffId?: string | null;
+  selectedDate?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  filterStaffId?: string | null;
+  filterServiceId?: string | null;
+  filterStatus?: string | null;
+  filterPaymentStatus?: string | null;
+  appointmentSearch?: string | null;
+  gridHourHeight?: number | null;
+  scrollY?: number | null;
+};
+
+const DASHBOARD_PERSISTENCE_KEY = "tenant-appointments-dashboard-state";
+
+function safeParseDashboardPersistence(value: string | null): DashboardPersistenceState | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as DashboardPersistenceState;
+  } catch {
+    return null;
+  }
+}
+
 export default function AppointmentsPage() {
   const t = useTranslations("Appointments");
   const params = useParams();
@@ -321,6 +350,8 @@ export default function AppointmentsPage() {
   const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestKeyRef = useRef<string>("");
   const refreshInFlightRef = useRef(false);
+  const pendingScrollRestoreRef = useRef<number | null>(null);
+  const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const defaultMonthRange = getCurrentMonthRange();
   const hasActiveFilters =
@@ -340,6 +371,128 @@ export default function AppointmentsPage() {
     Boolean(filterPaymentStatus),
     Boolean(appointmentSearch.trim())
   ].filter(Boolean).length;
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") {
+      return;
+    }
+
+    const saved = safeParseDashboardPersistence(window.localStorage.getItem(DASHBOARD_PERSISTENCE_KEY));
+    if (!saved) {
+      return;
+    }
+
+    if (saved.viewMode) setViewMode(saved.viewMode);
+    if (saved.calendarScope) setCalendarScope(saved.calendarScope);
+    if (typeof saved.calendarFocusedStaffId !== "undefined") setCalendarFocusedStaffId(saved.calendarFocusedStaffId);
+    if (saved.selectedDate) {
+      const restoredDate = new Date(saved.selectedDate);
+      if (!Number.isNaN(restoredDate.getTime())) {
+        setSelectedDate(restoredDate);
+      }
+    }
+    if (saved.startDate) setStartDate(saved.startDate);
+    if (saved.endDate) setEndDate(saved.endDate);
+    if (typeof saved.filterStaffId !== "undefined") setFilterStaffId(saved.filterStaffId || "");
+    if (typeof saved.filterServiceId !== "undefined") setFilterServiceId(saved.filterServiceId || "");
+    if (typeof saved.filterStatus !== "undefined") setFilterStatus(saved.filterStatus || "");
+    if (typeof saved.filterPaymentStatus !== "undefined") setFilterPaymentStatus(saved.filterPaymentStatus || "");
+    if (typeof saved.appointmentSearch !== "undefined") setAppointmentSearch(saved.appointmentSearch || "");
+    if (typeof saved.gridHourHeight === "number") {
+      setGridHourHeight(Math.max(120, Math.min(360, saved.gridHourHeight)));
+    }
+    if (typeof saved.scrollY === "number" && saved.scrollY >= 0) {
+      pendingScrollRestoreRef.current = saved.scrollY;
+    }
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") {
+      return;
+    }
+
+    const payload: DashboardPersistenceState = {
+      viewMode,
+      calendarScope,
+      calendarFocusedStaffId,
+      selectedDate: getLocalDateKey(selectedDate),
+      startDate,
+      endDate,
+      filterStaffId,
+      filterServiceId,
+      filterStatus,
+      filterPaymentStatus,
+      appointmentSearch,
+      gridHourHeight,
+      scrollY: window.scrollY || 0
+    };
+
+    window.localStorage.setItem(DASHBOARD_PERSISTENCE_KEY, JSON.stringify(payload));
+  }, [
+    hydrated,
+    viewMode,
+    calendarScope,
+    calendarFocusedStaffId,
+    selectedDate,
+    startDate,
+    endDate,
+    filterStaffId,
+    filterServiceId,
+    filterStatus,
+    filterPaymentStatus,
+    appointmentSearch,
+    gridHourHeight
+  ]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") {
+      return;
+    }
+
+    if (pendingScrollRestoreRef.current === null) {
+      return;
+    }
+
+    const target = pendingScrollRestoreRef.current;
+    pendingScrollRestoreRef.current = null;
+
+    const restore = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: target, behavior: "auto" });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(restore);
+    };
+  }, [hydrated, viewMode, calendarScope, selectedDate]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") {
+      return;
+    }
+
+    const handleScroll = () => {
+      if (scrollSaveTimerRef.current) {
+        clearTimeout(scrollSaveTimerRef.current);
+      }
+
+      scrollSaveTimerRef.current = setTimeout(() => {
+        const current = safeParseDashboardPersistence(window.localStorage.getItem(DASHBOARD_PERSISTENCE_KEY)) || {};
+        window.localStorage.setItem(DASHBOARD_PERSISTENCE_KEY, JSON.stringify({
+          ...current,
+          scrollY: window.scrollY || 0
+        }));
+      }, 150);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (scrollSaveTimerRef.current) {
+        clearTimeout(scrollSaveTimerRef.current);
+      }
+    };
+  }, [hydrated]);
 
   useEffect(() => {
     const query = appointmentSearch.trim();
@@ -1215,6 +1368,27 @@ export default function AppointmentsPage() {
     setFilterStatus("");
     setFilterPaymentStatus("");
     setAppointmentSearch("");
+    setCalendarFocusedStaffId(null);
+    setCalendarScope("day");
+    setViewMode("calendar");
+    setSelectedDate(new Date());
+    if (typeof window !== "undefined") {
+      const existing = safeParseDashboardPersistence(window.localStorage.getItem(DASHBOARD_PERSISTENCE_KEY)) || {};
+      window.localStorage.setItem(DASHBOARD_PERSISTENCE_KEY, JSON.stringify({
+        ...existing,
+        viewMode: "calendar",
+        calendarScope: "day",
+        calendarFocusedStaffId: null,
+        selectedDate: getLocalDateKey(new Date()),
+        startDate: defaults.start,
+        endDate: defaults.end,
+        filterStaffId: "",
+        filterServiceId: "",
+        filterStatus: "",
+        filterPaymentStatus: "",
+        appointmentSearch: ""
+      }));
+    }
   };
 
   const getWeekRangeFromDateKey = (dateKey: string) => {

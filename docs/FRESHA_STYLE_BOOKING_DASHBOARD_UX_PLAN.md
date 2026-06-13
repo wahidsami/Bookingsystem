@@ -13,7 +13,7 @@ Bring the tenant booking dashboard closer to the Fresha operating model without 
 - Phase 2 is mostly implemented, with search and drawer prefetch in place.
 - Structured `appointment_events` are now exposed in the drawer timeline, with note parsing as fallback.
 - Phase 3 remains conditional and should only happen if the current model proves limiting.
-- Phase 4 remains as the guardrail and polish pass.
+- Phase 4 is partially implemented through dashboard state persistence and scroll restoration.
 
 ## Key Changes
 - Preserve the calendar behind every drawer state.
@@ -51,8 +51,10 @@ Pending and conditional:
 - Add a normalized service-item layer only if the UI needs first-class line items and the backend cannot infer them from booking sessions.
 
 ### Phase 4: Guardrails and performance
-Pending:
-- Preserve date, scroll position, staff filters, and calendar scope when drawers open and close.
+Partially implemented:
+- Preserves date, scroll position, staff filters, calendar scope, and the current working search/query state.
+
+Still pending:
 - Use cached/preloaded payloads to keep drawer opens feeling fast.
 - Keep keyboard navigation and contrast strong.
 - Keep the mobile customer app unchanged in this rollout.
@@ -60,7 +62,8 @@ Pending:
 ## What Is Left
 - Confirm the drawer and search experience on very large tenant datasets.
 - Decide whether booking-session reporting needs any additional index or projection support.
-- Add any remaining performance guardrails once real usage feedback comes in.
+- Tune cache/revalidation behavior after real usage feedback comes in.
+- Keep the remaining mobile app work isolated from this tenant-dashboard rollout.
 
 ## Test Plan
 - Open the calendar and confirm it stays visible while drawers open.
