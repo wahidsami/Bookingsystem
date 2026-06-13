@@ -9,7 +9,7 @@ import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklySchedul
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { tenantApi } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
 import {
@@ -205,6 +205,7 @@ export default function AppointmentsPage() {
   const dialog = useAppDialog();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
+  const router = useRouter();
   const advancedDragEnabled = process.env.NEXT_PUBLIC_APPOINTMENTS_ADVANCED_DRAG !== "0";
   const [hydrated, setHydrated] = useState(false);
 
@@ -234,6 +235,27 @@ export default function AppointmentsPage() {
   const [showAppointmentDetailsDrawer, setShowAppointmentDetailsDrawer] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [appointmentSearch, setAppointmentSearch] = useState("");
+  const [dashboardSearchResults, setDashboardSearchResults] = useState<{
+    appointments: Appointment[];
+    customers: Array<{
+      id: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string | null;
+      phone?: string | null;
+      profileImage?: string | null;
+      walletBalance?: number;
+      loyaltyPoints?: number;
+      totalSpent?: number;
+      totalBookings?: number;
+    }>;
+    summary?: {
+      appointmentCount?: number;
+      customerCount?: number;
+      totalResults?: number;
+    };
+  } | null>(null);
+  const [dashboardSearchLoading, setDashboardSearchLoading] = useState(false);
   const [gridHourHeight, setGridHourHeight] = useState(() => {
     if (typeof window === "undefined") {
       return 240;
@@ -314,6 +336,47 @@ export default function AppointmentsPage() {
     Boolean(filterPaymentStatus),
     Boolean(appointmentSearch.trim())
   ].filter(Boolean).length;
+
+  useEffect(() => {
+    const query = appointmentSearch.trim();
+
+    if (query.length < 2) {
+      setDashboardSearchResults(null);
+      setDashboardSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          setDashboardSearchLoading(true);
+          const response = await tenantApi.searchDashboard({ search: query, limit: 5 });
+          if (!cancelled && response?.success) {
+            setDashboardSearchResults({
+              appointments: response.appointments || [],
+              customers: response.customers || [],
+              summary: response.summary || undefined
+            });
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.warn("Failed to search dashboard:", error);
+            setDashboardSearchResults(null);
+          }
+        } finally {
+          if (!cancelled) {
+            setDashboardSearchLoading(false);
+          }
+        }
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [appointmentSearch]);
 
   const visibleAppointments = useMemo(() => {
     const query = appointmentSearch.trim().toLowerCase();
@@ -1812,7 +1875,7 @@ export default function AppointmentsPage() {
       )}
 
       <div className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="rounded-3xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div className="relative rounded-3xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
           <label className="flex items-center gap-3">
             <MagnifyingGlassIcon className="h-5 w-5 flex-shrink-0 text-gray-400" />
             <input
@@ -1832,6 +1895,124 @@ export default function AppointmentsPage() {
               </button>
             ) : null}
           </label>
+          {appointmentSearch.trim().length >= 2 && (
+            <div className="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "نتائج سريعة" : "Quick results"}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {dashboardSearchLoading
+                      ? (locale === "ar" ? "جارٍ البحث..." : "Searching...")
+                      : dashboardSearchResults?.summary
+                        ? `${dashboardSearchResults.summary.totalResults || 0} ${locale === "ar" ? "نتيجة" : "results"}`
+                        : (locale === "ar" ? "اكتب بحثًا للعثور على المواعيد والعملاء." : "Type to find appointments and customers.")}
+                  </p>
+                </div>
+                {dashboardSearchResults?.summary ? (
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    {dashboardSearchResults.summary.appointmentCount || 0}/{dashboardSearchResults.summary.customerCount || 0}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="max-h-96 overflow-auto">
+                {dashboardSearchLoading ? (
+                  <div className="px-4 py-6 text-sm text-gray-500">
+                    {locale === "ar" ? "جارٍ تحميل النتائج..." : "Loading results..."}
+                  </div>
+                ) : (
+                  <>
+                    <div className="border-b border-gray-100 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                          {locale === "ar" ? "المواعيد" : "Appointments"}
+                        </p>
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700">
+                          {dashboardSearchResults?.appointments.length || 0}
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {(dashboardSearchResults?.appointments || []).length > 0 ? (
+                          dashboardSearchResults!.appointments.map((result) => {
+                            const customerName = result.user ? `${result.user.firstName} ${result.user.lastName}`.trim() : (locale === "ar" ? "عميل" : "Customer");
+                            const serviceName = locale === "ar" ? result.service?.name_ar : result.service?.name_en;
+                            return (
+                              <button
+                                key={result.id}
+                                type="button"
+                                onClick={() => handleOpenAppointmentDetails(result.id)}
+                                className="flex w-full items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:bg-gray-100"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-gray-900">{customerName}</p>
+                                  <p className="mt-1 truncate text-xs text-gray-500">
+                                    {serviceName || (locale === "ar" ? "خدمة" : "Service")}
+                                    {result.bookingNumber ? ` • ${result.bookingNumber}` : ""}
+                                  </p>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    {formatDateTime(result.startTime).date} • {formatDateTime(result.startTime).time} • {getStatusLabel(result.status, locale)}
+                                  </p>
+                                </div>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200">
+                                  {getPaymentStatusLabel(result.paymentStatus, locale)}
+                                </span>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <p className="text-sm text-gray-500">
+                            {locale === "ar" ? "لا توجد مواعيد مطابقة." : "No matching appointments."}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                          {locale === "ar" ? "العملاء" : "Customers"}
+                        </p>
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700">
+                          {dashboardSearchResults?.customers.length || 0}
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {(dashboardSearchResults?.customers || []).length > 0 ? (
+                          dashboardSearchResults!.customers.map((customer) => {
+                            const customerName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || (locale === "ar" ? "عميل" : "Customer");
+                            return (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                onClick={() => router.push(`/${locale}/dashboard/customers/${customer.id}`)}
+                                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:bg-gray-100"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-gray-900">{customerName}</p>
+                                  <p className="mt-1 truncate text-xs text-gray-500">
+                                    {customer.email || customer.phone || (locale === "ar" ? "ملف العميل" : "Customer profile")}
+                                  </p>
+                                </div>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200">
+                                  {locale === "ar" ? "فتح" : "Open"}
+                                </span>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <p className="text-sm text-gray-500">
+                            {locale === "ar" ? "لا توجد ملفات عملاء مطابقة." : "No matching customer profiles."}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">

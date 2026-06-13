@@ -83,6 +83,7 @@ router.use('/dashboard-accounts', tenantDashboardAccountRoutes);
 router.get('/dashboard/stats', tenantDashboardController.getDashboardStats);
 router.get('/dashboard/todays-appointments', tenantDashboardController.getTodaysAppointments);
 router.get('/dashboard/revenue-chart', tenantDashboardController.getRevenueChartData);
+router.get('/dashboard/search', tenantAppointmentController.searchDashboard);
 
 // Employee management
 router.get('/employees', tenantEmployeeController.getEmployees);

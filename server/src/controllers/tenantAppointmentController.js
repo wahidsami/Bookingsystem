@@ -1328,6 +1328,162 @@ exports.getAppointmentsBoard = async (req, res) => {
 };
 
 /**
+ * Global dashboard search.
+ * GET /api/v1/tenant/dashboard/search?search=...
+ */
+exports.searchDashboard = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const search = `${req.query.search || ''}`.trim();
+        const safeLimit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 10, 25));
+
+        if (!search) {
+            return res.status(400).json({
+                success: false,
+                message: 'Search text is required'
+            });
+        }
+
+        const pattern = `%${search}%`;
+        const appointmentWhere = {
+            tenantId,
+            [Op.or]: [
+                { bookingNumber: { [Op.iLike]: pattern } },
+                { bookingReference: { [Op.iLike]: pattern } },
+                { notes: { [Op.iLike]: pattern } },
+                { '$service.name_en$': { [Op.iLike]: pattern } },
+                { '$service.name_ar$': { [Op.iLike]: pattern } },
+                { '$staff.name$': { [Op.iLike]: pattern } },
+                { '$user.firstName$': { [Op.iLike]: pattern } },
+                { '$user.lastName$': { [Op.iLike]: pattern } },
+                { '$user.email$': { [Op.iLike]: pattern } },
+                { '$user.phone$': { [Op.iLike]: pattern } }
+            ]
+        };
+
+        if (/^[0-9a-f-]{8,}$/i.test(search)) {
+            appointmentWhere[Op.or].unshift({ id: { [Op.eq]: search } });
+        }
+
+        const [appointments, customers] = await Promise.all([
+            db.Appointment.findAll({
+                where: appointmentWhere,
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        where: { tenantId },
+                        attributes: ['id', 'name_en', 'name_ar', 'duration', 'category', 'image'],
+                        required: true
+                    },
+                    {
+                        model: db.Staff,
+                        as: 'staff',
+                        where: { tenantId },
+                        attributes: ['id', 'name', 'photo', 'phone', 'email'],
+                        required: true
+                    },
+                    {
+                        model: db.PlatformUser,
+                        as: 'user',
+                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
+                        required: false
+                    }
+                ],
+                order: [['startTime', 'DESC']],
+                limit: safeLimit
+            }),
+            db.PlatformUser.findAll({
+                where: {
+                    [Op.or]: [
+                        { firstName: { [Op.iLike]: pattern } },
+                        { lastName: { [Op.iLike]: pattern } },
+                        { email: { [Op.iLike]: pattern } },
+                        { phone: { [Op.iLike]: pattern } }
+                    ]
+                },
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointments',
+                        where: { tenantId },
+                        required: true,
+                        attributes: []
+                    }
+                ],
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage', 'walletBalance', 'loyaltyPoints', 'totalSpent', 'totalBookings'],
+                distinct: true,
+                order: [['createdAt', 'DESC']],
+                limit: safeLimit
+            })
+        ]);
+
+        return res.json({
+            success: true,
+            search,
+            summary: {
+                appointmentCount: appointments.length,
+                customerCount: customers.length,
+                totalResults: appointments.length + customers.length
+            },
+            appointments: appointments.map((appointment) => ({
+                id: appointment.id,
+                bookingNumber: appointment.bookingNumber || null,
+                bookingReference: appointment.bookingReference || null,
+                startTime: appointment.startTime,
+                endTime: appointment.endTime,
+                status: appointment.status,
+                paymentStatus: appointment.paymentStatus,
+                notes: appointment.notes || null,
+                price: appointment.price,
+                service: appointment.service ? {
+                    id: appointment.service.id,
+                    name_en: appointment.service.name_en,
+                    name_ar: appointment.service.name_ar,
+                    duration: appointment.service.duration,
+                    category: appointment.service.category,
+                    image: appointment.service.image
+                } : null,
+                staff: appointment.staff ? {
+                    id: appointment.staff.id,
+                    name: appointment.staff.name,
+                    photo: appointment.staff.photo,
+                    phone: appointment.staff.phone,
+                    email: appointment.staff.email
+                } : null,
+                user: appointment.user ? {
+                    id: appointment.user.id,
+                    firstName: appointment.user.firstName,
+                    lastName: appointment.user.lastName,
+                    email: appointment.user.email,
+                    phone: appointment.user.phone,
+                    photo: appointment.user.photo || null
+                } : null
+            })),
+            customers: customers.map((customer) => ({
+                id: customer.id,
+                firstName: customer.firstName,
+                lastName: customer.lastName,
+                email: customer.email,
+                phone: customer.phone,
+                profileImage: customer.profileImage || null,
+                walletBalance: customer.walletBalance || 0,
+                loyaltyPoints: customer.loyaltyPoints || 0,
+                totalSpent: customer.totalSpent || 0,
+                totalBookings: customer.totalBookings || 0
+            }))
+        });
+    } catch (error) {
+        console.error('Search dashboard error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to search dashboard data',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Get a single appointment by ID
  * GET /api/v1/tenant/appointments/:id
  */

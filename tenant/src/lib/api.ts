@@ -1250,6 +1250,17 @@ class TenantApiClient {
     return this.get(`/tenant/appointments/stats${query ? `?${query}` : ''}`);
   }
 
+  async searchDashboard(params: {
+    search: string;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('search', params.search);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString();
+    return this.get(`/tenant/dashboard/search${query ? `?${query}` : ''}`);
+  }
+
   async updateAppointmentStatus(id: string, status: string, notes?: string): Promise<any> {
     return this.request(`/tenant/appointments/${id}/status`, {
       method: 'PATCH',
