@@ -536,7 +536,7 @@ exports.createAppointment = async (req, res) => {
             bookingItemIndex
         } = req.body || {};
 
-        if (!serviceId || !startTime) {
+        if ((!serviceId || !startTime) && (!Array.isArray(items) || items.length === 0)) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
