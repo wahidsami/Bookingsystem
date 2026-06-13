@@ -482,6 +482,7 @@ export function AppointmentDetailsDrawer({
   const [rescheduleValue, setRescheduleValue] = useState("");
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const customerProfileRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !appointmentId) {
@@ -503,6 +504,7 @@ export function AppointmentDetailsDrawer({
       setError("");
       setActionNotice(null);
       setLoading(false);
+      customerProfileRequestRef.current = null;
       return;
     }
 
@@ -547,20 +549,26 @@ export function AppointmentDetailsDrawer({
   }, [open, appointmentId, locale]);
 
   useEffect(() => {
-    if (!open || viewMode !== "customer" || !appointment?.user?.id) {
+    const customerId = appointment?.user?.id;
+    if (!open || !customerId) {
       return;
     }
 
-    if (customerProfile?.id === appointment.user.id) {
+    if (customerProfile?.id === customerId) {
+      return;
+    }
+
+    if (customerProfileRequestRef.current === customerId) {
       return;
     }
 
     let cancelled = false;
+    customerProfileRequestRef.current = customerId;
 
     const loadCustomer = async () => {
       try {
         setCustomerLoading(true);
-        const response = await tenantApi.getCustomer(appointment.user!.id);
+        const response = await tenantApi.getCustomer(customerId);
         if (!cancelled && response.success) {
           setCustomerProfile(response.data || null);
         }
@@ -571,6 +579,7 @@ export function AppointmentDetailsDrawer({
       } finally {
         if (!cancelled) {
           setCustomerLoading(false);
+          customerProfileRequestRef.current = null;
         }
       }
     };
@@ -579,8 +588,9 @@ export function AppointmentDetailsDrawer({
 
     return () => {
       cancelled = true;
+      customerProfileRequestRef.current = null;
     };
-  }, [open, appointment?.user?.id, viewMode, customerProfile?.id]);
+  }, [open, appointment?.user?.id, customerProfile?.id]);
 
   useEffect(() => {
     if (!open || viewMode !== "customer" || customerTab !== "transactions" || !appointment?.user?.id || !customerProfile) {
@@ -984,6 +994,48 @@ export function AppointmentDetailsDrawer({
                 </button>
               </div>
             </div>
+          ) : null}
+
+          {customerProfile ? (
+            <WorkspacePanel
+              title={locale === "ar" ? "معاينة العميل" : "Customer preview"}
+              subtitle={customerFullName}
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerTab("overview");
+                    setViewMode("customer");
+                  }}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                >
+                  {locale === "ar" ? "فتح المساحة" : "Open workspace"}
+                </button>
+              }
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <MetricTile
+                  label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
+                  value={customerProfile.totalBookings ?? 0}
+                  className="bg-white"
+                />
+                <MetricTile
+                  label={locale === "ar" ? "إجمالي الإنفاق" : "Total spent"}
+                  value={<Currency amount={Number(customerProfile.totalSpent || 0)} />}
+                  className="bg-white"
+                />
+                <MetricTile
+                  label={locale === "ar" ? "آخر زيارة" : "Last visit"}
+                  value={customerProfile.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
+                  className="bg-white"
+                />
+                <MetricTile
+                  label={locale === "ar" ? "النقاط" : "Points"}
+                  value={Number(customerProfile.loyaltyPoints || 0)}
+                  className="bg-white"
+                />
+              </div>
+            </WorkspacePanel>
           ) : null}
 
           <WorkspacePanel
