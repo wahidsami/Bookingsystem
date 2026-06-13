@@ -514,6 +514,8 @@ export function AppointmentActionDrawer({
 
     if (selectedStaffId && !assignedEmployees.some((employee) => employee.id === selectedStaffId)) {
       setSelectedStaffId("");
+    } else if (!selectedStaffId && defaultStaffId && assignedEmployees.some((employee) => employee.id === defaultStaffId)) {
+      setSelectedStaffId(defaultStaffId);
     }
 
     if (!paymentMethod || !allowedPaymentMethods.includes(paymentMethod)) {
@@ -1191,7 +1193,7 @@ export function AppointmentActionDrawer({
                               onClick={() => {
                                 setSelectedServiceId(service.id);
                                 setSelectedVariantId(queuedItem?.variantId || "");
-                                setSelectedStaffId(queuedItem?.staffId || "");
+                                setSelectedStaffId(queuedItem?.staffId || selectedStaffId || defaultStaffId || "");
                                 setPaymentMethod("");
                               }}
                             >
@@ -1242,7 +1244,9 @@ export function AppointmentActionDrawer({
                                         checked={isQueued}
                                         onChange={() => {
                                           const selectedVariantForService = active ? (selectedVariantId || queuedItem?.variantId || null) : (queuedItem?.variantId || null);
-                                          const selectedStaffForService = active ? (selectedStaffId || queuedItem?.staffId || null) : (queuedItem?.staffId || null);
+                                          const selectedStaffForService = active
+                                            ? (selectedStaffId || queuedItem?.staffId || defaultStaffId || null)
+                                            : (queuedItem?.staffId || defaultStaffId || null);
                                           const added = toggleQueuedService(service.id, selectedVariantForService, selectedStaffForService);
 
                                           setSelectedServiceId(service.id);
