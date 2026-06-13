@@ -1474,25 +1474,44 @@ class ApiClient {
             return Array.from(map.values());
         };
 
-        const loadBookingsFromPath = async (endpoint: string) => {
+        const loadBookingsFromPath = async (endpoint: string): Promise<{ bookings: Booking[]; error: Error | null }> => {
             try {
-                return extractBookings(await this.get<{
+                const response = await this.get<{
                     success: boolean;
                     appointments?: Booking[];
                     bookings?: Booking[];
                     data?: { appointments?: Booking[]; bookings?: Booking[] };
-                }>(endpoint));
-            } catch (error) {
-                return [];
+                }>(endpoint);
+                return { bookings: extractBookings(response), error: null };
+            } catch (error: any) {
+                return {
+                    bookings: [],
+                    error: error instanceof Error ? error : new Error(error?.message || 'Request failed'),
+                };
             }
         };
 
         const fallbackQuery = resolvedPlatformUserId ? `?platformUserId=${encodeURIComponent(resolvedPlatformUserId)}` : '';
-        const [userScopedBookings, fallbackScopedBookings] = await Promise.all([
+        const [userScopedResult, fallbackScopedResult] = await Promise.all([
             loadBookingsFromPath('/users/bookings'),
-            fallbackQuery ? loadBookingsFromPath(`/bookings${fallbackQuery}`) : Promise.resolve([]),
+            fallbackQuery
+                ? loadBookingsFromPath(`/bookings${fallbackQuery}`)
+                : Promise.resolve({ bookings: [] as Booking[], error: null as Error | null }),
         ]);
-        const normalized = dedupeBookings([...userScopedBookings, ...fallbackScopedBookings]);
+
+        const normalized = dedupeBookings([
+            ...userScopedResult.bookings,
+            ...fallbackScopedResult.bookings,
+        ]);
+        const loadError = userScopedResult.error || fallbackScopedResult.error || null;
+
+        if (normalized.length === 0 && loadError) {
+            const authLikeError = /No token provided|Invalid or expired token|User not found|unauthorized/i.test(loadError.message);
+            if (authLikeError) {
+                throw new Error(`unauthorized: ${loadError.message}`);
+            }
+            throw loadError;
+        }
 
         if (!status) {
             return normalized;
