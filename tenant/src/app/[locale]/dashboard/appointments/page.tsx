@@ -234,6 +234,10 @@ export default function AppointmentsPage() {
   const [selectedBreak, setSelectedBreak] = useState<EmployeeBreak | null>(null);
   const [showAppointmentDetailsDrawer, setShowAppointmentDetailsDrawer] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [showAddServicePicker, setShowAddServicePicker] = useState(false);
+  const [addServiceSourceAppointment, setAddServiceSourceAppointment] = useState<AppointmentItem | null>(null);
+  const [addServicePickerQuery, setAddServicePickerQuery] = useState("");
+  const [addServicePickerSelectedId, setAddServicePickerSelectedId] = useState<string>("");
   const [appointmentSearch, setAppointmentSearch] = useState("");
   const [dashboardSearchResults, setDashboardSearchResults] = useState<{
     appointments: Appointment[];
@@ -410,6 +414,24 @@ export default function AppointmentsPage() {
       return haystack.includes(query);
     });
   }, [appointments, appointmentSearch, locale]);
+
+  const filteredServicesForPicker = useMemo(() => {
+    const query = addServicePickerQuery.trim().toLowerCase();
+    if (!query) {
+      return services;
+    }
+
+    return services.filter((service) => {
+      const serviceName = `${service.name_en || ""} ${service.name_ar || ""} ${service.category || ""}`.toLowerCase();
+      const employeeNames = (service.employees || []).map((employee) => employee.name).join(" ").toLowerCase();
+      return `${serviceName} ${employeeNames}`.includes(query);
+    });
+  }, [services, addServicePickerQuery]);
+
+  const selectedServiceForPicker = useMemo(
+    () => services.find((service) => service.id === addServicePickerSelectedId) || null,
+    [services, addServicePickerSelectedId]
+  );
 
   useEffect(() => {
     loadServices();
@@ -1005,30 +1027,56 @@ export default function AppointmentsPage() {
   };
 
   const handleAddServiceAppointment = (appointment: AppointmentItem) => {
-    const start = new Date(appointment.startTime);
+    setAddServiceSourceAppointment(appointment);
+    setAddServicePickerQuery("");
+    setAddServicePickerSelectedId("");
+    setShowAddServicePicker(true);
+    setShowAppointmentDetailsDrawer(false);
+  };
+
+  const handleAddServicePickerContinue = () => {
+    if (!addServiceSourceAppointment || !selectedServiceForPicker) {
+      return;
+    }
+
+    const end = new Date(addServiceSourceAppointment.endTime || addServiceSourceAppointment.startTime);
+    const date = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+    const time = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+
     setDrawerPrefill({
-      customer: appointment.user
+      customer: addServiceSourceAppointment.user
         ? {
-            id: appointment.user.id,
-            firstName: appointment.user.firstName,
-            lastName: appointment.user.lastName,
-            email: appointment.user.email,
-            phone: appointment.user.phone
+            id: addServiceSourceAppointment.user.id,
+            firstName: addServiceSourceAppointment.user.firstName,
+            lastName: addServiceSourceAppointment.user.lastName,
+            email: addServiceSourceAppointment.user.email,
+            phone: addServiceSourceAppointment.user.phone
           }
         : undefined,
-      staffId: appointment.staff?.id,
-      date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
-      time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
-      bookingSessionId: appointment.bookingSessionId || null,
-      bookingReference: appointment.bookingReference || appointment.bookingNumber || null,
+      staffId: addServiceSourceAppointment.staff?.id,
+      serviceId: selectedServiceForPicker.id,
+      date,
+      time,
+      bookingSessionId: addServiceSourceAppointment.bookingSessionId || null,
+      bookingReference: addServiceSourceAppointment.bookingReference || addServiceSourceAppointment.bookingNumber || null,
       startStep: 1,
-      paymentMethod: appointment.paymentMethod || undefined,
-      notes: appointment.notes || undefined
+      paymentMethod: addServiceSourceAppointment.paymentMethod || undefined,
+      notes: addServiceSourceAppointment.notes || undefined,
+      queuedServices: [
+        {
+          serviceId: selectedServiceForPicker.id,
+          staffId: addServiceSourceAppointment.staff?.id || null
+        }
+      ]
     });
     setQuickDrawerMode('appointment');
     setSelectedBreak(null);
     setShowQuickDrawer(true);
     setShowAppointmentDetailsDrawer(false);
+    setShowAddServicePicker(false);
+    setAddServiceSourceAppointment(null);
+    setAddServicePickerSelectedId("");
+    setAddServicePickerQuery("");
   };
 
   const handleOpenBlockedTime = (breakItem: EmployeeBreak) => {
@@ -2212,6 +2260,191 @@ export default function AppointmentsPage() {
           endHour={boardDisplayHours.endHour}
         />
       )}
+
+      {showAddServicePicker && addServiceSourceAppointment ? (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]">
+          <div className="w-full max-w-4xl overflow-hidden rounded-[2rem] bg-white shadow-2xl" dir={isRTL ? "rtl" : "ltr"}>
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70">
+                  {locale === "ar" ? "إضافة خدمة" : "Add service"}
+                </p>
+                <h3 className="mt-1 text-2xl font-bold text-gray-900">
+                  {locale === "ar" ? "اختر الخدمة التي تريد إضافتها" : "Choose the service to append"}
+                </h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  {locale === "ar"
+                    ? "اختر خدمة من النافذة المنبثقة ثم نفتح لك خطوة الجدولة مباشرة."
+                    : "Choose a service from the popup, then we jump straight into scheduling."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddServicePicker(false);
+                  setAddServiceSourceAppointment(null);
+                  setAddServicePickerSelectedId("");
+                  setAddServicePickerQuery("");
+                }}
+                className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-5 px-6 py-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الحجز الحالي" : "Current booking"}
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-gray-900">
+                    {addServiceSourceAppointment.service?.[locale === "ar" ? "name_ar" : "name_en"] || addServiceSourceAppointment.service?.name_en}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {addServiceSourceAppointment.user
+                      ? `${addServiceSourceAppointment.user.firstName} ${addServiceSourceAppointment.user.lastName}`.trim()
+                      : (locale === "ar" ? "لا يوجد عميل مرتبط" : "No linked customer")}
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "البداية" : "Start"}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {formatTimeLabel(new Date(addServiceSourceAppointment.startTime), locale)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "النهاية" : "End"}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {formatTimeLabel(new Date(addServiceSourceAppointment.endTime), locale)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <input
+                  type="text"
+                  value={addServicePickerQuery}
+                  onChange={(event) => setAddServicePickerQuery(event.target.value)}
+                  placeholder={locale === "ar" ? "ابحث في الخدمات..." : "Search services..."}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                />
+
+                <div className="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+                  {filteredServicesForPicker.length > 0 ? (
+                    filteredServicesForPicker.map((service) => {
+                      const active = selectedServiceForPicker?.id === service.id;
+                      const serviceName = locale === "ar" ? service.name_ar : service.name_en;
+                      const employeeCount = (service.employees || []).length;
+                      return (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => setAddServicePickerSelectedId(service.id)}
+                          className={`w-full rounded-3xl border p-4 text-left transition ${
+                            active
+                              ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                              : "border-gray-200 bg-white hover:border-primary/30 hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-gray-900">{serviceName}</p>
+                              <p className="mt-1 text-xs text-gray-500">
+                                {service.category || service.parentName || service.parentService || (locale === "ar" ? "خدمة" : "Service")}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-700">
+                              {employeeCount} {locale === "ar" ? "موظف" : "staff"}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <div className="text-xs text-gray-500">
+                              {service.duration} {locale === "ar" ? "دقيقة" : "min"}
+                              {Array.isArray(service.variants) && service.variants.length > 0 ? ` • ${locale === "ar" ? "خيارات" : "variants"}` : ""}
+                            </div>
+                            <Currency amount={Number(service.finalPrice || 0)} className="text-sm font-semibold text-gray-900" />
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                      {locale === "ar" ? "لا توجد خدمات مطابقة." : "No matching services found."}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الاختيار الحالي" : "Current selection"}
+                  </p>
+                  {selectedServiceForPicker ? (
+                    <div className="mt-3 rounded-3xl bg-white p-4 ring-1 ring-gray-200">
+                      <p className="text-lg font-semibold text-gray-900">
+                        {locale === "ar" ? selectedServiceForPicker.name_ar : selectedServiceForPicker.name_en}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {selectedServiceForPicker.duration} {locale === "ar" ? "دقيقة" : "min"} • {selectedServiceForPicker.category || selectedServiceForPicker.parentName || selectedServiceForPicker.parentService || (locale === "ar" ? "خدمة" : "Service")}
+                      </p>
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <span className="text-sm text-gray-500">
+                          {locale === "ar" ? "سيفتح المحرر الخطوة التالية مباشرة" : "The next scheduling step opens right away"}
+                        </span>
+                        <Currency amount={Number(selectedServiceForPicker.finalPrice || 0)} className="text-xl font-bold text-gray-900" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-3xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">
+                      {locale === "ar" ? "اختر خدمة من القائمة لبدء الإضافة." : "Pick a service from the list to start."}
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddServicePicker(false);
+                        setAddServiceSourceAppointment(null);
+                        setAddServicePickerSelectedId("");
+                        setAddServicePickerQuery("");
+                      }}
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
+                    >
+                      {locale === "ar" ? "إلغاء" : "Cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddServicePickerContinue}
+                      disabled={!selectedServiceForPicker}
+                      className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {locale === "ar" ? "متابعة" : "Continue"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-primary/10 bg-primary/5 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                    {locale === "ar" ? "ملاحظة سريعة" : "Quick note"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-gray-700">
+                    {locale === "ar"
+                      ? "هذا الاختيار لا يغادر الشاشة الحالية. بعد اختيار الخدمة، نفتح نافذة الجدولة المحسنة مع الخدمة جاهزة للإضافة."
+                      : "This keeps you on the current screen. Once you choose a service, we open the improved booking drawer with it preloaded."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <AppointmentDetailsDrawer
         open={showAppointmentDetailsDrawer}

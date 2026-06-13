@@ -94,6 +94,7 @@ export interface AppointmentActionDrawerPrefill {
   notes?: string;
   bookingSessionId?: string | null;
   bookingReference?: string | null;
+  queuedServices?: BookingDraftItem[];
 }
 
 type DrawerMode = "appointment" | "blocked_time";
@@ -320,16 +321,16 @@ export function AppointmentActionDrawer({
         gender: "",
         dateOfBirth: ""
       });
-      setSelectedServiceId(prefill?.serviceId || "");
-      setSelectedVariantId(prefill?.variantId || "");
-      setSelectedStaffId(prefill?.staffId || defaultStaffId || "");
+      setSelectedServiceId(prefill?.serviceId || prefill?.queuedServices?.[0]?.serviceId || "");
+      setSelectedVariantId(prefill?.variantId || prefill?.queuedServices?.[0]?.variantId || "");
+      setSelectedStaffId(prefill?.staffId || prefill?.queuedServices?.[0]?.staffId || defaultStaffId || "");
       setAppointmentDate(prefill?.date || defaultDate || getTodayDateKey());
       setAppointmentTime(prefill?.time || defaultTime || "10:00");
       setPaymentMethod(prefill?.paymentMethod || "");
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
       setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
-      setQueuedServices([]);
+      setQueuedServices(prefill?.queuedServices || []);
       return;
     }
 
