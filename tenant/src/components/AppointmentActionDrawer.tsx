@@ -986,7 +986,7 @@ export function AppointmentActionDrawer({
       />
 
       <aside
-        className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[42rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[76rem] bg-white shadow-2xl`}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
         <div className="flex h-full flex-col">
@@ -994,12 +994,12 @@ export function AppointmentActionDrawer({
             <div>
               <h3 className="text-xl font-bold text-gray-900">
                 {mode === "appointment"
-                  ? (locale === "ar" ? "موعد جديد" : "New Appointment")
+                  ? (locale === "ar" ? "مساحة الحجز" : "Booking workspace")
                   : (locale === "ar" ? "حظر وقت" : "Blocked Time")}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
                 {mode === "appointment"
-                  ? (locale === "ar" ? "أنشئ موعدًا من دون مغادرة اللوحة." : "Create an appointment without leaving the board.")
+                  ? (locale === "ar" ? "أنشئ أو عدل الحجز من نفس اللوحة." : "Create or edit a booking from the same panel.")
                   : (locale === "ar" ? "احجز وقتًا محجوزًا لموظف." : "Reserve time for an employee.")}
               </p>
             </div>
@@ -1034,52 +1034,31 @@ export function AppointmentActionDrawer({
             )}
 
             {mode === "appointment" ? (
-              <div className="space-y-5">
-                <div className={`rounded-2xl border border-gray-200 bg-white p-3 ${appointmentStep === 0 ? "" : "hidden"}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {appointmentStepLabels.map((label, index) => (
-                        <div
-                          key={label}
-                          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${
-                            index === appointmentStep
-                              ? "bg-primary text-white"
-                              : index < appointmentStep
-                                ? "bg-primary/10 text-primary"
-                                : "bg-gray-50 text-gray-500 ring-1 ring-gray-200"
-                          }`}
-                        >
-                          {label}
-                        </div>
-                      ))}
+              <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <div className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+                  <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                          {locale === "ar" ? "مساحة العميل" : "Customer panel"}
+                        </p>
+                        <h4 className="mt-1 text-base font-semibold text-gray-900">
+                          {selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer")}
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleWalkInCustomer}
+                        className="rounded-full border border-dashed border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:border-primary/50 hover:bg-primary/10"
+                      >
+                        {locale === "ar" ? "عميل حضوري" : "Walk in"}
+                      </button>
                     </div>
-                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold text-primary">
-                      {appointmentStep + 1} / {appointmentStepCount}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`rounded-3xl border border-gray-200 bg-gray-50 p-4 ${appointmentStep === 0 ? "" : "hidden"}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "العميل" : "Customer"}</p>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar" ? "ابحث عن عميل أو اختر عميلًا من القائمة." : "Search for a customer or pick one from the list."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleWalkInCustomer}
-                    className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary/50 hover:bg-primary/10"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path d="M10 3a2 2 0 100 4 2 2 0 000-4zM5.5 8.5A1.5 1.5 0 004 10v3.25A2.75 2.75 0 006.75 16h6.5A2.75 2.75 0 0016 13.25V10a1.5 1.5 0 00-1.5-1.5H5.5z" />
-                    </svg>
-                    <span>{locale === "ar" ? "عميل حضوري" : "Walk In Customer"}</span>
-                  </button>
-                  <div className="mt-4 space-y-3">
+                    <p className="mt-2 text-sm text-gray-500">
+                      {locale === "ar"
+                        ? "ابحث عن عميل موجود أو أكمل كحجز حضوري."
+                        : "Search for an existing customer or continue as a walk-in."}
+                    </p>
                     <input
                       type="text"
                       value={customerSearch}
@@ -1087,18 +1066,18 @@ export function AppointmentActionDrawer({
                         setSelectedCustomer(null);
                         setCustomerSearch(e.target.value);
                         setCustomerMode("existing");
-                        setAppointmentStep(0);
                       }}
                       placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      className="mt-4 w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                       style={{ textAlign: isRTL ? "right" : "left" }}
                     />
-
-                    {customerLoading ? (
-                      <div className="text-xs text-gray-500">{locale === "ar" ? "جارٍ البحث..." : "Searching..."}</div>
-                    ) : customers.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {customers.map((customer) => {
+                    <div className="mt-4 space-y-3">
+                      {customerLoading ? (
+                        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
+                          {locale === "ar" ? "جارٍ البحث..." : "Searching..."}
+                        </div>
+                      ) : customers.length > 0 ? (
+                        customers.slice(0, 6).map((customer) => {
                           const active = selectedCustomer?.id === customer.id;
                           return (
                             <button
@@ -1109,7 +1088,7 @@ export function AppointmentActionDrawer({
                                 setCustomerMode("existing");
                                 setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
                               }}
-                              className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"}`}
+                              className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-purple-50" : "border-gray-200 bg-white hover:border-primary/40"}`}
                             >
                               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
                                 {getInitials(customer.firstName, customer.lastName)}
@@ -1118,777 +1097,171 @@ export function AppointmentActionDrawer({
                                 <p className="truncate font-semibold text-gray-900">
                                   {customer.firstName} {customer.lastName}
                                 </p>
-                                <p className="truncate text-xs text-gray-500">{customer.email}</p>
-                                <p className="truncate text-xs text-gray-500">{customer.phone}</p>
+                                <p className="truncate text-xs text-gray-500">{customer.email || customer.phone}</p>
                               </div>
                             </button>
                           );
-                        })}
-                      </div>
-                    ) : customerSearch.trim().length >= 1 ? (
-                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-600">
-                        {locale === "ar"
-                          ? "لا يوجد عميل مطابق. يمكنك استخدام عميل حضوري بدلاً من ذلك."
-                          : "No customer found. You can use Walk In instead."}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-600">
-                        {locale === "ar"
-                          ? "ابدأ بالبحث عن عميل موجود بالاسم أو الهاتف أو البريد."
-                          : "Start by searching for an existing customer by name, phone, or email."}
-                      </div>
-                    )}
+                        })
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
+                          {customerSearch.trim().length >= 1
+                            ? (locale === "ar" ? "لا يوجد عميل مطابق." : "No customer found.")
+                            : (locale === "ar" ? "ابدأ بالبحث عن عميل موجود." : "Start by searching for a customer.")}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 1 ? "" : "hidden"}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-base font-semibold text-gray-900">
-                        {locale === "ar" ? "الخدمات" : "Services"}
-                      </h4>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar"
-                          ? "اختر خدمة، أضفها إلى نفس الحجز، ثم كرر الخطوة لإضافة خدمات أخرى."
-                          : "Choose a service, add it to the same booking, then repeat to add more services."}
-                      </p>
+                <div className="space-y-5">
+                  <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                          {locale === "ar" ? "ملخص الحجز" : "Booking summary"}
+                        </p>
+                        <h4 className="mt-1 text-lg font-semibold text-gray-900">
+                          {selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer")}
+                        </h4>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {selectedServiceName || (locale === "ar" ? "لم تُحدَّد خدمة" : "No service selected")}
+                        </p>
+                      </div>
+                      <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                        {appointmentSummaryTimeLabel}
+                      </div>
                     </div>
-                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                      {queuedServiceCount > 0
-                        ? locale === "ar"
-                          ? `${queuedServiceCount} خدمة مضافة`
-                          : `${queuedServiceCount} service${queuedServiceCount === 1 ? "" : "s"} added`
-                        : selectedServiceName || (locale === "ar" ? "لم تُحدَّد خدمة" : "No service selected")}
-                    </div>
-                  </div>
 
-                  <div className="mt-4 space-y-5">
-                    {groupedServices.map((group) => (
-                      <div key={group.heading || group.items[0]?.id} className="space-y-3">
-                        {group.heading ? (
-                          <div className="flex items-center gap-3">
-                            <div className="h-px flex-1 bg-gray-200" />
-                            <div className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-600">
-                              {group.heading}
-                            </div>
-                            <div className="h-px flex-1 bg-gray-200" />
-                          </div>
-                        ) : null}
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "العميل" : "Customer"}</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer")}</div>
+                        {selectedCustomer ? <div className="mt-1 truncate text-xs text-gray-500">{selectedCustomer.email || selectedCustomer.phone || "-"}</div> : null}
+                      </div>
 
-                        <div className="space-y-3">
-                        {group.items.map((service) => {
-                          const active = service.id === selectedServiceId;
-                          const serviceName = locale === "ar" ? service.name_ar : service.name_en;
-                          const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
-                          const serviceVariantsForCard = parseArrayValue<ServiceVariant>(service.variants).filter((variant) => variant.isActive !== false);
-                          const queuedIndexForService = findQueuedServiceIndex(service.id);
-                          const isQueued = queuedIndexForService >= 0;
-                          const queuedItem = isQueued ? queuedServices[queuedIndexForService] : null;
-                          return (
-                            <div
-                              key={service.id}
-                              className={`group overflow-hidden rounded-3xl border text-left transition ${
-                                active
-                                  ? "border-primary bg-purple-50 ring-2 ring-primary/20"
-                                  : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
-                              }`}
-                              onClick={() => {
-                                setSelectedServiceId(service.id);
-                                setSelectedVariantId(queuedItem?.variantId || "");
-                                setSelectedStaffId(queuedItem?.staffId || selectedStaffId || defaultStaffId || "");
-                                setPaymentMethod("");
-                              }}
-                            >
-                              <div className="grid gap-0 lg:grid-cols-[160px_minmax(0,1fr)]">
-                                <div className="relative h-32 w-full overflow-hidden bg-gray-100 lg:h-full lg:min-h-[168px]">
-                                  {service.image ? (
-                                    <img
-                                      src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
-                                      alt={serviceName}
-                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                                    />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-gray-300">
-                                      <svg className="h-10 w-10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/25 to-transparent" />
-                                </div>
-
-                                <div className="min-w-0 p-4 sm:p-5">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
-                                        {isQueued ? (
-                                          <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                            {locale === "ar" ? "مضافة" : "Added"}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                      <p className="mt-1 text-xs text-gray-500">
-                                        {serviceParent
-                                          ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
-                                          : locale === "ar"
-                                            ? "بدون فئة"
-                                            : "No category"}
-                                      </p>
-                                    </div>
-
-                                    <label
-                                      className="flex shrink-0 items-center gap-2 rounded-full bg-gray-50 px-3 py-2 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200"
-                                      onClick={(event) => event.stopPropagation()}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={isQueued}
-                                        onChange={() => {
-                                          const selectedVariantForService = active ? (selectedVariantId || queuedItem?.variantId || null) : (queuedItem?.variantId || null);
-                                          const selectedStaffForService = active
-                                            ? (selectedStaffId || queuedItem?.staffId || defaultStaffId || null)
-                                            : (queuedItem?.staffId || defaultStaffId || null);
-                                          const added = toggleQueuedService(service.id, selectedVariantForService, selectedStaffForService);
-
-                                          setSelectedServiceId(service.id);
-                                          setSelectedVariantId(selectedVariantForService || "");
-                                          setSelectedStaffId(selectedStaffForService || "");
-                                          setPaymentMethod("");
-                                          setError("");
-
-                                          if (!added && !isQueued) {
-                                            setError(locale === "ar" ? "تعذر إضافة الخدمة." : "Unable to add the service.");
-                                          }
-                                        }}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                      />
-                                      <span>{isQueued ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "إضافة" : "Add")}</span>
-                                    </label>
-                                  </div>
-
-                                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
-                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                      ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                    </span>
-                                    <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                      <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
-                                    </span>
-                                  </div>
-
-                                  {serviceVariantsForCard.length > 0 ? (
-                                    <div className="mt-4 border-t border-gray-100 pt-4">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                          {locale === "ar" ? "النسخ" : "Variants"}
-                                        </div>
-                                        {queuedItem?.variantId ? (
-                                          <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold text-primary">
-                                            {locale === "ar" ? "نسخة مختارة" : "Variant selected"}
-                                          </div>
-                                        ) : null}
-                                      </div>
-
-                                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        {serviceVariantsForCard.map((variant) => {
-                                          const activeVariant = active && selectedVariantId === variant.id;
-                                          return (
-                                            <button
-                                              key={variant.id}
-                                              type="button"
-                                              onClick={() => {
-                                                setSelectedServiceId(service.id);
-                                                setSelectedVariantId(variant.id);
-                                                setPaymentMethod("");
-                                                if (isQueued) {
-                                                  updateQueuedService(service.id, variant.id, selectedStaffId || queuedItem?.staffId || null);
-                                                }
-                                              }}
-                                              className={`rounded-2xl border px-3 py-3 text-left transition ${
-                                                activeVariant
-                                                  ? "border-primary bg-white ring-2 ring-primary/20"
-                                                  : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
-                                              }`}
-                                            >
-                                              <div className="flex items-center justify-between gap-3">
-                                                <div className="min-w-0">
-                                                  <div className="truncate text-sm font-semibold text-gray-900">
-                                                    {variant.description}
-                                                  </div>
-                                                  <div className="mt-1 text-xs text-gray-500">
-                                                    {variant.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                                  </div>
-                                                </div>
-                                                <div className="shrink-0 text-sm font-bold text-primary">
-                                                  <Currency amount={toSafeMoneyNumber(variant.finalPrice ?? 0)} />
-                                                </div>
-                                              </div>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                            );
-                          })}
+                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الخدمة" : "Service"}</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{selectedServiceName || (locale === "ar" ? "غير محددة" : "Not selected")}</div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          {selectedServiceParentLabel ? `${locale === "ar" ? "الفئة" : "Category"}: ${selectedServiceParentLabel}` : `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
                         </div>
                       </div>
-                    ))}
+
+                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الموظف" : "Staff"}</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{selectedStaff?.name || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}</div>
+                        <div className="mt-1 text-xs text-gray-500">{selectedStaffId || (locale === "ar" ? "سيتم التعيين تلقائيًا" : "Will be auto assigned")}</div>
+                      </div>
+
+                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "التاريخ والوقت" : "Date & time"}</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{appointmentDate} {appointmentTime}</div>
+                        <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "المدة" : "Duration"}: {displayDuration} {locale === "ar" ? "دقيقة" : "min"}</div>
+                      </div>
+
+                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "طريقة الدفع" : "Payment method"}</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{paymentMethodLabel || "-"}</div>
+                        <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "الإجمالي" : "Total"}: <Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} /></div>
+                      </div>
+
+                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "المجموع النهائي" : "Final total"}</div>
+                        <div className="mt-1 text-lg font-semibold text-primary"><Currency amount={queuedServices.length > 0 ? queuedServicesTotal : displayTotalPrice} /></div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          {queuedServices.length > 0
+                            ? (locale === "ar" ? `${queuedServices.length} خدمات في الحجز الحالي` : `${queuedServices.length} services in the current booking`)
+                            : (locale === "ar" ? "بدون خدمات إضافية" : "No extra services")}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="grid gap-5 xl:grid-cols-2">
+                    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "العميل المختار" : "Selected customer"}</p>
+                          <p className="text-xs text-gray-500">
+                            {selectedCustomer
+                              ? (selectedCustomer.email || selectedCustomer.phone || (locale === "ar" ? "تم اختيار عميل" : "Customer selected"))
+                              : (locale === "ar" ? "لا يوجد عميل محفوظ بعد" : "No saved customer yet")}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                          {customerMode === "guest"
+                            ? (locale === "ar" ? "ضيف" : "Guest")
+                            : customerMode === "new"
+                              ? (locale === "ar" ? "جديد" : "New")
+                              : (locale === "ar" ? "موجود" : "Existing")}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الاسم" : "Name"}</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{selectedCustomer ? `${selectedCustomer.firstName || ""} ${selectedCustomer.lastName || ""}`.trim() : (selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer"))}</div>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الهاتف" : "Phone"}</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{selectedCustomer?.phone || "-"}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الملاحظات" : "Notes"}</p>
+                          <p className="text-xs text-gray-500">{locale === "ar" ? "الملاحظات النصية للحجز" : "Free-text booking notes"}</p>
+                        </div>
+                      </div>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder={locale === "ar" ? "أضف ملاحظات..." : "Add booking notes..."}
+                        className="mt-4 min-h-[150px] w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? "right" : "left" }}
+                      />
+                    </div>
+                  </div>
+
+                  {includeGroupGuest || groupGuest.firstName.trim() || groupGuest.lastName.trim() || groupGuest.phone.trim() ? (
+                    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "تفاصيل الضيف" : "Guest details"}</p>
+                          <p className="text-xs text-gray-500">{locale === "ar" ? "بيانات الضيف الإضافي على نفس الحجز." : "Additional guest information for the same booking."}</p>
+                        </div>
+                        {groupGuest.isFree ? <span className="rounded-full bg-green-50 px-3 py-1 text-[11px] font-semibold text-green-700">{locale === "ar" ? "مجاني" : "Free"}</span> : null}
+                      </div>
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الاسم" : "Name"}</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{`${groupGuest.firstName} ${groupGuest.lastName}`.trim() || "-"}</div>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الهاتف" : "Phone"}</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{groupGuest.phone || "-"}</div>
+                        </div>
+                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الخدمة" : "Service"}</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{selectedGuestService?.name_en || selectedGuestService?.name_ar || "-"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {locale === "ar" ? "الخدمات المحددة" : "Selected services"}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {queuedServices.length > 0
-                            ? (locale === "ar"
-                              ? `${queuedServices.length} خدمات في الحجز الحالي`
-                              : `${queuedServices.length} services in the current booking`)
-                            : (selectedVariantName || `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`)}
-                        </p>
-                        {queuedServices.length === 0 && selectedServiceParentLabel ? (
-                          <p className="mt-1 text-xs text-gray-500">
-                            {locale === "ar" ? "الفئة" : "Category"}: {selectedServiceParentLabel}
-                          </p>
-                        ) : null}
+                        <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الإجراءات" : "Actions"}</p>
+                        <p className="text-xs text-gray-500">{locale === "ar" ? "احفظ التغييرات أو أغلق اللوحة." : "Save the booking changes or close the panel."}</p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-primary">
-                          <Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} />
-                        </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={onClose} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">{locale === "ar" ? "إغلاق" : "Close"}</button>
+                        <button type="button" onClick={handleAppointmentSubmit} disabled={saving} className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">{saving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "حفظ الحجز" : "Save booking")}</button>
                       </div>
                     </div>
-
-                    {queuedServices.length > 0 ? (
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl bg-white p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                            {locale === "ar" ? "الإجمالي الفرعي" : "Subtotal"}
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            <Currency amount={queuedServicesSubtotal} />
-                          </div>
-                        </div>
-                        <div className="rounded-2xl bg-white p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                            {locale === "ar" ? "خدمات مختارة" : "Selected services"}
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            {queuedServices.length}
-                          </div>
-                        </div>
-                        <div className="rounded-2xl bg-white p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                            {locale === "ar" ? "الإجمالي النهائي" : "Final total"}
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-primary">
-                            <Currency amount={queuedServicesTotal} />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-xs text-gray-500">
-                        {locale === "ar"
-                          ? "استخدم مربعات الاختيار لتجميع الخدمات واحتساب الإجمالي تلقائياً."
-                          : "Use the checkboxes to bundle services and calculate the total automatically."}
-                      </div>
-                    )}
-                  </div>
-                  {queuedServices.length > 0 ? (
-                    <div className="mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {locale === "ar" ? "الخدمات المضافة" : "Queued services"}
-                        </p>
-                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-primary ring-1 ring-primary/20">
-                          {queuedServices.length}
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {queuedServices.map((item, index) => {
-                          const service = services.find((entry) => entry.id === item.serviceId);
-                          const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
-                          const label = locale === "ar"
-                            ? (service?.name_ar || service?.name_en || "")
-                            : (service?.name_en || service?.name_ar || "");
-                          return (
-                            <div key={`${item.serviceId}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-gray-900">{label || item.serviceId}</p>
-                                <p className="truncate text-xs text-gray-500">
-                                  {variant?.description || `${service?.duration || 30} ${locale === "ar" ? "دقيقة" : "min"}`}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveQueuedService(index)}
-                                className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
-                              >
-                                {locale === "ar" ? "حذف" : "Remove"}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 2 ? "" : "hidden"}`}>
-                  <h4 className="text-base font-semibold text-gray-900">
-                    {locale === "ar" ? "الخدمة والموعد" : "Schedule"}
-                  </h4>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {locale === "ar"
-                      ? "راجع مقدم الخدمة والتاريخ والوقت إذا احتجت ذلك."
-                      : "Review the provider, date, and time if you need to change them."}
-                  </p>
-                  <div className="mt-4 grid grid-cols-1 gap-4">
-                    <select
-                      value={selectedStaffId}
-                      onChange={(e) => setSelectedStaffId(e.target.value)}
-                      disabled={!selectedService}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary disabled:bg-gray-100"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    >
-                      <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
-                      {assignedEmployees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="date"
-                        value={appointmentDate}
-                        onChange={(e) => setAppointmentDate(e.target.value)}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      />
-                      <select
-                        value={appointmentTime}
-                        onChange={(e) => setAppointmentTime(e.target.value)}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      >
-                        {TIME_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {locale === "ar" ? option.labelAr : option.labelEn}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {locale === "ar" ? "سعر الخدمة" : "Service price"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {locale === "ar" ? "المدة والسعر حسب الخدمة أو النسخة المختارة." : "Duration and price follow the selected service or variant."}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-primary">
-                            <Currency amount={displayServicePrice} />
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {displayDuration} {locale === "ar" ? "دقيقة" : "min"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 4 ? "" : "hidden"}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-base font-semibold text-gray-900">
-                        {locale === "ar" ? "الدفع" : "Payment"}
-                      </h4>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar" ? "اختر طريقة الدفع المتاحة لهذه الخدمة." : "Choose one of the payment methods available for this service."}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-primary">
-                      {allowedPaymentMethods.length}/3
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    {[
-                      { id: "at-center", title: locale === "ar" ? "الدفع عند المركز" : "Pay at Center" },
-                      { id: "online-full", title: locale === "ar" ? "الدفع الكامل أونلاين" : "Pay in Full Online" },
-                      { id: "booking-fee", title: locale === "ar" ? "عربون الحجز" : "Booking Fee" }
-                    ]
-                      .filter((option) => allowedPaymentMethods.includes(option.id))
-                      .map((option) => {
-                        const active = paymentMethod === option.id;
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => setPaymentMethod(option.id)}
-                            className={`rounded-2xl border px-4 py-3 text-left transition ${
-                              active
-                                ? 'border-primary bg-purple-50'
-                                : 'border-gray-200 bg-white hover:border-purple-300'
-                            }`}
-                          >
-                            <div className="text-sm font-semibold text-gray-900">{option.title}</div>
-                          </button>
-                        );
-                      })}
-                  </div>
-                  {includeGroupGuest ? (
-                    <div className="mt-4 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-gray-600">{locale === "ar" ? "سعر الخدمة الأساسية" : "Main service price"}</span>
-                        <span className="font-semibold text-gray-900">
-                          <Currency amount={displayServicePrice} />
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="text-gray-600">{locale === "ar" ? "سعر خدمة الضيف" : "Guest service fee"}</span>
-                        <span className="font-semibold text-gray-900">
-                          <Currency amount={guestServicePrice} />
-                        </span>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-200 pt-3">
-                        <span className="text-sm font-semibold text-gray-800">{locale === "ar" ? "الإجمالي" : "Total amount"}</span>
-                        <span className="text-lg font-bold text-primary">
-                          <Currency amount={displayTotalPrice} />
-                        </span>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 3 ? "" : "hidden"}`}>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-base font-semibold text-gray-900">
-                        {locale === "ar" ? "حجز جماعي" : "Group booking"}
-                      </h4>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar" ? "أضف ضيفًا إضافيًا على نفس الموعد." : "Add one extra guest on the same appointment."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIncludeGroupGuest((prev) => !prev)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${includeGroupGuest ? 'bg-primary text-white' : 'border border-gray-300 text-gray-700'}`}
-                    >
-                      {includeGroupGuest ? (locale === "ar" ? "مفعل" : "On") : (locale === "ar" ? "غير مفعل" : "Off")}
-                    </button>
-                  </div>
-                  {includeGroupGuest ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <input
-                          type="text"
-                          value={groupGuest.firstName}
-                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, firstName: e.target.value }))}
-                          placeholder={locale === "ar" ? "اسم الضيف الأول" : "Guest first name"}
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        />
-                        <input
-                          type="text"
-                          value={groupGuest.lastName}
-                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, lastName: e.target.value }))}
-                          placeholder={locale === "ar" ? "اسم العائلة" : "Guest last name"}
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        />
-                        <input
-                          type="tel"
-                          value={groupGuest.phone}
-                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, phone: e.target.value }))}
-                          placeholder={locale === "ar" ? "الجوال (اختياري)" : "Phone (optional)"}
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-
-                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {locale === "ar" ? "خدمة الضيف" : "Guest service"}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {locale === "ar"
-                                ? "اختر خدمة الضيف من القائمة العمودية."
-                                : "Choose the guest service from the vertical list."}
-                            </p>
-                          </div>
-                          {groupGuest.serviceId ? (
-                            <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                              {locale === "ar" ? "محدد" : "Selected"}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-4 space-y-5">
-                          {groupedServices.map((group) => (
-                            <div key={`guest-${group.heading || group.items[0]?.id}`} className="space-y-3">
-                              {group.heading ? (
-                                <div className="flex items-center gap-3">
-                                  <div className="h-px flex-1 bg-gray-200" />
-                                  <div className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-600">
-                                    {group.heading}
-                                  </div>
-                                  <div className="h-px flex-1 bg-gray-200" />
-                                </div>
-                              ) : null}
-
-                              <div className="space-y-3">
-                                {group.items.map((service) => {
-                                  const active = groupGuest.serviceId === service.id;
-                                  const serviceName = locale === "ar" ? service.name_ar : service.name_en;
-                                  const serviceParent = (service.parentName || service.parentService || service.category || "").trim();
-                                  return (
-                                    <button
-                                      key={`guest-${service.id}`}
-                                      type="button"
-                                      onClick={() => setGroupGuest((prev) => ({ ...prev, serviceId: service.id }))}
-                                      className={`group overflow-hidden rounded-3xl border text-left transition ${
-                                        active
-                                          ? "border-primary bg-purple-50 ring-2 ring-primary/20"
-                                          : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-sm"
-                                      }`}
-                                    >
-                                      <div className="grid gap-0 lg:grid-cols-[148px_minmax(0,1fr)]">
-                                        <div className="relative h-28 w-full overflow-hidden bg-gray-100 lg:h-full lg:min-h-[148px]">
-                                          {service.image ? (
-                                            <img
-                                              src={service.image.startsWith("http") ? service.image : getImageUrl(service.image)}
-                                              alt={serviceName}
-                                              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                                            />
-                                          ) : (
-                                            <div className="flex h-full w-full items-center justify-center text-gray-300">
-                                              <svg className="h-9 w-9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                <path d="M12 2a5 5 0 00-5 5c0 1.66.81 3.13 2.05 4.04A7 7 0 005 18v2h14v-2a7 7 0 00-4.05-6.96A5 5 0 0012 2z" />
-                                              </svg>
-                                            </div>
-                                          )}
-                                          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/20 to-transparent" />
-                                        </div>
-
-                                        <div className="min-w-0 p-4 sm:p-5">
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                <h5 className="truncate text-sm font-semibold text-gray-900">{serviceName}</h5>
-                                                {active && (
-                                                  <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
-                                                    {locale === "ar" ? "محدد" : "Selected"}
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <p className="mt-1 text-xs text-gray-500">
-                                                {serviceParent
-                                                  ? `${locale === "ar" ? "الفئة" : "Category"}: ${serviceParent}`
-                                                  : locale === "ar"
-                                                    ? "بدون فئة"
-                                                    : "No category"}
-                                              </p>
-                                            </div>
-                                          </div>
-
-                                          <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-gray-600">
-                                            <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                              ⏱ {service.duration} {locale === "ar" ? "دقيقة" : "min"}
-                                            </span>
-                                            <span className="rounded-full bg-gray-50 px-2.5 py-1 ring-1 ring-gray-200">
-                                              <Currency amount={toSafeMoneyNumber(service.finalPrice ?? 0)} />
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <label className="flex items-center gap-3 rounded-2xl border border-gray-300 px-4 py-3 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={groupGuest.isFree}
-                          onChange={(e) => setGroupGuest((prev) => ({ ...prev, isFree: e.target.checked }))}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <span className="font-medium text-gray-800">
-                          {locale === "ar" ? "خدمة مجانية" : "Free service"}
-                        </span>
-                      </label>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 5 ? "" : "hidden"}`}>
-                  <div>
-                    <h4 className="text-base font-semibold text-gray-900">
-                      {locale === "ar" ? "المراجعة" : "Review"}
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      {locale === "ar" ? "راجع الحجز قبل الحفظ." : "Review the appointment before saving."}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "العميل" : "Customer"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {selectedCustomerName || (locale === "ar" ? "عميل غير محدد" : "No customer selected")}
-                      </div>
-                      {(customerMode === "existing" ? selectedCustomer?.email : newCustomer.email) ? (
-                        <div className="mt-1 text-xs text-gray-500">
-                          {(customerMode === "existing" ? selectedCustomer?.email : newCustomer.email) || ""}
-                        </div>
-                      ) : null}
-                      {(customerMode === "existing" ? selectedCustomer?.phone : newCustomer.phone) ? (
-                        <div className="mt-1 text-xs text-gray-500">
-                          {(customerMode === "existing" ? selectedCustomer?.phone : newCustomer.phone) || ""}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الخدمات" : "Services"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {queuedServices.length > 0
-                          ? queuedServices
-                            .map((item) => {
-                              const service = services.find((entry) => entry.id === item.serviceId);
-                              const label = locale === "ar"
-                                ? (service?.name_ar || service?.name_en || "")
-                                : (service?.name_en || service?.name_ar || "");
-                              return label || item.serviceId;
-                            })
-                            .join(", ")
-                          : (selectedServiceName || "-")}
-                      </div>
-                      {queuedServices.length === 0 && selectedVariantName ? (
-                        <div className="mt-1 text-xs text-gray-500">{selectedVariantName}</div>
-                      ) : null}
-                      <div className="mt-1 text-xs text-gray-500">
-                        {queuedServices.length > 0
-                          ? (locale === "ar"
-                            ? `${queuedServices.length} خدمات محددة`
-                            : `${queuedServices.length} selected services`)
-                          : `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الموعد" : "Schedule"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {appointmentDate} {appointmentTime}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {selectedStaff?.name || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الدفع" : "Payment"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">{paymentMethodLabel || "-"}</div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                        <span><Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} /></span>
-                        {includeGroupGuest ? (
-                          <>
-                            <span>+</span>
-                            <span>
-                              {locale === "ar" ? "الضيف" : "guest"}: <Currency amount={guestServicePrice} />
-                            </span>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الإجمالي الفرعي" : "Subtotal"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        <Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} />
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "سعر خدمة الضيف" : "Guest service"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        <Currency amount={guestServicePrice} />
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {includeGroupGuest
-                          ? (groupGuest.isFree
-                            ? (locale === "ar" ? "مجانية" : "Free")
-                            : (locale === "ar" ? "مضافة للإجمالي" : "Included in total"))
-                          : (locale === "ar" ? "غير مفعلة" : "Not enabled")}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الإجمالي النهائي" : "Final total"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-primary">
-                        <Currency amount={queuedServices.length > 0 ? queuedServicesTotal : displayTotalPrice} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {includeGroupGuest ? (
-                    <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {locale === "ar" ? "الضيف الإضافي" : "Additional guest"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {`${groupGuest.firstName} ${groupGuest.lastName}`.trim()}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {selectedGuestServiceName || "-"}
-                        {groupGuest.isFree ? ` • ${locale === "ar" ? "خدمة مجانية" : "Free service"}` : ""}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      {locale === "ar" ? "ملاحظات" : "Notes"}
-                    </label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      rows={4}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      style={{ textAlign: isRTL ? 'right' : 'left' }}
-                    />
                   </div>
                 </div>
               </div>
