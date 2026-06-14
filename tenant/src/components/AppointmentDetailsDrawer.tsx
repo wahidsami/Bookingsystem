@@ -479,7 +479,6 @@ export function AppointmentDetailsDrawer({
   isRTL,
   onClose,
   onRebook,
-  onAddService
 }: AppointmentDetailsDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -492,7 +491,7 @@ export function AppointmentDetailsDrawer({
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [paymentUpdating, setPaymentUpdating] = useState(false);
-  const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions" | "wallet" | "loyalty" | "reviews">("overview");
+  const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
   const [recordRemainderMethod, setRecordRemainderMethod] = useState("cash");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
@@ -1047,29 +1046,6 @@ export function AppointmentDetailsDrawer({
 
     const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
     const currentStatusOptions = getManualStatusOptions(appointment.status);
-    const serviceSubtotal = Number(appointment.rawPrice ?? appointment.price ?? 0);
-    const serviceDiscount = Math.max(serviceSubtotal - Number(appointment.price || 0), 0);
-    const serviceTax = Number(appointment.taxAmount || 0);
-    const servicePaid = Math.max(serviceSubtotal - Number(appointment.remainderAmount ?? 0), 0);
-    const serviceRemaining = Number(appointment.remainderAmount ?? Math.max(0, Number(appointment.price || 0) - servicePaid));
-    const appointmentPaymentTransactions = appointment.paymentTransactions || [];
-    const canCollectRemainder = currentPaymentStatus === "deposit_paid" && Number(appointment.remainderAmount || 0) > 0;
-    const canMarkPaid = currentPaymentStatus === "pending";
-    const canMarkRefunded = !["refunded", "partially_refunded"].includes(currentPaymentStatus);
-    const serviceTimeline = [
-      {
-        label: locale === "ar" ? "إنشاء الموعد" : "Appointment created",
-        value: formatDateTime(appointment.createdAt || appointment.startTime, locale),
-        tone: "bg-gray-50 text-gray-700 ring-gray-200"
-      },
-      {
-        label: locale === "ar" ? "الحالة الحالية" : "Current status",
-        value: getStatusLabel(appointment.status, locale),
-        tone: "bg-blue-50 text-blue-700 ring-blue-200"
-      },
-      ...timelineAuditEntries
-    ].filter(Boolean) as Array<{ label: string; value: string; tone: string }>;
-
     return (
       <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <div className="space-y-4">
@@ -1111,276 +1087,16 @@ export function AppointmentDetailsDrawer({
             </div>
           ) : null}
 
-          <WorkspacePanel
-            title={locale === "ar" ? "لمحة سريعة" : "At a glance"}
-            subtitle={formatDateTime(appointment.startTime, locale)}
-            action={
-              <button
-                type="button"
-                onClick={() => {
-                  if (customerProfile) {
-                    setCustomerTab("overview");
-                    setViewMode("customer");
-                  }
-                }}
-                disabled={!customerProfile}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {locale === "ar" ? "فتح المساحة" : "Open workspace"}
-              </button>
-            }
-          >
-            <div className="space-y-4">
-              <div className="rounded-3xl border border-gray-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-                      {locale === "ar" ? "العميل" : "Customer"}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-semibold text-gray-900">
-                      {customerFullName || (locale === "ar" ? "عميل مرتبط" : "Linked customer")}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {customerProfile?.email || appointment.user?.email || appointment.user?.phone || (locale === "ar" ? "لا توجد بيانات إضافية" : "No extra contact data")}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                      {getStatusLabel(appointment.status, locale)}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-700">
-                      {getPaymentStatusLabel(currentPaymentStatus, locale)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <MetricTile
-                  label={locale === "ar" ? "الخدمة" : "Service"}
-                  value={
-                    <div className="min-w-0">
-                      <div className="truncate">{serviceName}</div>
-                      {appointment.serviceVariantName ? (
-                        <div className="mt-1 text-xs font-normal text-gray-500">
-                          {locale === "ar" ? "النوع" : "Variant"}: {appointment.serviceVariantName}
-                        </div>
-                      ) : null}
-                    </div>
-                  }
-                  className="bg-white"
-                />
-                <MetricTile
-                  label={locale === "ar" ? "الموظف" : "Employee"}
-                  value={appointment.staff.name}
-                  className="bg-white"
-                />
-                <MetricTile
-                  label={locale === "ar" ? "السعر" : "Price"}
-                  value={<Currency amount={Number(appointment.price || 0)} />}
-                  className="bg-white"
-                />
-                <MetricTile
-                  label={locale === "ar" ? "الزيارة" : "Visit"}
-                  value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
-                  className="bg-white"
-                />
-              </div>
-
-              {customerProfile ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <MetricTile
-                    label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
-                    value={customerProfile.totalBookings ?? 0}
-                    className="bg-white"
-                  />
-                  <MetricTile
-                    label={locale === "ar" ? "إجمالي الإنفاق" : "Total spent"}
-                    value={<Currency amount={Number(customerProfile.totalSpent || 0)} />}
-                    className="bg-white"
-                  />
-                </div>
-              ) : null}
+          <WorkspacePanel title={locale === "ar" ? "تفاصيل الموعد" : "Appointment details"} subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <MetricTile label={locale === "ar" ? "العميل" : "Customer"} value={customerFullName || (locale === "ar" ? "عميل مرتبط" : "Linked customer")} className="bg-white" />
+              <MetricTile label={locale === "ar" ? "وقت البدء" : "Start time"} value={formatDateTime(appointment.startTime, locale)} className="bg-white" />
+              <MetricTile label={locale === "ar" ? "وقت الانتهاء" : "End time"} value={formatDateTime(appointment.endTime, locale)} className="bg-white" />
+              <MetricTile label={locale === "ar" ? "الخدمة" : "Service"} value={serviceName} className="bg-white" />
+              <MetricTile label={locale === "ar" ? "الموظف" : "Staff"} value={appointment.staff.name} className="bg-white" />
+              <MetricTile label={locale === "ar" ? "السعر" : "Price"} value={<Currency amount={Number(appointment.price || 0)} />} className="bg-white sm:col-span-2" />
             </div>
           </WorkspacePanel>
-
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-              {locale === "ar" ? "بطاقة الخدمة" : "Service card"}
-            </p>
-            <div className="mt-3 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">{serviceName}</p>
-                  {appointment.serviceVariantName ? (
-                    <p className="mt-1 text-xs text-gray-500">
-                      {locale === "ar" ? "النوع" : "Variant"}: {appointment.serviceVariantName}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="text-right">
-                  <Currency amount={Number(appointment.price || 0)} className="text-base font-bold text-gray-900" />
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "المدة" : "Duration"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {appointment.serviceVariantDuration || appointment.service.duration || 0} {locale === "ar" ? "دقيقة" : "min"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-gray-200">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الحالة" : "Status"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{getStatusLabel(appointment.status, locale)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <WorkspacePanel title={locale === "ar" ? "الملخص المالي" : "Financial summary"}>
-            <div className="grid grid-cols-2 gap-3">
-              <MetricTile label={locale === "ar" ? "الإجمالي" : "Subtotal"} value={<Currency amount={serviceSubtotal} />} />
-              <MetricTile label={locale === "ar" ? "الخصم" : "Discount"} value={<Currency amount={serviceDiscount} />} />
-              <MetricTile label={locale === "ar" ? "الضريبة" : "Tax"} value={<Currency amount={serviceTax} />} />
-              <MetricTile label={locale === "ar" ? "المتبقي" : "Remaining"} value={<Currency amount={serviceRemaining} />} />
-            </div>
-            <div className="mt-3 rounded-2xl bg-primary/5 px-4 py-3 ring-1 ring-primary/10">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-gray-900">
-                  {locale === "ar" ? "المبلغ المدفوع" : "Paid"}
-                </p>
-                <Currency amount={servicePaid} className="text-base font-bold text-gray-900" />
-              </div>
-            </div>
-          </WorkspacePanel>
-
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "التحصيل" : "Payment actions"}
-              </p>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                {getPaymentStatusLabel(currentPaymentStatus, locale)}
-              </span>
-            </div>
-            <div className="mt-3 space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "باقي التحصيل" : "Remaining due"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    <Currency amount={Number(appointment.remainderAmount || 0)} />
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "طريقة الدفع" : "Payment method"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{appointment.paymentMethod || "-"}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => void handleMarkFullyPaid(appointment.paymentMethod || "cash")}
-                  disabled={paymentUpdating || !canMarkPaid}
-                  className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {locale === "ar" ? "تسجيل كمدفوع بالكامل" : "Mark fully paid"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleMarkRefunded()}
-                  disabled={paymentUpdating || !canMarkRefunded}
-                  className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {locale === "ar" ? "تسجيل كمرتجع" : "Mark refunded"}
-                </button>
-              </div>
-
-              {canCollectRemainder ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
-                  <p className="text-sm font-semibold text-amber-900">
-                    {locale === "ar" ? "تحصيل المتبقي داخل المركز" : "Collect remainder at center"}
-                  </p>
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                    <select
-                      value={recordRemainderMethod}
-                      onChange={(event) => setRecordRemainderMethod(event.target.value)}
-                      className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900"
-                    >
-                      <option value="cash">{locale === "ar" ? "نقدًا" : "Cash"}</option>
-                      <option value="card_pos">{locale === "ar" ? "بطاقة POS" : "Card POS"}</option>
-                      <option value="wallet">{locale === "ar" ? "المحفظة" : "Wallet"}</option>
-                      <option value="bank_transfer">{locale === "ar" ? "تحويل بنكي" : "Bank transfer"}</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void handleCollectRemainder()}
-                      disabled={paymentUpdating}
-                      className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {locale === "ar" ? "تسجيل الدفعة" : "Record payment"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "سجل الدفع" : "Payment history"}
-              </p>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                {appointmentPaymentTransactions.length}
-              </span>
-            </div>
-            <div className="mt-3 space-y-3">
-              {appointmentPaymentTransactions.length > 0 ? appointmentPaymentTransactions.map((transaction) => (
-                <div key={transaction.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {transaction.type === "deposit"
-                          ? (locale === "ar" ? "دفعة مقدمة" : "Deposit")
-                          : transaction.type === "remainder"
-                            ? (locale === "ar" ? "المتبقي" : "Remainder")
-                            : transaction.type === "refund"
-                              ? (locale === "ar" ? "استرداد" : "Refund")
-                              : (locale === "ar" ? "دفعة كاملة" : "Full payment")}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {formatDateTime(transaction.processedAt, locale)}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {transaction.paymentMethod}
-                        {transaction.transactionRef ? ` • ${transaction.transactionRef}` : ""}
-                      </p>
-                      {transaction.notes ? <p className="mt-2 text-sm text-gray-700">{transaction.notes}</p> : null}
-                    </div>
-                    <div className="text-right">
-                      <Currency amount={Number(transaction.amount || 0)} className="text-sm font-bold text-gray-900" />
-                      <p className="mt-2 text-xs font-semibold text-gray-500">
-                        {transaction.status}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-                  {locale === "ar" ? "لا توجد معاملات دفع لهذا الموعد بعد." : "No payment transactions have been recorded for this appointment yet."}
-                </div>
-              )}
-            </div>
-          </div>
 
           {cleanAppointmentNotes && (
             <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -1449,45 +1165,7 @@ export function AppointmentDetailsDrawer({
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-gray-900">
-                {locale === "ar" ? "الخط الزمني" : "Activity timeline"}
-              </p>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                {serviceTimeline.length}
-              </span>
-            </div>
-            <div className="mt-4 space-y-3">
-              {serviceTimeline.map((entry) => (
-                <div key={`${entry.label}-${entry.value}`} className={`rounded-2xl px-4 py-3 ring-1 ${entry.tone}`}>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">{entry.label}</p>
-                  <p className="mt-1 text-sm font-semibold">{entry.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="sticky top-4 z-20 rounded-3xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-            {appointment.bookingSessionId || appointment.bookingReference ? (
-              <div className="mb-4 rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                      {locale === "ar" ? "جلسة حجز متعددة الخدمات" : "Multi-service booking session"}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-600">
-                      {locale === "ar"
-                        ? "يمكنك إضافة خدمة أخرى إلى نفس جلسة الحجز من هنا."
-                        : "You can append another service to this same booking session from here."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-gray-900">
                 {locale === "ar" ? "الإجراءات السريعة" : "Quick actions"}
@@ -1508,62 +1186,12 @@ export function AppointmentDetailsDrawer({
               >
                 {locale === "ar" ? "إعادة الحجز" : "Rebook"}
               </button>
-              {onAddService ? (
-                <button
-                  type="button"
-                  onClick={() => onAddService(appointment)}
-                  className="rounded-2xl bg-primary/10 px-4 py-3 text-sm font-semibold text-primary ring-1 ring-primary/20 transition hover:bg-primary/15"
-                >
-                  {locale === "ar" ? "إضافة خدمة" : "Add service"}
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={handleReschedule}
                 className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
               >
                 {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
-              </button>
-            </div>
-
-            <div className="mt-3 rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "تغيير الحالة" : "Status shortcuts"}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {getManualStatusOptions(appointment.status)
-                  .filter((option) => option.value !== "pending")
-                  .filter((option) => option.value !== appointment.status)
-                  .map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => void handleQuickStatusUpdate(option.value)}
-                      disabled={statusUpdating}
-                      className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => void handleMarkFullyPaid(appointment.paymentMethod || "cash")}
-                disabled={paymentUpdating || !canMarkPaid}
-                className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {locale === "ar" ? "تسجيل كمدفوع بالكامل" : "Mark fully paid"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleMarkRefunded()}
-                disabled={paymentUpdating || !canMarkRefunded}
-                className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {locale === "ar" ? "تسجيل كمرتجع" : "Mark refunded"}
               </button>
             </div>
           </div>
@@ -1615,16 +1243,10 @@ export function AppointmentDetailsDrawer({
       );
     }
 
-    const customerWalletBalance = Number(customerProfile?.walletBalance || 0);
-    const customerLoyaltyPoints = Number(customerProfile?.loyaltyPoints || 0);
-    const customerReviews = customerProfile?.reviews || [];
     const customerTabs: Array<{ key: typeof customerTab; label: string }> = [
       { key: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
       { key: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
-      { key: "transactions", label: locale === "ar" ? "المعاملات" : "Transactions" },
-      { key: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
-      { key: "loyalty", label: locale === "ar" ? "الولاء" : "Loyalty" },
-      { key: "reviews", label: locale === "ar" ? "التقييمات" : "Reviews" }
+      { key: "transactions", label: locale === "ar" ? "المعاملات" : "Transactions" }
     ];
 
     const renderCustomerTabContent = () => {
@@ -1635,90 +1257,6 @@ export function AppointmentDetailsDrawer({
           return renderAppointments();
         case "transactions":
           return renderTransactions();
-        case "wallet":
-          return (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <MetricTile
-                  label={locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
-                  value={<Currency amount={customerWalletBalance} />}
-                />
-                <MetricTile
-                  label={locale === "ar" ? "إجمالي المعاملات" : "Transactions total"}
-                  value={customerTransactionsSummary?.totalTransactions ?? customerTransactions.length}
-                />
-                <MetricTile
-                  label={locale === "ar" ? "الصافي" : "Net total"}
-                  value={<Currency amount={customerTransactionsSummary?.netTotal ?? paymentSnapshot.recordedPaymentsTotal} />}
-                />
-              </div>
-              <WorkspacePanel title={locale === "ar" ? "حركة المحفظة" : "Wallet activity"}>
-                <p className="mt-2 text-sm text-gray-600">
-                  {locale === "ar"
-                    ? "تعرض هذه المساحة رصيد المحفظة وسجل التحركات المتاح من النظام الحالي."
-                    : "This section shows the wallet balance and the available transaction movements from the current system."}
-                </p>
-              </WorkspacePanel>
-            </div>
-          );
-        case "loyalty":
-          return (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <MetricTile
-                  label={locale === "ar" ? "نقاط الولاء" : "Loyalty points"}
-                  value={customerLoyaltyPoints}
-                />
-                <MetricTile
-                  label={locale === "ar" ? "شريحة الولاء" : "Loyalty tier"}
-                  value={<span className="capitalize">{customerProfile?.loyaltyTier || "-"}</span>}
-                />
-              </div>
-              <WorkspacePanel title={locale === "ar" ? "تفاصيل الولاء" : "Loyalty details"}>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <MetricTile
-                    label={locale === "ar" ? "إجمالي الإنفاق" : "Total spent"}
-                    value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
-                    className="bg-white"
-                  />
-                  <MetricTile
-                    label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
-                    value={customerProfile?.totalBookings ?? 0}
-                    className="bg-white"
-                  />
-                </div>
-              </WorkspacePanel>
-            </div>
-          );
-        case "reviews":
-          return (
-            <div className="space-y-4">
-              {customerReviews.length > 0 ? (
-                customerReviews.map((review) => (
-                  <div key={review.id} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {review.serviceName || (locale === "ar" ? "تقييم عميل" : "Customer review")}
-                        </p>
-                        {review.date ? <p className="mt-1 text-xs text-gray-500">{formatDateTime(review.date, locale)}</p> : null}
-                      </div>
-                      <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                        {review.rating ?? 0}/5
-                      </div>
-                    </div>
-                    {review.comment ? <p className="mt-3 text-sm leading-6 text-gray-700">{review.comment}</p> : null}
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-                  {locale === "ar"
-                    ? "لا توجد تقييمات متاحة لهذا العميل بعد."
-                    : "No reviews are available for this customer yet."}
-                </div>
-              )}
-            </div>
-          );
       }
     };
 
@@ -1850,17 +1388,7 @@ export function AppointmentDetailsDrawer({
 
   const renderOverview = () => (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Link
-          href={`/${locale}/dashboard/customers/${customerProfile?.id || ""}/wallet`}
-          className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/400"
-        >
-          <MetricTile
-            label={locale === "ar" ? "رصيد المحفظة" : "Wallet balance"}
-            value={<Currency amount={Number(customerProfile?.walletBalance || 0)} />}
-            className="bg-gradient-to-br from-primary/10 to-white ring-primary/20 transition hover:-translate-y-0.5 hover:shadow-md"
-          />
-        </Link>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
         <MetricTile
           label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
@@ -1959,281 +1487,187 @@ export function AppointmentDetailsDrawer({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "مواعيد بانتظار الدفع" : "Pending appointments"}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{paymentSnapshot.pendingAppointments.length}</p>
-              <p className="mt-1 text-xs text-gray-500">
-                <Currency amount={paymentSnapshot.pendingOutstandingTotal} />
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "مدفوعات مسجلة" : "Recorded payments"}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{paymentSnapshot.recordedPayments.length}</p>
-              <p className="mt-1 text-xs text-gray-500">
-                <Currency amount={paymentSnapshot.recordedPaymentsTotal} />
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "المبالغ المستردة" : "Refunds"}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{paymentSnapshot.refundTransactions.length}</p>
-              <p className="mt-1 text-xs text-gray-500">
-                <Currency amount={paymentSnapshot.refundTotal} />
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "الصافي المسجل" : "Net recorded"}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                <Currency amount={Math.max(paymentSnapshot.recordedPaymentsTotal - paymentSnapshot.refundTotal, 0)} />
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                {locale === "ar" ? "يشمل المدفوعات والاستردادات" : "Payments minus refunds"}
-              </p>
-            </div>
-          </div>
-
-          {paymentSnapshot.pendingAppointments.length > 0 && (
-            <div className="rounded-3xl border border-amber-200 bg-amber-50/70 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
-                    {locale === "ar" ? "مواعيد معلقة" : "Pending appointments"}
-                  </p>
-                  <p className="mt-1 text-sm text-amber-900">
-                    {locale === "ar"
-                      ? "هذه المواعيد لم تُسدّد بعد أو ما زال عليها رصيد متبقٍ."
-                      : "These appointments are unpaid or still have an outstanding balance."}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
-                    {locale === "ar" ? "المتبقي" : "Outstanding"}
-                  </p>
-                  <p className="mt-1 text-lg font-bold text-amber-950">
-                    <Currency amount={paymentSnapshot.pendingOutstandingTotal} />
-                  </p>
-                </div>
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {locale === "ar" ? "تصفية المعاملات" : "Transaction filters"}
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {locale === "ar" ? "فلترة حسب النوع والحالة." : "Filter by type and status."}
+                </p>
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                {paymentSnapshot.pendingAppointments.slice(0, 4).map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-amber-200 bg-white p-3">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {item.service?.name_en || item.service?.name_ar || (locale === "ar" ? "خدمة" : "Service")}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">{formatDateTime(item.date, locale)}</p>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                        {getPaymentStatusLabel(resolveEffectivePaymentStatus(item), locale)}
-                      </span>
-                      <Currency amount={Number(item.outstandingAmount || item.price || 0)} className="text-sm font-bold text-gray-900" />
-                    </div>
-                  </div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { key: "all", label: locale === "ar" ? "الكل" : "All" },
+                  { key: "appointment", label: locale === "ar" ? "المواعيد" : "Appointments" },
+                  { key: "order", label: locale === "ar" ? "الطلبات" : "Orders" },
+                  { key: "ledger", label: locale === "ar" ? "السجل" : "Ledger" }
+                ] as const).map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => setTransactionTypeFilter(chip.key)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      transactionTypeFilter === chip.key
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
                 ))}
               </div>
             </div>
-          )}
 
-          {customerTransactions.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-              {paymentSnapshot.pendingAppointments.length > 0
-                ? (locale === "ar"
-                  ? "لا توجد مدفوعات مسجلة بعد، لكن توجد مواعيد بانتظار الدفع."
-                  : "No payments have been recorded yet, but the customer still has appointments waiting for payment.")
-                : (locale === "ar"
-                  ? "لا توجد معاملات مسجلة لهذا العميل بعد."
-                  : "No recorded transactions yet for this customer.")}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {([
+                { key: "all", label: locale === "ar" ? "كل الحالات" : "All statuses" },
+                { key: "completed", label: locale === "ar" ? "مكتمل" : "Completed" },
+                { key: "pending", label: locale === "ar" ? "قيد الانتظار" : "Pending" },
+                { key: "refunded", label: locale === "ar" ? "مسترد" : "Refunded" },
+                { key: "failed", label: locale === "ar" ? "فشل" : "Failed" },
+                { key: "cancelled", label: locale === "ar" ? "ملغي" : "Cancelled" }
+              ] as const).map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setTransactionStatusFilter(chip.key)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    transactionStatusFilter === chip.key
+                      ? "bg-gray-900 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
             </div>
-          ) : (
-            <>
-              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "تصفية المعاملات" : "Transaction filters"}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {locale === "ar" ? "فلترة حسب النوع والحالة." : "Filter by type and status."}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { key: "all", label: locale === "ar" ? "الكل" : "All" },
-                      { key: "appointment", label: locale === "ar" ? "المواعيد" : "Appointments" },
-                      { key: "order", label: locale === "ar" ? "الطلبات" : "Orders" },
-                      { key: "ledger", label: locale === "ar" ? "السجل" : "Ledger" }
-                    ] as const).map((chip) => (
-                      <button
-                        key={chip.key}
-                        type="button"
-                        onClick={() => setTransactionTypeFilter(chip.key)}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                          transactionTypeFilter === chip.key
-                            ? "bg-primary text-white shadow-sm"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          </div>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {([
-                    { key: "all", label: locale === "ar" ? "كل الحالات" : "All statuses" },
-                    { key: "completed", label: locale === "ar" ? "مكتمل" : "Completed" },
-                    { key: "pending", label: locale === "ar" ? "قيد الانتظار" : "Pending" },
-                    { key: "refunded", label: locale === "ar" ? "مسترد" : "Refunded" },
-                    { key: "failed", label: locale === "ar" ? "فشل" : "Failed" },
-                    { key: "cancelled", label: locale === "ar" ? "ملغي" : "Cancelled" }
-                  ] as const).map((chip) => (
+          {filteredTransactions.length > 0 ? (
+            <div className="space-y-3">
+              {filteredTransactions.map((item) => {
+                const isExpanded = expandedTransactionId === item.id;
+                return (
+                  <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
                     <button
-                      key={chip.key}
                       type="button"
-                      onClick={() => setTransactionStatusFilter(chip.key)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        transactionStatusFilter === chip.key
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
+                      onClick={() => setExpandedTransactionId(isExpanded ? null : item.id)}
+                      className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
                     >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {filteredTransactions.length > 0 ? filteredTransactions.map((item) => {
-                  const isExpanded = expandedTransactionId === item.id;
-                  return (
-                    <div key={`${item.source}-${item.id}`} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedTransactionId(isExpanded ? null : item.id)}
-                        className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
-                      >
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                              {item.source === "ledger"
-                                ? (locale === "ar" ? "سجل الدفع" : "Ledger")
-                                : item.source === "appointment"
-                                  ? (locale === "ar" ? "مدفوع من الموعد" : "Appointment payment")
-                                  : (locale === "ar" ? "عملية مالية" : "Transaction")}
-                            </span>
-                            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                              {getTransactionTypeLabel(item.entityType, locale)}
-                            </span>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getTransactionStatusTone(item.status)}`}>
-                              {getTransactionStatusLabel(item.status, locale)}
-                            </span>
-                          </div>
-                          <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
-                          {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
-                            <span>{formatDateTime(item.processedAt, locale)}</span>
-                            <span>{item.paymentMethodLabel}</span>
-                            {item.transactionRef && <span>{item.transactionRef}</span>}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-2">
-                          <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
-                          <span className="text-xs font-semibold text-primary">
-                            {isExpanded ? (locale === "ar" ? "إخفاء التفاصيل" : "Hide details") : (locale === "ar" ? "إظهار التفاصيل" : "Details")}
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                            {item.source === "ledger"
+                              ? (locale === "ar" ? "سجل الدفع" : "Ledger")
+                              : item.source === "appointment"
+                                ? (locale === "ar" ? "مدفوع من الموعد" : "Appointment payment")
+                                : (locale === "ar" ? "عملية مالية" : "Transaction")}
+                          </span>
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                            {getTransactionTypeLabel(item.entityType, locale)}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getTransactionStatusTone(item.status)}`}>
+                            {getTransactionStatusLabel(item.status, locale)}
                           </span>
                         </div>
-                      </button>
+                        <h5 className="text-base font-bold text-gray-900">{item.title}</h5>
+                        {item.subtitle && <p className="text-sm text-gray-600">{item.subtitle}</p>}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
+                          <span>{formatDateTime(item.processedAt, locale)}</span>
+                          <span>{item.paymentMethodLabel}</span>
+                          {item.transactionRef && <span>{item.transactionRef}</span>}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <Currency amount={Number(item.amount || 0)} className="text-lg font-bold text-gray-900" />
+                        <span className="text-xs font-semibold text-primary">
+                          {isExpanded ? (locale === "ar" ? "إخفاء التفاصيل" : "Hide details") : (locale === "ar" ? "إظهار التفاصيل" : "Details")}
+                        </span>
+                      </div>
+                    </button>
 
-                      {isExpanded && (
-                        <div className="border-t border-gray-100 px-4 pb-4">
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            <div className="rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                {locale === "ar" ? "المصدر" : "Source"}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.source}</p>
-                            </div>
-                            <div className="rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                {locale === "ar" ? "الطريقة" : "Method"}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.paymentMethodLabel}</p>
-                            </div>
-                            <div className="rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                {locale === "ar" ? "المعالج" : "Processor"}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.processorName || "-"}</p>
-                            </div>
-                            <div className="rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                {locale === "ar" ? "المرجع" : "Reference"}
-                              </p>
-                              <p className="mt-1 break-all text-sm font-semibold text-gray-900">{item.reference}</p>
-                            </div>
-                            <div className="rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                {locale === "ar" ? "المعرف" : "Entity"}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-gray-900">
-                                {item.entityType}
-                                {item.entityId ? ` · ${item.entityId}` : ""}
-                              </p>
-                            </div>
-                            <div className="rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                {locale === "ar" ? "النوع" : "Type"}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-gray-900">{item.type}</p>
-                            </div>
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 px-4 pb-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          <div className="rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "المصدر" : "Source"}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{item.source}</p>
                           </div>
+                          <div className="rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "الطريقة" : "Method"}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{item.paymentMethodLabel}</p>
+                          </div>
+                          <div className="rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "المعالج" : "Processor"}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{item.processorName || "-"}</p>
+                          </div>
+                          <div className="rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "المرجع" : "Reference"}
+                            </p>
+                            <p className="mt-1 break-all text-sm font-semibold text-gray-900">{item.reference}</p>
+                          </div>
+                          <div className="rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "المعرف" : "Entity"}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {item.entityType}
+                              {item.entityId ? ` · ${item.entityId}` : ""}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "النوع" : "Type"}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{item.type}</p>
+                          </div>
+                        </div>
 
-                          {(item.notes || item.detailPath) && (
-                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-                              <div className="min-w-0">
-                                {item.notes ? (
-                                  <>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                                      {locale === "ar" ? "ملاحظات" : "Notes"}
-                                    </p>
-                                    <p className="mt-1 text-sm text-gray-700">{item.notes}</p>
-                                  </>
-                                ) : (
-                                  <p className="text-sm text-gray-500">
-                                    {locale === "ar" ? "لا توجد ملاحظات إضافية." : "No extra notes."}
+                        {(item.notes || item.detailPath) && (
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                            <div className="min-w-0">
+                              {item.notes ? (
+                                <>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                    {locale === "ar" ? "ملاحظات" : "Notes"}
                                   </p>
-                                )}
-                              </div>
-                              {item.detailPath && (
-                                <Link
-                                  href={`/${locale}${item.detailPath}`}
-                                  className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
-                                >
-                                  {locale === "ar" ? "فتح السجل" : "Open record"}
-                                </Link>
+                                  <p className="mt-1 text-sm text-gray-700">{item.notes}</p>
+                                </>
+                              ) : (
+                                <p className="text-sm text-gray-500">
+                                  {locale === "ar" ? "لا توجد ملاحظات إضافية." : "No extra notes."}
+                                </p>
                               )}
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }) : (
-                  <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-                    {locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}
+                            {item.detailPath && (
+                              <Link
+                                href={`/${locale}${item.detailPath}`}
+                                className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                              >
+                                {locale === "ar" ? "فتح السجل" : "Open record"}
+                              </Link>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+              {locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}
+            </div>
           )}
         </>
       )}
