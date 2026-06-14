@@ -567,6 +567,13 @@ export function AppointmentActionDrawer({
     () => services.find((service) => service.id === selectedServiceId) || null,
     [services, selectedServiceId]
   );
+  const primaryServiceId = (editingServiceIndex !== null ? queuedServices[editingServiceIndex]?.serviceId : queuedServices[0]?.serviceId)
+    || selectedServiceId
+    || serviceDraft.serviceId;
+  const activeServiceForPayment = useMemo(
+    () => services.find((service) => service.id === primaryServiceId) || selectedService || null,
+    [services, primaryServiceId, selectedService]
+  );
 
   const serviceVariants = useMemo(
     () => parseArrayValue<ServiceVariant>(selectedService?.variants).filter((variant) => variant.isActive !== false),
@@ -579,9 +586,9 @@ export function AppointmentActionDrawer({
   );
 
   const allowedPaymentMethods = useMemo(() => {
-    const normalized = parseArrayValue<string>(selectedService?.paymentOptions);
+    const normalized = parseArrayValue<string>(activeServiceForPayment?.paymentOptions);
     return normalized.length > 0 ? normalized : ["at-center", "online-full", "booking-fee"];
-  }, [selectedService]);
+  }, [activeServiceForPayment]);
 
   useEffect(() => {
     if (!open || mode !== "appointment") {
@@ -591,8 +598,6 @@ export function AppointmentActionDrawer({
     if (!selectedService) {
       setSelectedVariantId("");
       setSelectedStaffId(defaultStaffId || "");
-      setPaymentMethod("");
-      return;
     }
 
     if (selectedVariantId && !serviceVariants.some((variant) => variant.id === selectedVariantId)) {
@@ -611,7 +616,7 @@ export function AppointmentActionDrawer({
   }, [
     open,
     mode,
-    selectedService,
+    activeServiceForPayment,
     allowedPaymentMethods,
     assignedEmployees,
     serviceVariants,
@@ -1570,6 +1575,56 @@ export function AppointmentActionDrawer({
                         </div>
                       </div>
                     ) : null}
+                  </div>
+
+                  <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                          {locale === "ar" ? "طريقة الدفع" : "Payment"}
+                        </p>
+                        <h4 className="mt-1 text-lg font-semibold text-gray-900">
+                          {paymentMethodLabel || (locale === "ar" ? "اختر طريقة الدفع" : "Choose payment method")}
+                        </h4>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {locale === "ar"
+                            ? "اختر الطريقة المناسبة قبل حفظ الحجز."
+                            : "Choose how this booking will be paid before saving."}
+                        </p>
+                      </div>
+                      <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                        {locale === "ar" ? "إلزامي" : "Required"}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {allowedPaymentMethods.map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setPaymentMethod(method)}
+                          className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                            paymentMethod === method
+                              ? "border-primary bg-primary text-white"
+                              : "border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-purple-50"
+                          }`}
+                        >
+                          {method === "at-center"
+                            ? (locale === "ar" ? "الدفع عند المركز" : "Pay at Center")
+                            : method === "online-full"
+                              ? (locale === "ar" ? "الدفع الكامل أونلاين" : "Pay Online")
+                              : method === "booking-fee"
+                                ? (locale === "ar" ? "عربون الحجز" : "Booking Fee")
+                                : method}
+                        </button>
+                      ))}
+                    </div>
+
+                    <p className="mt-3 text-xs text-gray-500">
+                      {locale === "ar"
+                        ? "إذا لم تحدد طريقة، سنستخدم أول خيار متاح."
+                        : "If you do not choose one, we will use the first available option."}
+                    </p>
                   </div>
 
                   {editingQueuedService ? (
