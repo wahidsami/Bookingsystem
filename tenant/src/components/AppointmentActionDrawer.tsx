@@ -331,6 +331,7 @@ export function AppointmentActionDrawer({
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
   const [serviceSearch, setServiceSearch] = useState("");
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState("all");
   const [serviceDraft, setServiceDraft] = useState({
     serviceId: "",
     staffId: "",
@@ -404,9 +405,10 @@ export function AppointmentActionDrawer({
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
       setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
-      setShowServicePicker(false);
+      setShowServicePicker(true);
       setEditingServiceIndex(null);
       setServiceSearch("");
+      setSelectedServiceCategory("all");
       setServiceDraft({
         serviceId: initialServices[0]?.serviceId || "",
         staffId: initialServices[0]?.staffId || defaultStaffId || "",
@@ -712,6 +714,21 @@ export function AppointmentActionDrawer({
       })
     }));
   }, [services, locale]);
+  const serviceCategoryTabs = useMemo(() => {
+    const categories = new Set<string>();
+    groupedServices.forEach((group) => {
+      if (group.heading) {
+        categories.add(group.heading);
+      }
+      group.items.forEach((service) => {
+        const label = (service.category || service.parentName || service.parentService || "").trim();
+        if (label) {
+          categories.add(label);
+        }
+      });
+    });
+    return ["all", ...Array.from(categories)];
+  }, [groupedServices]);
   const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
 
   const findQueuedServiceIndex = (serviceId: string) =>
@@ -1432,10 +1449,10 @@ export function AppointmentActionDrawer({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowServicePicker((current) => !current)}
+                        onClick={() => setShowServicePicker(true)}
                         className="rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
                       >
-                        {showServicePicker ? (locale === "ar" ? "إخفاء القائمة" : "Hide picker") : (locale === "ar" ? "إضافة خدمة" : "Add service")}
+                        {locale === "ar" ? "إضافة خدمة" : "Add service"}
                       </button>
                     </div>
 
@@ -1520,61 +1537,79 @@ export function AppointmentActionDrawer({
                       )}
                     </div>
 
-                    {showServicePicker ? (
-                      <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
                         <input
                           type="text"
                           value={serviceSearch}
                           onChange={(e) => setServiceSearch(e.target.value)}
-                          placeholder={locale === "ar" ? "ابحث عن خدمة..." : "Search services..."}
+                          placeholder={locale === "ar" ? "ابحث عن خدمات أو فئات..." : "Search services, categories..."}
                           className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                         />
-                        <div className="mt-4 space-y-4">
-                          {groupedServices
-                            .map((group) => ({
-                              ...group,
-                              items: group.items.filter((service) => {
-                                const serviceName = `${service.name_en} ${service.name_ar} ${service.category || ""} ${service.parentName || ""} ${service.parentService || ""}`.toLowerCase();
-                                return !serviceSearch.trim() || serviceName.includes(serviceSearch.trim().toLowerCase());
-                              })
-                            }))
-                            .filter((group) => group.items.length > 0)
-                            .map((group) => (
-                              <div key={group.heading || "all"} className="space-y-2">
-                                {group.heading ? <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{group.heading}</p> : null}
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  {group.items.map((service) => {
-                                    const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
-                                    return (
-                                      <button
-                                        key={service.id}
-                                        type="button"
-                                        onClick={() => {
-                                          addQueuedService(service.id, null, defaultStaffId || null);
-                                        }}
-                                        className="rounded-2xl border border-gray-200 bg-white p-3 text-left transition hover:border-primary/40 hover:bg-purple-50"
-                                      >
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="min-w-0">
-                                            <p className="truncate font-semibold text-gray-900">{serviceName}</p>
-                                            <p className="mt-0.5 text-xs text-gray-500">
-                                              {formatMinutesLabel(service.duration, locale)}
-                                              {service.category || service.parentName || service.parentService ? ` • ${service.category || service.parentName || service.parentService}` : ""}
-                                            </p>
-                                          </div>
-                                          <div className="text-sm font-semibold text-primary">
-                                            <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />
-                                          </div>
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                        </div>
                       </div>
-                    ) : null}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {serviceCategoryTabs.map((tab) => (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setSelectedServiceCategory(tab)}
+                            className={`rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
+                              selectedServiceCategory === tab
+                                ? "border-primary bg-primary text-white"
+                                : "border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-purple-50"
+                            }`}
+                          >
+                            {tab === "all" ? (locale === "ar" ? "الكل" : "All") : tab}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                        {groupedServices
+                          .flatMap((group) => group.items)
+                          .filter((service) => {
+                            const serviceName = `${service.name_en} ${service.name_ar} ${service.category || ""} ${service.parentName || ""} ${service.parentService || ""}`.toLowerCase();
+                            const matchesSearch = !serviceSearch.trim() || serviceName.includes(serviceSearch.trim().toLowerCase());
+                            const serviceCategory = (service.category || service.parentName || service.parentService || "").trim();
+                            const matchesCategory = selectedServiceCategory === "all" || serviceCategory === selectedServiceCategory;
+                            return matchesSearch && matchesCategory;
+                          })
+                          .map((service) => {
+                            const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                            const isSelected = queuedServices.some((item) => item.serviceId === service.id);
+                            return (
+                              <button
+                                key={service.id}
+                                type="button"
+                                onClick={() => {
+                                  addQueuedService(service.id, null, defaultStaffId || null);
+                                }}
+                                className={`rounded-2xl border bg-white p-4 text-left transition hover:border-primary/40 hover:bg-purple-50 ${isSelected ? "border-primary ring-1 ring-primary/20" : "border-gray-200"}`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate font-semibold text-gray-900">{serviceName}</p>
+                                    <p className="mt-0.5 text-xs text-gray-500">
+                                      {formatMinutesLabel(service.duration, locale)}
+                                      {service.category || service.parentName || service.parentService ? ` • ${service.category || service.parentName || service.parentService}` : ""}
+                                    </p>
+                                  </div>
+                                  <div className="text-sm font-semibold text-primary">
+                                    <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-gray-500">
+                                  <span className="rounded-full bg-gray-100 px-3 py-1 ring-1 ring-gray-200">
+                                    {service.employees?.length ? (locale === "ar" ? "محدد" : "Available") : (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
+                                  </span>
+                                  <span className="text-gray-400">{isSelected ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "أضفها" : "Add")}</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -1930,17 +1965,21 @@ export function AppointmentActionDrawer({
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
                     {queuedServices.length > 0
-                      ? (locale === "ar" ? `${queuedServices.length} خدمات في الحجز الحالي` : `${queuedServices.length} services in the current booking`)
-                      : (locale === "ar" ? "بدون خدمات إضافية" : "No extra services")}
+                      ? (locale === "ar" ? `${queuedServices.length} خدمات محددة` : `${queuedServices.length} services selected`)
+                      : (locale === "ar" ? "بدون خدمات محددة" : "No services selected")}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={onClose}
+                    onClick={() => {
+                      setQueuedServices([]);
+                      setEditingServiceIndex(null);
+                      setShowServicePicker(true);
+                    }}
                     className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                   >
-                    {locale === "ar" ? "إغلاق" : "Close"}
+                    {locale === "ar" ? "مسح" : "Clear"}
                   </button>
                   <button
                     type="button"
@@ -1950,7 +1989,7 @@ export function AppointmentActionDrawer({
                   >
                     {saving
                       ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
-                      : (locale === "ar" ? "حفظ الحجز" : "Save booking")}
+                      : (locale === "ar" ? "إضافة إلى الموعد" : "Add to appointment")}
                   </button>
                 </div>
               </div>
