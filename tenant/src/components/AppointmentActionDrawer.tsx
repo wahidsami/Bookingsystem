@@ -1420,7 +1420,7 @@ export function AppointmentActionDrawer({
                     </div>
                   ) : null}
 
-                  <div className={`rounded-3xl border border-gray-200 bg-white p-5 shadow-sm ${hasQueuedServices ? "" : "hidden"}`}>
+                  <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
@@ -1619,82 +1619,84 @@ export function AppointmentActionDrawer({
                     )}
                       </div>
 
-                      <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                          {locale === "ar" ? "ملخص الدفع" : "Payment summary"}
-                        </p>
-                        <h4 className="mt-1 text-lg font-semibold text-gray-900">
-                          {paymentMethodLabel || (locale === "ar" ? "اختر طريقة الدفع" : "Choose payment method")}
-                        </h4>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {locale === "ar"
-                            ? "راجع المبالغ واختر طريقة الدفع المناسبة."
-                            : "Review the amounts and choose a payment method."}
-                        </p>
-                      </div>
-                      <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                        {locale === "ar" ? "مطلوب" : "Required"}
-                      </div>
-                    </div>
+                      {hasQueuedServices ? (
+                        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                                {locale === "ar" ? "ملخص الدفع" : "Payment summary"}
+                              </p>
+                              <h4 className="mt-1 text-lg font-semibold text-gray-900">
+                                {paymentMethodLabel || (locale === "ar" ? "اختر طريقة الدفع" : "Choose payment method")}
+                              </h4>
+                              <p className="mt-1 text-sm text-gray-500">
+                                {locale === "ar"
+                                  ? "راجع المبالغ واختر طريقة الدفع المناسبة."
+                                  : "Review the amounts and choose a payment method."}
+                              </p>
+                            </div>
+                            <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                              {locale === "ar" ? "مطلوب" : "Required"}
+                            </div>
+                          </div>
 
-                    <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-gray-600">{locale === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
-                        <span className="font-semibold text-gray-900"><Currency amount={queuedServicesBaseTotal} /></span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="text-gray-600">{locale === "ar" ? "الخصم" : "Discount"}</span>
-                        <span className="font-semibold text-gray-900">
-                          {queuedServicesDiscountTotal > 0 ? <Currency amount={queuedServicesDiscountTotal} /> : (locale === "ar" ? "بدون" : "None")}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="text-gray-600">{locale === "ar" ? "الضريبة (0%)" : "Tax (0%)"}</span>
-                        <span className="font-semibold text-gray-900"><Currency amount={0} /></span>
-                      </div>
-                      <div className="mt-3 border-t border-gray-200 pt-3">
-                        <div className="flex items-center justify-between gap-3 text-base">
-                          <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
-                          <span className="font-semibold text-primary"><Currency amount={queuedServicesTotal} /></span>
+                          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                              <span className="text-gray-600">{locale === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
+                              <span className="font-semibold text-gray-900"><Currency amount={queuedServicesBaseTotal} /></span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                              <span className="text-gray-600">{locale === "ar" ? "الخصم" : "Discount"}</span>
+                              <span className="font-semibold text-gray-900">
+                                {queuedServicesDiscountTotal > 0 ? <Currency amount={queuedServicesDiscountTotal} /> : (locale === "ar" ? "بدون" : "None")}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                              <span className="text-gray-600">{locale === "ar" ? "الضريبة (0%)" : "Tax (0%)"}</span>
+                              <span className="font-semibold text-gray-900"><Currency amount={0} /></span>
+                            </div>
+                            <div className="mt-3 border-t border-gray-200 pt-3">
+                              <div className="flex items-center justify-between gap-3 text-base">
+                                <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
+                                <span className="font-semibold text-primary"><Currency amount={queuedServicesTotal} /></span>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                                <span className="font-semibold text-gray-900">{locale === "ar" ? "المتبقي للدفع" : "To pay"}</span>
+                                <span className="font-semibold text-gray-900"><Currency amount={queuedServicesTotal} /></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {allowedPaymentMethods.map((method) => (
+                              <button
+                                key={method}
+                                type="button"
+                                onClick={() => setPaymentMethod(method)}
+                                className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                                  paymentMethod === method
+                                    ? "border-primary bg-primary text-white"
+                                    : "border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-purple-50"
+                                }`}
+                              >
+                                {method === "at-center"
+                                  ? (locale === "ar" ? "الدفع عند المركز" : "Pay at Center")
+                                  : method === "online-full"
+                                    ? (locale === "ar" ? "الدفع الكامل أونلاين" : "Pay Online")
+                                    : method === "booking-fee"
+                                      ? (locale === "ar" ? "عربون الحجز" : "Booking Fee")
+                                      : method}
+                              </button>
+                            ))}
+                          </div>
+
+                          <p className="mt-3 text-xs text-gray-500">
+                            {locale === "ar"
+                              ? "إذا لم تحدد طريقة، سنستخدم أول خيار متاح."
+                              : "If you do not choose one, we will use the first available option."}
+                          </p>
                         </div>
-                        <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                          <span className="font-semibold text-gray-900">{locale === "ar" ? "المتبقي للدفع" : "To pay"}</span>
-                          <span className="font-semibold text-gray-900"><Currency amount={queuedServicesTotal} /></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {allowedPaymentMethods.map((method) => (
-                        <button
-                          key={method}
-                          type="button"
-                          onClick={() => setPaymentMethod(method)}
-                          className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                            paymentMethod === method
-                              ? "border-primary bg-primary text-white"
-                              : "border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-purple-50"
-                          }`}
-                        >
-                          {method === "at-center"
-                            ? (locale === "ar" ? "الدفع عند المركز" : "Pay at Center")
-                            : method === "online-full"
-                              ? (locale === "ar" ? "الدفع الكامل أونلاين" : "Pay Online")
-                              : method === "booking-fee"
-                                ? (locale === "ar" ? "عربون الحجز" : "Booking Fee")
-                                : method}
-                        </button>
-                      ))}
-                    </div>
-
-                    <p className="mt-3 text-xs text-gray-500">
-                      {locale === "ar"
-                        ? "إذا لم تحدد طريقة، سنستخدم أول خيار متاح."
-                        : "If you do not choose one, we will use the first available option."}
-                    </p>
-                    </div>
+                      ) : null}
 
                       {editingQueuedService ? (
                         <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
