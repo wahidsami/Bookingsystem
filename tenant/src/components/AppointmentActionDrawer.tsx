@@ -300,8 +300,6 @@ export function AppointmentActionDrawer({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [errorDebug, setErrorDebug] = useState<any>(null);
-  const [appointmentStep, setAppointmentStep] = useState(0);
-
   const [customerMode, setCustomerMode] = useState<"existing" | "new" | "guest">("existing");
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -362,7 +360,6 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
-      setAppointmentStep(0);
       setCustomerMode(prefill?.customer ? "existing" : "guest");
       setShowCustomerPicker(false);
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
@@ -420,8 +417,6 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    setAppointmentStep(4);
-
     const breakDateValue =
       getLocalDateKeyFromValue(existingBreak?.specificDate) ||
       getLocalDateKeyFromValue(existingBreak?.startDateTime) ||
@@ -443,85 +438,6 @@ export function AppointmentActionDrawer({
     setBreakLabel(existingBreak?.label || "");
   }, [open, mode, defaultStaffId, defaultDate, defaultTime, prefill, existingBreak]);
 
-  const appointmentStepLabels = [
-    locale === "ar" ? "العميل" : "Customer",
-    locale === "ar" ? "الخدمات" : "Services",
-    locale === "ar" ? "الخدمة والموعد" : "Schedule",
-    locale === "ar" ? "حجز جماعي" : "Group",
-    locale === "ar" ? "الدفع" : "Payment",
-    locale === "ar" ? "المراجعة" : "Review"
-  ];
-
-  const appointmentStepCount = appointmentStepLabels.length;
-  function getAppointmentStepError(step: number) {
-    if (step === 0) {
-      if (customerMode === "existing" && !selectedCustomer) {
-        return locale === "ar" ? "الرجاء اختيار عميل موجود." : "Please select an existing customer.";
-      }
-
-      if (customerMode === "new" && (!newCustomer.firstName.trim() || !newCustomer.lastName.trim())) {
-        return locale === "ar" ? "الرجاء إدخال الاسم الأول والأخير للعميل." : "Please enter customer first and last name.";
-      }
-
-    }
-
-    if (step === 1 && queuedServices.length === 0) {
-      return locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please select at least one service.";
-    }
-
-    if (step === 2) {
-      if (!appointmentDate || !appointmentTime) {
-        return locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.";
-      }
-
-      const timeGuardMessage = getPastTodayTimeWarning(appointmentDate, appointmentTime, locale);
-      if (timeGuardMessage) {
-        return timeGuardMessage;
-      }
-
-      if (assignedEmployees.length > 0 && !selectedStaffId) {
-        return locale === "ar" ? "الرجاء اختيار مقدم الخدمة." : "Please choose a service provider.";
-      }
-    }
-
-    if (step === 3 && includeGroupGuest) {
-      if (!groupGuest.firstName.trim() || !groupGuest.lastName.trim()) {
-        return locale === "ar" ? "الرجاء إدخال الاسم الكامل للضيف الإضافي." : "Please enter the additional guest full name.";
-      }
-
-      if (!groupGuest.serviceId.trim()) {
-        return locale === "ar" ? "الرجاء اختيار خدمة الضيف الإضافي." : "Please choose the additional guest service.";
-      }
-    }
-
-    if (step === 4) {
-      if (!paymentMethod) {
-        return locale === "ar" ? "الرجاء اختيار طريقة الدفع." : "Please choose a payment method.";
-      }
-    }
-
-    return "";
-  }
-
-  const currentAppointmentStepLabel = appointmentStepLabels[appointmentStep] || "";
-  const nextAppointmentStepLabel = appointmentStepLabels[appointmentStep + 1] || "";
-
-  const goToNextAppointmentStep = () => {
-    const stepError = getAppointmentStepError(appointmentStep);
-    if (stepError) {
-      setError(stepError);
-      return;
-    }
-
-    setError("");
-    setAppointmentStep((current) => Math.min(current + 1, appointmentStepCount - 1));
-  };
-
-  const goToPreviousAppointmentStep = () => {
-    setError("");
-    setAppointmentStep((current) => Math.max(current - 1, 0));
-  };
-
   const handleWalkInCustomer = () => {
     setError("");
     setCustomerMode("guest");
@@ -536,7 +452,6 @@ export function AppointmentActionDrawer({
       gender: "",
       dateOfBirth: ""
     });
-    setAppointmentStep(0);
   };
 
   useEffect(() => {
@@ -729,8 +644,6 @@ export function AppointmentActionDrawer({
     });
     return ["all", ...Array.from(categories)];
   }, [groupedServices]);
-  const currentAppointmentStepError = mode === "appointment" ? getAppointmentStepError(appointmentStep) : "";
-
   const findQueuedServiceIndex = (serviceId: string) =>
     queuedServices.findIndex((item) => item.serviceId === serviceId);
 
@@ -1823,7 +1736,7 @@ export function AppointmentActionDrawer({
               </div>
             ) : (
               <div className="space-y-5">
-                <div className={`rounded-3xl border border-gray-200 bg-white p-4 ${appointmentStep === 4 ? "" : "hidden"}`}>
+                <div className="rounded-3xl border border-gray-200 bg-white p-4">
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     {locale === "ar" ? "الموظف" : "Employee"}
                   </label>
