@@ -378,7 +378,7 @@ export function AppointmentActionDrawer({
 
     if (mode === "appointment") {
       setCustomerMode(prefill?.customer ? "existing" : "guest");
-      setShowCustomerPicker(false);
+      setShowCustomerPicker(true);
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
       setCustomers([]);
       setSelectedCustomer(prefill?.customer ? {
@@ -458,7 +458,7 @@ export function AppointmentActionDrawer({
   const handleWalkInCustomer = () => {
     setError("");
     setCustomerMode("guest");
-    setShowCustomerPicker(false);
+    setShowCustomerPicker(true);
     setCustomerSearch("");
     setSelectedCustomer(null);
     setNewCustomer({
