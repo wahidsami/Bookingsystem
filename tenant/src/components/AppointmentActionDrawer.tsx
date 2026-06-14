@@ -343,6 +343,7 @@ export function AppointmentActionDrawer({
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
   const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
   const [queuedServices, setQueuedServices] = useState<BookingDraftItem[]>([]);
+  const [stagedServiceIds, setStagedServiceIds] = useState<string[]>([]);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
   const [serviceSearch, setServiceSearch] = useState("");
@@ -377,7 +378,7 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
-      setCustomerMode(prefill?.customer ? "existing" : "guest");
+      setCustomerMode("existing");
       setShowCustomerPicker(true);
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
       setCustomers([]);
@@ -410,6 +411,7 @@ export function AppointmentActionDrawer({
             }]
           : [];
       setQueuedServices(initialServices);
+      setStagedServiceIds([]);
       setSelectedServiceId(initialServices[0]?.serviceId || "");
       setSelectedVariantId(initialServices[0]?.variantId || "");
       setSelectedStaffId(initialServices[0]?.staffId || defaultStaffId || "");
@@ -666,8 +668,53 @@ export function AppointmentActionDrawer({
     });
     return ["all", ...Array.from(categories)];
   }, [groupedServices]);
+  const filteredServices = useMemo(
+    () =>
+      groupedServices
+        .flatMap((group) => group.items)
+        .filter((service) => {
+          const serviceName = `${service.name_en} ${service.name_ar} ${service.category || ""} ${service.parentName || ""} ${service.parentService || ""}`.toLowerCase();
+          const matchesSearch = !serviceSearch.trim() || serviceName.includes(serviceSearch.trim().toLowerCase());
+          const serviceCategory = (service.category || service.parentName || service.parentService || "").trim();
+          const matchesCategory = selectedServiceCategory === "all" || serviceCategory === selectedServiceCategory;
+          return matchesSearch && matchesCategory;
+        }),
+    [groupedServices, selectedServiceCategory, serviceSearch]
+  );
+  const visibleCustomers = customers.slice(0, 6);
   const findQueuedServiceIndex = (serviceId: string) =>
     queuedServices.findIndex((item) => item.serviceId === serviceId);
+  const toggleStagedService = (serviceId: string) => {
+    setStagedServiceIds((current) =>
+      current.includes(serviceId)
+        ? current.filter((item) => item !== serviceId)
+        : [...current, serviceId]
+    );
+  };
+  const clearStagedServices = () => setStagedServiceIds([]);
+  const commitStagedServices = () => {
+    if (!stagedServiceIds.length) {
+      return;
+    }
+
+    const nextServices: BookingDraftItem[] = stagedServiceIds.map((serviceId) => ({
+      serviceId,
+      variantId: null,
+      staffId: defaultStaffId || null,
+      startTime: null,
+      duration: null,
+      discountType: "none",
+      discountValue: null
+    }));
+
+    setQueuedServices(nextServices);
+    setSelectedServiceId(nextServices[0]?.serviceId || "");
+    setSelectedVariantId("");
+    setSelectedStaffId(defaultStaffId || "");
+    setShowServicePicker(false);
+    setEditingServiceIndex(null);
+    setStagedServiceIds([]);
+  };
 
   const getQueueItemService = (item: BookingDraftItem) => {
     const service = services.find((entry) => entry.id === item.serviceId) || null;
@@ -1220,157 +1267,259 @@ export function AppointmentActionDrawer({
 
             {mode === "appointment" ? (
               <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="space-y-4 xl:sticky xl:top-5 xl:self-start">
-                  <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                          {locale === "ar" ? "العميل" : "Client"}
-                        </p>
-                        <h4 className="mt-1 text-base font-semibold text-gray-900">
-                          {selectedCustomer
-                            ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim()
-                            : `${newCustomer.firstName || (locale === "ar" ? "عميل" : "Customer")} ${newCustomer.lastName || "001"}`.trim()}
-                        </h4>
+                <div className="xl:sticky xl:top-5 xl:self-start">
+                  <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="rounded-[24px] border border-dashed border-gray-200 px-6 py-8 text-center">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500">
+                        <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19a6 6 0 10-6 0m6 0H9m6 0a3 3 0 013 3m-9-3a3 3 0 00-3 3" />
+                        </svg>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleWalkInCustomer}
-                        className="rounded-full border border-dashed border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:border-primary/50 hover:bg-primary/10"
-                      >
-                        {locale === "ar" ? "حجوزات حضورية" : "Walk-in"}
-                      </button>
+                      <h4 className="mt-5 text-[24px] font-semibold tracking-tight text-gray-900">
+                        {selectedCustomer
+                          ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim()
+                          : (locale === "ar" ? "اختر عميل" : "Select a client")}
+                      </h4>
+                      <p className="mt-2 text-sm leading-6 text-gray-500">
+                        {locale === "ar" ? "أو اتركه فارغًا للحجوزات الحضورية" : "Or leave empty for walk-ins"}
+                      </p>
                     </div>
 
-                    {!showCustomerPicker && !selectedCustomer && customerMode !== "new" ? (
-                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <p className="text-sm text-gray-600">
-                          {locale === "ar"
-                            ? "اتركه فارغًا ليُحفظ كحجز حضوري."
-                            : "Leave this empty to save the booking as a walk-in."}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomerPicker(true)}
-                          className="mt-4 w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-                        >
-                          {locale === "ar" ? "إضافة عميل" : "Add client"}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mt-4 space-y-4">
-                        <input
-                          type="text"
-                          value={customerSearch}
-                          onChange={(e) => {
-                            setSelectedCustomer(null);
-                            setCustomerMode("existing");
-                            setShowCustomerPicker(true);
-                            setCustomerSearch(e.target.value);
-                          }}
-                          placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          style={{ textAlign: isRTL ? "right" : "left" }}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomerMode("new");
-                              setShowCustomerPicker(true);
-                            }}
-                            className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                          >
-                            {locale === "ar" ? "عميل جديد" : "Add new client"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleWalkInCustomer}
-                            className="flex-1 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
-                          >
-                            {locale === "ar" ? "حضوري" : "Walk-in"}
-                          </button>
-                        </div>
+                    <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                      <span className="h-px flex-1 bg-gray-200" />
+                      <span>OR</span>
+                      <span className="h-px flex-1 bg-gray-200" />
+                    </div>
 
-                        {customerMode === "new" ? (
-                          <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                            <div className="grid grid-cols-2 gap-3">
-                              <input
-                                value={newCustomer.firstName}
-                                onChange={(e) => setNewCustomer((current) => ({ ...current, firstName: e.target.value }))}
-                                placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
-                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                              />
-                              <input
-                                value={newCustomer.lastName}
-                                onChange={(e) => setNewCustomer((current) => ({ ...current, lastName: e.target.value }))}
-                                placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
-                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <input
-                                value={newCustomer.phone}
-                                onChange={(e) => setNewCustomer((current) => ({ ...current, phone: e.target.value }))}
-                                placeholder={locale === "ar" ? "الهاتف" : "Phone"}
-                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                              />
-                              <input
-                                value={newCustomer.email}
-                                onChange={(e) => setNewCustomer((current) => ({ ...current, email: e.target.value }))}
-                                placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
-                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                              />
-                            </div>
+                    <button
+                      type="button"
+                      onClick={handleWalkInCustomer}
+                      className="flex w-full items-center justify-between rounded-[22px] border border-gray-200 bg-white px-5 py-4 text-left transition hover:border-primary/40 hover:bg-purple-50"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-700">
+                          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold text-gray-900">{locale === "ar" ? "حجز حضوري" : "Walk-in booking"}</p>
+                          <p className="mt-1 text-sm text-gray-500">{locale === "ar" ? "المتابعة بدون عميل" : "Continue without a client"}</p>
+                        </div>
+                      </div>
+                      <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+
+                    <div className="mt-6">
+                      <p className="mb-3 text-lg font-semibold tracking-tight text-gray-900">
+                        {locale === "ar" ? "العملاء الحاليون" : "Recent clients"}
+                      </p>
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setSelectedCustomer(null);
+                          setCustomerMode("existing");
+                          setShowCustomerPicker(true);
+                          setCustomerSearch(e.target.value);
+                        }}
+                        placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search clients by name, phone or email"}
+                        className="w-full rounded-[20px] border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        style={{ textAlign: isRTL ? "right" : "left" }}
+                      />
+                    </div>
+
+                    <div className="mt-3 space-y-0 overflow-hidden rounded-[22px] border border-gray-200 bg-white">
+                      {customerMode === "new" ? (
+                        <div className="grid gap-3 bg-gray-50 p-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              value={newCustomer.firstName}
+                              onChange={(e) => setNewCustomer((current) => ({ ...current, firstName: e.target.value }))}
+                              placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
+                              className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                            />
+                            <input
+                              value={newCustomer.lastName}
+                              onChange={(e) => setNewCustomer((current) => ({ ...current, lastName: e.target.value }))}
+                              placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
+                              className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                            />
                           </div>
-                        ) : null}
-
-                        <div className="space-y-3">
-                          {customerLoading ? (
-                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
-                              {locale === "ar" ? "جارٍ البحث..." : "Searching..."}
-                            </div>
-                          ) : customers.length > 0 ? (
-                            customers.slice(0, 6).map((customer) => {
-                              const active = selectedCustomer?.id === customer.id;
-                              return (
-                                <button
-                                  key={customer.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedCustomer(customer);
-                                    setCustomerMode("existing");
-                                    setShowCustomerPicker(false);
-                                    setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
-                                  }}
-                                  className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-purple-50" : "border-gray-200 bg-white hover:border-primary/40"}`}
-                                >
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
-                                    {getInitials(customer.firstName, customer.lastName)}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate font-semibold text-gray-900">
-                                      {customer.firstName} {customer.lastName}
-                                    </p>
-                                    <p className="truncate text-xs text-gray-500">{customer.email || customer.phone}</p>
-                                  </div>
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
-                              {customerSearch.trim().length >= 1
-                                ? (locale === "ar" ? "لا يوجد عميل مطابق." : "No customer found.")
-                                : (locale === "ar" ? "ابدأ بالبحث عن عميل موجود." : "Start by searching for a customer.")}
-                            </div>
-                          )}
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              value={newCustomer.phone}
+                              onChange={(e) => setNewCustomer((current) => ({ ...current, phone: e.target.value }))}
+                              placeholder={locale === "ar" ? "الهاتف" : "Phone"}
+                              className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                            />
+                            <input
+                              value={newCustomer.email}
+                              onChange={(e) => setNewCustomer((current) => ({ ...current, email: e.target.value }))}
+                              placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                              className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                            />
+                          </div>
                         </div>
+                      ) : customerLoading ? (
+                        <div className="p-4 text-sm text-gray-500">{locale === "ar" ? "جارٍ تحميل العملاء..." : "Loading customers..."}</div>
+                      ) : visibleCustomers.length > 0 ? (
+                        visibleCustomers.map((customer, index) => {
+                          const active = selectedCustomer?.id === customer.id;
+                          return (
+                            <button
+                              key={customer.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setCustomerMode("existing");
+                                setShowCustomerPicker(true);
+                                setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
+                              }}
+                              className={`flex w-full items-center gap-4 px-4 py-4 text-left transition ${index > 0 ? "border-t border-gray-200" : ""} ${active ? "bg-purple-50" : "bg-white hover:bg-gray-50"}`}
+                            >
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700">
+                                {getInitials(customer.firstName, customer.lastName)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-base font-semibold text-gray-900">{customer.firstName} {customer.lastName}</p>
+                                <p className="mt-1 truncate text-sm text-gray-500">{customer.phone || customer.email}</p>
+                              </div>
+                              <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 text-sm text-gray-500">
+                          {customerSearch.trim()
+                            ? (locale === "ar" ? "لا يوجد عميل مطابق." : "No customer found.")
+                            : (locale === "ar" ? "ابدأ بالبحث عن عميل." : "Start by searching for a customer.")}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerMode("new");
+                        setShowCustomerPicker(true);
+                      }}
+                      className="mt-4 flex w-full items-center gap-3 rounded-[22px] border border-gray-200 bg-white px-5 py-4 text-left transition hover:border-primary/40 hover:bg-purple-50"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-50 text-gray-700">
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                        </svg>
                       </div>
-                    )}
+                      <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "إضافة عميل جديد" : "Add new client"}</span>
+                    </button>
                   </div>
                 </div>
 
                 <div className="space-y-5">
+                  {!hasQueuedServices ? (
+                    <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+                      <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-5">
+                        <h3 className="text-[32px] font-semibold tracking-tight text-gray-900">
+                          {locale === "ar" ? "اختر خدمة" : "Select a service"}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="rounded-2xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        >
+                          {locale === "ar" ? "إلغاء" : "Cancel"}
+                        </button>
+                      </div>
+
+                      <div className="space-y-5 px-6 py-5">
+                        <input
+                          type="text"
+                          value={serviceSearch}
+                          onChange={(e) => setServiceSearch(e.target.value)}
+                          placeholder={locale === "ar" ? "ابحث عن الخدمات أو الفئات..." : "Search services, categories..."}
+                          className="w-full rounded-[20px] border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        />
+
+                        <div className="flex flex-wrap gap-2">
+                          {serviceCategoryTabs.map((tab) => (
+                            <button
+                              key={tab}
+                              type="button"
+                              onClick={() => setSelectedServiceCategory(tab)}
+                              className={`rounded-[18px] border px-5 py-2.5 text-sm font-semibold transition ${
+                                selectedServiceCategory === tab
+                                  ? "border-primary bg-white text-gray-900 shadow-sm"
+                                  : "border-transparent bg-white text-gray-500 hover:border-gray-200 hover:text-gray-900"
+                              }`}
+                            >
+                              {tab === "all" ? (locale === "ar" ? "الكل" : "All") : tab}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="grid gap-4 xl:grid-cols-2">
+                          {filteredServices.map((service) => {
+                            const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                            const isSelected = stagedServiceIds.includes(service.id);
+                            return (
+                              <button
+                                key={service.id}
+                                type="button"
+                                onClick={() => toggleStagedService(service.id)}
+                                className={`rounded-[24px] border p-5 text-left transition ${
+                                  isSelected
+                                    ? "border-primary bg-purple-50 shadow-sm"
+                                    : "border-gray-200 bg-white hover:border-primary/40 hover:bg-gray-50"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-start gap-4">
+                                      <span className="mt-1 h-12 w-1 rounded-full bg-gray-400/70" />
+                                      <div className="min-w-0">
+                                        <p className="truncate text-[26px] font-semibold tracking-tight text-gray-900">{serviceName}</p>
+                                        <p className="mt-1 text-base text-gray-600">
+                                          {service.parentName || service.parentService || service.category || ""}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="mt-5 flex flex-wrap items-center gap-5 text-sm text-gray-600">
+                                      <span>{formatMinutesLabel(service.duration, locale)}</span>
+                                      <span>
+                                        {service.employees?.length
+                                          ? (locale === "ar" ? "متاح مع الموظفين المحددين" : "Available with selected staff")
+                                          : (locale === "ar" ? "قد لا يتوفر مع الموظف الحالي" : "Staff member availability may vary")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-4">
+                                    <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="text-lg font-semibold text-gray-900">
+                                      <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />
+                                    </span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {!filteredServices.length ? (
+                          <div className="rounded-[24px] border border-dashed border-gray-300 bg-gray-50 px-5 py-8 text-center text-sm text-gray-500">
+                            {locale === "ar" ? "لا توجد خدمات مطابقة للبحث الحالي." : "No services match the current search."}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   {hasQueuedServices ? (
                     <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1855,6 +2004,8 @@ export function AppointmentActionDrawer({
                       </div>
                     </div>
                       ) : null}
+                    </>
+                  )}
               </div>
               </div>
             ) : (
@@ -2037,8 +2188,31 @@ export function AppointmentActionDrawer({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                  {locale === "ar" ? "اختر خدمة للانتقال إلى تفاصيل الموعد." : "Select a service to continue to the appointment details."}
+                <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+                  <div className="hidden xl:block" />
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={clearStagedServices}
+                      disabled={!stagedServiceIds.length}
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {locale === "ar" ? "مسح" : "Clear"}
+                    </button>
+                    <div className="text-sm font-medium text-gray-500">
+                      {locale === "ar"
+                        ? `${stagedServiceIds.length} خدمة محددة`
+                        : `${stagedServiceIds.length} service selected${stagedServiceIds.length === 1 ? "" : "s"}`}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={commitStagedServices}
+                      disabled={!stagedServiceIds.length}
+                      className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {locale === "ar" ? "إضافة إلى الموعد" : "Add to appointment"}
+                    </button>
+                  </div>
                 </div>
               )
             ) : mode === "blocked_time" && existingBreak ? (
