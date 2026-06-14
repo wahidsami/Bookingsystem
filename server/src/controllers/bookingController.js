@@ -276,7 +276,10 @@ const createBooking = async (req, res) => {
                     startTime: parsedStartTime.toISOString(),
                     notes: item.notes || normalizedNotes || null,
                     paymentMethod: normalizedPaymentMethod,
-                    assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined)
+                    assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined),
+                    duration: item.duration,
+                    discountType: item.discountType,
+                    discountValue: item.discountValue
                 };
             });
 

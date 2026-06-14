@@ -29,6 +29,31 @@ const formatNotificationDate = (value) => {
         });
 };
 
+const normalizeNumber = (value, fallback = 0) => {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const resolveDiscountAmount = (baseRawPrice, discountType, discountValue) => {
+    const amount = normalizeNumber(baseRawPrice, 0);
+    if (amount <= 0) {
+        return 0;
+    }
+
+    const normalizedType = `${discountType || ''}`.trim().toLowerCase();
+    const normalizedValue = normalizeNumber(discountValue, 0);
+
+    if (!normalizedType || normalizedType === 'none' || normalizedValue <= 0) {
+        return 0;
+    }
+
+    if (normalizedType === 'percent' || normalizedType === 'percentage') {
+        return Math.max(0, amount * (normalizedValue / 100));
+    }
+
+    return Math.max(0, Math.min(amount, normalizedValue));
+};
+
 class BookingService {
 
     async loadBookingSessionContext({ bookingSessionId, bookingReference, tenantId, platformUserId, transaction }) {
@@ -134,7 +159,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -254,8 +279,10 @@ class BookingService {
             throw new Error('Invalid start time format');
         }
 
-        const duration = serviceVariant?.duration || service.duration || 30; // Default 30 minutes
-        const end = new Date(start.getTime() + duration * 60000);
+        const resolvedDuration = normalizeNumber(duration, 0) > 0
+            ? normalizeNumber(duration, 0)
+            : (serviceVariant?.duration || service.duration || 30); // Default 30 minutes
+        const end = new Date(start.getTime() + resolvedDuration * 60000);
 
         // Validate start time is in the future for customer/self-service bookings.
         // Tenant dashboard bookings can intentionally bypass this rule so admins can
@@ -298,18 +325,22 @@ class BookingService {
         }
 
         // ========== PRICING CALCULATION ==========
-        const pricingSource = serviceVariant
-            ? {
-                ...service.toJSON(),
-                rawPrice: calculateRawPriceFromFinalPrice(
-                    serviceVariant.finalPrice,
-                    service.taxRate,
-                    service.commissionRate
-                ),
-                finalPrice: serviceVariant.finalPrice,
-                duration
-            }
-            : service;
+        const baseRawPrice = serviceVariant
+            ? calculateRawPriceFromFinalPrice(
+                serviceVariant.finalPrice,
+                service.taxRate,
+                service.commissionRate
+            )
+            : normalizeNumber(service.rawPrice || service.basePrice, 0);
+        const discountAmount = resolveDiscountAmount(baseRawPrice, discountType, discountValue);
+        const discountedRawPrice = Math.max(0, baseRawPrice - discountAmount);
+        const pricingSource = {
+            ...service.toJSON(),
+            rawPrice: discountedRawPrice,
+            basePrice: discountedRawPrice,
+            finalPrice: discountedRawPrice,
+            duration: resolvedDuration
+        };
         const pricing = db.Appointment.calculateRevenueBreakdown(pricingSource, staff);
         const bookingSplit = normalizedPaymentMethod === 'booking-fee'
             ? calculateServiceDeposit(pricing.price, tenantPaymentSettings)
@@ -363,7 +394,7 @@ class BookingService {
                 serviceVariantId: serviceVariant?.id || null,
                 serviceVariantName: serviceVariant?.description || null,
                 serviceVariantDescription: serviceVariant?.description || null,
-                serviceVariantDuration: serviceVariant?.duration || null,
+                serviceVariantDuration: resolvedDuration || null,
                 bookingSessionId: existingSession?.id || bookingSessionId || null,
                 bookingReference: resolvedBookingReference || null,
                 bookingItemIndex: resolvedBookingItemIndex,
@@ -591,6 +622,9 @@ class BookingService {
                     notes: item.notes || normalizedNotes || null,
                     paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
                     assignmentMode: item.assignmentMode,
+                    duration: item.duration,
+                    discountType: item.discountType,
+                    discountValue: item.discountValue,
                     bookingSessionId: session.id,
                     bookingReference: session.bookingReference,
                     bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex + index : (Number(session.itemCount || 0) + index),

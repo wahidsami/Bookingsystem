@@ -80,6 +80,10 @@ interface BookingDraftItem {
   serviceId: string;
   variantId?: string | null;
   staffId?: string | null;
+  startTime?: string | null;
+  duration?: number | null;
+  discountType?: "none" | "percent" | "fixed";
+  discountValue?: number | null;
 }
 
 export interface AppointmentActionDrawerPrefill {
@@ -208,6 +212,49 @@ function addMinutesToTime(time: string, minutesToAdd: number) {
   return base.toTimeString().slice(0, 5);
 }
 
+function normalizeTimeLabel(time?: string | null) {
+  return `${time || ""}`.trim().slice(0, 5);
+}
+
+function extractTimeLabel(value?: string | null) {
+  const raw = `${value || ""}`.trim();
+  if (!raw) {
+    return "";
+  }
+
+  if (/^\d{2}:\d{2}/.test(raw)) {
+    return raw.slice(0, 5);
+  }
+
+  const date = new Date(raw);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toTimeString().slice(0, 5);
+  }
+
+  return raw.slice(0, 5);
+}
+
+function formatMinutesLabel(minutes: number, locale: string) {
+  const safeMinutes = Number.isFinite(minutes) ? Math.max(5, Math.round(minutes)) : 30;
+  return locale === "ar" ? `${safeMinutes} دقيقة` : `${safeMinutes} min`;
+}
+
+function resolveDiscountAmount(basePrice: number, discountType: string, discountValue: number) {
+  const price = toSafeMoneyNumber(basePrice);
+  const value = toSafeMoneyNumber(discountValue);
+  const type = `${discountType || ""}`.trim().toLowerCase();
+
+  if (!price || !type || type === "none" || value <= 0) {
+    return 0;
+  }
+
+  if (type === "percent" || type === "percentage") {
+    return Math.max(0, price * (value / 100));
+  }
+
+  return Math.max(0, Math.min(price, value));
+}
+
 function toSafeMoneyNumber(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -256,6 +303,7 @@ export function AppointmentActionDrawer({
   const [appointmentStep, setAppointmentStep] = useState(0);
 
   const [customerMode, setCustomerMode] = useState<"existing" | "new" | "guest">("existing");
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -280,6 +328,17 @@ export function AppointmentActionDrawer({
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
   const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
   const [queuedServices, setQueuedServices] = useState<BookingDraftItem[]>([]);
+  const [showServicePicker, setShowServicePicker] = useState(false);
+  const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [serviceDraft, setServiceDraft] = useState({
+    serviceId: "",
+    staffId: "",
+    startTime: "10:00",
+    duration: "30",
+    discountType: "none" as "none" | "percent" | "fixed",
+    discountValue: ""
+  });
 
   const [breakEmployeeId, setBreakEmployeeId] = useState("");
   const [breakDate, setBreakDate] = useState(getTodayDateKey());
@@ -302,8 +361,9 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
-      setAppointmentStep(prefill?.startStep ?? 0);
-      setCustomerMode(prefill?.customer ? "existing" : "existing");
+      setAppointmentStep(0);
+      setCustomerMode(prefill?.customer ? "existing" : "guest");
+      setShowCustomerPicker(false);
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
       setCustomers([]);
       setSelectedCustomer(prefill?.customer ? {
@@ -314,23 +374,47 @@ export function AppointmentActionDrawer({
         phone: prefill.customer.phone || ""
       } : null);
       setNewCustomer({
-        firstName: "",
-        lastName: "",
+        firstName: locale === "ar" ? "عميل" : "Customer",
+        lastName: "001",
         email: "",
         phone: "",
         gender: "",
         dateOfBirth: ""
       });
-      setSelectedServiceId(prefill?.serviceId || prefill?.queuedServices?.[0]?.serviceId || "");
-      setSelectedVariantId(prefill?.variantId || prefill?.queuedServices?.[0]?.variantId || "");
-      setSelectedStaffId(prefill?.staffId || prefill?.queuedServices?.[0]?.staffId || defaultStaffId || "");
+      const initialServices = prefill?.queuedServices?.length
+        ? prefill.queuedServices
+        : prefill?.serviceId
+          ? [{
+              serviceId: prefill.serviceId,
+              variantId: prefill.variantId || null,
+              staffId: prefill.staffId || defaultStaffId || null,
+              startTime: prefill.time ? `${prefill.date || defaultDate || getTodayDateKey()}T${prefill.time}:00` : null,
+              duration: null,
+              discountType: "none" as const,
+              discountValue: null
+            }]
+          : [];
+      setQueuedServices(initialServices);
+      setSelectedServiceId(initialServices[0]?.serviceId || "");
+      setSelectedVariantId(initialServices[0]?.variantId || "");
+      setSelectedStaffId(initialServices[0]?.staffId || defaultStaffId || "");
       setAppointmentDate(prefill?.date || defaultDate || getTodayDateKey());
       setAppointmentTime(prefill?.time || defaultTime || "10:00");
       setPaymentMethod(prefill?.paymentMethod || "");
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
       setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
-      setQueuedServices(prefill?.queuedServices || []);
+      setShowServicePicker(false);
+      setEditingServiceIndex(null);
+      setServiceSearch("");
+      setServiceDraft({
+        serviceId: initialServices[0]?.serviceId || "",
+        staffId: initialServices[0]?.staffId || defaultStaffId || "",
+        startTime: prefill?.time || defaultTime || "10:00",
+        duration: `${prefill?.queuedServices?.[0]?.duration || 30}`,
+        discountType: prefill?.queuedServices?.[0]?.discountType || "none",
+        discountValue: `${prefill?.queuedServices?.[0]?.discountValue || ""}`
+      });
       return;
     }
 
@@ -439,6 +523,7 @@ export function AppointmentActionDrawer({
   const handleWalkInCustomer = () => {
     setError("");
     setCustomerMode("guest");
+    setShowCustomerPicker(false);
     setCustomerSearch("");
     setSelectedCustomer(null);
     setNewCustomer({
@@ -449,11 +534,11 @@ export function AppointmentActionDrawer({
       gender: "",
       dateOfBirth: ""
     });
-    setAppointmentStep(1);
+    setAppointmentStep(0);
   };
 
   useEffect(() => {
-    if (!open || mode !== "appointment" || appointmentStep !== 0 || customerMode !== "existing") {
+    if (!open || mode !== "appointment" || !showCustomerPicker || customerMode !== "existing") {
       return;
     }
 
@@ -476,7 +561,7 @@ export function AppointmentActionDrawer({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [open, mode, appointmentStep, customerSearch, customerMode]);
+  }, [open, mode, showCustomerPicker, customerSearch, customerMode]);
 
   const selectedService = useMemo(
     () => services.find((service) => service.id === selectedServiceId) || null,
@@ -627,65 +712,196 @@ export function AppointmentActionDrawer({
   const findQueuedServiceIndex = (serviceId: string) =>
     queuedServices.findIndex((item) => item.serviceId === serviceId);
 
-  const getServicePriceForQueueItem = (item: BookingDraftItem) => {
+  const getQueueItemService = (item: BookingDraftItem) => {
     const service = services.find((entry) => entry.id === item.serviceId) || null;
     const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
+    return { service, variant };
+  };
+
+  const getQueueItemDuration = (item: BookingDraftItem) => {
+    const { service, variant } = getQueueItemService(item);
+    const overriddenDuration = Number(item.duration || 0);
+    if (Number.isFinite(overriddenDuration) && overriddenDuration > 0) {
+      return overriddenDuration;
+    }
+    return variant?.duration ?? service?.duration ?? 30;
+  };
+
+  const getQueueItemBasePrice = (item: BookingDraftItem) => {
+    const { service, variant } = getQueueItemService(item);
     return toSafeMoneyNumber(variant?.finalPrice ?? service?.finalPrice ?? 0);
   };
 
+  const getQueueItemAdjustedPrice = (item: BookingDraftItem) => {
+    const basePrice = getQueueItemBasePrice(item);
+    const discountAmount = resolveDiscountAmount(basePrice, item.discountType || "none", item.discountValue || 0);
+    return toSafeMoneyNumber(basePrice - discountAmount);
+  };
+
+  const getQueueItemStartTime = (item: BookingDraftItem) => extractTimeLabel(item.startTime) || appointmentTime;
+
+  const getQueueItemEndTime = (item: BookingDraftItem) => addMinutesToTime(getQueueItemStartTime(item), getQueueItemDuration(item));
+
+  const editingQueuedService = editingServiceIndex !== null ? queuedServices[editingServiceIndex] || null : null;
+  const editingQueuedServiceRecord = editingQueuedService
+    ? services.find((service) => service.id === editingQueuedService.serviceId) || null
+    : null;
+  const editingQueuedServicePrice = editingQueuedService ? getQueueItemBasePrice(editingQueuedService) : 0;
+  const editingQueuedServiceDiscount = editingQueuedService
+    ? resolveDiscountAmount(editingQueuedServicePrice, editingQueuedService.discountType || "none", editingQueuedService.discountValue || 0)
+    : 0;
+  const editingQueuedServiceTotal = toSafeMoneyNumber(editingQueuedServicePrice - editingQueuedServiceDiscount);
+  const editingQueuedServiceWarning = editingQueuedService
+    ? getPastTodayTimeWarning(
+        getLocalDateKeyFromValue(editingQueuedService.startTime) || appointmentDate,
+        getQueueItemStartTime(editingQueuedService),
+        locale
+      )
+    : "";
+
   const queuedServicesSubtotal = useMemo(
-    () => toSafeMoneyNumber(queuedServices.reduce((sum, item) => sum + getServicePriceForQueueItem(item), 0)),
+    () => toSafeMoneyNumber(queuedServices.reduce((sum, item) => sum + getQueueItemAdjustedPrice(item), 0)),
     [queuedServices, services]
   );
   const queuedServicesTotal = toSafeMoneyNumber(queuedServicesSubtotal + guestServicePrice);
 
-  const toggleQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
+  const addQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
     const trimmedServiceId = `${serviceId || ""}`.trim();
     if (!trimmedServiceId) {
-      return false;
+      return -1;
     }
 
     const normalizedVariantId = variantId || null;
     const normalizedStaffId = staffId || null;
-    const existingIndex = findQueuedServiceIndex(trimmedServiceId);
+    const targetService = services.find((entry) => entry.id === trimmedServiceId) || null;
+    const next = [...queuedServices];
+    const existingIndex = next.findIndex((item) => item.serviceId === trimmedServiceId);
+    if (existingIndex >= 0) {
+      openQueuedServiceEditor(existingIndex);
+      return existingIndex;
+    }
 
-    setQueuedServices((current) => {
-      const next = [...current];
-      const currentIndex = next.findIndex((item) => item.serviceId === trimmedServiceId);
+    const lastItem = next[next.length - 1];
+    const startTime = lastItem
+      ? new Date(new Date(lastItem.startTime || `${appointmentDate}T${appointmentTime}:00`).getTime() + getQueueItemDuration(lastItem) * 60000).toISOString()
+      : new Date(`${appointmentDate}T${appointmentTime}:00`).toISOString();
 
-      if (currentIndex >= 0) {
-        next.splice(currentIndex, 1);
-        return next;
-      }
-
-      next.push({
-        serviceId: trimmedServiceId,
-        variantId: normalizedVariantId,
-        staffId: normalizedStaffId
-      });
-      return next;
+    next.push({
+      serviceId: trimmedServiceId,
+      variantId: normalizedVariantId,
+      staffId: normalizedStaffId,
+      startTime,
+      duration: null,
+      discountType: "none",
+      discountValue: null
     });
-
-    return existingIndex < 0;
+    const createdIndex = next.length - 1;
+    setQueuedServices(next);
+    setEditingServiceIndex(createdIndex);
+    setServiceDraft({
+      serviceId: trimmedServiceId,
+      staffId: normalizedStaffId || defaultStaffId || "",
+      startTime: extractTimeLabel(startTime),
+      duration: `${targetService?.duration || 30}`,
+      discountType: "none",
+      discountValue: ""
+    });
+    setShowServicePicker(false);
+    return createdIndex;
   };
 
-  const updateQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
-    const trimmedServiceId = `${serviceId || ""}`.trim();
-    if (!trimmedServiceId) {
+  const openQueuedServiceEditor = (index: number) => {
+    const item = queuedServices[index];
+    if (!item) {
       return;
     }
 
-    setQueuedServices((current) =>
-      current.map((item) =>
-        item.serviceId === trimmedServiceId
-          ? {
-              ...item,
-              variantId: variantId || null,
-              staffId: staffId || null,
-            }
-          : item
-      )
-    );
+    setEditingServiceIndex(index);
+    setShowServicePicker(false);
+    setServiceDraft({
+      serviceId: item.serviceId,
+      staffId: item.staffId || defaultStaffId || "",
+      startTime: extractTimeLabel(item.startTime),
+      duration: `${getQueueItemDuration(item)}`,
+      discountType: item.discountType || "none",
+      discountValue: `${item.discountValue || ""}`
+    });
+  };
+
+  const applyQueuedServiceEdit = () => {
+    if (editingServiceIndex === null) {
+      return;
+    }
+
+    const targetService = services.find((entry) => entry.id === serviceDraft.serviceId) || null;
+    const sanitizedDuration = Math.max(5, Number(serviceDraft.duration || 0) || targetService?.duration || 30);
+    const startTime = normalizeTimeLabel(serviceDraft.startTime) || appointmentTime;
+    const nextStart = new Date(`${appointmentDate}T${startTime}:00`);
+
+    setQueuedServices((current) => {
+      const next = [...current];
+      if (!next[editingServiceIndex]) {
+        return current;
+      }
+
+      next[editingServiceIndex] = {
+        ...next[editingServiceIndex],
+        serviceId: serviceDraft.serviceId,
+        staffId: serviceDraft.staffId || null,
+        startTime: nextStart.toISOString(),
+        duration: sanitizedDuration,
+        discountType: serviceDraft.discountType,
+        discountValue: serviceDraft.discountType === "none" ? 0 : toSafeMoneyNumber(serviceDraft.discountValue)
+      };
+
+      for (let index = editingServiceIndex + 1; index < next.length; index += 1) {
+        const previous = next[index - 1];
+        const previousDuration = getQueueItemDuration(previous);
+        const previousStartTime = new Date(previous.startTime || `${appointmentDate}T${appointmentTime}:00`);
+        const recalculatedStart = new Date(previousStartTime.getTime() + previousDuration * 60000);
+        next[index] = {
+          ...next[index],
+          startTime: recalculatedStart.toISOString()
+        };
+      }
+
+      return next;
+    });
+
+    setEditingServiceIndex(null);
+    setServiceDraft({
+      serviceId: "",
+      staffId: "",
+      startTime: appointmentTime,
+      duration: "30",
+      discountType: "none",
+      discountValue: ""
+    });
+    setError("");
+  };
+
+  const removeQueuedServiceAt = (index: number) => {
+    setQueuedServices((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setEditingServiceIndex((current) => {
+      if (current === null) {
+        return null;
+      }
+      if (current === index) {
+        return null;
+      }
+      if (current > index) {
+        return current - 1;
+      }
+      return current;
+    });
+  };
+
+  const queuePreviewStartTime = queuedServices[0]?.startTime ? extractTimeLabel(queuedServices[0].startTime) : appointmentTime;
+  const queuePreviewDate = queuedServices[0]?.startTime ? getLocalDateKeyFromValue(queuedServices[0].startTime) || appointmentDate : appointmentDate;
+  const queuePreviewWarning = getPastTodayTimeWarning(queuePreviewDate, queuePreviewStartTime, locale);
+
+  const applyDraftService = () => {
+    applyQueuedServiceEdit();
   };
 
   const buildSequentialBookingItems = () => {
@@ -693,16 +909,21 @@ export function AppointmentActionDrawer({
       return [];
     }
 
-    const draftItems: BookingDraftItem[] = [...queuedServices];
-    const startCursor = new Date(`${appointmentDate}T${appointmentTime}`);
-    let cursor = new Date(startCursor);
+    let cursor = new Date(`${appointmentDate}T${appointmentTime}`);
 
-    return draftItems.map((item) => {
-      const service = services.find((entry) => entry.id === item.serviceId) || null;
-      const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
-      const duration = variant?.duration ?? service?.duration ?? 30;
-      const startTime = new Date(cursor);
-      cursor = new Date(cursor.getTime() + duration * 60000);
+    return queuedServices.map((item, index) => {
+      const duration = getQueueItemDuration(item);
+      const startTime = index === 0 && item.startTime
+        ? new Date(item.startTime)
+        : item.startTime
+          ? new Date(item.startTime)
+          : new Date(cursor);
+
+      if (Number.isNaN(startTime.getTime())) {
+        throw new Error(locale === "ar" ? "تاريخ أو وقت غير صالح." : "Invalid date or time.");
+      }
+
+      cursor = new Date(startTime.getTime() + duration * 60000);
 
       return {
         serviceId: item.serviceId,
@@ -711,13 +932,12 @@ export function AppointmentActionDrawer({
         requestedStaffId: item.staffId || null,
         startTime: startTime.toISOString(),
         paymentMethod,
-        assignmentMode: item.staffId ? "tenant_reassigned" : "auto_assigned"
+        assignmentMode: item.staffId ? "tenant_reassigned" : "auto_assigned",
+        duration,
+        discountType: item.discountType || "none",
+        discountValue: toSafeMoneyNumber(item.discountValue || 0)
       };
     });
-  };
-
-  const handleRemoveQueuedService = (index: number) => {
-    setQueuedServices((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const handleAppointmentSubmit = async () => {
@@ -727,11 +947,6 @@ export function AppointmentActionDrawer({
 
     if (queuedServices.length === 0) {
       setError(locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please select at least one service.");
-      return;
-    }
-
-    if (customerMode === "existing" && !selectedCustomer) {
-      setError(locale === "ar" ? "الرجاء اختيار عميل موجود أو إنشاء عميل جديد." : "Please select an existing customer or create a new one.");
       return;
     }
 
@@ -755,12 +970,15 @@ export function AppointmentActionDrawer({
       }));
     }
 
-    if (!appointmentDate || !appointmentTime) {
+    const bookingStartDate = queuePreviewDate || appointmentDate;
+    const bookingStartTime = queuePreviewStartTime || appointmentTime;
+
+    if (!bookingStartDate || !bookingStartTime) {
       setError(locale === "ar" ? "الرجاء اختيار التاريخ والوقت." : "Please choose a date and time.");
       return;
     }
 
-    const timeGuardMessage = getPastTodayTimeWarning(appointmentDate, appointmentTime, locale);
+    const timeGuardMessage = getPastTodayTimeWarning(bookingStartDate, bookingStartTime, locale);
     if (timeGuardMessage) {
       setError(timeGuardMessage);
       return;
@@ -786,8 +1004,12 @@ export function AppointmentActionDrawer({
       return;
     }
 
+    const resolvedCustomerMode = selectedCustomer
+      ? "existing"
+      : (customerMode === "new" ? "new" : "guest");
+
     const emailForConfirmation =
-      customerMode === "existing"
+      resolvedCustomerMode === "existing"
         ? (selectedCustomer?.email || "").trim()
         : (newCustomer.email || "").trim();
 
@@ -836,19 +1058,19 @@ export function AppointmentActionDrawer({
             return (locale === "ar" ? matchedService.name_ar : matchedService.name_en) || matchedService.name_en || matchedService.name_ar || undefined;
           })()
         } : undefined,
-        platformUserId: customerMode === "existing" ? selectedCustomer?.id : undefined,
-        customer: customerMode === "new" || customerMode === "guest"
+        platformUserId: resolvedCustomerMode === "existing" ? selectedCustomer?.id : undefined,
+        customer: resolvedCustomerMode === "new" || resolvedCustomerMode === "guest"
           ? {
               ...newCustomer,
-              firstName: customerMode === "guest"
+              firstName: resolvedCustomerMode === "guest"
                 ? (newCustomer.firstName.trim() || (locale === "ar" ? "عميل" : "Customer"))
                 : newCustomer.firstName.trim(),
-              lastName: customerMode === "guest"
+              lastName: resolvedCustomerMode === "guest"
                 ? (newCustomer.lastName.trim() || "001")
                 : newCustomer.lastName.trim(),
-              email: customerMode === "guest" ? "" : newCustomer.email.trim(),
-              phone: customerMode === "guest" ? "" : newCustomer.phone.trim(),
-              isGuest: customerMode === "guest"
+              email: resolvedCustomerMode === "guest" ? "" : newCustomer.email.trim(),
+              phone: resolvedCustomerMode === "guest" ? "" : newCustomer.phone.trim(),
+              isGuest: resolvedCustomerMode === "guest"
             }
           : null,
         assignmentMode: selectedStaffId ? "tenant_reassigned" : "auto_assigned"
@@ -1040,10 +1262,12 @@ export function AppointmentActionDrawer({
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                          {locale === "ar" ? "مساحة العميل" : "Customer panel"}
+                          {locale === "ar" ? "العميل" : "Client"}
                         </p>
                         <h4 className="mt-1 text-base font-semibold text-gray-900">
-                          {selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer")}
+                          {selectedCustomer
+                            ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim()
+                            : `${newCustomer.firstName || (locale === "ar" ? "عميل" : "Customer")} ${newCustomer.lastName || "001"}`.trim()}
                         </h4>
                       </div>
                       <button
@@ -1051,65 +1275,135 @@ export function AppointmentActionDrawer({
                         onClick={handleWalkInCustomer}
                         className="rounded-full border border-dashed border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:border-primary/50 hover:bg-primary/10"
                       >
-                        {locale === "ar" ? "عميل حضوري" : "Walk in"}
+                        {locale === "ar" ? "حجوزات حضورية" : "Walk-in"}
                       </button>
                     </div>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {locale === "ar"
-                        ? "ابحث عن عميل موجود أو أكمل كحجز حضوري."
-                        : "Search for an existing customer or continue as a walk-in."}
-                    </p>
-                    <input
-                      type="text"
-                      value={customerSearch}
-                      onChange={(e) => {
-                        setSelectedCustomer(null);
-                        setCustomerSearch(e.target.value);
-                        setCustomerMode("existing");
-                      }}
-                      placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
-                      className="mt-4 w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                      style={{ textAlign: isRTL ? "right" : "left" }}
-                    />
-                    <div className="mt-4 space-y-3">
-                      {customerLoading ? (
-                        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
-                          {locale === "ar" ? "جارٍ البحث..." : "Searching..."}
+
+                    {!showCustomerPicker && !selectedCustomer && customerMode !== "new" ? (
+                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-sm text-gray-600">
+                          {locale === "ar"
+                            ? "اتركه فارغًا ليُحفظ كحجز حضوري."
+                            : "Leave this empty to save the booking as a walk-in."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomerPicker(true)}
+                          className="mt-4 w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                        >
+                          {locale === "ar" ? "إضافة عميل" : "Add client"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-4">
+                        <input
+                          type="text"
+                          value={customerSearch}
+                          onChange={(e) => {
+                            setSelectedCustomer(null);
+                            setCustomerMode("existing");
+                            setShowCustomerPicker(true);
+                            setCustomerSearch(e.target.value);
+                          }}
+                          placeholder={locale === "ar" ? "ابحث بالاسم أو الهاتف أو البريد..." : "Search by name, phone, or email..."}
+                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          style={{ textAlign: isRTL ? "right" : "left" }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomerMode("new");
+                              setShowCustomerPicker(true);
+                            }}
+                            className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                          >
+                            {locale === "ar" ? "عميل جديد" : "Add new client"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleWalkInCustomer}
+                            className="flex-1 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                          >
+                            {locale === "ar" ? "حضوري" : "Walk-in"}
+                          </button>
                         </div>
-                      ) : customers.length > 0 ? (
-                        customers.slice(0, 6).map((customer) => {
-                          const active = selectedCustomer?.id === customer.id;
-                          return (
-                            <button
-                              key={customer.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedCustomer(customer);
-                                setCustomerMode("existing");
-                                setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
-                              }}
-                              className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-purple-50" : "border-gray-200 bg-white hover:border-primary/40"}`}
-                            >
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
-                                {getInitials(customer.firstName, customer.lastName)}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-semibold text-gray-900">
-                                  {customer.firstName} {customer.lastName}
-                                </p>
-                                <p className="truncate text-xs text-gray-500">{customer.email || customer.phone}</p>
-                              </div>
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
-                          {customerSearch.trim().length >= 1
-                            ? (locale === "ar" ? "لا يوجد عميل مطابق." : "No customer found.")
-                            : (locale === "ar" ? "ابدأ بالبحث عن عميل موجود." : "Start by searching for a customer.")}
+
+                        {customerMode === "new" ? (
+                          <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                value={newCustomer.firstName}
+                                onChange={(e) => setNewCustomer((current) => ({ ...current, firstName: e.target.value }))}
+                                placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
+                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                              />
+                              <input
+                                value={newCustomer.lastName}
+                                onChange={(e) => setNewCustomer((current) => ({ ...current, lastName: e.target.value }))}
+                                placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
+                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                value={newCustomer.phone}
+                                onChange={(e) => setNewCustomer((current) => ({ ...current, phone: e.target.value }))}
+                                placeholder={locale === "ar" ? "الهاتف" : "Phone"}
+                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                              />
+                              <input
+                                value={newCustomer.email}
+                                onChange={(e) => setNewCustomer((current) => ({ ...current, email: e.target.value }))}
+                                placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                                className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-3">
+                          {customerLoading ? (
+                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
+                              {locale === "ar" ? "جارٍ البحث..." : "Searching..."}
+                            </div>
+                          ) : customers.length > 0 ? (
+                            customers.slice(0, 6).map((customer) => {
+                              const active = selectedCustomer?.id === customer.id;
+                              return (
+                                <button
+                                  key={customer.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCustomer(customer);
+                                    setCustomerMode("existing");
+                                    setShowCustomerPicker(false);
+                                    setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
+                                  }}
+                                  className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-purple-50" : "border-gray-200 bg-white hover:border-primary/40"}`}
+                                >
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700">
+                                    {getInitials(customer.firstName, customer.lastName)}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate font-semibold text-gray-900">
+                                      {customer.firstName} {customer.lastName}
+                                    </p>
+                                    <p className="truncate text-xs text-gray-500">{customer.email || customer.phone}</p>
+                                  </div>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-xs text-gray-600">
+                              {customerSearch.trim().length >= 1
+                                ? (locale === "ar" ? "لا يوجد عميل مطابق." : "No customer found.")
+                                : (locale === "ar" ? "ابدأ بالبحث عن عميل موجود." : "Start by searching for a customer.")}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1118,151 +1412,323 @@ export function AppointmentActionDrawer({
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                          {locale === "ar" ? "ملخص الحجز" : "Booking summary"}
+                          {locale === "ar" ? "الخدمات" : "Services"}
                         </p>
                         <h4 className="mt-1 text-lg font-semibold text-gray-900">
-                          {selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer")}
+                          {queuedServices.length > 0
+                            ? (locale === "ar" ? `${queuedServices.length} خدمة` : `${queuedServices.length} service${queuedServices.length > 1 ? "s" : ""}`)
+                            : (locale === "ar" ? "لا توجد خدمات بعد" : "No services yet")}
                         </h4>
                         <p className="mt-1 text-sm text-gray-500">
-                          {selectedServiceName || (locale === "ar" ? "لم تُحدَّد خدمة" : "No service selected")}
+                          {locale === "ar"
+                            ? "أضف خدمة واحدة أو أكثر ثم عدّل كل خدمة على حدة."
+                            : "Add one or more services, then customize each service individually."}
                         </p>
                       </div>
-                      <div className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                        {appointmentSummaryTimeLabel}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowServicePicker((current) => !current)}
+                        className="rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                      >
+                        {showServicePicker ? (locale === "ar" ? "إخفاء القائمة" : "Hide picker") : (locale === "ar" ? "إضافة خدمة" : "Add service")}
+                      </button>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "العميل" : "Customer"}</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">{selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer")}</div>
-                        {selectedCustomer ? <div className="mt-1 truncate text-xs text-gray-500">{selectedCustomer.email || selectedCustomer.phone || "-"}</div> : null}
-                      </div>
-
-                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الخدمة" : "Service"}</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">{selectedServiceName || (locale === "ar" ? "غير محددة" : "Not selected")}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {selectedServiceParentLabel ? `${locale === "ar" ? "الفئة" : "Category"}: ${selectedServiceParentLabel}` : `${displayDuration} ${locale === "ar" ? "دقيقة" : "min"}`}
+                    <div className="mt-4 space-y-3">
+                      {queuedServices.length > 0 ? queuedServices.map((item, index) => {
+                        const service = services.find((entry) => entry.id === item.serviceId) || null;
+                        const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
+                        const serviceName = locale === "ar"
+                          ? (service?.name_ar || service?.name_en || "")
+                          : (service?.name_en || service?.name_ar || "");
+                        const itemPrice = getQueueItemAdjustedPrice(item);
+                        const itemStartTime = getQueueItemStartTime(item);
+                        const itemDuration = getQueueItemDuration(item);
+                        return (
+                          <button
+                            key={`${item.serviceId}-${index}`}
+                            type="button"
+                            onClick={() => openQueuedServiceEditor(index)}
+                            className="flex w-full items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-primary/40 hover:bg-purple-50"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="h-10 w-1.5 rounded-full bg-primary/70" />
+                                <div className="min-w-0">
+                                  <p className="truncate font-semibold text-gray-900">{serviceName || (locale === "ar" ? "خدمة" : "Service")}</p>
+                                  <p className="mt-0.5 text-xs text-gray-500">
+                                    {itemStartTime} • {formatMinutesLabel(itemDuration, locale)}{variant?.description ? ` • ${variant.description}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+                                <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
+                                  <Currency amount={itemPrice} />
+                                </span>
+                                {item.discountType && item.discountType !== "none" && item.discountValue ? (
+                                  <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-200">
+                                    {item.discountType === "percent" ? `${item.discountValue}%` : <Currency amount={item.discountValue} />}
+                                  </span>
+                                ) : null}
+                                {item.staffId ? (
+                                  <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 ring-1 ring-gray-200">
+                                    {employees.find((employee) => employee.id === item.staffId)?.name || item.staffId}
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 ring-1 ring-gray-200">
+                                    {locale === "ar" ? "تعيين تلقائي" : "Auto assign"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 ring-1 ring-gray-200">
+                                {locale === "ar" ? "تعديل" : "Edit"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  removeQueuedServiceAt(index);
+                                }}
+                                className="rounded-full border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                              >
+                                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                  <path d="M6 7a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm-1 3a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm2 3a1 1 0 100 2h4a1 1 0 100-2H7z" />
+                                </svg>
+                              </button>
+                            </div>
+                          </button>
+                        );
+                      }) : (
+                        <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "ابدأ بإضافة خدمة" : "Start by adding a service"}</p>
+                          <p className="mt-1 text-xs text-gray-500">{locale === "ar" ? "اضغط على إضافة خدمة لبدء الحجز" : "Use Add service to begin the booking"}</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowServicePicker(true)}
+                            className="mt-4 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90"
+                          >
+                            {locale === "ar" ? "إضافة خدمة" : "Add service"}
+                          </button>
                         </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الموظف" : "Staff"}</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">{selectedStaff?.name || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}</div>
-                        <div className="mt-1 text-xs text-gray-500">{selectedStaffId || (locale === "ar" ? "سيتم التعيين تلقائيًا" : "Will be auto assigned")}</div>
-                      </div>
-
-                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "التاريخ والوقت" : "Date & time"}</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">{appointmentDate} {appointmentTime}</div>
-                        <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "المدة" : "Duration"}: {displayDuration} {locale === "ar" ? "دقيقة" : "min"}</div>
-                      </div>
-
-                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "طريقة الدفع" : "Payment method"}</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">{paymentMethodLabel || "-"}</div>
-                        <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "الإجمالي" : "Total"}: <Currency amount={queuedServices.length > 0 ? queuedServicesSubtotal : displayServicePrice} /></div>
-                      </div>
-
-                      <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "المجموع النهائي" : "Final total"}</div>
-                        <div className="mt-1 text-lg font-semibold text-primary"><Currency amount={queuedServices.length > 0 ? queuedServicesTotal : displayTotalPrice} /></div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {queuedServices.length > 0
-                            ? (locale === "ar" ? `${queuedServices.length} خدمات في الحجز الحالي` : `${queuedServices.length} services in the current booking`)
-                            : (locale === "ar" ? "بدون خدمات إضافية" : "No extra services")}
-                        </div>
-                      </div>
+                      )}
                     </div>
+
+                    {showServicePicker ? (
+                      <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                        <input
+                          type="text"
+                          value={serviceSearch}
+                          onChange={(e) => setServiceSearch(e.target.value)}
+                          placeholder={locale === "ar" ? "ابحث عن خدمة..." : "Search services..."}
+                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                        />
+                        <div className="mt-4 space-y-4">
+                          {groupedServices
+                            .map((group) => ({
+                              ...group,
+                              items: group.items.filter((service) => {
+                                const serviceName = `${service.name_en} ${service.name_ar} ${service.category || ""} ${service.parentName || ""} ${service.parentService || ""}`.toLowerCase();
+                                return !serviceSearch.trim() || serviceName.includes(serviceSearch.trim().toLowerCase());
+                              })
+                            }))
+                            .filter((group) => group.items.length > 0)
+                            .map((group) => (
+                              <div key={group.heading || "all"} className="space-y-2">
+                                {group.heading ? <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{group.heading}</p> : null}
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  {group.items.map((service) => {
+                                    const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                                    return (
+                                      <button
+                                        key={service.id}
+                                        type="button"
+                                        onClick={() => {
+                                          addQueuedService(service.id, null, defaultStaffId || null);
+                                        }}
+                                        className="rounded-2xl border border-gray-200 bg-white p-3 text-left transition hover:border-primary/40 hover:bg-purple-50"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <p className="truncate font-semibold text-gray-900">{serviceName}</p>
+                                            <p className="mt-0.5 text-xs text-gray-500">
+                                              {formatMinutesLabel(service.duration, locale)}
+                                              {service.category || service.parentName || service.parentService ? ` • ${service.category || service.parentName || service.parentService}` : ""}
+                                            </p>
+                                          </div>
+                                          <div className="text-sm font-semibold text-primary">
+                                            <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />
+                                          </div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="grid gap-5 xl:grid-cols-2">
+                  {editingQueuedService ? (
                     <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "العميل المختار" : "Selected customer"}</p>
-                          <p className="text-xs text-gray-500">
-                            {selectedCustomer
-                              ? (selectedCustomer.email || selectedCustomer.phone || (locale === "ar" ? "تم اختيار عميل" : "Customer selected"))
-                              : (locale === "ar" ? "لا يوجد عميل محفوظ بعد" : "No saved customer yet")}
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                            {locale === "ar" ? "تعديل الخدمة" : "Edit service"}
                           </p>
+                          <h4 className="mt-1 text-lg font-semibold text-gray-900">
+                            {editingQueuedServiceRecord
+                              ? (locale === "ar"
+                                ? (editingQueuedServiceRecord.name_ar || editingQueuedServiceRecord.name_en)
+                                : (editingQueuedServiceRecord.name_en || editingQueuedServiceRecord.name_ar))
+                              : (locale === "ar" ? "خدمة" : "Service")}
+                          </h4>
                         </div>
-                        <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                          {customerMode === "guest"
-                            ? (locale === "ar" ? "ضيف" : "Guest")
-                            : customerMode === "new"
-                              ? (locale === "ar" ? "جديد" : "New")
-                              : (locale === "ar" ? "موجود" : "Existing")}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingServiceIndex(null)}
+                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                        >
+                          {locale === "ar" ? "عودة" : "Back"}
+                        </button>
                       </div>
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الاسم" : "Name"}</div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">{selectedCustomer ? `${selectedCustomer.firstName || ""} ${selectedCustomer.lastName || ""}`.trim() : (selectedCustomerName || (locale === "ar" ? "عميل حضوري" : "Walk-in customer"))}</div>
-                        </div>
-                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الهاتف" : "Phone"}</div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">{selectedCustomer?.phone || "-"}</div>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الملاحظات" : "Notes"}</p>
-                          <p className="text-xs text-gray-500">{locale === "ar" ? "الملاحظات النصية للحجز" : "Free-text booking notes"}</p>
-                        </div>
+                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {editingQueuedServiceRecord
+                            ? (locale === "ar"
+                              ? (editingQueuedServiceRecord.name_ar || editingQueuedServiceRecord.name_en)
+                              : (editingQueuedServiceRecord.name_en || editingQueuedServiceRecord.name_ar))
+                            : (locale === "ar" ? "الخدمة المختارة" : "Selected service")}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {getQueueItemStartTime(editingQueuedService)} • {formatMinutesLabel(getQueueItemDuration(editingQueuedService), locale)} • <Currency amount={editingQueuedServicePrice} />
+                        </p>
                       </div>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder={locale === "ar" ? "أضف ملاحظات..." : "Add booking notes..."}
-                        className="mt-4 min-h-[150px] w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                        style={{ textAlign: isRTL ? "right" : "left" }}
-                      />
-                    </div>
-                  </div>
 
-                  {includeGroupGuest || groupGuest.firstName.trim() || groupGuest.lastName.trim() || groupGuest.phone.trim() ? (
-                    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "تفاصيل الضيف" : "Guest details"}</p>
-                          <p className="text-xs text-gray-500">{locale === "ar" ? "بيانات الضيف الإضافي على نفس الحجز." : "Additional guest information for the same booking."}</p>
-                        </div>
-                        {groupGuest.isFree ? <span className="rounded-full bg-green-50 px-3 py-1 text-[11px] font-semibold text-green-700">{locale === "ar" ? "مجاني" : "Free"}</span> : null}
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "الموظف" : "Staff member"}</span>
+                          <select
+                            value={serviceDraft.staffId}
+                            onChange={(e) => setServiceDraft((current) => ({ ...current, staffId: e.target.value }))}
+                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          >
+                            <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
+                            {assignedEmployees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "نوع الخصم" : "Discount"}</span>
+                          <select
+                            value={serviceDraft.discountType}
+                            onChange={(e) => setServiceDraft((current) => ({ ...current, discountType: e.target.value as "none" | "percent" | "fixed" }))}
+                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          >
+                            <option value="none">{locale === "ar" ? "بدون خصم" : "No discount"}</option>
+                            <option value="percent">{locale === "ar" ? "نسبة مئوية" : "Percent"}</option>
+                            <option value="fixed">{locale === "ar" ? "مبلغ ثابت" : "Fixed amount"}</option>
+                          </select>
+                        </label>
+
+                        {serviceDraft.discountType !== "none" ? (
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "قيمة الخصم" : "Discount value"}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={serviceDraft.discountValue}
+                              onChange={(e) => setServiceDraft((current) => ({ ...current, discountValue: e.target.value }))}
+                              placeholder={serviceDraft.discountType === "percent" ? "10" : "25"}
+                              className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                            />
+                          </label>
+                        ) : (
+                          <div className="hidden sm:block" />
+                        )}
+
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "وقت البدء" : "Start time"}</span>
+                          <select
+                            value={serviceDraft.startTime}
+                            onChange={(e) => setServiceDraft((current) => ({ ...current, startTime: e.target.value }))}
+                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          >
+                            {TIME_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {locale === "ar" ? option.labelAr : option.labelEn}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "المدة" : "Duration"}</span>
+                          <input
+                            type="number"
+                            min="5"
+                            step="5"
+                            value={serviceDraft.duration}
+                            onChange={(e) => setServiceDraft((current) => ({ ...current, duration: e.target.value }))}
+                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          />
+                        </label>
                       </div>
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الاسم" : "Name"}</div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">{`${groupGuest.firstName} ${groupGuest.lastName}`.trim() || "-"}</div>
+
+                      {editingQueuedServiceWarning ? (
+                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          {editingQueuedServiceWarning}
                         </div>
-                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الهاتف" : "Phone"}</div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">{groupGuest.phone || "-"}</div>
+                      ) : null}
+
+                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-gray-600">{locale === "ar" ? "السعر الأصلي" : "Original price"}</span>
+                          <span className="font-semibold text-gray-900"><Currency amount={editingQueuedServicePrice} /></span>
                         </div>
-                        <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-200">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{locale === "ar" ? "الخدمة" : "Service"}</div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">{selectedGuestService?.name_en || selectedGuestService?.name_ar || "-"}</div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                          <span className="text-gray-600">{locale === "ar" ? "الخصم" : "Discount"}</span>
+                          <span className="font-semibold text-gray-900">
+                            {editingQueuedServiceDiscount > 0
+                              ? (serviceDraft.discountType === "percent"
+                                ? `${serviceDraft.discountValue}%`
+                                : <Currency amount={editingQueuedServiceDiscount} />)
+                              : (locale === "ar" ? "بدون" : "None")}
+                          </span>
                         </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-base">
+                          <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
+                          <span className="font-semibold text-primary"><Currency amount={editingQueuedServiceTotal} /></span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => editingServiceIndex !== null && removeQueuedServiceAt(editingServiceIndex)}
+                          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                        >
+                          {locale === "ar" ? "حذف الخدمة" : "Delete service"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={applyDraftService}
+                          className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                        >
+                          {locale === "ar" ? "تطبيق" : "Apply"}
+                        </button>
                       </div>
                     </div>
                   ) : null}
-
-                  <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الإجراءات" : "Actions"}</p>
-                        <p className="text-xs text-gray-500">{locale === "ar" ? "احفظ التغييرات أو أغلق اللوحة." : "Save the booking changes or close the panel."}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={onClose} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">{locale === "ar" ? "إغلاق" : "Close"}</button>
-                        <button type="button" onClick={handleAppointmentSubmit} disabled={saving} className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">{saving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "حفظ الحجز" : "Save booking")}</button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             ) : (
@@ -1402,39 +1868,36 @@ export function AppointmentActionDrawer({
 
           <div className="border-t border-gray-100 px-5 py-4">
             {mode === "appointment" ? (
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={goToPreviousAppointmentStep}
-                  disabled={appointmentStep === 0 || saving}
-                  className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {locale === "ar" ? "السابق" : "Previous"}
-                </button>
-
-                {appointmentStep < appointmentStepCount - 1 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {locale === "ar" ? "الإجمالي" : "Total"}: <Currency amount={queuedServices.length > 0 ? queuedServicesTotal : displayTotalPrice} />
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {queuedServices.length > 0
+                      ? (locale === "ar" ? `${queuedServices.length} خدمات في الحجز الحالي` : `${queuedServices.length} services in the current booking`)
+                      : (locale === "ar" ? "بدون خدمات إضافية" : "No extra services")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={goToNextAppointmentStep}
-                    disabled={saving || Boolean(currentAppointmentStepError)}
-                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                    onClick={onClose}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                   >
-                    {locale === "ar"
-                      ? `التالي${nextAppointmentStepLabel ? `: ${nextAppointmentStepLabel}` : ""}`
-                      : `Next${nextAppointmentStepLabel ? `: ${nextAppointmentStepLabel}` : ""}`}
+                    {locale === "ar" ? "إغلاق" : "Close"}
                   </button>
-                ) : (
                   <button
                     type="button"
                     onClick={handleAppointmentSubmit}
-                    disabled={saving}
-                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={saving || Boolean(queuePreviewWarning)}
+                    className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {saving
                       ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
-                      : (locale === "ar" ? "حفظ الموعد" : "Save Appointment")}
+                      : (locale === "ar" ? "حفظ الحجز" : "Save booking")}
                   </button>
-                )}
+                </div>
               </div>
             ) : mode === "blocked_time" && existingBreak ? (
               <div className="flex gap-3">

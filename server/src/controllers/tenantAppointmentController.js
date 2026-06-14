@@ -604,7 +604,10 @@ exports.createAppointment = async (req, res) => {
                     startTime: parsedStartTime.toISOString(),
                     notes: item?.notes || notes || null,
                     paymentMethod: itemPaymentMethod,
-                    assignmentMode: item?.assignmentMode || (item?.staffId ? 'tenant_reassigned' : 'auto_assigned')
+                    assignmentMode: item?.assignmentMode || (item?.staffId ? 'tenant_reassigned' : 'auto_assigned'),
+                    duration: item?.duration,
+                    discountType: item?.discountType,
+                    discountValue: item?.discountValue
                 };
             });
 

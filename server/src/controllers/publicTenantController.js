@@ -910,7 +910,10 @@ exports.createPublicBooking = async (req, res) => {
                     startTime: parsedStartTime.toISOString(),
                     notes: item.notes || specialRequests || null,
                     paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
-                    assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined)
+                    assignmentMode: item.assignmentMode || (item.staffId ? 'tenant_reassigned' : undefined),
+                    duration: item.duration,
+                    discountType: item.discountType,
+                    discountValue: item.discountValue
                 };
             });
 

@@ -1137,6 +1137,9 @@ class TenantApiClient {
       notes?: string;
       paymentMethod?: string;
       assignmentMode?: string;
+      duration?: number;
+      discountType?: "none" | "percent" | "fixed";
+      discountValue?: number;
     }>;
     customer?: {
       firstName: string;
