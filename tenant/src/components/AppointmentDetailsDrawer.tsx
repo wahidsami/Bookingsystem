@@ -500,6 +500,7 @@ export function AppointmentDetailsDrawer({
   isRTL,
   onClose,
   onRebook,
+  onAddService,
 }: AppointmentDetailsDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
