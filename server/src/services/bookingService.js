@@ -54,6 +54,17 @@ const resolveDiscountAmount = (baseRawPrice, discountType, discountValue) => {
     return Math.max(0, Math.min(amount, normalizedValue));
 };
 
+const isUniqueConstraintForField = (error, fieldName) => {
+    if (error?.name !== 'SequelizeUniqueConstraintError') {
+        return false;
+    }
+
+    return Array.isArray(error?.errors) && error.errors.some((entry) => {
+        const path = `${entry?.path || ''}`.trim().toLowerCase();
+        return path === `${fieldName}`.trim().toLowerCase();
+    });
+};
+
 class BookingService {
 
     async loadBookingSessionContext({ bookingSessionId, bookingReference, tenantId, platformUserId, transaction }) {
@@ -377,7 +388,7 @@ class BookingService {
             const requiresArrivalPayment = ['at-center', 'at_center', 'pay_on_visit', 'cash_on_delivery', 'cash']
                 .includes(`${normalizedPaymentMethod}`.trim().toLowerCase());
             const initialAppointmentStatus = requiresArrivalPayment ? 'pending' : 'confirmed';
-            const appointment = await db.Appointment.create({
+            const appointmentPayload = {
                 serviceId,
                 staffId: finalStaffId,
                 requestedStaffId: customerSelectedSpecificStaff ? normalizedRequestedStaffId : null,
@@ -410,7 +421,24 @@ class BookingService {
                 remainderAmount: initialRemainderAmount,
                 remainderPaid: false,
                 totalPaid: 0
-            }, { transaction: finalTransaction });
+            };
+
+            let appointment = null;
+            let bookingNumberAttempts = 0;
+            while (!appointment && bookingNumberAttempts < 5) {
+                bookingNumberAttempts += 1;
+                try {
+                    appointment = await db.Appointment.create({
+                        ...appointmentPayload,
+                        bookingNumber: await db.Appointment.generateBookingNumber()
+                    }, { transaction: finalTransaction });
+                } catch (createError) {
+                    const isBookingNumberConflict = isUniqueConstraintForField(createError, 'bookingNumber');
+                    if (!isBookingNumberConflict || bookingNumberAttempts >= 5) {
+                        throw createError;
+                    }
+                }
+            }
 
             const invoice = await ensureAppointmentInvoice(appointment.id, {
                 transaction: finalTransaction,

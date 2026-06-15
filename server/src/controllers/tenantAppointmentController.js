@@ -280,11 +280,12 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     // PlatformUser requires non-null unique email/phone in DB.
     // For quick appointment creation we allow missing input, then fill safe placeholders.
     if (!email) {
-        const guestTag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        const guestTag = `${Date.now()}${crypto.randomInt(1000, 9999)}`;
         email = `guest+${guestTag}@guest.refah.local`;
     }
     if (!phone) {
-        phone = `+9665${String(Date.now()).slice(-8)}`;
+        const phoneSuffix = `${String(Date.now()).slice(-5)}${crypto.randomInt(100, 999)}`;
+        phone = `+9665${phoneSuffix}`;
     }
 
     const isDefaultWalkInPlaceholder = isGuest && (
