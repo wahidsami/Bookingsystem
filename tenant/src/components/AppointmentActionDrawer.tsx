@@ -649,6 +649,16 @@ export function AppointmentActionDrawer({
     return toSafeMoneyNumber(basePrice - discountAmount);
   };
 
+  const queueHasMissingRequiredStaff = useMemo(
+    () =>
+      queuedServices.some((item) => {
+        const service = services.find((entry) => entry.id === item.serviceId);
+        const serviceEmployees = (service?.employees || []).filter((employee) => employee.isActive !== false);
+        return serviceEmployees.length > 0 && !item.staffId;
+      }),
+    [queuedServices, services]
+  );
+
   const getQueueItemStartTime = (item: BookingDraftItem) => extractTimeLabel(item.startTime) || appointmentTime;
 
   const getQueueItemEndTime = (item: BookingDraftItem) => addMinutesToTime(getQueueItemStartTime(item), getQueueItemDuration(item));
@@ -993,7 +1003,7 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    if (assignedEmployees.length > 0 && !selectedStaffId) {
+    if (queueHasMissingRequiredStaff) {
       setError(locale === "ar" ? "الرجاء اختيار مقدم الخدمة." : "Please choose a service provider.");
       return;
     }

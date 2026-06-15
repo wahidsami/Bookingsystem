@@ -538,7 +538,7 @@ class BookingService {
      * Each item is still persisted as a normal appointment row.
      */
     async createBookingSession(data, options = {}) {
-        const { tenantId, platformUserId, items, notes, paymentMethod, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation } = data;
+        const { tenantId, platformUserId, items, notes, paymentMethod, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;
         const finalTransaction = transaction || await db.sequelize.transaction();
@@ -629,6 +629,7 @@ class BookingService {
                     duration: item.duration,
                     discountType: item.discountType,
                     discountValue: item.discountValue,
+                    skipAdvanceValidation: Boolean(skipAdvanceValidation),
                     skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
                     bookingSessionId: session.id,
                     bookingReference: session.bookingReference,
