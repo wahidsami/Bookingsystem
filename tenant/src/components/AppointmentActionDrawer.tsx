@@ -1651,13 +1651,13 @@ export function AppointmentActionDrawer({
                         return (
                           <div
                             key={`${item.serviceId}-${index}`}
-                            className={`overflow-hidden rounded-2xl border text-left transition ${
+                            className={`overflow-hidden rounded-3xl border text-left shadow-sm transition ${
                               isEditingThisService
-                                ? "border-primary/50 bg-purple-50 shadow-sm"
-                                : "border-gray-200 bg-gray-50 hover:border-primary/40 hover:bg-purple-50"
+                                ? "border-primary/30 bg-white ring-1 ring-primary/20"
+                                : "border-gray-200 bg-white hover:border-primary/40 hover:bg-purple-50"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-3 p-4">
+                            <div className="flex items-start justify-between gap-4 p-4">
                               <button
                                 type="button"
                                 onClick={() => openQueuedServiceEditor(index)}
@@ -1673,7 +1673,7 @@ export function AppointmentActionDrawer({
                                   </div>
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
-                                  <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
+                                  <span className="rounded-full bg-gray-50 px-3 py-1 text-gray-600 ring-1 ring-gray-200">
                                     <Currency amount={itemPrice} />
                                   </span>
                                   {item.discountType && item.discountType !== "none" && item.discountValue ? (
@@ -1696,7 +1696,7 @@ export function AppointmentActionDrawer({
                                 <button
                                   type="button"
                                   onClick={() => isEditingThisService ? setEditingServiceIndex(null) : openQueuedServiceEditor(index)}
-                                  className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 ring-1 ring-gray-200 transition hover:bg-gray-50"
+                                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50"
                                 >
                                   {isEditingThisService
                                     ? (locale === "ar" ? "إغلاق" : "Close")
@@ -1714,7 +1714,7 @@ export function AppointmentActionDrawer({
                               </div>
                             </div>
                             {isEditingThisService ? (
-                              <div className="border-t border-primary/20 bg-white/80 p-4 sm:p-5">
+                              <div className="border-t border-gray-200 bg-gray-50 p-4 sm:p-5">
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
                                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
@@ -1737,7 +1737,7 @@ export function AppointmentActionDrawer({
                                   </button>
                                 </div>
 
-                                <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
                                   <p className="text-sm font-semibold text-gray-900">
                                     {editingQueuedServiceRecord
                                       ? (locale === "ar"
@@ -1757,7 +1757,7 @@ export function AppointmentActionDrawer({
                                       <select
                                         value={serviceDraft.staffId}
                                         onChange={(e) => setServiceDraft((current) => ({ ...current, staffId: e.target.value }))}
-                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                                       >
                                         <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
                                         {assignedEmployees.map((employee) => (
@@ -1773,7 +1773,7 @@ export function AppointmentActionDrawer({
                                       <select
                                         value={serviceDraft.discountType}
                                         onChange={(e) => setServiceDraft((current) => ({ ...current, discountType: e.target.value as "none" | "percent" | "fixed" }))}
-                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                                       >
                                         <option value="none">{locale === "ar" ? "بدون خصم" : "No discount"}</option>
                                         <option value="percent">{locale === "ar" ? "نسبة مئوية" : "Percent"}</option>
@@ -1793,7 +1793,7 @@ export function AppointmentActionDrawer({
                                           value={serviceDraft.discountValue}
                                           onChange={(e) => setServiceDraft((current) => ({ ...current, discountValue: e.target.value }))}
                                           placeholder={serviceDraft.discountType === "percent" ? "10" : "25"}
-                                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                          className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                                         />
                                       </label>
                                     </div>
@@ -1805,7 +1805,7 @@ export function AppointmentActionDrawer({
                                       <select
                                         value={serviceDraft.startTime}
                                         onChange={(e) => setServiceDraft((current) => ({ ...current, startTime: e.target.value }))}
-                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                                       >
                                         {TIME_OPTIONS.map((option) => (
                                           <option key={option.value} value={option.value}>
@@ -1823,7 +1823,7 @@ export function AppointmentActionDrawer({
                                         step="5"
                                         value={serviceDraft.duration}
                                         onChange={(e) => setServiceDraft((current) => ({ ...current, duration: e.target.value }))}
-                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                                       />
                                     </label>
                                   </div>
@@ -1835,7 +1835,7 @@ export function AppointmentActionDrawer({
                                   </div>
                                 ) : null}
 
-                                <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
                                   <div className="flex items-center justify-between gap-3 text-sm">
                                     <span className="text-gray-600">{locale === "ar" ? "السعر الأصلي" : "Original price"}</span>
                                     <span className="font-semibold text-gray-900"><Currency amount={editingQueuedServicePrice} /></span>
