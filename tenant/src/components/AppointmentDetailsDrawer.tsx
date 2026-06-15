@@ -1257,7 +1257,7 @@ export function AppointmentDetailsDrawer({
     };
 
     const renderCustomerPanel = () => (
-      <div className="space-y-4 overflow-y-auto pr-2">
+      <div className="space-y-3 overflow-y-auto pr-2">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
@@ -1271,24 +1271,24 @@ export function AppointmentDetailsDrawer({
           </button>
         </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white px-4 py-5 shadow-sm">
+        <div className="rounded-[28px] border border-gray-200 bg-white px-3.5 py-4 shadow-sm">
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-lg font-semibold text-gray-900">
+            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-base font-semibold text-gray-900">
               {customerAvatarSrc ? (
                 <img src={customerAvatarSrc} alt={customerDisplayName} className="h-full w-full object-cover" />
               ) : (
                 (customerDisplayName?.[0] || "?").toUpperCase()
               )}
             </div>
-            <p className="mt-3 text-sm font-semibold uppercase tracking-[0.2em] text-violet-500">
+            <p className="mt-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-violet-500">
               {locale === "ar" ? "العميل" : "Client"}
             </p>
-            <h4 className="mt-2 truncate text-xl font-bold text-gray-900">{customerDisplayName}</h4>
-            <div className="mt-2 space-y-1 text-sm text-gray-600">
+            <h4 className="mt-1.5 truncate text-lg font-bold text-gray-900">{customerDisplayName}</h4>
+            <div className="mt-1.5 space-y-0.5 text-sm text-gray-600">
               <p className="truncate">{customerEmail || (locale === "ar" ? "لا يوجد بريد" : "No email")}</p>
               <p>{customerPhone || (locale === "ar" ? "لا يوجد هاتف" : "No phone")}</p>
             </div>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
               {customerProfile?.loyaltyTier ? (
                 <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
                   {customerProfile.loyaltyTier}
@@ -1300,11 +1300,11 @@ export function AppointmentDetailsDrawer({
                 </span>
               ) : null}
             </div>
-            <div className="mt-5 grid w-full grid-cols-2 gap-3">
+            <div className="mt-4 grid w-full grid-cols-2 gap-2.5">
               <Link
                 href={customerProfileLink}
                 onClick={onClose}
-                className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
               >
                 {locale === "ar" ? "الملف" : "Profile"}
               </Link>
@@ -1312,7 +1312,7 @@ export function AppointmentDetailsDrawer({
                 <button
                   type="button"
                   onClick={() => setMoreActionsOpen((current) => !current)}
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
                 >
                   {locale === "ar" ? "الإجراءات" : "Actions"}
                 </button>
@@ -1345,7 +1345,7 @@ export function AppointmentDetailsDrawer({
             title={locale === "ar" ? "حالة الحضور المباشر" : "Walk-in state"}
             className="bg-white"
           >
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-3.5">
               <p className="text-sm font-semibold text-gray-900">
                 {locale === "ar" ? "حجز حضوري" : "Walk-in appointment"}
               </p>
@@ -1355,7 +1355,7 @@ export function AppointmentDetailsDrawer({
               <Link
                 href={customerProfileLink}
                 onClick={onClose}
-                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
               >
                 {locale === "ar" ? "تعيين عميل" : "Assign customer"}
               </Link>
@@ -1389,7 +1389,7 @@ export function AppointmentDetailsDrawer({
                   </div>
                 }
               >
-                <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-3">
+                <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
                       {getStatusLabel(appointment.status, locale)}
@@ -1413,14 +1413,14 @@ export function AppointmentDetailsDrawer({
                     ) : null}
                   </div>
 
-                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                         {locale === "ar" ? "تاريخ الخدمة" : "Service date"}
                       </p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
                     </div>
-                    <div className="min-w-[220px] sm:ml-auto">
+                    <div className="min-w-[200px] sm:ml-auto">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                         {locale === "ar" ? "الحالة" : "Status"}
                       </p>
@@ -1463,8 +1463,8 @@ export function AppointmentDetailsDrawer({
                   ) : null
                 }
               >
-                <div className="space-y-2.5">
-                  {serviceCards.map((item) => {
+              <div className="space-y-2">
+                {serviceCards.map((item) => {
                     const itemServiceName = locale === "ar" ? item.service.name_ar : item.service.name_en;
                     const itemVariant = item.serviceVariantName?.trim() || item.serviceVariantDescription?.trim() || "";
                     const itemDuration = item.serviceVariantDuration || item.service.duration || durationMinutes;
@@ -1472,29 +1472,33 @@ export function AppointmentDetailsDrawer({
                     return (
                       <div
                         key={item.id}
-                        className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition ${
+                        className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${
                           isEditingThisService ? "border-primary/30 ring-1 ring-primary/20" : "border-gray-200"
                         }`}
                       >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 p-3.5">
-                            <p className="text-base font-semibold text-gray-900">{itemServiceName}</p>
-                            {itemVariant ? (
-                              <p className="mt-1 text-sm text-gray-500">{itemVariant}</p>
-                            ) : null}
-                            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                              <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{itemDuration} min</span>
-                              <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{item.staff.name}</span>
-                              <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">
+                        <div className="flex flex-wrap items-center justify-between gap-2.5">
+                          <div className="min-w-0 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-semibold text-gray-900">{itemServiceName}</p>
+                              {itemVariant ? (
+                                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
+                                  {itemVariant}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                              <span className="rounded-full bg-gray-100 px-2.5 py-1 font-semibold">{itemDuration} min</span>
+                              <span className="rounded-full bg-gray-100 px-2.5 py-1 font-semibold">{item.staff.name}</span>
+                              <span className="rounded-full bg-gray-100 px-2.5 py-1 font-semibold">
                                 <Currency amount={Number(item.price || 0)} />
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 p-3.5">
+                          <div className="flex items-center gap-2 px-3 pb-3 pt-0">
                             <button
                               type="button"
                               onClick={() => beginServiceEdit(item)}
-                              className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                              className="rounded-2xl border border-gray-200 bg-white px-2.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                             >
                               {isEditingThisService ? (locale === "ar" ? "إغلاق" : "Close") : (locale === "ar" ? "تعديل" : "Edit")}
                             </button>
@@ -1504,14 +1508,14 @@ export function AppointmentDetailsDrawer({
                                 kind: "error",
                                 message: locale === "ar" ? "حذف الخدمة غير مفعل بعد." : "Service deletion is not wired yet."
                               })}
-                              className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                              className="rounded-2xl border border-gray-200 bg-white px-2.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                             >
                               {locale === "ar" ? "حذف" : "Delete"}
                             </button>
                           </div>
                         </div>
                         {isEditingThisService ? (
-                          <div className="border-t border-gray-200 bg-gray-50 p-3.5 sm:p-4">
+                          <div className="border-t border-gray-200 bg-gray-50 p-3 sm:p-3.5">
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
@@ -1556,13 +1560,13 @@ export function AppointmentDetailsDrawer({
                               </div>
                             </div>
 
-                            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                               {locale === "ar"
                                 ? "المدة تتبع إعدادات الخدمة. يتم حفظ وقت البدء الحالي فقط داخل هذه الواجهة."
                                 : "Duration follows the service setup. This inline edit currently saves the start time in-place."}
                             </div>
 
-                            <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3.5">
+                            <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3">
                               <div className="flex items-center justify-between gap-3 text-sm">
                                 <span className="text-gray-600">{locale === "ar" ? "الموظف" : "Staff"}</span>
                                 <span className="font-semibold text-gray-900">{item.staff.name}</span>
@@ -1579,7 +1583,7 @@ export function AppointmentDetailsDrawer({
                               <button
                                 type="button"
                                 onClick={cancelServiceEdit}
-                                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                                className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
                               >
                                 {locale === "ar" ? "إلغاء" : "Cancel"}
                               </button>
@@ -1587,7 +1591,7 @@ export function AppointmentDetailsDrawer({
                                 type="button"
                                 onClick={() => void saveServiceEdit(item)}
                                 disabled={editingServiceSubmitting}
-                                className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-2xl bg-primary px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {editingServiceSubmitting
                                   ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
@@ -1603,7 +1607,7 @@ export function AppointmentDetailsDrawer({
               </WorkspacePanel>
 
               <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
-                <div className="space-y-2.5 text-sm">
+                <div className="space-y-2 text-sm">
                 {[
                   { label: locale === "ar" ? "المجموع الفرعي" : "Subtotal", value: subtotalAmount },
                   { label: locale === "ar" ? "الخصم" : "Discount", value: discountAmount },
@@ -1615,16 +1619,16 @@ export function AppointmentDetailsDrawer({
                     <Currency amount={row.value} />
                   </div>
                 ))}
-                <div className="border-t border-gray-200 pt-2.5">
+                <div className="border-t border-gray-200 pt-2">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
                     <Currency amount={totalAmount} className="text-base font-bold" />
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                  <div className="mt-1 flex items-center justify-between gap-3">
                     <span className="text-gray-600">{locale === "ar" ? "المدفوع" : "Paid"}</span>
                     <Currency amount={paidAmount} />
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                  <div className="mt-1 flex items-center justify-between gap-3">
                     <span className="text-gray-600">{locale === "ar" ? "المتبقي" : "Remaining"}</span>
                     <Currency amount={remainingAmount} className="font-semibold text-gray-900" />
                   </div>
@@ -1634,7 +1638,7 @@ export function AppointmentDetailsDrawer({
 
               <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <WorkspacePanel title={locale === "ar" ? "سجل النشاط" : "Activity timeline"}>
-                <div className="space-y-3">
+                  <div className="space-y-2.5">
                   {timelineAuditEntries.length > 0 ? (
                     timelineAuditEntries.map((entry, index) => (
                       <div key={`${entry.label}-${entry.timestamp}-${index}`} className="flex gap-3">
@@ -1654,7 +1658,7 @@ export function AppointmentDetailsDrawer({
                     </div>
                   )}
                 </div>
-                <div className="mt-3 flex justify-end">
+                  <div className="mt-3 flex justify-end">
                   <Link
                     href={`/${locale}/dashboard/appointments/${appointment.id}`}
                     onClick={onClose}
