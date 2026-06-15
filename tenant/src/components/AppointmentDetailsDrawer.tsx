@@ -1366,7 +1366,8 @@ export function AppointmentDetailsDrawer({
     );
 
     return (
-      <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="h-full p-4 lg:p-5">
+        <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="min-h-0 overflow-y-auto pr-1">
           {renderCustomerPanel()}
         </aside>
@@ -1726,6 +1727,7 @@ export function AppointmentDetailsDrawer({
             </div>
           </div>
         </section>
+        </div>
       </div>
     );
   };
@@ -1759,7 +1761,8 @@ export function AppointmentDetailsDrawer({
     };
 
     return (
-      <div className="grid gap-5 xl:grid-cols-[340px_220px_minmax(0,1fr)]">
+      <div className="h-full p-4 lg:p-5">
+        <div className="grid gap-5 xl:grid-cols-[340px_220px_minmax(0,1fr)]">
         <div className="space-y-4">
           <WorkspacePanel
             title={locale === "ar" ? "مساحة العميل" : "Customer workspace"}
