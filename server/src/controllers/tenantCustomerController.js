@@ -1256,6 +1256,8 @@ exports.getCustomerTransactions = async (req, res) => {
         const tenantId = req.tenant.id;
         const { id } = req.params;
         const { startDate, endDate, limit = 50 } = req.query;
+        const localeSource = `${req.query.locale || req.headers['x-locale'] || req.headers['accept-language'] || 'en'}`.toLowerCase();
+        const locale = localeSource.startsWith('ar') ? 'ar' : 'en';
         const safeLimit = Math.max(parseInt(limit, 10) || 50, 1);
         const requestId = `cust_tx_${Date.now()}_${id}`;
 
