@@ -11,6 +11,8 @@ interface Appointment {
   id: string;
   startTime: string;
   endTime: string;
+  bookingSessionId?: string | null;
+  bookingReference?: string | null;
   status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus:
     | 'pending'
@@ -739,6 +741,25 @@ export function CalendarView({
     onShowAllProviders?.();
   };
 
+  const getAppointmentGroupKey = (appointment: Appointment) => {
+    return `${appointment.bookingSessionId || appointment.bookingReference || appointment.id}`;
+  };
+
+  const getGroupedAppointments = (items: Appointment[]) => {
+    const grouped = new Map<string, Appointment[]>();
+
+    items.forEach((appointment) => {
+      const key = getAppointmentGroupKey(appointment);
+      const existing = grouped.get(key) || [];
+      existing.push(appointment);
+      grouped.set(key, existing);
+    });
+
+    return Array.from(grouped.values())
+      .map((groupItems) => groupItems.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()))
+      .sort((a, b) => new Date(a[0].startTime).getTime() - new Date(b[0].startTime).getTime());
+  };
+
   const handleStaffDragOver = (event: DragEvent<HTMLDivElement>, staffId: string) => {
     if (!(onReassignAppointment || onDropAppointmentChange) || !draggedAppointmentId) {
       return;
@@ -1344,7 +1365,10 @@ export function CalendarView({
                         </div>
                       )}
 
-                      {staffAppointments.map((appointment) => {
+                      {getGroupedAppointments(staffAppointments).map((appointmentGroup) => {
+                        const appointment = appointmentGroup[0];
+                        const lastAppointment = appointmentGroup[appointmentGroup.length - 1];
+                        const isMultiServiceBooking = appointmentGroup.length > 1;
                         const customerFirstName =
                           appointment.user?.firstName?.trim() ||
                           appointment.user?.lastName?.trim() ||
@@ -1353,10 +1377,13 @@ export function CalendarView({
                           locale === 'ar' ? appointment.service.name_ar : appointment.service.name_en;
                         const variantName = appointment.serviceVariantName?.trim() || "";
                         const startTime = new Date(appointment.startTime);
-                        const endTime = new Date(appointment.endTime);
+                        const endTime = new Date(lastAppointment.endTime);
                         const timeLabel = `${formatTime(startTime.getHours(), startTime.getMinutes(), locale)} - ${formatTime(endTime.getHours(), endTime.getMinutes(), locale)}`;
 
-                        const style = getAppointmentStyle(appointment, dateKey);
+                        const style = getAppointmentStyle({
+                          ...appointment,
+                          endTime: lastAppointment.endTime
+                        }, dateKey);
                         const calculatedHeight = Number.parseFloat(String(style.height ?? '0')) || MIN_APPOINTMENT_HEIGHT;
                         const minHeight = Math.max(calculatedHeight, MIN_APPOINTMENT_HEIGHT);
                         const isCompactCard = minHeight < 160;
@@ -1396,7 +1423,7 @@ export function CalendarView({
 
                         return (
                           <div
-                            key={appointment.id}
+                            key={getAppointmentGroupKey(appointment)}
                             onClick={() => handleAppointmentClick(appointment.id)}
                             onContextMenu={(event) => {
                               if (!onGridContextMenu) {
@@ -1431,12 +1458,16 @@ export function CalendarView({
                             }}
                             className={`${getAppointmentColor(appointment)} group relative z-20 text-white rounded-2xl cursor-pointer transition-all shadow-md hover:shadow-lg overflow-visible border border-white/15 ${appointment.assignmentMode === 'auto_assigned' ? 'ring-1 ring-slate-300/70' : ''} ${canReassign ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragged ? 'opacity-70 ring-2 ring-dashed ring-white/50' : ''}`}
                             style={{ ...style, height: `${minHeight}px` }}
-                            title={`${customerFirstName} - ${serviceName} - ${timeLabel}`}
+                            title={`${customerFirstName} - ${isMultiServiceBooking ? `${appointmentGroup.length} services` : serviceName} - ${timeLabel}`}
                           >
                               <div className={`pointer-events-none absolute z-30 w-72 rounded-3xl border border-white/20 bg-slate-950/95 p-4 text-white shadow-2xl ring-1 ring-black/25 backdrop-blur-xl opacity-0 transition-all duration-150 ${isDragged ? 'hidden' : 'group-hover:opacity-100 group-hover:translate-y-0'} ${isRTL ? 'right-full mr-3 translate-y-2' : 'left-full ml-3 translate-y-2'} top-0`}>
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="truncate text-base font-semibold leading-tight">{serviceName}</div>
+                                    <div className="truncate text-base font-semibold leading-tight">
+                                      {isMultiServiceBooking
+                                        ? (locale === 'ar' ? `${appointmentGroup.length} خدمات` : `${appointmentGroup.length} services`)
+                                        : serviceName}
+                                    </div>
                                     <div className="mt-1 flex items-center gap-2 text-xs text-white/70">
                                       <span className="truncate">{customerFirstName}</span>
                                     </div>
@@ -1538,7 +1569,9 @@ export function CalendarView({
                               <div className={`flex flex-shrink-0 items-center justify-between gap-2 bg-black/25 ${isCompactCard ? 'px-3 py-2' : 'px-4 py-3'}`}>
                                 <div className="min-w-0">
                                   <div className={`break-words font-semibold leading-tight ${isCompactCard ? 'text-sm' : 'text-sm'}`}>
-                                    {serviceName}
+                                    {isMultiServiceBooking
+                                      ? (locale === 'ar' ? 'حجز متعدد الخدمات' : 'Multi-service booking')
+                                      : serviceName}
                                   </div>
                                 </div>
                                 {hasCustomerSelectedStaff && (
@@ -1636,6 +1669,33 @@ export function CalendarView({
                                   </svg>
                                   <span className="truncate">{timeLabel}</span>
                                 </div>
+
+                                {isMultiServiceBooking && (
+                                  <div className={`rounded-2xl border border-white/15 bg-black/10 ${isCompactCard ? 'px-2.5 py-2' : 'px-3 py-2.5'}`}>
+                                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                                      {locale === 'ar' ? 'الخدمات' : 'Services'}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      {appointmentGroup.map((item) => {
+                                        const itemStart = new Date(item.startTime);
+                                        const itemEnd = new Date(item.endTime);
+                                        const itemServiceName = locale === 'ar' ? item.service.name_ar : item.service.name_en;
+                                        const itemTimeLabel = `${formatTime(itemStart.getHours(), itemStart.getMinutes(), locale)} - ${formatTime(itemEnd.getHours(), itemEnd.getMinutes(), locale)}`;
+                                        return (
+                                          <div key={item.id} className="flex items-start justify-between gap-2 rounded-xl bg-white/10 px-2 py-1.5">
+                                            <div className="min-w-0">
+                                              <div className="truncate text-[12px] font-semibold leading-tight">{itemServiceName}</div>
+                                              {item.serviceVariantName?.trim() ? (
+                                                <div className="truncate text-[10px] text-white/70">{item.serviceVariantName.trim()}</div>
+                                              ) : null}
+                                            </div>
+                                            <div className="shrink-0 text-[10px] text-white/75">{itemTimeLabel}</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
 
                                 <div className={`mt-auto flex items-center justify-between gap-2 ${isCompactCard ? 'pt-0.5' : 'pt-1.5'}`}>
                                   <div className="flex items-center gap-1">
