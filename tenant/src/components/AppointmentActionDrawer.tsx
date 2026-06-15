@@ -1726,79 +1726,83 @@ export function AppointmentActionDrawer({
                                   </p>
                                 </div>
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                  <label className="block">
-                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "الموظف" : "Staff member"}</span>
-                                    <select
-                                      value={serviceDraft.staffId}
-                                      onChange={(e) => setServiceDraft((current) => ({ ...current, staffId: e.target.value }))}
-                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                                    >
-                                      <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
-                                      {assignedEmployees.map((employee) => (
-                                        <option key={employee.id} value={employee.id}>
-                                          {employee.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
+                                <div className="mt-4 space-y-3">
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="block">
+                                      <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "الموظف" : "Staff member"}</span>
+                                      <select
+                                        value={serviceDraft.staffId}
+                                        onChange={(e) => setServiceDraft((current) => ({ ...current, staffId: e.target.value }))}
+                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                      >
+                                        <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
+                                        {assignedEmployees.map((employee) => (
+                                          <option key={employee.id} value={employee.id}>
+                                            {employee.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
 
-                                  <label className="block">
-                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "نوع الخصم" : "Discount"}</span>
-                                    <select
-                                      value={serviceDraft.discountType}
-                                      onChange={(e) => setServiceDraft((current) => ({ ...current, discountType: e.target.value as "none" | "percent" | "fixed" }))}
-                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                                    >
-                                      <option value="none">{locale === "ar" ? "بدون خصم" : "No discount"}</option>
-                                      <option value="percent">{locale === "ar" ? "نسبة مئوية" : "Percent"}</option>
-                                      <option value="fixed">{locale === "ar" ? "مبلغ ثابت" : "Fixed amount"}</option>
-                                    </select>
-                                  </label>
+                                    <label className="block">
+                                      <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "نوع الخصم" : "Discount"}</span>
+                                      <select
+                                        value={serviceDraft.discountType}
+                                        onChange={(e) => setServiceDraft((current) => ({ ...current, discountType: e.target.value as "none" | "percent" | "fixed" }))}
+                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                      >
+                                        <option value="none">{locale === "ar" ? "بدون خصم" : "No discount"}</option>
+                                        <option value="percent">{locale === "ar" ? "نسبة مئوية" : "Percent"}</option>
+                                        <option value="fixed">{locale === "ar" ? "مبلغ ثابت" : "Fixed amount"}</option>
+                                      </select>
+                                    </label>
+                                  </div>
 
                                   {serviceDraft.discountType !== "none" ? (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                      <label className="block">
+                                        <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "قيمة الخصم" : "Discount value"}</span>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.5"
+                                          value={serviceDraft.discountValue}
+                                          onChange={(e) => setServiceDraft((current) => ({ ...current, discountValue: e.target.value }))}
+                                          placeholder={serviceDraft.discountType === "percent" ? "10" : "25"}
+                                          className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                        />
+                                      </label>
+                                    </div>
+                                  ) : null}
+
+                                  <div className="grid gap-3 sm:grid-cols-2">
                                     <label className="block">
-                                      <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "قيمة الخصم" : "Discount value"}</span>
+                                      <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "وقت البدء" : "Start time"}</span>
+                                      <select
+                                        value={serviceDraft.startTime}
+                                        onChange={(e) => setServiceDraft((current) => ({ ...current, startTime: e.target.value }))}
+                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                      >
+                                        {TIME_OPTIONS.map((option) => (
+                                          <option key={option.value} value={option.value}>
+                                            {locale === "ar" ? option.labelAr : option.labelEn}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+
+                                    <label className="block">
+                                      <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "المدة" : "Duration"}</span>
                                       <input
                                         type="number"
-                                        min="0"
-                                        step="0.5"
-                                        value={serviceDraft.discountValue}
-                                        onChange={(e) => setServiceDraft((current) => ({ ...current, discountValue: e.target.value }))}
-                                        placeholder={serviceDraft.discountType === "percent" ? "10" : "25"}
+                                        min="5"
+                                        step="5"
+                                        value={serviceDraft.duration}
+                                        onChange={(e) => setServiceDraft((current) => ({ ...current, duration: e.target.value }))}
                                         className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                                       />
                                     </label>
-                                  ) : (
-                                    <div className="hidden sm:block" />
-                                  )}
-
-                                  <label className="block">
-                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "وقت البدء" : "Start time"}</span>
-                                    <select
-                                      value={serviceDraft.startTime}
-                                      onChange={(e) => setServiceDraft((current) => ({ ...current, startTime: e.target.value }))}
-                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                                    >
-                                      {TIME_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {locale === "ar" ? option.labelAr : option.labelEn}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
-
-                                  <label className="block">
-                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "المدة" : "Duration"}</span>
-                                    <input
-                                      type="number"
-                                      min="5"
-                                      step="5"
-                                      value={serviceDraft.duration}
-                                      onChange={(e) => setServiceDraft((current) => ({ ...current, duration: e.target.value }))}
-                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                                    />
-                                  </label>
+                                  </div>
                                 </div>
 
                                 {editingQueuedServiceWarning ? (
