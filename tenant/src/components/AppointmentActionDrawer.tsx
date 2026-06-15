@@ -622,6 +622,35 @@ export function AppointmentActionDrawer({
     ? (groupGuest.isFree ? 0 : toSafeMoneyNumber(selectedGuestService?.finalPrice ?? 0))
     : 0;
   const displayTotalPrice = toSafeMoneyNumber(displayServicePrice + guestServicePrice);
+  const getQueueItemService = (item: BookingDraftItem) => {
+    const service = services.find((entry) => entry.id === item.serviceId) || null;
+    const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
+    return { service, variant };
+  };
+
+  const getQueueItemDuration = (item: BookingDraftItem) => {
+    const { service, variant } = getQueueItemService(item);
+    const overriddenDuration = Number(item.duration || 0);
+    if (Number.isFinite(overriddenDuration) && overriddenDuration > 0) {
+      return overriddenDuration;
+    }
+    return variant?.duration ?? service?.duration ?? 30;
+  };
+
+  const getQueueItemBasePrice = (item: BookingDraftItem) => {
+    const { service, variant } = getQueueItemService(item);
+    return toSafeMoneyNumber(variant?.finalPrice ?? service?.finalPrice ?? 0);
+  };
+
+  const getQueueItemAdjustedPrice = (item: BookingDraftItem) => {
+    const basePrice = getQueueItemBasePrice(item);
+    const discountAmount = resolveDiscountAmount(basePrice, item.discountType || "none", item.discountValue || 0);
+    return toSafeMoneyNumber(basePrice - discountAmount);
+  };
+
+  const getQueueItemStartTime = (item: BookingDraftItem) => extractTimeLabel(item.startTime) || appointmentTime;
+
+  const getQueueItemEndTime = (item: BookingDraftItem) => addMinutesToTime(getQueueItemStartTime(item), getQueueItemDuration(item));
   const hasQueuedServices = queuedServices.length > 0;
   const queuedServicesDurationTotal = queuedServices.reduce((sum, item) => sum + getQueueItemDuration(item), 0);
   const queuedServiceCount = queuedServices.length;
@@ -715,36 +744,6 @@ export function AppointmentActionDrawer({
     setEditingServiceIndex(null);
     setStagedServiceIds([]);
   };
-
-  const getQueueItemService = (item: BookingDraftItem) => {
-    const service = services.find((entry) => entry.id === item.serviceId) || null;
-    const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
-    return { service, variant };
-  };
-
-  const getQueueItemDuration = (item: BookingDraftItem) => {
-    const { service, variant } = getQueueItemService(item);
-    const overriddenDuration = Number(item.duration || 0);
-    if (Number.isFinite(overriddenDuration) && overriddenDuration > 0) {
-      return overriddenDuration;
-    }
-    return variant?.duration ?? service?.duration ?? 30;
-  };
-
-  const getQueueItemBasePrice = (item: BookingDraftItem) => {
-    const { service, variant } = getQueueItemService(item);
-    return toSafeMoneyNumber(variant?.finalPrice ?? service?.finalPrice ?? 0);
-  };
-
-  const getQueueItemAdjustedPrice = (item: BookingDraftItem) => {
-    const basePrice = getQueueItemBasePrice(item);
-    const discountAmount = resolveDiscountAmount(basePrice, item.discountType || "none", item.discountValue || 0);
-    return toSafeMoneyNumber(basePrice - discountAmount);
-  };
-
-  const getQueueItemStartTime = (item: BookingDraftItem) => extractTimeLabel(item.startTime) || appointmentTime;
-
-  const getQueueItemEndTime = (item: BookingDraftItem) => addMinutesToTime(getQueueItemStartTime(item), getQueueItemDuration(item));
 
   const editingQueuedService = editingServiceIndex !== null ? queuedServices[editingServiceIndex] || null : null;
   const editingQueuedServiceRecord = editingQueuedService
