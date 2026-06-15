@@ -20,6 +20,9 @@ export interface AppointmentItem {
   price: number;
   rawPrice?: number;
   taxAmount?: number;
+  depositAmount?: number | null;
+  totalPaid?: number | null;
+  outstandingAmount?: number | null;
   platformFee?: number;
   tenantRevenue?: number;
   employeeCommission?: number;
@@ -224,6 +227,7 @@ interface AppointmentDetailsDrawerProps {
   onClose: () => void;
   onRebook: (appointment: AppointmentItem) => void;
   onAddService?: (appointment: AppointmentItem) => void;
+  onAppointmentSettingsClick?: (appointmentId: string) => void;
 }
 
 function avatarUrl(path: string | undefined | null): string {
@@ -472,6 +476,23 @@ function getTransactionStatusTone(status: string) {
   }
 }
 
+function toTimeInputValue(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "00:00";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function withLocalTime(baseDateTime: string, timeValue: string) {
+  const baseDate = new Date(baseDateTime);
+  if (Number.isNaN(baseDate.getTime())) return baseDateTime;
+  const [hoursRaw, minutesRaw] = `${timeValue || ""}`.split(":");
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return baseDateTime;
+  baseDate.setHours(hours, minutes, 0, 0);
+  return baseDate.toISOString();
+}
+
 export function AppointmentDetailsDrawer({
   open,
   appointmentId,
@@ -500,6 +521,10 @@ export function AppointmentDetailsDrawer({
   const [rescheduleValue, setRescheduleValue] = useState("");
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [editingServiceStartTime, setEditingServiceStartTime] = useState("");
+  const [editingServiceSubmitting, setEditingServiceSubmitting] = useState(false);
   const customerProfileRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -521,6 +546,10 @@ export function AppointmentDetailsDrawer({
       setRescheduleSubmitting(false);
       setError("");
       setActionNotice(null);
+      setMoreActionsOpen(false);
+      setEditingServiceId(null);
+      setEditingServiceStartTime("");
+      setEditingServiceSubmitting(false);
       setLoading(false);
       customerProfileRequestRef.current = null;
       return;
@@ -865,11 +894,12 @@ export function AppointmentDetailsDrawer({
 
       setRescheduleOpen(false);
       setRescheduleValue("");
-      setActionNotice({
-        kind: "success",
-        message: locale === "ar" ? "تمت إعادة الجدولة بنجاح." : "Rescheduled successfully."
-      });
-    } catch (err: any) {
+        setActionNotice({
+          kind: "success",
+          message: locale === "ar" ? "تمت إعادة الجدولة بنجاح." : "Rescheduled successfully."
+        });
+        setMoreActionsOpen(false);
+      } catch (err: any) {
       console.error("Failed to reschedule from drawer:", err);
       setActionNotice({
         kind: "error",
@@ -923,6 +953,63 @@ export function AppointmentDetailsDrawer({
     const refreshed = await tenantApi.getAppointment(appointment.id);
     if (refreshed?.success && refreshed?.appointment) {
       setAppointment(refreshed.appointment);
+    }
+  };
+
+  const beginServiceEdit = (item: AppointmentItem) => {
+    setActionNotice(null);
+    setEditingServiceId((current) => (current === item.id ? null : item.id));
+    setEditingServiceStartTime(toTimeInputValue(item.startTime));
+  };
+
+  const cancelServiceEdit = () => {
+    setEditingServiceId(null);
+    setEditingServiceStartTime("");
+  };
+
+  const saveServiceEdit = async (item: AppointmentItem) => {
+    if (!appointment || editingServiceSubmitting) return;
+
+    const nextStartTime = withLocalTime(item.startTime, editingServiceStartTime);
+    if (!nextStartTime) {
+      setActionNotice({
+        kind: "error",
+        message: locale === "ar" ? "وقت البدء غير صالح." : "Invalid start time."
+      });
+      return;
+    }
+
+    try {
+      setEditingServiceSubmitting(true);
+      const response = await tenantApi.reassignRescheduleAppointment(appointment.id, {
+        staffId: item.staff.id,
+        startTime: nextStartTime,
+        notifyCustomer: true
+      });
+
+      if (!response?.success) {
+        setActionNotice({
+          kind: "error",
+          message: response?.message || (locale === "ar" ? "تعذر حفظ تعديل الخدمة." : "Failed to save service edit.")
+        });
+        return;
+      }
+
+      await refreshAppointment();
+      cancelServiceEdit();
+      setMoreActionsOpen(false);
+      setActionNotice({
+        kind: "success",
+        message: locale === "ar" ? "تم تحديث الخدمة داخل البطاقة." : "Service updated inline."
+      });
+    } catch (err: any) {
+      console.error("Failed to save inline service edit:", err);
+      setActionNotice({
+        kind: "error",
+        message: err?.message || (locale === "ar" ? "تعذر حفظ تعديل الخدمة." : "Failed to save service edit.")
+      });
+    } finally {
+      setEditingServiceSubmitting(false);
     }
   };
 
@@ -1041,193 +1128,677 @@ export function AppointmentDetailsDrawer({
     return options;
   };
 
+  const customerId = customerProfile?.id || appointment?.user?.id || null;
+  const customerDisplayName = customerProfile
+    ? `${customerProfile.firstName} ${customerProfile.lastName}`.trim()
+    : appointment?.user
+      ? `${appointment.user.firstName} ${appointment.user.lastName}`.trim()
+      : (locale === "ar" ? "عميل غير محدد" : "Unknown customer");
+  const customerPhone = customerProfile?.phone || appointment?.user?.phone || "";
+  const customerEmail = customerProfile?.email || appointment?.user?.email || "";
+  const customerAvatarSrc = customerProfile?.profileImage
+    ? avatarUrl(customerProfile.profileImage)
+    : appointment?.user?.photo || appointment?.user?.profileImage
+      ? avatarUrl(appointment.user.photo || appointment.user.profileImage || undefined)
+      : "";
+  const customerIsWalkIn = !appointment?.user?.id;
+  const appointmentDateLabel = appointment ? new Intl.DateTimeFormat(locale === "ar" ? "ar-SA" : "en-US", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(new Date(appointment.startTime)) : "";
+
   const renderAppointmentWorkspace = () => {
     if (!appointment) return null;
 
     const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
     const currentStatusOptions = getManualStatusOptions(appointment.status);
-    return (
-      <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          {appointment.user ? (
-            <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <div className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
-                    {(appointment.user.photo || appointment.user.profileImage) ? (
-                      <img
-                        src={avatarUrl(appointment.user.photo || appointment.user.profileImage || undefined)}
-                        alt={`${appointment.user.firstName} ${appointment.user.lastName}`}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      `${appointment.user.firstName?.[0] || ""}${appointment.user.lastName?.[0] || ""}`.toUpperCase() || "?"
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {appointment.user.firstName} {appointment.user.lastName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {locale === "ar" ? "عرض بيانات العميل في نفس اللوحة" : "View customer data in this drawer"}
-                    </p>
-                  </div>
+    const appointmentDateTime = new Date(appointment.startTime);
+    const appointmentEndDateTime = new Date(appointment.endTime);
+    const durationMinutes = Math.max(
+      0,
+      Math.round((appointmentEndDateTime.getTime() - appointmentDateTime.getTime()) / 60000)
+    );
+    const durationLabel = `${durationMinutes || 0} min`;
+    const customerProfileLink = customerId
+      ? `/${locale}/dashboard/customers/${customerId}`
+      : `/${locale}/dashboard/customers`;
+    const subtotalAmount = Number(appointment.rawPrice || appointment.price || 0);
+    const taxAmount = Number(appointment.taxAmount || 0);
+    const discountAmount = 0;
+    const depositAmount = Number(appointment.depositAmount || 0);
+    const paidAmount = Number(appointment.totalPaid || 0);
+    const totalAmount = Number(appointment.price || 0);
+    const remainingAmount = Math.max(0, Number(appointment.remainderAmount ?? (totalAmount - paidAmount)));
+    const serviceCards = [appointment];
+
+    const triggerMoreAction = (action: "rebook" | "reschedule" | "mark_refunded" | "open_full_page") => {
+      setMoreActionsOpen(false);
+      if (action === "rebook") {
+        handleRebook();
+        return;
+      }
+      if (action === "reschedule") {
+        handleReschedule();
+        return;
+      }
+      if (action === "mark_refunded") {
+        void handleMarkRefunded();
+        return;
+      }
+      if (action === "open_full_page") {
+        window.open(`/${locale}/dashboard/appointments/${appointment.id}`, "_blank", "noopener,noreferrer");
+      }
+    };
+
+    const handlePayNow = async () => {
+      if (remainingAmount > 0) {
+        await handleCollectRemainder();
+        return;
+      }
+      await handleMarkFullyPaid(recordRemainderMethod);
+    };
+
+    const handleCheckout = async () => {
+      if (currentPaymentStatus !== "fully_paid" && currentPaymentStatus !== "paid" && remainingAmount > 0) {
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
+            ? "أكمل الدفع أولاً قبل إنهاء العملية."
+            : "Please collect payment before checkout."
+        });
+        return;
+      }
+      await handleQuickStatusUpdate("completed");
+    };
+
+    const renderCustomerPanel = () => (
+      <div className="space-y-4 overflow-y-auto pr-2">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50"
+            aria-label={locale === "ar" ? "إغلاق" : "Close"}
+          >
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
+          <div className={`flex items-start justify-between gap-4 ${isRTL ? "flex-row-reverse" : ""}`}>
+            <div className={`flex items-start gap-4 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-2xl font-semibold text-gray-900">
+                {customerAvatarSrc ? (
+                  <img src={customerAvatarSrc} alt={customerDisplayName} className="h-full w-full object-cover" />
+                ) : (
+                  (customerDisplayName?.[0] || "?").toUpperCase()
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-500">
+                  {locale === "ar" ? "العميل" : "Client"}
+                </p>
+                <h4 className="mt-1 truncate text-2xl font-bold text-gray-900">{customerDisplayName}</h4>
+                <div className="mt-2 space-y-1 text-sm text-gray-600">
+                  <p>{customerPhone || (locale === "ar" ? "لا يوجد هاتف" : "No phone")}</p>
+                  <p className="truncate">{customerEmail || (locale === "ar" ? "لا يوجد بريد" : "No email")}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomerTab("overview");
-                    setViewMode("customer");
-                  }}
-                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90"
-                >
-                  {locale === "ar" ? "فتح الملف" : "Open profile"}
-                </button>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {customerProfile?.loyaltyTier ? (
+                    <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                      {customerProfile.loyaltyTier}
+                    </span>
+                  ) : null}
+                  {customerIsWalkIn ? (
+                    <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                      {locale === "ar" ? "حضور مباشر" : "Walk-in"}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
-          ) : null}
-
-          <WorkspacePanel title={locale === "ar" ? "تفاصيل الموعد" : "Appointment details"} subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <MetricTile label={locale === "ar" ? "العميل" : "Customer"} value={customerFullName || (locale === "ar" ? "عميل مرتبط" : "Linked customer")} className="bg-white" />
-              <MetricTile label={locale === "ar" ? "وقت البدء" : "Start time"} value={formatDateTime(appointment.startTime, locale)} className="bg-white" />
-              <MetricTile label={locale === "ar" ? "وقت الانتهاء" : "End time"} value={formatDateTime(appointment.endTime, locale)} className="bg-white" />
-              <MetricTile label={locale === "ar" ? "الخدمة" : "Service"} value={serviceName} className="bg-white" />
-              <MetricTile label={locale === "ar" ? "الموظف" : "Staff"} value={appointment.staff.name} className="bg-white" />
-              <MetricTile label={locale === "ar" ? "السعر" : "Price"} value={<Currency amount={Number(appointment.price || 0)} />} className="bg-white sm:col-span-2" />
-            </div>
-          </WorkspacePanel>
-
-          {cleanAppointmentNotes && (
-            <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "ملاحظات" : "Notes"}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
-            </div>
-          )}
-
-          {groupGuest ? (
-            <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
-                {locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details"}
-              </p>
-              <p className="mt-2 text-sm font-semibold text-indigo-950">{groupGuest.fullName}</p>
-              {groupGuest.phone ? (
-                <p className="mt-1 text-sm text-indigo-900">{groupGuest.phone}</p>
-              ) : null}
-              {groupGuest.serviceName ? (
-                <p className="mt-1 text-sm text-indigo-900">
-                  {locale === "ar" ? "الخدمة" : "Service"}: {groupGuest.serviceName}
-                </p>
-              ) : null}
-              {groupGuest.isFree ? (
-                <p className="mt-1 text-sm font-semibold text-emerald-700">
-                  {locale === "ar" ? "خدمة مجانية" : "Free service"}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+            <Link
+              href={customerProfileLink}
+              onClick={onClose}
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+            >
+              {locale === "ar" ? "عرض الملف" : "View full profile"}
+            </Link>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                {getStatusLabel(appointment.status, locale)}
-              </span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                {getPaymentStatusLabel(currentPaymentStatus, locale)}
-              </span>
-              {latestRescheduleAudit?.toStartTime ? (
-                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                  {locale === "ar"
-                    ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
-                    : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
-                </span>
-              ) : null}
-              {latestCancellationAudit ? (
-                <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                  {locale === "ar"
-                    ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
-                    : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {locale === "ar" ? "الجدولة" : "Schedule"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">
-                {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
-              </p>
-            </div>
+        <WorkspacePanel title={locale === "ar" ? "إحصاءات العميل" : "Customer stats"} className="bg-white">
+          <div className="grid grid-cols-1 gap-3">
+            <MetricTile label={locale === "ar" ? "الزيارات" : "Visits"} value={customerProfile?.totalBookings ?? 0} className="bg-white" />
+            <MetricTile label={locale === "ar" ? "الإنفاق الكلي" : "Lifetime spend"} value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />} className="bg-white" />
+            <MetricTile label={locale === "ar" ? "آخر زيارة" : "Last visit"} value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"} className="bg-white" />
+            <MetricTile label={locale === "ar" ? "منذ" : "Member since"} value={customerProfile?.joinedAt ? formatDateTime(customerProfile.joinedAt, locale) : "-"} className="bg-white" />
           </div>
+        </WorkspacePanel>
 
-          <div className="sticky top-4 z-20 rounded-3xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
+        <WorkspacePanel title={locale === "ar" ? "إجراءات العميل" : "Customer actions"} className="bg-white">
+          <div className="space-y-2">
+            <Link
+              href={customerProfileLink}
+              onClick={onClose}
+              className="flex items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+            >
+              <span>{locale === "ar" ? "عرض الملف الكامل" : "View full profile"}</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+            <a
+              href={customerPhone ? `https://wa.me/${customerPhone.replace(/[^0-9]/g, "")}` : "#"}
+              onClick={(event) => {
+                if (!customerPhone) {
+                  event.preventDefault();
+                }
+              }}
+              target="_blank"
+              rel="noreferrer"
+              className={`flex items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50 ${!customerPhone ? "pointer-events-none opacity-50" : ""}`}
+            >
+              <span>{locale === "ar" ? "إرسال واتساب" : "Send WhatsApp"}</span>
+              <span aria-hidden="true">›</span>
+            </a>
+            <a
+              href={customerPhone ? `tel:${customerPhone}` : "#"}
+              onClick={(event) => {
+                if (!customerPhone) {
+                  event.preventDefault();
+                }
+              }}
+              className={`flex items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50 ${!customerPhone ? "pointer-events-none opacity-50" : ""}`}
+            >
+              <span>{locale === "ar" ? "اتصال بالعميل" : "Call customer"}</span>
+              <span aria-hidden="true">›</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                const notesSection = document.getElementById("appointment-notes-section");
+                notesSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="flex w-full items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+            >
+              <span>{locale === "ar" ? "إضافة ملاحظة" : "Add note"}</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+        </WorkspacePanel>
+
+        {customerIsWalkIn ? (
+          <WorkspacePanel
+            title={locale === "ar" ? "حالة الحضور المباشر" : "Walk-in state"}
+            className="bg-white"
+          >
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4">
               <p className="text-sm font-semibold text-gray-900">
-                {locale === "ar" ? "الإجراءات السريعة" : "Quick actions"}
+                {locale === "ar" ? "حجز حضوري" : "Walk-in appointment"}
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                {locale === "ar" ? "لم يتم تعيين عميل بعد" : "No customer assigned"}
               </p>
               <Link
-                href={`/${locale}/dashboard/appointments/${appointment.id}`}
-                className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-100"
+                href={customerProfileLink}
                 onClick={onClose}
+                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
               >
-                {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
+                {locale === "ar" ? "تعيين عميل" : "Assign customer"}
               </Link>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={handleRebook}
-                className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-              >
-                {locale === "ar" ? "إعادة الحجز" : "Rebook"}
-              </button>
-              <button
-                type="button"
-                onClick={handleReschedule}
-                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-              >
-                {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
-              </button>
-            </div>
-          </div>
+          </WorkspacePanel>
+        ) : null}
+      </div>
+    );
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-gray-900">
-              {locale === "ar" ? "الحالة" : "Status"}
-            </p>
-            <div className="mt-3">
-              <select
-                value={appointment.status}
-                disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
-                onChange={(event) => {
-                  const nextStatus = event.target.value as AppointmentItem["status"];
-                  if (nextStatus === appointment.status) return;
-                  if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
-                    void handleQuickStatusUpdate(nextStatus);
-                    return;
-                  }
-                }}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+    return (
+      <div className="grid h-full gap-5 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-y-auto pr-1">
+          {renderCustomerPanel()}
+        </aside>
+
+        <section className="min-h-0 overflow-y-auto pr-1">
+          <div className="space-y-4 pb-6">
+            <WorkspacePanel
+              title={locale === "ar" ? "تفاصيل الموعد" : "Appointment details"}
+              subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
+              action={
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setMoreActionsOpen((current) => !current)}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "المزيد" : "More actions"}
+                    </button>
+                    {moreActionsOpen ? (
+                      <div className={`absolute top-full mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ${isRTL ? "left-0" : "right-0"}`}>
+                        {[
+                          { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
+                          { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
+                          { key: "mark_refunded", label: locale === "ar" ? "وضع علامة مسترد" : "Mark refunded" },
+                          { key: "open_full_page", label: locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page" }
+                        ].map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => triggerMoreAction(item.key as any)}
+                            className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handlePayNow()}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "ادفع الآن" : "Pay now"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                  {getStatusLabel(appointment.status, locale)}
+                </span>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                  {getPaymentStatusLabel(currentPaymentStatus, locale)}
+                </span>
+                {latestRescheduleAudit?.toStartTime ? (
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                    {locale === "ar"
+                      ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
+                      : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+                  </span>
+                ) : null}
+                {latestCancellationAudit ? (
+                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                    {locale === "ar"
+                      ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+                      : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-4 rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "التاريخ" : "Date"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الوقت" : "Time"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "التكرار" : "Repeat"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {locale === "ar" ? "لا يتكرر" : "Doesn't repeat"}
+                  </p>
+                </div>
+                <div className="ml-auto min-w-[220px]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {locale === "ar" ? "الحالة" : "Status"}
+                  </p>
+                  <select
+                    value={appointment.status}
+                    disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                    onChange={(event) => {
+                      const nextStatus = event.target.value as AppointmentItem["status"];
+                      if (nextStatus === appointment.status) return;
+                      if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
+                        void handleQuickStatusUpdate(nextStatus);
+                        return;
+                      }
+                    }}
+                    className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {currentStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </WorkspacePanel>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+              <WorkspacePanel
+                title={locale === "ar" ? "نظرة على الموعد" : "Appointment overview"}
               >
-                {currentStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-gray-500">
-                {locale === "ar"
-                  ? "يمكن تحديث الحالة يدويًا من هنا، أو تتغير تلقائيًا عند تأكيد العميل."
-                  : "Status can be changed manually here, and will also update automatically when customer confirms."}
-              </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <MetricTile label={locale === "ar" ? "الموظف" : "Staff"} value={appointment.staff.name} className="bg-white" />
+                  <MetricTile label={locale === "ar" ? "عدد الخدمات" : "Services"} value={serviceCards.length} className="bg-white" />
+                  <MetricTile label={locale === "ar" ? "المدة" : "Duration"} value={durationLabel} className="bg-white" />
+                  <MetricTile label={locale === "ar" ? "المورد" : "Resource"} value={locale === "ar" ? "غير محدد" : "Unassigned"} className="bg-white" />
+                </div>
+              </WorkspacePanel>
+
+              <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
+                <div className="space-y-3 text-sm">
+                  {[
+                    { label: locale === "ar" ? "المجموع الفرعي" : "Subtotal", value: subtotalAmount },
+                    { label: locale === "ar" ? "الخصم" : "Discount", value: discountAmount },
+                    { label: locale === "ar" ? "الضريبة" : "Tax", value: taxAmount },
+                    { label: locale === "ar" ? "العربون" : "Deposit", value: depositAmount }
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between gap-3">
+                      <span className="text-gray-600">{row.label}</span>
+                      <Currency amount={row.value} />
+                    </div>
+                  ))}
+                  <div className="border-t border-gray-200 pt-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
+                      <Currency amount={totalAmount} className="text-base font-bold" />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="text-gray-600">{locale === "ar" ? "المدفوع" : "Paid"}</span>
+                      <Currency amount={paidAmount} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="text-gray-600">{locale === "ar" ? "المتبقي" : "Remaining"}</span>
+                      <Currency amount={remainingAmount} className="font-semibold text-gray-900" />
+                    </div>
+                  </div>
+                </div>
+              </WorkspacePanel>
+            </div>
+
+            <WorkspacePanel
+              title={locale === "ar" ? "الخدمات" : "Services"}
+              subtitle={locale === "ar" ? `${serviceCards.length} خدمة مرتبطة` : `${serviceCards.length} service(s) attached`}
+              action={
+                onAddService ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddService(appointment)}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إضافة خدمة أخرى" : "Add another service"}
+                  </button>
+                ) : null
+              }
+            >
+              <div className="space-y-3">
+                {serviceCards.map((item) => {
+                  const itemServiceName = locale === "ar" ? item.service.name_ar : item.service.name_en;
+                  const itemVariant = item.serviceVariantName?.trim() || item.serviceVariantDescription?.trim() || "";
+                  const itemDuration = item.serviceVariantDuration || item.service.duration || durationMinutes;
+                  const isEditingThisService = editingServiceId === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition ${
+                        isEditingThisService ? "border-primary/30 ring-1 ring-primary/20" : "border-gray-200"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0 p-4">
+                          <p className="text-lg font-semibold text-gray-900">{itemServiceName}</p>
+                          {itemVariant ? (
+                            <p className="mt-1 text-sm text-gray-500">{itemVariant}</p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{itemDuration} min</span>
+                            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{item.staff.name}</span>
+                            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">
+                              <Currency amount={Number(item.price || 0)} />
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-4">
+                          <button
+                            type="button"
+                            onClick={() => beginServiceEdit(item)}
+                            className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                          >
+                            {isEditingThisService ? (locale === "ar" ? "إغلاق" : "Close") : (locale === "ar" ? "تعديل" : "Edit")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActionNotice({
+                              kind: "error",
+                              message: locale === "ar" ? "حذف الخدمة غير مفعل بعد." : "Service deletion is not wired yet."
+                            })}
+                            className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                          >
+                            {locale === "ar" ? "حذف" : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                      {isEditingThisService ? (
+                        <div className="border-t border-gray-200 bg-gray-50 p-4 sm:p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                                {locale === "ar" ? "تعديل الخدمة" : "Edit service"}
+                              </p>
+                              <h4 className="mt-1 text-lg font-semibold text-gray-900">{itemServiceName}</h4>
+                              <p className="mt-1 text-xs text-gray-500">
+                                {locale === "ar"
+                                  ? "تعديل داخل نفس البطاقة حتى لا يحتاج المستخدم للتمرير للأسفل."
+                                  : "Edit inline from this card so the workspace stays close to the service."}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={cancelServiceEdit}
+                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                            >
+                              {locale === "ar" ? "إغلاق" : "Close"}
+                            </button>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <label className="block">
+                              <span className="mb-2 block text-sm font-medium text-gray-700">
+                                {locale === "ar" ? "وقت البدء" : "Start time"}
+                              </span>
+                              <input
+                                type="time"
+                                value={editingServiceStartTime}
+                                onChange={(event) => setEditingServiceStartTime(event.target.value)}
+                                className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                              />
+                            </label>
+
+                            <div className="block">
+                              <span className="mb-2 block text-sm font-medium text-gray-700">
+                                {locale === "ar" ? "المدة" : "Duration"}
+                              </span>
+                              <div className="flex h-[46px] items-center rounded-2xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900">
+                                {itemDuration} {locale === "ar" ? "دقيقة" : "min"}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                            {locale === "ar"
+                              ? "المدة تتبع إعدادات الخدمة. يتم حفظ وقت البدء الحالي فقط داخل هذه الواجهة."
+                              : "Duration follows the service setup. This inline edit currently saves the start time in-place."}
+                          </div>
+
+                          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                              <span className="text-gray-600">{locale === "ar" ? "الموظف" : "Staff"}</span>
+                              <span className="font-semibold text-gray-900">{item.staff.name}</span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                              <span className="text-gray-600">{locale === "ar" ? "السعر" : "Price"}</span>
+                              <span className="font-semibold text-gray-900">
+                                <Currency amount={Number(item.price || 0)} />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={cancelServiceEdit}
+                              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                            >
+                              {locale === "ar" ? "إلغاء" : "Cancel"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void saveServiceEdit(item)}
+                              disabled={editingServiceSubmitting}
+                              className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {editingServiceSubmitting
+                                ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                                : (locale === "ar" ? "تطبيق" : "Apply")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </WorkspacePanel>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <WorkspacePanel title={locale === "ar" ? "سجل النشاط" : "Activity timeline"}>
+                <div className="space-y-3">
+                  {timelineAuditEntries.length > 0 ? (
+                    timelineAuditEntries.map((entry, index) => (
+                      <div key={`${entry.label}-${entry.timestamp}-${index}`} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                          <span className="mt-1 h-3 w-3 rounded-full bg-gray-900" />
+                          {index !== timelineAuditEntries.length - 1 ? <span className="h-full w-px bg-gray-200" /> : null}
+                        </div>
+                        <div className={`flex-1 rounded-2xl border px-3 py-2 ${entry.tone}`}>
+                          <p className="text-sm font-semibold">{entry.label}</p>
+                          <p className="mt-0.5 text-xs opacity-80">{entry.value}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                      {locale === "ar" ? "لا يوجد نشاط بعد." : "No activity yet."}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    href={`/${locale}/dashboard/appointments/${appointment.id}`}
+                    onClick={onClose}
+                    className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "عرض كل النشاط" : "View all activity"}
+                  </Link>
+                </div>
+              </WorkspacePanel>
+
+              <WorkspacePanel
+                title={locale === "ar" ? "ملاحظات" : "Notes"}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const notesSection = document.getElementById("appointment-notes-section");
+                      notesSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إضافة ملاحظة" : "Add note"}
+                  </button>
+                }
+              >
+                <div id="appointment-notes-section" className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  {cleanAppointmentNotes ? (
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">{locale === "ar" ? "لا توجد ملاحظات." : "No notes yet."}</p>
+                  )}
+                </div>
+              </WorkspacePanel>
+            </div>
+
+            <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 pt-4 backdrop-blur">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setMoreActionsOpen((current) => !current)}
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "المزيد" : "More actions"}
+                    </button>
+                    {moreActionsOpen ? (
+                      <div className={`absolute bottom-full mb-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ${isRTL ? "left-0" : "right-0"}`}>
+                        {[
+                          { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
+                          { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
+                          { key: "mark_refunded", label: locale === "ar" ? "وضع علامة مسترد" : "Mark refunded" },
+                          { key: "open_full_page", label: locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page" }
+                        ].map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => triggerMoreAction(item.key as any)}
+                            className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handlePayNow()}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "ادفع الآن" : "Pay now"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCheckout()}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إنهاء" : "Checkout"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void refreshAppointment();
+                      setActionNotice({
+                        kind: "success",
+                        message: locale === "ar" ? "تم حفظ التغييرات." : "Changes saved."
+                      });
+                    }}
+                    className="rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                  >
+                    {locale === "ar" ? "حفظ التغييرات" : "Save changes"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     );
   };
@@ -1682,84 +2253,8 @@ export function AppointmentDetailsDrawer({
         className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[76rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
-        <div className="flex h-full flex-col">
-            <div className="border-b border-gray-100 px-6 py-5 lg:px-8">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                  {viewMode === "customer"
-                    ? (locale === "ar" ? "مساحة العميل" : "Customer workspace")
-                    : (locale === "ar" ? "تفاصيل الموعد" : "Appointment Details")}
-                </p>
-                <h3 className="mt-1 text-xl font-bold text-gray-900">
-                  {loading
-                    ? (locale === "ar" ? "جارٍ التحميل..." : "Loading...")
-                    : viewMode === "customer"
-                      ? (customerFullName || serviceName)
-                      : serviceName}
-                </h3>
-                {appointment && (
-                  <p className="mt-1 text-sm text-gray-500">
-                    {appointment.bookingNumber || appointment.bookingReference || appointment.id.slice(0, 8).toUpperCase()}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
-              </button>
-            </div>
-
-            {appointment && (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الوقت الحالي" : "Current time"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
-                  </p>
-                </div>
-                {viewMode === "appointment" ? (
-                  <div className="min-w-[220px]">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "الحالة" : "Status"}
-                    </p>
-                    <select
-                      value={appointment.status}
-                      disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
-                      onChange={(event) => {
-                        const nextStatus = event.target.value as AppointmentItem["status"];
-                        if (nextStatus === appointment.status) return;
-                        if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
-                          void handleQuickStatusUpdate(nextStatus);
-                          return;
-                        }
-                      }}
-                      className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {getManualStatusOptions(appointment.status).map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                    {getStatusLabel(appointment.status, locale)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
+        <div className="flex h-full flex-col overflow-hidden">
+          <div className="flex-1 overflow-hidden px-4 py-4 lg:px-6">
             {actionNotice && (
               <div
                 className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
@@ -1779,11 +2274,11 @@ export function AppointmentDetailsDrawer({
             )}
 
             {loading ? (
-              <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
+              <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
                 <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
               </div>
             ) : appointment ? (
-              <div className="space-y-4">
+              <div className="h-full">
                 {viewMode === "appointment" ? renderAppointmentWorkspace() : renderCustomerWorkspace()}
               </div>
             ) : (
