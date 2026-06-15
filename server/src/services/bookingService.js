@@ -159,7 +159,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -215,7 +215,11 @@ class BookingService {
             transaction: finalTransaction
         });
         const tenantPaymentSettings = await getTenantPaymentSettings(tenantId, { transaction: finalTransaction });
-        assertServicePaymentMethodAllowed(normalizedPaymentMethod, tenantPaymentSettings, service.paymentOptions);
+        assertServicePaymentMethodAllowed(
+            normalizedPaymentMethod,
+            tenantPaymentSettings,
+            skipServicePaymentOptionValidation ? null : service.paymentOptions
+        );
 
         const existingSession = await this.loadBookingSessionContext({
             bookingSessionId,
@@ -534,7 +538,7 @@ class BookingService {
      * Each item is still persisted as a normal appointment row.
      */
     async createBookingSession(data, options = {}) {
-        const { tenantId, platformUserId, items, notes, paymentMethod, bookingSessionId, bookingReference, bookingItemIndex } = data;
+        const { tenantId, platformUserId, items, notes, paymentMethod, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;
         const finalTransaction = transaction || await db.sequelize.transaction();
@@ -625,6 +629,7 @@ class BookingService {
                     duration: item.duration,
                     discountType: item.discountType,
                     discountValue: item.discountValue,
+                    skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
                     bookingSessionId: session.id,
                     bookingReference: session.bookingReference,
                     bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex + index : (Number(session.itemCount || 0) + index),

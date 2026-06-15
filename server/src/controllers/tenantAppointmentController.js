@@ -546,6 +546,7 @@ exports.createAppointment = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
         const tenantId = req.tenantId;
+        const dashboardOverridePaymentMethod = 'at-center';
         const {
             serviceId,
             variantId,
@@ -594,7 +595,7 @@ exports.createAppointment = async (req, res) => {
                     throw new Error(`Invalid start time for booking item ${index + 1}`);
                 }
 
-                const itemPaymentMethod = `${item?.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase();
+                const itemPaymentMethod = dashboardOverridePaymentMethod;
 
                 return {
                     serviceId: itemServiceId,
@@ -616,7 +617,8 @@ exports.createAppointment = async (req, res) => {
                 platformUserId: customerUser.id,
                 items: normalizedItems,
                 notes: notes || null,
-                paymentMethod: normalizedItems[0]?.paymentMethod || paymentMethod || 'at-center',
+                paymentMethod: dashboardOverridePaymentMethod,
+                skipServicePaymentOptionValidation: true,
                 bookingSessionId,
                 bookingReference,
                 bookingItemIndex
@@ -775,9 +777,10 @@ exports.createAppointment = async (req, res) => {
             tenantId,
             startTime,
             notes: normalizedNotes,
-            paymentMethod,
+            paymentMethod: dashboardOverridePaymentMethod,
             assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
             skipAdvanceValidation: true,
+            skipServicePaymentOptionValidation: true,
             bookingSessionId: existingSession?.id || null,
             bookingReference: resolvedBookingReference || undefined,
             bookingItemIndex: resolvedBookingItemIndex

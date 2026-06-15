@@ -524,9 +524,8 @@ export function AppointmentActionDrawer({
   );
 
   const allowedPaymentMethods = useMemo(() => {
-    const normalized = parseArrayValue<string>(activeServiceForPayment?.paymentOptions);
-    return normalized.length > 0 ? normalized : ["at-center", "online-full", "booking-fee"];
-  }, [activeServiceForPayment]);
+    return ["at-center"];
+  }, []);
 
   useEffect(() => {
     if (!open || mode !== "appointment") {
