@@ -1255,7 +1255,7 @@ export function AppointmentActionDrawer({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="flex-1 overflow-hidden px-5 py-5">
             {error && (
               <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -1275,9 +1275,10 @@ export function AppointmentActionDrawer({
             )}
 
             {mode === "appointment" ? (
-              <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="xl:sticky xl:top-5 xl:self-start">
-                  <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <div className="min-h-0">
+                  <div className="h-full overflow-y-auto pr-1">
+                    <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="rounded-[24px] border border-dashed border-gray-200 px-6 py-8 text-center">
                       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500">
                         <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -1426,10 +1427,12 @@ export function AppointmentActionDrawer({
                       </div>
                       <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "إضافة عميل جديد" : "Add new client"}</span>
                     </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-5">
+                <div className="min-h-0 overflow-y-auto pr-1">
+                  <div className="space-y-5">
                   {!hasQueuedServices ? (
                     <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
                       <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-5">
@@ -1620,61 +1623,230 @@ export function AppointmentActionDrawer({
                         const itemPrice = getQueueItemAdjustedPrice(item);
                         const itemStartTime = getQueueItemStartTime(item);
                         const itemDuration = getQueueItemDuration(item);
+                        const isEditingThisService = editingServiceIndex === index;
                         return (
-                          <button
+                          <div
                             key={`${item.serviceId}-${index}`}
-                            type="button"
-                            onClick={() => openQueuedServiceEditor(index)}
-                            className="flex w-full items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-primary/40 hover:bg-purple-50"
+                            className={`overflow-hidden rounded-2xl border text-left transition ${
+                              isEditingThisService
+                                ? "border-primary/50 bg-purple-50 shadow-sm"
+                                : "border-gray-200 bg-gray-50 hover:border-primary/40 hover:bg-purple-50"
+                            }`}
                           >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="h-10 w-1.5 rounded-full bg-primary/70" />
-                                <div className="min-w-0">
-                                  <p className="truncate font-semibold text-gray-900">{serviceName || (locale === "ar" ? "خدمة" : "Service")}</p>
-                                  <p className="mt-0.5 text-xs text-gray-500">
-                                    {itemStartTime} • {formatMinutesLabel(itemDuration, locale)}{variant?.description ? ` • ${variant.description}` : ""}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
-                                <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
-                                  <Currency amount={itemPrice} />
-                                </span>
-                                {item.discountType && item.discountType !== "none" && item.discountValue ? (
-                                  <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-200">
-                                    {item.discountType === "percent" ? `${item.discountValue}%` : <Currency amount={item.discountValue} />}
-                                  </span>
-                                ) : null}
-                                {item.staffId ? (
-                                  <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 ring-1 ring-gray-200">
-                                    {employees.find((employee) => employee.id === item.staffId)?.name || item.staffId}
-                                  </span>
-                                ) : (
-                                  <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 ring-1 ring-gray-200">
-                                    {locale === "ar" ? "تعيين تلقائي" : "Auto assign"}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 ring-1 ring-gray-200">
-                                {locale === "ar" ? "تعديل" : "Edit"}
-                              </span>
+                            <div className="flex items-start justify-between gap-3 p-4">
                               <button
                                 type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  removeQueuedServiceAt(index);
-                                }}
-                                className="rounded-full border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                                onClick={() => openQueuedServiceEditor(index)}
+                                className="min-w-0 flex-1 text-left"
                               >
-                                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                  <path d="M6 7a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm-1 3a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm2 3a1 1 0 100 2h4a1 1 0 100-2H7z" />
-                                </svg>
+                                <div className="flex items-center gap-2">
+                                  <span className="h-10 w-1.5 rounded-full bg-primary/70" />
+                                  <div className="min-w-0">
+                                    <p className="truncate font-semibold text-gray-900">{serviceName || (locale === "ar" ? "خدمة" : "Service")}</p>
+                                    <p className="mt-0.5 text-xs text-gray-500">
+                                      {itemStartTime} • {formatMinutesLabel(itemDuration, locale)}{variant?.description ? ` • ${variant.description}` : ""}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+                                  <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
+                                    <Currency amount={itemPrice} />
+                                  </span>
+                                  {item.discountType && item.discountType !== "none" && item.discountValue ? (
+                                    <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-200">
+                                      {item.discountType === "percent" ? `${item.discountValue}%` : <Currency amount={item.discountValue} />}
+                                    </span>
+                                  ) : null}
+                                  {item.staffId ? (
+                                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 ring-1 ring-gray-200">
+                                      {employees.find((employee) => employee.id === item.staffId)?.name || item.staffId}
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 ring-1 ring-gray-200">
+                                      {locale === "ar" ? "تعيين تلقائي" : "Auto assign"}
+                                    </span>
+                                  )}
+                                </div>
                               </button>
+                              <div className="flex flex-col items-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => isEditingThisService ? setEditingServiceIndex(null) : openQueuedServiceEditor(index)}
+                                  className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 ring-1 ring-gray-200 transition hover:bg-gray-50"
+                                >
+                                  {isEditingThisService
+                                    ? (locale === "ar" ? "إغلاق" : "Close")
+                                    : (locale === "ar" ? "تعديل" : "Edit")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeQueuedServiceAt(index)}
+                                  className="rounded-full border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                                >
+                                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path d="M6 7a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm-1 3a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm2 3a1 1 0 100 2h4a1 1 0 100-2H7z" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
-                          </button>
+                            {isEditingThisService ? (
+                              <div className="border-t border-primary/20 bg-white/80 p-4 sm:p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                                      {locale === "ar" ? "تعديل الخدمة" : "Edit service"}
+                                    </p>
+                                    <h4 className="mt-1 text-lg font-semibold text-gray-900">
+                                      {editingQueuedServiceRecord
+                                        ? (locale === "ar"
+                                          ? (editingQueuedServiceRecord.name_ar || editingQueuedServiceRecord.name_en)
+                                          : (editingQueuedServiceRecord.name_en || editingQueuedServiceRecord.name_ar))
+                                        : (locale === "ar" ? "خدمة" : "Service")}
+                                    </h4>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingServiceIndex(null)}
+                                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                                  >
+                                    {locale === "ar" ? "إغلاق" : "Close"}
+                                  </button>
+                                </div>
+
+                                <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {editingQueuedServiceRecord
+                                      ? (locale === "ar"
+                                        ? (editingQueuedServiceRecord.name_ar || editingQueuedServiceRecord.name_en)
+                                        : (editingQueuedServiceRecord.name_en || editingQueuedServiceRecord.name_ar))
+                                      : (locale === "ar" ? "الخدمة المختارة" : "Selected service")}
+                                  </p>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    {getQueueItemStartTime(editingQueuedService!)} • {formatMinutesLabel(getQueueItemDuration(editingQueuedService!), locale)} • <Currency amount={editingQueuedServicePrice} />
+                                  </p>
+                                </div>
+
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                  <label className="block">
+                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "الموظف" : "Staff member"}</span>
+                                    <select
+                                      value={serviceDraft.staffId}
+                                      onChange={(e) => setServiceDraft((current) => ({ ...current, staffId: e.target.value }))}
+                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                    >
+                                      <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
+                                      {assignedEmployees.map((employee) => (
+                                        <option key={employee.id} value={employee.id}>
+                                          {employee.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "نوع الخصم" : "Discount"}</span>
+                                    <select
+                                      value={serviceDraft.discountType}
+                                      onChange={(e) => setServiceDraft((current) => ({ ...current, discountType: e.target.value as "none" | "percent" | "fixed" }))}
+                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                    >
+                                      <option value="none">{locale === "ar" ? "بدون خصم" : "No discount"}</option>
+                                      <option value="percent">{locale === "ar" ? "نسبة مئوية" : "Percent"}</option>
+                                      <option value="fixed">{locale === "ar" ? "مبلغ ثابت" : "Fixed amount"}</option>
+                                    </select>
+                                  </label>
+
+                                  {serviceDraft.discountType !== "none" ? (
+                                    <label className="block">
+                                      <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "قيمة الخصم" : "Discount value"}</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={serviceDraft.discountValue}
+                                        onChange={(e) => setServiceDraft((current) => ({ ...current, discountValue: e.target.value }))}
+                                        placeholder={serviceDraft.discountType === "percent" ? "10" : "25"}
+                                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                      />
+                                    </label>
+                                  ) : (
+                                    <div className="hidden sm:block" />
+                                  )}
+
+                                  <label className="block">
+                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "وقت البدء" : "Start time"}</span>
+                                    <select
+                                      value={serviceDraft.startTime}
+                                      onChange={(e) => setServiceDraft((current) => ({ ...current, startTime: e.target.value }))}
+                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                    >
+                                      {TIME_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {locale === "ar" ? option.labelAr : option.labelEn}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "المدة" : "Duration"}</span>
+                                    <input
+                                      type="number"
+                                      min="5"
+                                      step="5"
+                                      value={serviceDraft.duration}
+                                      onChange={(e) => setServiceDraft((current) => ({ ...current, duration: e.target.value }))}
+                                      className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                    />
+                                  </label>
+                                </div>
+
+                                {editingQueuedServiceWarning ? (
+                                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                    {editingQueuedServiceWarning}
+                                  </div>
+                                ) : null}
+
+                                <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                  <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-gray-600">{locale === "ar" ? "السعر الأصلي" : "Original price"}</span>
+                                    <span className="font-semibold text-gray-900"><Currency amount={editingQueuedServicePrice} /></span>
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-gray-600">{locale === "ar" ? "الخصم" : "Discount"}</span>
+                                    <span className="font-semibold text-gray-900">
+                                      {editingQueuedServiceDiscount > 0
+                                        ? (serviceDraft.discountType === "percent"
+                                          ? `${serviceDraft.discountValue}%`
+                                          : <Currency amount={editingQueuedServiceDiscount} />)
+                                        : (locale === "ar" ? "بدون" : "None")}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between gap-3 text-base">
+                                    <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
+                                    <span className="font-semibold text-primary"><Currency amount={editingQueuedServiceTotal} /></span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => editingServiceIndex !== null && removeQueuedServiceAt(editingServiceIndex)}
+                                    className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                                  >
+                                    {locale === "ar" ? "حذف الخدمة" : "Delete service"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={applyDraftService}
+                                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                                  >
+                                    {locale === "ar" ? "تطبيق" : "Apply"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
                         );
                       }) : (
                         <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
@@ -1856,169 +2028,13 @@ export function AppointmentActionDrawer({
                         </div>
                       ) : null}
 
-                      {editingQueuedService ? (
-                        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                            {locale === "ar" ? "تعديل الخدمة" : "Edit service"}
-                          </p>
-                          <h4 className="mt-1 text-lg font-semibold text-gray-900">
-                            {editingQueuedServiceRecord
-                              ? (locale === "ar"
-                                ? (editingQueuedServiceRecord.name_ar || editingQueuedServiceRecord.name_en)
-                                : (editingQueuedServiceRecord.name_en || editingQueuedServiceRecord.name_ar))
-                              : (locale === "ar" ? "خدمة" : "Service")}
-                          </h4>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setEditingServiceIndex(null)}
-                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                        >
-                          {locale === "ar" ? "عودة" : "Back"}
-                        </button>
-                      </div>
-
-                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {editingQueuedServiceRecord
-                            ? (locale === "ar"
-                              ? (editingQueuedServiceRecord.name_ar || editingQueuedServiceRecord.name_en)
-                              : (editingQueuedServiceRecord.name_en || editingQueuedServiceRecord.name_ar))
-                            : (locale === "ar" ? "الخدمة المختارة" : "Selected service")}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {getQueueItemStartTime(editingQueuedService)} • {formatMinutesLabel(getQueueItemDuration(editingQueuedService), locale)} • <Currency amount={editingQueuedServicePrice} />
-                        </p>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <label className="block">
-                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "الموظف" : "Staff member"}</span>
-                          <select
-                            value={serviceDraft.staffId}
-                            onChange={(e) => setServiceDraft((current) => ({ ...current, staffId: e.target.value }))}
-                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">{locale === "ar" ? "تعيين تلقائي" : "Auto assign"}</option>
-                            {assignedEmployees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="block">
-                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "نوع الخصم" : "Discount"}</span>
-                          <select
-                            value={serviceDraft.discountType}
-                            onChange={(e) => setServiceDraft((current) => ({ ...current, discountType: e.target.value as "none" | "percent" | "fixed" }))}
-                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="none">{locale === "ar" ? "بدون خصم" : "No discount"}</option>
-                            <option value="percent">{locale === "ar" ? "نسبة مئوية" : "Percent"}</option>
-                            <option value="fixed">{locale === "ar" ? "مبلغ ثابت" : "Fixed amount"}</option>
-                          </select>
-                        </label>
-
-                        {serviceDraft.discountType !== "none" ? (
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "قيمة الخصم" : "Discount value"}</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={serviceDraft.discountValue}
-                              onChange={(e) => setServiceDraft((current) => ({ ...current, discountValue: e.target.value }))}
-                              placeholder={serviceDraft.discountType === "percent" ? "10" : "25"}
-                              className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                            />
-                          </label>
-                        ) : (
-                          <div className="hidden sm:block" />
-                        )}
-
-                        <label className="block">
-                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "وقت البدء" : "Start time"}</span>
-                          <select
-                            value={serviceDraft.startTime}
-                            onChange={(e) => setServiceDraft((current) => ({ ...current, startTime: e.target.value }))}
-                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          >
-                            {TIME_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {locale === "ar" ? option.labelAr : option.labelEn}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="block">
-                          <span className="mb-2 block text-sm font-medium text-gray-700">{locale === "ar" ? "المدة" : "Duration"}</span>
-                          <input
-                            type="number"
-                            min="5"
-                            step="5"
-                            value={serviceDraft.duration}
-                            onChange={(e) => setServiceDraft((current) => ({ ...current, duration: e.target.value }))}
-                            className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          />
-                        </label>
-                      </div>
-
-                      {editingQueuedServiceWarning ? (
-                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                          {editingQueuedServiceWarning}
-                        </div>
-                      ) : null}
-
-                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="text-gray-600">{locale === "ar" ? "السعر الأصلي" : "Original price"}</span>
-                          <span className="font-semibold text-gray-900"><Currency amount={editingQueuedServicePrice} /></span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                          <span className="text-gray-600">{locale === "ar" ? "الخصم" : "Discount"}</span>
-                          <span className="font-semibold text-gray-900">
-                            {editingQueuedServiceDiscount > 0
-                              ? (serviceDraft.discountType === "percent"
-                                ? `${serviceDraft.discountValue}%`
-                                : <Currency amount={editingQueuedServiceDiscount} />)
-                              : (locale === "ar" ? "بدون" : "None")}
-                          </span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-3 text-base">
-                          <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
-                          <span className="font-semibold text-primary"><Currency amount={editingQueuedServiceTotal} /></span>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => editingServiceIndex !== null && removeQueuedServiceAt(editingServiceIndex)}
-                          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                        >
-                          {locale === "ar" ? "حذف الخدمة" : "Delete service"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={applyDraftService}
-                          className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-                        >
-                          {locale === "ar" ? "تطبيق" : "Apply"}
-                        </button>
-                      </div>
-                    </div>
-                      ) : null}
                     </>
                   )}
-              </div>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="h-full space-y-5 overflow-y-auto pr-1">
                 <div className="rounded-3xl border border-gray-200 bg-white p-4">
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     {locale === "ar" ? "الموظف" : "Employee"}
