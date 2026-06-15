@@ -1766,95 +1766,95 @@ export function AppointmentDetailsDrawer({
 
     return (
       <div className="h-full p-4 lg:p-5">
-        <div className="grid gap-5 xl:grid-cols-[340px_220px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <WorkspacePanel
-            title={locale === "ar" ? "مساحة العميل" : "Customer workspace"}
-            subtitle={customerFullName}
-            action={
-              <button
-                type="button"
-                onClick={() => setViewMode("appointment")}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-              >
-                {locale === "ar" ? "رجوع" : "Back"}
-              </button>
-            }
-          >
-            <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <div className="min-w-0">
-                <div className={`mt-4 flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
-                    {customerProfile?.profileImage ? (
-                      <img
-                        src={avatarUrl(customerProfile.profileImage)}
-                        alt={customerFullName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      `${customerProfile?.firstName?.[0] || ""}${customerProfile?.lastName?.[0] || ""}`.toUpperCase() || "?"
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-900">{customerFullName}</p>
-                    <p className="text-xs text-gray-500">
-                      {locale === "ar" ? "مساحة العميل" : "Customer workspace"}
-                    </p>
+        <div className="grid h-full gap-5 xl:grid-cols-[340px_220px_minmax(0,1fr)]">
+          <div className="space-y-4">
+            <WorkspacePanel
+              title={locale === "ar" ? "مساحة العميل" : "Customer workspace"}
+              subtitle={customerFullName}
+              action={
+                <button
+                  type="button"
+                  onClick={() => setViewMode("appointment")}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                >
+                  {locale === "ar" ? "رجوع" : "Back"}
+                </button>
+              }
+            >
+              <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <div className="min-w-0">
+                  <div className={`mt-4 flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
+                      {customerProfile?.profileImage ? (
+                        <img
+                          src={avatarUrl(customerProfile.profileImage)}
+                          alt={customerFullName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        `${customerProfile?.firstName?.[0] || ""}${customerProfile?.lastName?.[0] || ""}`.toUpperCase() || "?"
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">{customerFullName}</p>
+                      <p className="text-xs text-gray-500">
+                        {locale === "ar" ? "مساحة العميل" : "Customer workspace"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
-              <MetricTile
-                label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
-                value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
-              />
-              <MetricTile
-                label={locale === "ar" ? "أول زيارة" : "First visit"}
-                value={customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
-              />
-              <MetricTile
-                label={locale === "ar" ? "آخر زيارة" : "Last visit"}
-                value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
-              />
-            </div>
-
-            <WorkspacePanel title={locale === "ar" ? "ملف العميل" : "Customer profile"} className="mt-4 bg-gray-50">
-              <div className="mt-3 grid grid-cols-1 gap-3">
-                <MetricTile label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={customerProfile?.email || "-"} className="bg-white" />
-                <MetricTile label={locale === "ar" ? "الهاتف" : "Phone"} value={customerProfile?.phone || "-"} className="bg-white" />
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
                 <MetricTile
-                  label={locale === "ar" ? "اللغة" : "Language"}
-                  value={customerProfile?.preferredLanguage || "-"}
-                  className="bg-white"
+                  label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
+                  value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
+                />
+                <MetricTile
+                  label={locale === "ar" ? "أول زيارة" : "First visit"}
+                  value={customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
+                />
+                <MetricTile
+                  label={locale === "ar" ? "آخر زيارة" : "Last visit"}
+                  value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
                 />
               </div>
-            </WorkspacePanel>
 
-            {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
-              <WorkspacePanel title={locale === "ar" ? "ملاحظات" : "Notes"}>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                  {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
-                </p>
-                {customerProfile?.tags && customerProfile.tags.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {customerProfile.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <WorkspacePanel title={locale === "ar" ? "ملف العميل" : "Customer profile"} className="mt-4 bg-gray-50">
+                <div className="mt-3 grid grid-cols-1 gap-3">
+                  <MetricTile label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={customerProfile?.email || "-"} className="bg-white" />
+                  <MetricTile label={locale === "ar" ? "الهاتف" : "Phone"} value={customerProfile?.phone || "-"} className="bg-white" />
+                  <MetricTile
+                    label={locale === "ar" ? "اللغة" : "Language"}
+                    value={customerProfile?.preferredLanguage || "-"}
+                    className="bg-white"
+                  />
+                </div>
               </WorkspacePanel>
-            )}
-          </WorkspacePanel>
-        </div>
 
-        <div className="sticky top-4 z-10 rounded-3xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
-          <div className="space-y-2">
-            {customerTabs.map((tab) => (
+              {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
+                <WorkspacePanel title={locale === "ar" ? "ملاحظات" : "Notes"}>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                    {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
+                  </p>
+                  {customerProfile?.tags && customerProfile.tags.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {customerProfile.tags.map((tag) => (
+                        <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </WorkspacePanel>
+              )}
+            </WorkspacePanel>
+          </div>
+
+          <div className="sticky top-4 z-10 rounded-3xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
+            <div className="space-y-2">
+              {customerTabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
@@ -1867,22 +1867,23 @@ export function AppointmentDetailsDrawer({
                 >
                   {tab.label}
                 </button>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="space-y-4">
-          {customerWorkspaceLoading ? (
-            <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
-              <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
-            </div>
-          ) : customerProfile ? (
-            renderCustomerTabContent()
-          ) : (
-            <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-              {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
-            </div>
-          )}
+          <div className="space-y-4">
+            {customerWorkspaceLoading ? (
+              <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
+                <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+            ) : customerProfile ? (
+              renderCustomerTabContent()
+            ) : (
+              <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
