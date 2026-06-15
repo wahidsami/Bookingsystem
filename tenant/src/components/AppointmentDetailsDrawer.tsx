@@ -1731,7 +1731,6 @@ export function AppointmentDetailsDrawer({
               </div>
             </div>
           </section>
-        </section>
         </div>
       </div>
     );
