@@ -1317,7 +1317,7 @@ export function AppointmentDetailsDrawer({
                   {locale === "ar" ? "الإجراءات" : "Actions"}
                 </button>
                 {moreActionsOpen ? (
-                  <div className={`absolute left-0 top-full z-30 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ${isRTL ? "right-0 left-auto" : ""}`}>
+                  <div className={`absolute bottom-full left-0 z-50 mb-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl ${isRTL ? "right-0 left-auto" : ""}`}>
                     {[
                       { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
                       { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
