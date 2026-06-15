@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getImageUrl, tenantApi } from "@/lib/api";
 import { Currency } from "@/components/Currency";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface ServiceEmployee {
   id: string;
@@ -313,6 +314,7 @@ export function AppointmentActionDrawer({
   onAppointmentCreated,
   onBreakSaved
 }: AppointmentActionDrawerProps) {
+  const dialog = useAppDialog();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -1025,11 +1027,14 @@ export function AppointmentActionDrawer({
     if (!emailForConfirmation) {
       const confirmedWithoutEmail = typeof window === "undefined"
         ? true
-        : window.confirm(
-            locale === "ar"
+        : await dialog.confirm({
+            title: locale === "ar" ? "تأكيد حفظ الموعد" : "Confirm appointment save",
+            message: locale === "ar"
               ? "لم يتم إدخال بريد إلكتروني للعميل. لن يتم إرسال رسالة تأكيد الموعد عبر البريد الإلكتروني. هل تريد المتابعة وحفظ الموعد بدون إرسال تأكيد بريد؟"
-              : "No customer email was entered. Appointment confirmation email will NOT be sent. Do you want to continue and save the appointment anyway?"
-          );
+              : "No customer email was entered. Appointment confirmation email will NOT be sent. Do you want to continue and save the appointment anyway?",
+            confirmText: locale === "ar" ? "متابعة الحفظ" : "Continue",
+            cancelText: locale === "ar" ? "إلغاء" : "Cancel"
+          });
       if (!confirmedWithoutEmail) {
         return;
       }
@@ -1181,7 +1186,13 @@ export function AppointmentActionDrawer({
 
     const confirmed = typeof window === "undefined"
       ? true
-      : window.confirm(locale === "ar" ? "هل تريد حذف الوقت المحجوز؟" : "Delete this blocked time?");
+      : await dialog.confirm({
+          title: locale === "ar" ? "حذف الوقت المحجوز" : "Delete blocked time",
+          message: locale === "ar" ? "هل تريد حذف الوقت المحجوز؟" : "Delete this blocked time?",
+          confirmText: locale === "ar" ? "حذف" : "Delete",
+          cancelText: locale === "ar" ? "إلغاء" : "Cancel",
+          tone: "danger"
+        });
 
     if (!confirmed) {
       return;
