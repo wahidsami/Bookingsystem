@@ -1214,12 +1214,29 @@ export default function AppointmentsPage() {
     setShowAppointmentDetailsDrawer(false);
   };
 
+  const getAddServiceAnchorTime = (appointment: AppointmentItem) => {
+    const sessionAppointments = appointment.bookingSession?.appointments || [];
+    const candidates = sessionAppointments.length ? sessionAppointments : [appointment];
+    const latest = candidates.reduce((currentLatest, currentItem) => {
+      const currentEnd = new Date(currentItem.endTime || currentItem.startTime);
+      if (Number.isNaN(currentEnd.getTime())) {
+        return currentLatest;
+      }
+      if (!currentLatest) {
+        return currentEnd;
+      }
+      return currentEnd.getTime() > currentLatest.getTime() ? currentEnd : currentLatest;
+    }, null as Date | null);
+
+    return latest || new Date(appointment.endTime || appointment.startTime);
+  };
+
   const handleAddServicePickerContinue = () => {
     if (!addServiceSourceAppointment || !selectedServiceForPicker) {
       return;
     }
 
-    const end = new Date(addServiceSourceAppointment.endTime || addServiceSourceAppointment.startTime);
+    const end = getAddServiceAnchorTime(addServiceSourceAppointment);
     const date = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
     const time = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
 

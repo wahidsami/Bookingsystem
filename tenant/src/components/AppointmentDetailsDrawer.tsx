@@ -45,6 +45,7 @@ export interface AppointmentItem {
   };
   paymentTransactions?: PaymentTransaction[];
   events?: AppointmentEventItem[];
+  bookingSession?: AppointmentBookingSession | null;
   user?: {
     id: string;
     firstName: string;
@@ -55,6 +56,32 @@ export interface AppointmentItem {
     profileImage?: string | null;
   };
   createdAt?: string;
+}
+
+interface AppointmentSessionItem {
+  id: string;
+  bookingItemIndex?: number | null;
+  startTime: string;
+  endTime: string;
+  status: AppointmentItem["status"];
+  paymentStatus: AppointmentItem["paymentStatus"];
+  price: number;
+  rawPrice?: number;
+  notes?: string;
+  serviceVariantId?: string | null;
+  serviceVariantName?: string | null;
+  serviceVariantDescription?: string | null;
+  serviceVariantDuration?: number | null;
+  service: AppointmentItem["service"];
+  staff: AppointmentItem["staff"];
+  user?: AppointmentItem["user"];
+}
+
+interface AppointmentBookingSession {
+  id: string;
+  bookingReference?: string | null;
+  itemCount?: number | null;
+  appointments?: AppointmentSessionItem[];
 }
 
 interface AppointmentEventItem {
@@ -1172,7 +1199,23 @@ export function AppointmentDetailsDrawer({
     const paidAmount = Number(appointment.totalPaid || 0);
     const totalAmount = Number(appointment.price || 0);
     const remainingAmount = Math.max(0, Number(appointment.remainderAmount ?? (totalAmount - paidAmount)));
-    const serviceCards = [appointment];
+    const serviceCards = (() => {
+      const sessionAppointments = appointment.bookingSession?.appointments || [];
+      if (!sessionAppointments.length) {
+        return [appointment];
+      }
+
+      return sessionAppointments
+        .slice()
+        .sort((left, right) => {
+          const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+          const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+          if (leftIndex !== rightIndex) {
+            return leftIndex - rightIndex;
+          }
+          return new Date(left.startTime).getTime() - new Date(right.startTime).getTime();
+        });
+    })();
 
     const triggerMoreAction = (action: "rebook" | "reschedule" | "mark_refunded" | "open_full_page") => {
       setMoreActionsOpen(false);
@@ -1357,7 +1400,7 @@ export function AppointmentDetailsDrawer({
     );
 
     return (
-      <div className="grid h-full gap-5 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="min-h-0 overflow-y-auto pr-1">
           {renderCustomerPanel()}
         </aside>
@@ -2251,7 +2294,7 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[76rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[68rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col overflow-hidden">

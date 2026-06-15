@@ -1594,7 +1594,42 @@ exports.getAppointment = async (req, res) => {
                         }
                     ],
                     required: false
+                },
+                {
+                    model: db.BookingSession,
+                    as: 'bookingSession',
+                    required: false,
+                    include: [
+                        {
+                            model: db.Appointment,
+                            as: 'appointments',
+                            include: [
+                                {
+                                    model: db.Service,
+                                    as: 'service',
+                                    attributes: ['id', 'name_en', 'name_ar', 'duration'],
+                                    required: true
+                                },
+                                {
+                                    model: db.Staff,
+                                    as: 'staff',
+                                    attributes: ['id', 'name', 'photo'],
+                                    required: true
+                                },
+                                {
+                                    model: db.PlatformUser,
+                                    as: 'user',
+                                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
+                                    required: false
+                                }
+                            ],
+                            required: false
+                        }
+                    ]
                 }
+            ],
+            order: [
+                [{ model: db.BookingSession, as: 'bookingSession' }, { model: db.Appointment, as: 'appointments' }, 'bookingItemIndex', 'ASC']
             ]
         });
 
