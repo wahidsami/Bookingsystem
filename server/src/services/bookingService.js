@@ -427,12 +427,27 @@ class BookingService {
             let bookingNumberAttempts = 0;
             while (!appointment && bookingNumberAttempts < 5) {
                 bookingNumberAttempts += 1;
+                const createTransaction = transaction
+                    ? await db.sequelize.transaction({ transaction: finalTransaction })
+                    : finalTransaction;
                 try {
                     appointment = await db.Appointment.create({
                         ...appointmentPayload,
                         bookingNumber: await db.Appointment.generateBookingNumber()
-                    }, { transaction: finalTransaction });
+                    }, { transaction: createTransaction });
+
+                    if (createTransaction !== finalTransaction) {
+                        await createTransaction.commit();
+                    }
                 } catch (createError) {
+                    if (createTransaction !== finalTransaction) {
+                        try {
+                            await createTransaction.rollback();
+                        } catch (rollbackError) {
+                            console.warn('Appointment savepoint rollback warning:', rollbackError.message);
+                        }
+                    }
+
                     const isBookingNumberConflict = isUniqueConstraintForField(createError, 'bookingNumber');
                     if (!isBookingNumberConflict || bookingNumberAttempts >= 5) {
                         throw createError;
