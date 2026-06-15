@@ -135,7 +135,7 @@ interface CustomerOrderHistoryItem {
   shippingAddress?: string | null;
   trackingNumber?: string | null;
   date: string;
-  expectedDeliveryDate?: string | null;
+  estimatedDeliveryDate?: string | null;
 }
 
 interface CustomerTransactionRecord {

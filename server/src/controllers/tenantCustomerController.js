@@ -802,7 +802,7 @@ exports.getCustomer = async (req, res) => {
                 shippingAddress: o.shippingAddress,
                 trackingNumber: o.trackingNumber,
                 date: o.createdAt,
-                expectedDeliveryDate: o.expectedDeliveryDate
+                estimatedDeliveryDate: o.estimatedDeliveryDate
             })),
             // Recent activity (for backward compatibility)
             recentAppointments: appointments.slice(0, 10).map(a => ({
@@ -1312,7 +1312,7 @@ exports.getCustomerTransactions = async (req, res) => {
                         attributes: ['id', 'quantity', 'unitPrice', 'totalPrice', 'productName', 'productNameAr', 'productImage']
                     }
                 ],
-                attributes: ['id', 'orderNumber', 'paymentMethod', 'paymentStatus', 'status', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'expectedDeliveryDate'],
+                attributes: ['id', 'orderNumber', 'paymentMethod', 'paymentStatus', 'status', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'estimatedDeliveryDate'],
                 order: [['createdAt', 'DESC']]
             })
         ]);
@@ -1365,7 +1365,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     {
                         model: db.Order,
                         as: 'order',
-                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'expectedDeliveryDate'],
+                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'estimatedDeliveryDate'],
                         required: false,
                         include: [
                             {
@@ -1430,7 +1430,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     {
                         model: db.Order,
                         as: 'order',
-                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'expectedDeliveryDate'],
+                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'estimatedDeliveryDate'],
                         required: false,
                         include: [
                             {
