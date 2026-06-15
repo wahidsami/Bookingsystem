@@ -830,7 +830,7 @@ export function AppointmentActionDrawer({
     setServiceDraft({
       serviceId: item.serviceId,
       staffId: item.staffId || defaultStaffId || "",
-      startTime: extractTimeLabel(item.startTime),
+      startTime: getQueueItemStartTime(item),
       duration: `${getQueueItemDuration(item)}`,
       discountType: item.discountType || "none",
       discountValue: `${item.discountValue || ""}`
