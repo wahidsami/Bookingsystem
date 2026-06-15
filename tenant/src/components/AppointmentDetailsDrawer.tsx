@@ -1188,7 +1188,6 @@ export function AppointmentDetailsDrawer({
       0,
       Math.round((appointmentEndDateTime.getTime() - appointmentDateTime.getTime()) / 60000)
     );
-    const durationLabel = `${durationMinutes || 0} min`;
     const customerProfileLink = customerId
       ? `/${locale}/dashboard/customers/${customerId}`
       : `/${locale}/dashboard/customers`;
@@ -1400,7 +1399,7 @@ export function AppointmentDetailsDrawer({
     );
 
     return (
-      <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="min-h-0 overflow-y-auto pr-1">
           {renderCustomerPanel()}
         </aside>
@@ -1450,121 +1449,64 @@ export function AppointmentDetailsDrawer({
                 </div>
               }
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                  {getStatusLabel(appointment.status, locale)}
-                </span>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                  {getPaymentStatusLabel(currentPaymentStatus, locale)}
-                </span>
-                {latestRescheduleAudit?.toStartTime ? (
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                    {locale === "ar"
-                      ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
-                      : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+              <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
+                    {getStatusLabel(appointment.status, locale)}
                   </span>
-                ) : null}
-                {latestCancellationAudit ? (
-                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                    {locale === "ar"
-                      ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
-                      : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                    {getPaymentStatusLabel(currentPaymentStatus, locale)}
                   </span>
-                ) : null}
-              </div>
+                  {latestRescheduleAudit?.toStartTime ? (
+                    <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                      {locale === "ar"
+                        ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
+                        : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+                    </span>
+                  ) : null}
+                  {latestCancellationAudit ? (
+                    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                      {locale === "ar"
+                        ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+                        : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
+                    </span>
+                  ) : null}
+                </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-4 rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "التاريخ" : "Date"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الوقت" : "Time"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {formatDateTime(appointment.startTime, locale)} → {formatDateTime(appointment.endTime, locale)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "التكرار" : "Repeat"}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
-                    {locale === "ar" ? "لا يتكرر" : "Doesn't repeat"}
-                  </p>
-                </div>
-                <div className="ml-auto min-w-[220px]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {locale === "ar" ? "الحالة" : "Status"}
-                  </p>
-                  <select
-                    value={appointment.status}
-                    disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
-                    onChange={(event) => {
-                      const nextStatus = event.target.value as AppointmentItem["status"];
-                      if (nextStatus === appointment.status) return;
-                      if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
-                        void handleQuickStatusUpdate(nextStatus);
-                        return;
-                      }
-                    }}
-                    className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {currentStatusOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "تاريخ الخدمة" : "Service date"}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
+                  </div>
+                  <div className="min-w-[220px] sm:ml-auto">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "الحالة" : "Status"}
+                    </p>
+                    <select
+                      value={appointment.status}
+                      disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                      onChange={(event) => {
+                        const nextStatus = event.target.value as AppointmentItem["status"];
+                        if (nextStatus === appointment.status) return;
+                        if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
+                          void handleQuickStatusUpdate(nextStatus);
+                          return;
+                        }
+                      }}
+                      className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {currentStatusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </WorkspacePanel>
-
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-              <WorkspacePanel
-                title={locale === "ar" ? "نظرة على الموعد" : "Appointment overview"}
-              >
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <MetricTile label={locale === "ar" ? "الموظف" : "Staff"} value={appointment.staff.name} className="bg-white" />
-                  <MetricTile label={locale === "ar" ? "عدد الخدمات" : "Services"} value={serviceCards.length} className="bg-white" />
-                  <MetricTile label={locale === "ar" ? "المدة" : "Duration"} value={durationLabel} className="bg-white" />
-                  <MetricTile label={locale === "ar" ? "المورد" : "Resource"} value={locale === "ar" ? "غير محدد" : "Unassigned"} className="bg-white" />
-                </div>
-              </WorkspacePanel>
-
-              <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
-                <div className="space-y-3 text-sm">
-                  {[
-                    { label: locale === "ar" ? "المجموع الفرعي" : "Subtotal", value: subtotalAmount },
-                    { label: locale === "ar" ? "الخصم" : "Discount", value: discountAmount },
-                    { label: locale === "ar" ? "الضريبة" : "Tax", value: taxAmount },
-                    { label: locale === "ar" ? "العربون" : "Deposit", value: depositAmount }
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between gap-3">
-                      <span className="text-gray-600">{row.label}</span>
-                      <Currency amount={row.value} />
-                    </div>
-                  ))}
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
-                      <Currency amount={totalAmount} className="text-base font-bold" />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-gray-600">{locale === "ar" ? "المدفوع" : "Paid"}</span>
-                      <Currency amount={paidAmount} />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-gray-600">{locale === "ar" ? "المتبقي" : "Remaining"}</span>
-                      <Currency amount={remainingAmount} className="font-semibold text-gray-900" />
-                    </div>
-                  </div>
-                </div>
-              </WorkspacePanel>
-            </div>
 
             <WorkspacePanel
               title={locale === "ar" ? "الخدمات" : "Services"}
@@ -1717,6 +1659,36 @@ export function AppointmentDetailsDrawer({
                     </div>
                   );
                 })}
+              </div>
+            </WorkspacePanel>
+
+            <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
+              <div className="space-y-3 text-sm">
+                {[
+                  { label: locale === "ar" ? "المجموع الفرعي" : "Subtotal", value: subtotalAmount },
+                  { label: locale === "ar" ? "الخصم" : "Discount", value: discountAmount },
+                  { label: locale === "ar" ? "الضريبة" : "Tax", value: taxAmount },
+                  { label: locale === "ar" ? "العربون" : "Deposit", value: depositAmount }
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-3">
+                    <span className="text-gray-600">{row.label}</span>
+                    <Currency amount={row.value} />
+                  </div>
+                ))}
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
+                    <Currency amount={totalAmount} className="text-base font-bold" />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-gray-600">{locale === "ar" ? "المدفوع" : "Paid"}</span>
+                    <Currency amount={paidAmount} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-gray-600">{locale === "ar" ? "المتبقي" : "Remaining"}</span>
+                    <Currency amount={remainingAmount} className="font-semibold text-gray-900" />
+                  </div>
+                </div>
               </div>
             </WorkspacePanel>
 
@@ -2294,7 +2266,7 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[68rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[64rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col overflow-hidden">
