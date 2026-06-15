@@ -283,7 +283,7 @@ interface WorkspacePanelProps {
 
 function WorkspacePanel({ title, subtitle, children, action, className = "" }: WorkspacePanelProps) {
   return (
-    <section className={`rounded-3xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
+    <section className={`rounded-3xl border border-gray-200 bg-white p-3 shadow-sm ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{title}</p>
@@ -291,7 +291,7 @@ function WorkspacePanel({ title, subtitle, children, action, className = "" }: W
         </div>
         {action}
       </div>
-      <div className="mt-3">{children}</div>
+      <div className="mt-2">{children}</div>
     </section>
   );
 }
@@ -1368,242 +1368,242 @@ export function AppointmentDetailsDrawer({
     return (
       <div className="h-full p-4 lg:p-5">
         <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto pr-1">
-          {renderCustomerPanel()}
-        </aside>
+          <aside className="min-h-0 overflow-y-auto pr-1">
+            {renderCustomerPanel()}
+          </aside>
 
-        <section className="min-h-0 overflow-y-auto pr-1">
-          <div className="space-y-4 pb-6">
-            <WorkspacePanel
-              title={locale === "ar" ? "تفاصيل الموعد" : "Appointment details"}
-              subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
-              action={
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handlePayNow()}
-                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "ادفع الآن" : "Pay now"}
-                  </button>
-                </div>
-              }
-            >
-              <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
-                    {getStatusLabel(appointment.status, locale)}
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                    {getPaymentStatusLabel(currentPaymentStatus, locale)}
-                  </span>
-                  {latestRescheduleAudit?.toStartTime ? (
-                    <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                      {locale === "ar"
-                        ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
-                        : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
-                    </span>
-                  ) : null}
-                  {latestCancellationAudit ? (
-                    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                      {locale === "ar"
-                        ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
-                        : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "تاريخ الخدمة" : "Service date"}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
-                  </div>
-                  <div className="min-w-[220px] sm:ml-auto">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {locale === "ar" ? "الحالة" : "Status"}
-                    </p>
-                    <select
-                      value={appointment.status}
-                      disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
-                      onChange={(event) => {
-                        const nextStatus = event.target.value as AppointmentItem["status"];
-                        if (nextStatus === appointment.status) return;
-                        if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
-                          void handleQuickStatusUpdate(nextStatus);
-                          return;
-                        }
-                      }}
-                      className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+          <section className="min-h-0 overflow-y-auto pr-1">
+            <div className="space-y-3 pb-4">
+              <WorkspacePanel
+                title={locale === "ar" ? "تفاصيل الموعد" : "Appointment details"}
+                subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
+                action={
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handlePayNow()}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
                     >
-                      {currentStatusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      {locale === "ar" ? "ادفع الآن" : "Pay now"}
+                    </button>
+                  </div>
+                }
+              >
+                <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
+                      {getStatusLabel(appointment.status, locale)}
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                      {getPaymentStatusLabel(currentPaymentStatus, locale)}
+                    </span>
+                    {latestRescheduleAudit?.toStartTime ? (
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                        {locale === "ar"
+                          ? `أعيدت الجدولة ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} إلى ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`
+                          : `Rescheduled ${formatDateTime(latestRescheduleAudit.at || latestRescheduleAudit.toStartTime, locale)} -> ${formatDateTime(latestRescheduleAudit.toStartTime, locale)}`}
+                      </span>
+                    ) : null}
+                    {latestCancellationAudit ? (
+                      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                        {locale === "ar"
+                          ? `ألغي ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • السبب: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`
+                          : `Cancelled ${formatDateTime(latestCancellationAudit.at || appointment.createdAt || appointment.startTime, locale)}${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode ? ` • Reason: ${latestCancellationAudit.reasonText || latestCancellationAudit.reasonCode}` : ""}`}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "تاريخ الخدمة" : "Service date"}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
+                    </div>
+                    <div className="min-w-[220px] sm:ml-auto">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "الحالة" : "Status"}
+                      </p>
+                      <select
+                        value={appointment.status}
+                        disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                        onChange={(event) => {
+                          const nextStatus = event.target.value as AppointmentItem["status"];
+                          if (nextStatus === appointment.status) return;
+                          if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
+                            void handleQuickStatusUpdate(nextStatus);
+                            return;
+                          }
+                        }}
+                        className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {currentStatusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </WorkspacePanel>
+              </WorkspacePanel>
 
-            <WorkspacePanel
-              title={locale === "ar" ? "الخدمات" : "Services"}
-              subtitle={locale === "ar" ? `${serviceCards.length} خدمة مرتبطة` : `${serviceCards.length} service(s) attached`}
-              action={
-                onAddService ? (
-                  <button
-                    type="button"
-                    onClick={() => onAddService(appointment)}
-                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "إضافة خدمة أخرى" : "Add another service"}
-                  </button>
-                ) : null
-              }
-            >
-              <div className="space-y-3">
-                {serviceCards.map((item) => {
-                  const itemServiceName = locale === "ar" ? item.service.name_ar : item.service.name_en;
-                  const itemVariant = item.serviceVariantName?.trim() || item.serviceVariantDescription?.trim() || "";
-                  const itemDuration = item.serviceVariantDuration || item.service.duration || durationMinutes;
-                  const isEditingThisService = editingServiceId === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition ${
-                        isEditingThisService ? "border-primary/30 ring-1 ring-primary/20" : "border-gray-200"
-                      }`}
+              <WorkspacePanel
+                title={locale === "ar" ? "الخدمات" : "Services"}
+                subtitle={locale === "ar" ? `${serviceCards.length} خدمة مرتبطة` : `${serviceCards.length} service(s) attached`}
+                action={
+                  onAddService ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddService(appointment)}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="min-w-0 p-4">
-                          <p className="text-lg font-semibold text-gray-900">{itemServiceName}</p>
-                          {itemVariant ? (
-                            <p className="mt-1 text-sm text-gray-500">{itemVariant}</p>
-                          ) : null}
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{itemDuration} min</span>
-                            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{item.staff.name}</span>
-                            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">
-                              <Currency amount={Number(item.price || 0)} />
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-4">
-                          <button
-                            type="button"
-                            onClick={() => beginServiceEdit(item)}
-                            className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                          >
-                            {isEditingThisService ? (locale === "ar" ? "إغلاق" : "Close") : (locale === "ar" ? "تعديل" : "Edit")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActionNotice({
-                              kind: "error",
-                              message: locale === "ar" ? "حذف الخدمة غير مفعل بعد." : "Service deletion is not wired yet."
-                            })}
-                            className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                          >
-                            {locale === "ar" ? "حذف" : "Delete"}
-                          </button>
-                        </div>
-                      </div>
-                      {isEditingThisService ? (
-                        <div className="border-t border-gray-200 bg-gray-50 p-4 sm:p-5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
-                                {locale === "ar" ? "تعديل الخدمة" : "Edit service"}
-                              </p>
-                              <h4 className="mt-1 text-lg font-semibold text-gray-900">{itemServiceName}</h4>
-                              <p className="mt-1 text-xs text-gray-500">
-                                {locale === "ar"
-                                  ? "تعديل داخل نفس البطاقة حتى لا يحتاج المستخدم للتمرير للأسفل."
-                                  : "Edit inline from this card so the workspace stays close to the service."}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={cancelServiceEdit}
-                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                            >
-                              {locale === "ar" ? "إغلاق" : "Close"}
-                            </button>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <label className="block">
-                              <span className="mb-2 block text-sm font-medium text-gray-700">
-                                {locale === "ar" ? "وقت البدء" : "Start time"}
-                              </span>
-                              <input
-                                type="time"
-                                value={editingServiceStartTime}
-                                onChange={(event) => setEditingServiceStartTime(event.target.value)}
-                                className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                              />
-                            </label>
-
-                            <div className="block">
-                              <span className="mb-2 block text-sm font-medium text-gray-700">
-                                {locale === "ar" ? "المدة" : "Duration"}
-                              </span>
-                              <div className="flex h-[46px] items-center rounded-2xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900">
-                                {itemDuration} {locale === "ar" ? "دقيقة" : "min"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                            {locale === "ar"
-                              ? "المدة تتبع إعدادات الخدمة. يتم حفظ وقت البدء الحالي فقط داخل هذه الواجهة."
-                              : "Duration follows the service setup. This inline edit currently saves the start time in-place."}
-                          </div>
-
-                          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
-                            <div className="flex items-center justify-between gap-3 text-sm">
-                              <span className="text-gray-600">{locale === "ar" ? "الموظف" : "Staff"}</span>
-                              <span className="font-semibold text-gray-900">{item.staff.name}</span>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                              <span className="text-gray-600">{locale === "ar" ? "السعر" : "Price"}</span>
-                              <span className="font-semibold text-gray-900">
+                      {locale === "ar" ? "إضافة خدمة أخرى" : "Add another service"}
+                    </button>
+                  ) : null
+                }
+              >
+                <div className="space-y-2.5">
+                  {serviceCards.map((item) => {
+                    const itemServiceName = locale === "ar" ? item.service.name_ar : item.service.name_en;
+                    const itemVariant = item.serviceVariantName?.trim() || item.serviceVariantDescription?.trim() || "";
+                    const itemDuration = item.serviceVariantDuration || item.service.duration || durationMinutes;
+                    const isEditingThisService = editingServiceId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition ${
+                          isEditingThisService ? "border-primary/30 ring-1 ring-primary/20" : "border-gray-200"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 p-3.5">
+                            <p className="text-base font-semibold text-gray-900">{itemServiceName}</p>
+                            {itemVariant ? (
+                              <p className="mt-1 text-sm text-gray-500">{itemVariant}</p>
+                            ) : null}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                              <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{itemDuration} min</span>
+                              <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">{item.staff.name}</span>
+                              <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold">
                                 <Currency amount={Number(item.price || 0)} />
                               </span>
                             </div>
                           </div>
-
-                          <div className="mt-4 flex items-center justify-end gap-2">
+                          <div className="flex items-center gap-2 p-3.5">
                             <button
                               type="button"
-                              onClick={cancelServiceEdit}
-                              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                              onClick={() => beginServiceEdit(item)}
+                              className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                             >
-                              {locale === "ar" ? "إلغاء" : "Cancel"}
+                              {isEditingThisService ? (locale === "ar" ? "إغلاق" : "Close") : (locale === "ar" ? "تعديل" : "Edit")}
                             </button>
                             <button
                               type="button"
-                              onClick={() => void saveServiceEdit(item)}
-                              disabled={editingServiceSubmitting}
-                              className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => setActionNotice({
+                                kind: "error",
+                                message: locale === "ar" ? "حذف الخدمة غير مفعل بعد." : "Service deletion is not wired yet."
+                              })}
+                              className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                             >
-                              {editingServiceSubmitting
-                                ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
-                                : (locale === "ar" ? "تطبيق" : "Apply")}
+                              {locale === "ar" ? "حذف" : "Delete"}
                             </button>
                           </div>
                         </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </WorkspacePanel>
+                        {isEditingThisService ? (
+                          <div className="border-t border-gray-200 bg-gray-50 p-3.5 sm:p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                                  {locale === "ar" ? "تعديل الخدمة" : "Edit service"}
+                                </p>
+                                <h4 className="mt-1 text-lg font-semibold text-gray-900">{itemServiceName}</h4>
+                                <p className="mt-1 text-xs text-gray-500">
+                                  {locale === "ar"
+                                    ? "تعديل داخل نفس البطاقة حتى لا يحتاج المستخدم للتمرير للأسفل."
+                                    : "Edit inline from this card so the workspace stays close to the service."}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={cancelServiceEdit}
+                                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                              >
+                                {locale === "ar" ? "إغلاق" : "Close"}
+                              </button>
+                            </div>
 
-            <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
-              <div className="space-y-3 text-sm">
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <label className="block">
+                                <span className="mb-2 block text-sm font-medium text-gray-700">
+                                  {locale === "ar" ? "وقت البدء" : "Start time"}
+                                </span>
+                                <input
+                                  type="time"
+                                  value={editingServiceStartTime}
+                                  onChange={(event) => setEditingServiceStartTime(event.target.value)}
+                                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                                />
+                              </label>
+
+                              <div className="block">
+                                <span className="mb-2 block text-sm font-medium text-gray-700">
+                                  {locale === "ar" ? "المدة" : "Duration"}
+                                </span>
+                                <div className="flex h-[46px] items-center rounded-2xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900">
+                                  {itemDuration} {locale === "ar" ? "دقيقة" : "min"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                              {locale === "ar"
+                                ? "المدة تتبع إعدادات الخدمة. يتم حفظ وقت البدء الحالي فقط داخل هذه الواجهة."
+                                : "Duration follows the service setup. This inline edit currently saves the start time in-place."}
+                            </div>
+
+                            <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3.5">
+                              <div className="flex items-center justify-between gap-3 text-sm">
+                                <span className="text-gray-600">{locale === "ar" ? "الموظف" : "Staff"}</span>
+                                <span className="font-semibold text-gray-900">{item.staff.name}</span>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                                <span className="text-gray-600">{locale === "ar" ? "السعر" : "Price"}</span>
+                                <span className="font-semibold text-gray-900">
+                                  <Currency amount={Number(item.price || 0)} />
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={cancelServiceEdit}
+                                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                              >
+                                {locale === "ar" ? "إلغاء" : "Cancel"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void saveServiceEdit(item)}
+                                disabled={editingServiceSubmitting}
+                                className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {editingServiceSubmitting
+                                  ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                                  : (locale === "ar" ? "تطبيق" : "Apply")}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </WorkspacePanel>
+
+              <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
+                <div className="space-y-2.5 text-sm">
                 {[
                   { label: locale === "ar" ? "المجموع الفرعي" : "Subtotal", value: subtotalAmount },
                   { label: locale === "ar" ? "الخصم" : "Discount", value: discountAmount },
@@ -1615,25 +1615,25 @@ export function AppointmentDetailsDrawer({
                     <Currency amount={row.value} />
                   </div>
                 ))}
-                <div className="border-t border-gray-200 pt-3">
+                <div className="border-t border-gray-200 pt-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
                     <Currency amount={totalAmount} className="text-base font-bold" />
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
                     <span className="text-gray-600">{locale === "ar" ? "المدفوع" : "Paid"}</span>
                     <Currency amount={paidAmount} />
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
                     <span className="text-gray-600">{locale === "ar" ? "المتبقي" : "Remaining"}</span>
                     <Currency amount={remainingAmount} className="font-semibold text-gray-900" />
                   </div>
                 </div>
-              </div>
-            </WorkspacePanel>
+                </div>
+              </WorkspacePanel>
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-              <WorkspacePanel title={locale === "ar" ? "سجل النشاط" : "Activity timeline"}>
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <WorkspacePanel title={locale === "ar" ? "سجل النشاط" : "Activity timeline"}>
                 <div className="space-y-3">
                   {timelineAuditEntries.length > 0 ? (
                     timelineAuditEntries.map((entry, index) => (
@@ -1654,7 +1654,7 @@ export function AppointmentDetailsDrawer({
                     </div>
                   )}
                 </div>
-                <div className="mt-4 flex justify-end">
+                <div className="mt-3 flex justify-end">
                   <Link
                     href={`/${locale}/dashboard/appointments/${appointment.id}`}
                     onClick={onClose}
@@ -1663,69 +1663,70 @@ export function AppointmentDetailsDrawer({
                     {locale === "ar" ? "عرض كل النشاط" : "View all activity"}
                   </Link>
                 </div>
-              </WorkspacePanel>
+                </WorkspacePanel>
 
-              <WorkspacePanel
-                title={locale === "ar" ? "ملاحظات" : "Notes"}
-                action={
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const notesSection = document.getElementById("appointment-notes-section");
-                      notesSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "إضافة ملاحظة" : "Add note"}
-                  </button>
-                }
-              >
-                <div id="appointment-notes-section" className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  {cleanAppointmentNotes ? (
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
-                  ) : (
-                    <p className="text-sm text-gray-500">{locale === "ar" ? "لا توجد ملاحظات." : "No notes yet."}</p>
-                  )}
-                </div>
-              </WorkspacePanel>
-            </div>
+                <WorkspacePanel
+                  title={locale === "ar" ? "ملاحظات" : "Notes"}
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const notesSection = document.getElementById("appointment-notes-section");
+                        notesSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إضافة ملاحظة" : "Add note"}
+                    </button>
+                  }
+                >
+                  <div id="appointment-notes-section" className="rounded-2xl border border-gray-200 bg-gray-50 p-3.5">
+                    {cleanAppointmentNotes ? (
+                      <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{cleanAppointmentNotes}</p>
+                    ) : (
+                      <p className="text-sm text-gray-500">{locale === "ar" ? "لا توجد ملاحظات." : "No notes yet."}</p>
+                    )}
+                  </div>
+                </WorkspacePanel>
+              </div>
 
-            <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 pt-4 backdrop-blur">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handlePayNow()}
-                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "ادفع الآن" : "Pay now"}
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleCheckout()}
-                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "إنهاء" : "Checkout"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void refreshAppointment();
-                      setActionNotice({
-                        kind: "success",
-                        message: locale === "ar" ? "تم حفظ التغييرات." : "Changes saved."
-                      });
-                    }}
-                    className="rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
-                  >
-                    {locale === "ar" ? "حفظ التغييرات" : "Save changes"}
-                  </button>
+              <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 pt-3 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handlePayNow()}
+                      className="rounded-2xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "ادفع الآن" : "Pay now"}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleCheckout()}
+                      className="rounded-2xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إنهاء" : "Checkout"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void refreshAppointment();
+                        setActionNotice({
+                          kind: "success",
+                          message: locale === "ar" ? "تم حفظ التغييرات." : "Changes saved."
+                        });
+                      }}
+                      className="rounded-2xl bg-gray-900 px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
+                    >
+                      {locale === "ar" ? "حفظ التغييرات" : "Save changes"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
         </section>
         </div>
       </div>
