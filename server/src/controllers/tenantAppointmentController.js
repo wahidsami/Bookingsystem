@@ -997,10 +997,29 @@ exports.createAppointment = async (req, res) => {
             console.warn('Create appointment rollback warning:', rollbackError.message);
         }
         console.error('Create appointment error:', error);
+        const validationDetails = Array.isArray(error?.errors)
+            ? error.errors.map((entry) => ({
+                field: entry.path || null,
+                message: entry.message || 'Invalid value',
+                value: entry.value
+            }))
+            : [];
+
+        let errorMessage = 'Failed to create appointment';
+        if (error.name === 'SequelizeValidationError') {
+            errorMessage = `Validation error: ${validationDetails.map((entry) => entry.message).join(', ')}`;
+        } else if (error.name === 'SequelizeUniqueConstraintError') {
+            errorMessage = `Validation error: ${validationDetails.map((entry) => entry.message).join(', ') || 'Duplicate value detected'}`;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
         res.status(500).json({
             success: false,
-            message: 'Failed to create appointment',
-            error: error.message
+            message: errorMessage,
+            error: error.message,
+            errorName: error.name,
+            errors: validationDetails
         });
     }
 };

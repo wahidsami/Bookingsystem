@@ -1100,6 +1100,16 @@ export function AppointmentActionDrawer({
     } catch (err: any) {
       console.error("Failed to create appointment:", err);
       setErrorDebug(err?.data?.debug || null);
+      const detailedValidationMessage = Array.isArray(err?.data?.errors) && err.data.errors.length > 0
+        ? err.data.errors
+            .map((entry: { field?: string; message?: string }) => {
+              const fieldLabel = `${entry?.field || ""}`.trim();
+              const message = `${entry?.message || ""}`.trim();
+              return fieldLabel ? `${fieldLabel}: ${message}` : message;
+            })
+            .filter(Boolean)
+            .join(" | ")
+        : "";
       const rawMessage = `${err?.message || ''}`.toLowerCase();
       if (rawMessage.includes('conflict') || rawMessage.includes('time slot not available')) {
         setError(locale === "ar"
@@ -1110,7 +1120,11 @@ export function AppointmentActionDrawer({
           ? "انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى."
           : "Your session expired. Please login again.");
       } else {
-        setError(err.message || (locale === "ar" ? "فشل إنشاء الموعد." : "Failed to create appointment."));
+        setError(
+          detailedValidationMessage
+            || err.message
+            || (locale === "ar" ? "فشل إنشاء الموعد." : "Failed to create appointment.")
+        );
       }
     } finally {
       setSaving(false);
