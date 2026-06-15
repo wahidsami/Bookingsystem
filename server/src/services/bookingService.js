@@ -433,7 +433,9 @@ class BookingService {
                 try {
                     appointment = await db.Appointment.create({
                         ...appointmentPayload,
-                        bookingNumber: await db.Appointment.generateBookingNumber()
+                        bookingNumber: await db.Appointment.generateBookingNumber({
+                            transaction: createTransaction
+                        })
                     }, { transaction: createTransaction });
 
                     if (createTransaction !== finalTransaction) {

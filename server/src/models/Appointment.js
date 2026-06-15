@@ -78,7 +78,8 @@ module.exports = (sequelize, DataTypes) => {
          * Generate a short, human-readable booking number for reception/POS lookup.
          * Format: BKG-YYYY-XXXXXX
          */
-        static async generateBookingNumber() {
+        static async generateBookingNumber(options = {}) {
+            const transaction = options?.transaction || null;
             const year = new Date().getFullYear();
             const prefix = `BKG-${year}-`;
 
@@ -88,7 +89,8 @@ module.exports = (sequelize, DataTypes) => {
                         [sequelize.Sequelize.Op.like]: `${prefix}%`
                     }
                 },
-                order: [['createdAt', 'DESC']]
+                order: [['createdAt', 'DESC']],
+                transaction
             });
 
             let sequence = 1;
