@@ -1271,107 +1271,74 @@ export function AppointmentDetailsDrawer({
           </button>
         </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
-          <div className={`flex items-start justify-between gap-4 ${isRTL ? "flex-row-reverse" : ""}`}>
-            <div className={`flex items-start gap-4 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-2xl font-semibold text-gray-900">
-                {customerAvatarSrc ? (
-                  <img src={customerAvatarSrc} alt={customerDisplayName} className="h-full w-full object-cover" />
-                ) : (
-                  (customerDisplayName?.[0] || "?").toUpperCase()
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-500">
-                  {locale === "ar" ? "العميل" : "Client"}
-                </p>
-                <h4 className="mt-1 truncate text-2xl font-bold text-gray-900">{customerDisplayName}</h4>
-                <div className="mt-2 space-y-1 text-sm text-gray-600">
-                  <p>{customerPhone || (locale === "ar" ? "لا يوجد هاتف" : "No phone")}</p>
-                  <p className="truncate">{customerEmail || (locale === "ar" ? "لا يوجد بريد" : "No email")}</p>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {customerProfile?.loyaltyTier ? (
-                    <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                      {customerProfile.loyaltyTier}
-                    </span>
-                  ) : null}
-                  {customerIsWalkIn ? (
-                    <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
-                      {locale === "ar" ? "حضور مباشر" : "Walk-in"}
-                    </span>
-                  ) : null}
-                </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white px-4 py-5 shadow-sm">
+          <div className="flex flex-col items-center text-center">
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-lg font-semibold text-gray-900">
+              {customerAvatarSrc ? (
+                <img src={customerAvatarSrc} alt={customerDisplayName} className="h-full w-full object-cover" />
+              ) : (
+                (customerDisplayName?.[0] || "?").toUpperCase()
+              )}
+            </div>
+            <p className="mt-3 text-sm font-semibold uppercase tracking-[0.2em] text-violet-500">
+              {locale === "ar" ? "العميل" : "Client"}
+            </p>
+            <h4 className="mt-2 truncate text-xl font-bold text-gray-900">{customerDisplayName}</h4>
+            <div className="mt-2 space-y-1 text-sm text-gray-600">
+              <p className="truncate">{customerEmail || (locale === "ar" ? "لا يوجد بريد" : "No email")}</p>
+              <p>{customerPhone || (locale === "ar" ? "لا يوجد هاتف" : "No phone")}</p>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {customerProfile?.loyaltyTier ? (
+                <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                  {customerProfile.loyaltyTier}
+                </span>
+              ) : null}
+              {customerIsWalkIn ? (
+                <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                  {locale === "ar" ? "حضور مباشر" : "Walk-in"}
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-5 grid w-full grid-cols-2 gap-3">
+              <Link
+                href={customerProfileLink}
+                onClick={onClose}
+                className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                {locale === "ar" ? "الملف" : "Profile"}
+              </Link>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMoreActionsOpen((current) => !current)}
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                >
+                  {locale === "ar" ? "الإجراءات" : "Actions"}
+                </button>
+                {moreActionsOpen ? (
+                  <div className={`absolute left-0 top-full z-30 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ${isRTL ? "right-0 left-auto" : ""}`}>
+                    {[
+                      { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
+                      { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
+                      { key: "mark_refunded", label: locale === "ar" ? "وضع علامة مسترد" : "Mark refunded" },
+                      { key: "open_full_page", label: locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page" }
+                    ].map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => triggerMoreAction(item.key as any)}
+                        className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
-            <Link
-              href={customerProfileLink}
-              onClick={onClose}
-              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-            >
-              {locale === "ar" ? "عرض الملف" : "View full profile"}
-            </Link>
           </div>
         </div>
-
-        <WorkspacePanel title={locale === "ar" ? "إحصاءات العميل" : "Customer stats"} className="bg-white">
-          <div className="grid grid-cols-1 gap-3">
-            <MetricTile label={locale === "ar" ? "الزيارات" : "Visits"} value={customerProfile?.totalBookings ?? 0} className="bg-white" />
-            <MetricTile label={locale === "ar" ? "الإنفاق الكلي" : "Lifetime spend"} value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />} className="bg-white" />
-            <MetricTile label={locale === "ar" ? "آخر زيارة" : "Last visit"} value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"} className="bg-white" />
-            <MetricTile label={locale === "ar" ? "منذ" : "Member since"} value={customerProfile?.joinedAt ? formatDateTime(customerProfile.joinedAt, locale) : "-"} className="bg-white" />
-          </div>
-        </WorkspacePanel>
-
-        <WorkspacePanel title={locale === "ar" ? "إجراءات العميل" : "Customer actions"} className="bg-white">
-          <div className="space-y-2">
-            <Link
-              href={customerProfileLink}
-              onClick={onClose}
-              className="flex items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
-            >
-              <span>{locale === "ar" ? "عرض الملف الكامل" : "View full profile"}</span>
-              <span aria-hidden="true">›</span>
-            </Link>
-            <a
-              href={customerPhone ? `https://wa.me/${customerPhone.replace(/[^0-9]/g, "")}` : "#"}
-              onClick={(event) => {
-                if (!customerPhone) {
-                  event.preventDefault();
-                }
-              }}
-              target="_blank"
-              rel="noreferrer"
-              className={`flex items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50 ${!customerPhone ? "pointer-events-none opacity-50" : ""}`}
-            >
-              <span>{locale === "ar" ? "إرسال واتساب" : "Send WhatsApp"}</span>
-              <span aria-hidden="true">›</span>
-            </a>
-            <a
-              href={customerPhone ? `tel:${customerPhone}` : "#"}
-              onClick={(event) => {
-                if (!customerPhone) {
-                  event.preventDefault();
-                }
-              }}
-              className={`flex items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50 ${!customerPhone ? "pointer-events-none opacity-50" : ""}`}
-            >
-              <span>{locale === "ar" ? "اتصال بالعميل" : "Call customer"}</span>
-              <span aria-hidden="true">›</span>
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                const notesSection = document.getElementById("appointment-notes-section");
-                notesSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className="flex w-full items-center justify-between rounded-2xl border border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
-            >
-              <span>{locale === "ar" ? "إضافة ملاحظة" : "Add note"}</span>
-              <span aria-hidden="true">›</span>
-            </button>
-          </div>
-        </WorkspacePanel>
 
         {customerIsWalkIn ? (
           <WorkspacePanel
@@ -1411,34 +1378,6 @@ export function AppointmentDetailsDrawer({
               subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
               action={
                 <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMoreActionsOpen((current) => !current)}
-                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                    >
-                      {locale === "ar" ? "المزيد" : "More actions"}
-                    </button>
-                    {moreActionsOpen ? (
-                      <div className={`absolute top-full mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ${isRTL ? "left-0" : "right-0"}`}>
-                        {[
-                          { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
-                          { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
-                          { key: "mark_refunded", label: locale === "ar" ? "وضع علامة مسترد" : "Mark refunded" },
-                          { key: "open_full_page", label: locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page" }
-                        ].map((item) => (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => triggerMoreAction(item.key as any)}
-                            className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
                   <button
                     type="button"
                     onClick={() => void handlePayNow()}
@@ -1753,34 +1692,6 @@ export function AppointmentDetailsDrawer({
             <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 pt-4 backdrop-blur">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMoreActionsOpen((current) => !current)}
-                      className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                    >
-                      {locale === "ar" ? "المزيد" : "More actions"}
-                    </button>
-                    {moreActionsOpen ? (
-                      <div className={`absolute bottom-full mb-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ${isRTL ? "left-0" : "right-0"}`}>
-                        {[
-                          { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
-                          { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
-                          { key: "mark_refunded", label: locale === "ar" ? "وضع علامة مسترد" : "Mark refunded" },
-                          { key: "open_full_page", label: locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page" }
-                        ].map((item) => (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => triggerMoreAction(item.key as any)}
-                            className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
                   <button
                     type="button"
                     onClick={() => void handlePayNow()}
@@ -2266,7 +2177,7 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[64rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col overflow-hidden">
