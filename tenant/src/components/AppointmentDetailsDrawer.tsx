@@ -3264,11 +3264,11 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl lg:top-[88px] lg:h-[calc(100dvh-88px)]`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col overflow-hidden">
-          <div className="flex-1 overflow-hidden px-4 py-4 lg:px-6">
+          <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6">
             {actionNotice && (
               <div
                 className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
