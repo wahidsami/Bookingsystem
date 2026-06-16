@@ -11,6 +11,9 @@ const {
     calculateServiceDeposit
 } = require('../utils/tenantPaymentSettings');
 const {
+    normalizePaymentAllocations
+} = require('./splitPaymentService');
+const {
     calculateRawPriceFromFinalPrice,
     parseServiceVariants,
     resolveServiceVariant
@@ -583,7 +586,7 @@ class BookingService {
      * Each item is still persisted as a normal appointment row.
      */
     async createBookingSession(data, options = {}) {
-        const { tenantId, platformUserId, items, notes, paymentMethod, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation } = data;
+        const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;
         const finalTransaction = transaction || await db.sequelize.transaction();
@@ -601,6 +604,7 @@ class BookingService {
             if (platformUser.isBanned) throw new Error('User account is banned');
 
             const normalizedNotes = typeof notes === 'string' ? notes.trim() : '';
+            const paymentAllocationsProvided = Array.isArray(paymentAllocations) && paymentAllocations.length > 0;
             const normalizedMethods = items
                 .map((item) => `${item?.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase())
                 .filter(Boolean);
@@ -698,14 +702,45 @@ class BookingService {
                 }
             }
 
+            let paymentPlanMetadata = {
+                paymentCollectionMode: paymentAllocationsProvided ? 'customized' : 'single',
+                requestedPaymentMethod: paymentMethod || null,
+                paymentAllocations: []
+            };
+
+            if (paymentAllocationsProvided) {
+                const normalizedPaymentAllocations = normalizePaymentAllocations({
+                    amount: totalAmount,
+                    paymentMethod: paymentMethod || 'at-center',
+                    paymentAllocations,
+                    fallbackSource: 'cash'
+                });
+
+                paymentPlanMetadata = {
+                    paymentCollectionMode: normalizedPaymentAllocations.length > 1 ? 'customized' : 'single',
+                    requestedPaymentMethod: paymentMethod || null,
+                    paymentAllocations: normalizedPaymentAllocations
+                };
+            }
+
             session = await this.syncBookingSessionTotals(session.id, finalTransaction) || session;
+            await session.update({
+                paymentMethod: paymentPlanMetadata.paymentCollectionMode === 'customized'
+                    ? 'split'
+                    : session.paymentMethod || sessionPaymentMethod,
+                metadata: {
+                    ...(session.metadata && typeof session.metadata === 'object' ? session.metadata : {}),
+                    bookingPaymentPlan: paymentPlanMetadata
+                }
+            }, { transaction: finalTransaction });
 
             const paymentSummary = {
                 atCenterAmount: parseFloat(atCenterAmount.toFixed(2)),
                 onlineFullAmount: parseFloat(onlineFullAmount.toFixed(2)),
                 bookingFeeAmount: parseFloat(bookingFeeAmount.toFixed(2)),
                 totalAmount: parseFloat(totalAmount.toFixed(2)),
-                itemCount: appointments.length
+                itemCount: appointments.length,
+                bookingPaymentPlan: paymentPlanMetadata
             };
 
             if (shouldCommit) {

@@ -107,6 +107,11 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: true
         },
+        metadata: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            defaultValue: {}
+        },
         notes: {
             type: DataTypes.TEXT,
             allowNull: true

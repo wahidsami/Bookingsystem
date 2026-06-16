@@ -568,6 +568,31 @@ const ensureAppointmentSchema = async () => {
     }
 };
 
+const ensureBookingSessionSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'booking_sessions'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.booking_sessions
+                    ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+            END $$;
+        `);
+
+        console.log('Booking session schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure booking session schema:', error);
+        throw error;
+    }
+};
+
 const ensurePaymentTransactionSchema = async () => {
     try {
         await db.sequelize.query(`
@@ -708,6 +733,7 @@ const startServer = async () => {
         await db.AppointmentEvent.sync({ force: false }); // Appointment lifecycle events (cancel/reschedule timeline)
         await db.TenantOperationalAlertRead.sync({ force: false }); // Server-side unread tracking for tenant operational alerts
         await ensureAppointmentSchema();
+        await ensureBookingSessionSchema();
         await db.Review.sync({ force: false }); // Customer reviews
         await db.CustomerInsight.sync({ force: false });
         await db.Transaction.sync({ force: false });
