@@ -1297,6 +1297,60 @@ export function AppointmentDetailsDrawer({
     setCustomerActionsMenuStyle(null);
   };
 
+  useEffect(() => {
+    if (!moreActionsOpen) return;
+
+    const handleCloseMoreActions = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (moreActionsButtonRef.current?.contains(target) ||
+          document.getElementById("appointment-more-actions-menu")?.contains(target))
+      ) {
+        return;
+      }
+
+      setMoreActionsOpen(false);
+      setMoreActionsMenuStyle(null);
+    };
+
+    window.addEventListener("mousedown", handleCloseMoreActions);
+    window.addEventListener("keydown", handleCloseMoreActions);
+    return () => {
+      window.removeEventListener("mousedown", handleCloseMoreActions);
+      window.removeEventListener("keydown", handleCloseMoreActions);
+    };
+  }, [moreActionsOpen]);
+
+  useEffect(() => {
+    if (!customerActionsOpen) return;
+
+    const handleCloseCustomerActions = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (customerActionsButtonRef.current?.contains(target) ||
+          document.getElementById("customer-actions-menu")?.contains(target))
+      ) {
+        return;
+      }
+
+      setCustomerActionsOpen(false);
+      setCustomerActionsMenuStyle(null);
+    };
+
+    window.addEventListener("mousedown", handleCloseCustomerActions);
+    window.addEventListener("keydown", handleCloseCustomerActions);
+    return () => {
+      window.removeEventListener("mousedown", handleCloseCustomerActions);
+      window.removeEventListener("keydown", handleCloseCustomerActions);
+    };
+  }, [customerActionsOpen]);
+
   const renderAppointmentWorkspace = () => {
     if (!appointment) return null;
 
@@ -1450,60 +1504,6 @@ export function AppointmentDetailsDrawer({
     setCustomerActionsOpen(false);
     setCustomerActionsMenuStyle(null);
   };
-
-  useEffect(() => {
-    if (!moreActionsOpen) return;
-
-    const handleCloseMoreActions = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
-
-      const target = event.target as Node | null;
-      if (
-        target &&
-        (moreActionsButtonRef.current?.contains(target) ||
-          document.getElementById("appointment-more-actions-menu")?.contains(target))
-      ) {
-        return;
-      }
-
-      setMoreActionsOpen(false);
-      setMoreActionsMenuStyle(null);
-    };
-
-    window.addEventListener("mousedown", handleCloseMoreActions);
-    window.addEventListener("keydown", handleCloseMoreActions);
-    return () => {
-      window.removeEventListener("mousedown", handleCloseMoreActions);
-      window.removeEventListener("keydown", handleCloseMoreActions);
-    };
-  }, [moreActionsOpen]);
-
-  useEffect(() => {
-    if (!customerActionsOpen) return;
-
-    const handleCloseCustomerActions = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
-
-      const target = event.target as Node | null;
-      if (
-        target &&
-        (customerActionsButtonRef.current?.contains(target) ||
-          document.getElementById("customer-actions-menu")?.contains(target))
-      ) {
-        return;
-      }
-
-      setCustomerActionsOpen(false);
-      setCustomerActionsMenuStyle(null);
-    };
-
-    window.addEventListener("mousedown", handleCloseCustomerActions);
-    window.addEventListener("keydown", handleCloseCustomerActions);
-    return () => {
-      window.removeEventListener("mousedown", handleCloseCustomerActions);
-      window.removeEventListener("keydown", handleCloseCustomerActions);
-    };
-  }, [customerActionsOpen]);
 
     const paymentMethodOptions: Array<{ value: PaymentCollectionMethod; label: string }> = [
       { value: "cash", label: locale === "ar" ? "نقداً" : "Cash" },
