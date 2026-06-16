@@ -1124,6 +1124,12 @@ class TenantApiClient {
     startTime?: string;
     notes?: string;
     paymentMethod?: string;
+    paymentAllocations?: Array<{
+      paymentMethod: string;
+      amount: number;
+      giftCardCode?: string;
+      notes?: string;
+    }>;
     platformUserId?: string;
     bookingSessionId?: string | null;
     bookingReference?: string | null;

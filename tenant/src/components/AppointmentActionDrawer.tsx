@@ -87,6 +87,15 @@ interface BookingDraftItem {
   discountValue?: number | null;
 }
 
+type PaymentCollectionMethod = "cash" | "card_pos" | "wallet" | "bank_transfer" | "gift_card_code";
+
+interface PaymentCollectionRow {
+  id: string;
+  paymentMethod: PaymentCollectionMethod;
+  amount: string;
+  giftCardCode: string;
+}
+
 export interface AppointmentActionDrawerPrefill {
   customer?: PrefillCustomer | null;
   serviceId?: string;
@@ -341,6 +350,8 @@ export function AppointmentActionDrawer({
   const [appointmentDate, setAppointmentDate] = useState(getTodayDateKey());
   const [appointmentTime, setAppointmentTime] = useState("10:00");
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentCollectionMode, setPaymentCollectionMode] = useState<"single" | "customized">("single");
+  const [paymentCollectionRows, setPaymentCollectionRows] = useState<PaymentCollectionRow[]>([]);
   const [notes, setNotes] = useState("");
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
   const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
@@ -420,6 +431,8 @@ export function AppointmentActionDrawer({
       setAppointmentDate(prefill?.date || defaultDate || getTodayDateKey());
       setAppointmentTime(prefill?.time || defaultTime || "10:00");
       setPaymentMethod(prefill?.paymentMethod || "");
+      setPaymentCollectionMode("single");
+      setPaymentCollectionRows([]);
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
       setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
@@ -606,6 +619,19 @@ export function AppointmentActionDrawer({
       : paymentMethod === "booking-fee"
         ? (locale === "ar" ? "عربون الحجز" : "Booking Fee")
         : paymentMethod;
+  const paymentCollectionMethodOptions: Array<{ value: PaymentCollectionMethod; label: string }> = [
+    { value: "cash", label: locale === "ar" ? "نقداً" : "Cash" },
+    { value: "card_pos", label: locale === "ar" ? "بطاقة عند المركز" : "Card POS" },
+    { value: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
+    { value: "bank_transfer", label: locale === "ar" ? "تحويل بنكي" : "Bank transfer" },
+    { value: "gift_card_code", label: locale === "ar" ? "رمز بطاقة هدية" : "Gift card code" }
+  ];
+  const createPaymentCollectionRow = (overrides?: Partial<PaymentCollectionRow>): PaymentCollectionRow => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    paymentMethod: overrides?.paymentMethod || "cash",
+    amount: overrides?.amount || "0.00",
+    giftCardCode: overrides?.giftCardCode || ""
+  });
   const customerModeLabel = customerMode === "existing"
     ? (locale === "ar" ? "عميل موجود" : "Existing customer")
     : customerMode === "new"
@@ -783,6 +809,32 @@ export function AppointmentActionDrawer({
   );
   const queuedServicesDiscountTotal = toSafeMoneyNumber(Math.max(0, queuedServicesBaseTotal - queuedServicesSubtotal));
   const queuedServicesTotal = toSafeMoneyNumber(queuedServicesSubtotal + guestServicePrice);
+  const paymentCollectionTotal = paymentCollectionRows.reduce((sum, row) => sum + toSafeMoneyNumber(row.amount || 0), 0);
+  const paymentCollectionMismatch = paymentCollectionMode === "customized" && paymentCollectionRows.length > 0
+    ? Math.abs(paymentCollectionTotal - queuedServicesTotal) > 0.01
+    : false;
+  const updatePaymentCollectionRow = (rowId: string, patch: Partial<PaymentCollectionRow>) => {
+    setPaymentCollectionRows((current) => current.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
+  };
+  const addPaymentCollectionRow = () => {
+    setPaymentCollectionRows((current) => [...current, createPaymentCollectionRow()]);
+  };
+  const removePaymentCollectionRow = (rowId: string) => {
+    setPaymentCollectionRows((current) => (current.length > 1 ? current.filter((row) => row.id !== rowId) : current));
+  };
+  const enableCustomizedPaymentCollection = () => {
+    setPaymentCollectionMode("customized");
+    setPaymentCollectionRows((current) => {
+      if (current.length > 0) {
+        return current;
+      }
+      return [createPaymentCollectionRow({ amount: queuedServicesTotal > 0 ? queuedServicesTotal.toFixed(2) : "0.00" })];
+    });
+  };
+  const disableCustomizedPaymentCollection = () => {
+    setPaymentCollectionMode("single");
+    setPaymentCollectionRows([]);
+  };
 
   const addQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
     const trimmedServiceId = `${serviceId || ""}`.trim();
@@ -1061,9 +1113,35 @@ export function AppointmentActionDrawer({
         throw new Error(locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please choose at least one service.");
       }
 
+      const normalizedPaymentAllocations = paymentCollectionMode === "customized"
+        ? paymentCollectionRows
+            .map((row) => ({
+              paymentMethod: row.paymentMethod,
+              amount: toSafeMoneyNumber(row.amount),
+              giftCardCode: row.paymentMethod === "gift_card_code" ? row.giftCardCode.trim() : undefined
+            }))
+            .filter((row) => row.amount > 0)
+        : [];
+
+      if (paymentCollectionMode === "customized") {
+        if (normalizedPaymentAllocations.length === 0) {
+          throw new Error(locale === "ar" ? "أضف طريقة دفع واحدة على الأقل." : "Add at least one payment method.");
+        }
+
+        const allocationsTotal = normalizedPaymentAllocations.reduce((sum, row) => sum + row.amount, 0);
+        if (Math.abs(allocationsTotal - queuedServicesTotal) > 0.01) {
+          throw new Error(locale === "ar" ? "يجب أن يساوي مجموع طرق الدفع إجمالي الموعد." : "The payment split must match the appointment total.");
+        }
+
+        if (normalizedPaymentAllocations.some((row) => row.paymentMethod === "gift_card_code" && !row.giftCardCode)) {
+          throw new Error(locale === "ar" ? "أدخل رمز بطاقة الهدية لكل سطر يستخدم هذه الطريقة." : "Enter a gift card code for every gift card payment row.");
+        }
+      }
+
       const payload = {
         notes: notes.trim() || undefined,
         paymentMethod: resolvedPaymentMethod,
+        paymentAllocations: normalizedPaymentAllocations.length > 0 ? normalizedPaymentAllocations : undefined,
         bookingSessionId: prefill?.bookingSessionId || undefined,
         bookingReference: prefill?.bookingReference || undefined,
         items: bookingItems,
@@ -2048,6 +2126,128 @@ export function AppointmentActionDrawer({
                             ))}
                           </div>
 
+                          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                                  {locale === "ar" ? "خطة التحصيل" : "Payment collection plan"}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-500">
+                                  {locale === "ar"
+                                    ? "يمكنك تسجيل وسيلة واحدة أو تقسيم المبلغ بين عدة وسائل."
+                                    : "You can record one method or split the amount across multiple methods."}
+                                </p>
+                              </div>
+                              <div className="inline-flex rounded-full border border-gray-200 bg-gray-50 p-1">
+                                <button
+                                  type="button"
+                                  onClick={disableCustomizedPaymentCollection}
+                                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                                    paymentCollectionMode === "single" ? "bg-primary text-white" : "text-gray-700"
+                                  }`}
+                                >
+                                  {locale === "ar" ? "طريقة واحدة" : "Single"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={enableCustomizedPaymentCollection}
+                                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                                    paymentCollectionMode === "customized" ? "bg-primary text-white" : "text-gray-700"
+                                  }`}
+                                >
+                                  {locale === "ar" ? "مخصصة" : "Customized"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {paymentCollectionMode === "customized" ? (
+                              <div className="mt-4 space-y-3">
+                                {paymentCollectionRows.map((row, index) => (
+                                  <div key={row.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                                    <div className="grid gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
+                                      <label className="block">
+                                        <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                                          {locale === "ar" ? "طريقة الدفع" : "Payment method"}
+                                        </span>
+                                        <select
+                                          value={row.paymentMethod}
+                                          onChange={(event) => updatePaymentCollectionRow(row.id, { paymentMethod: event.target.value as PaymentCollectionMethod })}
+                                          className="w-full rounded-2xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        >
+                                          {paymentCollectionMethodOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <label className="block">
+                                        <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                                          {locale === "ar" ? "المبلغ" : "Amount"}
+                                        </span>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={row.amount}
+                                          onChange={(event) => updatePaymentCollectionRow(row.id, { amount: event.target.value })}
+                                          className="w-full rounded-2xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                      </label>
+                                    </div>
+                                    {row.paymentMethod === "gift_card_code" ? (
+                                      <label className="mt-3 block">
+                                        <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                                          {locale === "ar" ? "رمز بطاقة الهدية" : "Gift card code"}
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={row.giftCardCode}
+                                          onChange={(event) => updatePaymentCollectionRow(row.id, { giftCardCode: event.target.value })}
+                                          placeholder={locale === "ar" ? "أدخل الرمز" : "Enter code"}
+                                          className="w-full rounded-2xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                      </label>
+                                    ) : null}
+                                    <div className="mt-3 flex items-center justify-between gap-3">
+                                      <p className="text-xs text-gray-500">
+                                        {locale === "ar" ? `السطر ${index + 1}` : `Row ${index + 1}`}
+                                      </p>
+                                      {paymentCollectionRows.length > 1 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => removePaymentCollectionRow(row.id)}
+                                          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                                        >
+                                          {locale === "ar" ? "حذف" : "Remove"}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                ))}
+
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={addPaymentCollectionRow}
+                                    className="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary/40 hover:bg-purple-50"
+                                  >
+                                    {locale === "ar" ? "إضافة طريقة" : "Add method"}
+                                  </button>
+                                  <div className="text-sm font-semibold text-gray-700">
+                                    {locale === "ar" ? "المجموع الحالي" : "Current total"}: <Currency amount={paymentCollectionTotal} />
+                                  </div>
+                                </div>
+
+                                {paymentCollectionMismatch ? (
+                                  <p className="text-sm font-medium text-amber-700">
+                                    {locale === "ar"
+                                      ? "يجب أن يساوي مجموع طرق الدفع إجمالي الموعد."
+                                      : "The payment split must match the appointment total."}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+
                           <p className="mt-3 text-xs text-gray-500">
                             {locale === "ar"
                               ? "إذا لم تحدد طريقة، سنستخدم أول خيار متاح."
@@ -2211,7 +2411,7 @@ export function AppointmentActionDrawer({
                     <button
                       type="button"
                       onClick={() => void handleAppointmentSubmit("at-center")}
-                      disabled={saving || Boolean(queuePreviewWarning)}
+                      disabled={saving || Boolean(queuePreviewWarning) || paymentCollectionMismatch}
                       className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {saving
@@ -2221,7 +2421,7 @@ export function AppointmentActionDrawer({
                     <button
                       type="button"
                       onClick={() => void handleAppointmentSubmit("online-full")}
-                      disabled={saving || Boolean(queuePreviewWarning)}
+                      disabled={saving || Boolean(queuePreviewWarning) || paymentCollectionMismatch}
                       className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {saving
@@ -2231,7 +2431,7 @@ export function AppointmentActionDrawer({
                     <button
                       type="button"
                       onClick={() => void handleAppointmentSubmit()}
-                      disabled={saving || Boolean(queuePreviewWarning)}
+                      disabled={saving || Boolean(queuePreviewWarning) || paymentCollectionMismatch}
                       className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {saving
