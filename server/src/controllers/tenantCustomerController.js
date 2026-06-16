@@ -76,6 +76,7 @@ function formatPaymentMethodLabel(paymentMethod) {
         wallet: 'Wallet',
         bank_transfer: 'Bank transfer',
         gift_card_code: 'Gift card code',
+        split: 'Split payment',
         pay_on_visit: 'Pay on visit',
         cash_on_delivery: 'Cash on delivery'
     }[paymentMethod] || paymentMethod || 'Not set');
@@ -131,9 +132,10 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
       || record.transactionRef
       || record.id;
   const processedAt = record.processedAt || record.createdAt || record.date;
+  const metadataPaymentMethod = record.metadata?.paymentMethod || record.metadata?.paymentSummaryMethod || null;
   const paymentMethodValue = typeof record.paymentMethod === 'string'
       ? record.paymentMethod
-      : (record.paymentMethod?.type || appointment?.paymentMethod || order?.paymentMethod || 'cash');
+      : (record.paymentMethod?.type || metadataPaymentMethod || appointment?.paymentMethod || order?.paymentMethod || 'cash');
   const normalizedAppointmentPayment = appointment
       ? normalizeAppointmentPaymentState(appointment, record.source || 'transaction')
       : null;

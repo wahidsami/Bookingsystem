@@ -175,43 +175,76 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
         fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
     });
 
-    await createAppointmentPaymentTransactions({
-        appointment,
-        type: 'remainder',
-        amount,
-        paymentMethod: paymentMethod || appointment.paymentMethod || 'cash',
-        paymentAllocations: normalizedAllocations,
-        processedBy,
-        transactionRef: transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
-        notes,
-        source: 'tenant_remainder_collection'
-    });
-
-    // Update appointment
-    const newTotalPaid = parseFloat(appointment.totalPaid) + parseFloat(amount);
-    const resolvedPaymentMethod = normalizedAllocations.length > 1
-        ? 'split'
-        : normalizedAllocations[0]?.paymentMethod || paymentMethod || appointment.paymentMethod || 'cash';
-
-    await appointment.update({
-        paymentMethod: resolvedPaymentMethod,
-        remainderPaid: true,
-        remainderAmount: 0,
-        totalPaid: newTotalPaid,
-        paymentStatus: 'fully_paid',
-        paidAt: appointment.paidAt || new Date()
-    });
-
-    const invoice = await ensureAppointmentInvoice(appointment.id, {
-        triggerSource: 'tenant_remainder_collection'
-    });
-    if (invoice?.id) {
-        sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
-            console.warn('Remainder payment invoice email warning:', error.message);
+    return db.sequelize.transaction(async (transaction) => {
+        await createAppointmentPaymentTransactions({
+            appointment,
+            type: 'remainder',
+            amount,
+            paymentMethod: paymentMethod || appointment.paymentMethod || 'cash',
+            paymentAllocations: normalizedAllocations,
+            processedBy,
+            transactionRef: transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+            notes,
+            source: 'tenant_remainder_collection',
+            transaction
         });
-    }
 
-    return appointment;
+        const resolvedPaymentMethod = normalizedAllocations.length > 1
+            ? 'split'
+            : normalizedAllocations[0]?.paymentMethod || paymentMethod || appointment.paymentMethod || 'cash';
+        const numericAmount = parseFloat(amount);
+        const platformFee = parseFloat((numericAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((numericAmount - platformFee).toFixed(2));
+        const paymentTransactionRef = transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
+
+        await db.Transaction.create({
+            platformUserId: appointment.platformUserId,
+            tenantId: appointment.tenantId,
+            appointmentId: appointment.id,
+            amount: numericAmount,
+            currency: 'SAR',
+            type: 'booking',
+            status: 'completed',
+            platformFee,
+            tenantRevenue,
+            metadata: {
+                source: 'tenant_remainder_collection',
+                paymentMethod: resolvedPaymentMethod,
+                paymentAllocations: normalizedAllocations,
+                paymentTransactionRef,
+                notes: notes || null
+            }
+        }, { transaction });
+
+        const newTotalPaid = parseFloat(appointment.totalPaid) + numericAmount;
+        await appointment.update({
+            paymentMethod: resolvedPaymentMethod,
+            remainderPaid: true,
+            remainderAmount: 0,
+            totalPaid: newTotalPaid,
+            paymentStatus: 'fully_paid',
+            paidAt: appointment.paidAt || new Date()
+        }, { transaction });
+
+        const invoice = await ensureAppointmentInvoice(appointment.id, {
+            transaction,
+            triggerSource: 'tenant_remainder_collection'
+        });
+
+        return {
+            appointment,
+            invoice,
+            paymentTransactionRef
+        };
+    }).then(({ appointment: updatedAppointment, invoice }) => {
+        if (invoice?.id) {
+            sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
+                console.warn('Remainder payment invoice email warning:', error.message);
+            });
+        }
+
+        return updatedAppointment;
+    });
 };
 
 /**
