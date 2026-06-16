@@ -1621,7 +1621,9 @@ export function AppointmentDetailsDrawer({
     };
 
     const paymentCollectionTotal = paymentCollectionRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    const paymentCollectionMismatch = Math.abs(paymentCollectionTotal - paymentDueAmount) > 0.01;
+    const paymentCollectionDifference = paymentCollectionTotal - paymentDueAmount;
+    const paymentCollectionMismatch = Math.abs(paymentCollectionDifference) > 0.01;
+    const paymentCollectionDifferenceLabel = `${paymentCollectionDifference > 0 ? "+" : ""}${paymentCollectionDifference.toFixed(2)}`;
 
     const submitPaymentCollection = async () => {
       if (!appointment || paymentCollectionSubmitting) return;
@@ -2241,6 +2243,25 @@ export function AppointmentDetailsDrawer({
                           <span className="text-gray-600">{locale === "ar" ? "المجموع الحالي" : "Current split total"}</span>
                           <Currency amount={paymentCollectionTotal} className="font-semibold text-gray-900" />
                         </div>
+                        <div
+                          className={`mt-3 rounded-2xl border px-3 py-2 text-xs font-semibold ${
+                            paymentCollectionMismatch
+                              ? "border-amber-200 bg-amber-50 text-amber-800"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {paymentCollectionMismatch
+                            ? (
+                              locale === "ar"
+                                ? `الفرق الحالي ${paymentCollectionDifferenceLabel} SAR. عدّل المبالغ حتى يساوي الإجمالي المبلغ المستحق.`
+                                : `Current difference is ${paymentCollectionDifferenceLabel} SAR. Adjust the rows until the total matches the amount due.`
+                            )
+                            : (
+                              locale === "ar"
+                                ? "الإجمالي يطابق المبلغ المستحق."
+                                : "The split total matches the amount due."
+                            )}
+                        </div>
                       </div>
 
                       <div className="space-y-3">
@@ -2339,8 +2360,8 @@ export function AppointmentDetailsDrawer({
                       {paymentCollectionMismatch ? (
                         <p className="text-sm font-medium text-amber-700">
                           {locale === "ar"
-                            ? "يجب أن يساوي مجموع الطرق المبلغ المستحق."
-                            : "The split total must match the amount due."}
+                            ? "لا يمكن تطبيق الدفع قبل أن يساوي الإجمالي المبلغ المستحق."
+                            : "You cannot apply payment until the total matches the amount due."}
                         </p>
                       ) : null}
                     </div>
@@ -2429,7 +2450,7 @@ export function AppointmentDetailsDrawer({
 
     return (
       <div className="h-full p-3 lg:p-4">
-        <div className="grid h-full gap-4 xl:grid-cols-[320px_220px_minmax(0,1fr)]">
+        <div className="grid h-full gap-4 xl:grid-cols-[360px_240px_minmax(0,1fr)]">
           <div className="space-y-4">
             <WorkspacePanel
               title={locale === "ar" ? "الملف الشخصي" : "Customer profile"}
@@ -2491,6 +2512,36 @@ export function AppointmentDetailsDrawer({
                     >
                       {locale === "ar" ? "الملف" : "Profile"}
                     </button>
+                  </div>
+                  <div className="mt-4 grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "الانضمام" : "Joined"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-gray-900">
+                        {customerProfile?.joinedAt ? formatDateTime(customerProfile.joinedAt, locale).split(",")[0] || "-" : "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "اللغة" : "Language"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-gray-900">
+                        {customerProfile?.preferredLanguage ? customerProfile.preferredLanguage.toUpperCase() : "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "النوع" : "Gender"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-gray-900 capitalize">{customerProfile?.gender || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "الحجوزات" : "Bookings"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
+                    </div>
                   </div>
                   {customerActionsOpen && customerActionsMenuStyle ? (
                     <div
@@ -3264,7 +3315,7 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl lg:top-[88px] lg:h-[calc(100dvh-88px)]`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl lg:top-[88px] lg:h-[calc(100dvh-88px)] lg:max-w-[72rem] 2xl:max-w-[80rem]`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col overflow-hidden">
