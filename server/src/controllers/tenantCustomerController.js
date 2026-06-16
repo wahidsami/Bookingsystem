@@ -87,6 +87,12 @@ function formatTransactionTitle(record) {
         return 'Refund';
     }
 
+    if (record.kind === 'booking_session') {
+        return record.bookingSession?.bookingReference
+            ? `Booking #${record.bookingSession.bookingReference}`
+            : 'Booking payment';
+    }
+
     if (record.source === 'transaction') {
         if (record.kind === 'appointment') {
             return record.appointment?.service
@@ -111,6 +117,17 @@ function formatTransactionTitle(record) {
 }
 
 function formatTransactionSubtitle(record, locale = 'en') {
+    if (record.kind === 'booking_session') {
+        const serviceCount = Array.isArray(record.bookingSession?.appointments)
+            ? record.bookingSession.appointments.length
+            : 0;
+        return serviceCount > 0
+            ? (locale === 'ar'
+                ? `${serviceCount} خدمة`
+                : `${serviceCount} service${serviceCount === 1 ? '' : 's'}`)
+            : record.bookingSession?.bookingReference || record.reference || '';
+    }
+
     if (record.kind === 'appointment') {
         return record.appointment?.staff?.name || record.appointment?.bookingNumber || record.reference || '';
     }
@@ -129,9 +146,11 @@ function formatTransactionSubtitle(record, locale = 'en') {
 function mapCustomerTransactionRecord(record, locale = 'en') {
   const appointment = record.appointment || null;
   const order = record.order || null;
-  const entityType = record.kind || (appointment ? 'appointment' : 'order');
+  const bookingSession = record.bookingSession || null;
+  const entityType = record.kind || (bookingSession ? 'booking_session' : appointment ? 'appointment' : 'order');
   const reference = record.reference
         || appointment?.bookingNumber
+      || bookingSession?.bookingReference
       || order?.orderNumber
       || record.transactionRef
       || record.id;
@@ -148,10 +167,10 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
     id: record.id,
     source: record.source || 'transaction',
         entityType,
-        entityId: record.entityId || appointment?.id || order?.id || null,
+        entityId: record.entityId || bookingSession?.id || appointment?.id || order?.id || null,
         reference,
-        title: formatTransactionTitle({ ...record, appointment, order }),
-        subtitle: formatTransactionSubtitle({ ...record, appointment, order }, locale),
+        title: formatTransactionTitle({ ...record, appointment, order, bookingSession }),
+        subtitle: formatTransactionSubtitle({ ...record, appointment, order, bookingSession }, locale),
     amount: parseFloat(record.amount || 0),
     currency: record.currency || 'SAR',
     type: record.type || 'booking',
@@ -166,7 +185,9 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
         notes: record.notes || null,
         processedAt,
         processorName: record.processor?.name || null,
-        detailPath: appointment
+        detailPath: bookingSession?.appointments?.[0]?.id
+            ? `/dashboard/appointments/${bookingSession.appointments[0].id}`
+            : appointment
             ? `/dashboard/appointments/${appointment.id}`
             : order?.id
                 ? `/dashboard/orders/${order.id}`
@@ -1372,6 +1393,28 @@ exports.getCustomerTransactions = async (req, res) => {
                         ]
                     },
                     {
+                        model: db.BookingSession,
+                        as: 'bookingSession',
+                        attributes: ['id', 'bookingReference', 'status', 'paymentMethod', 'itemCount', 'totalAmount', 'createdAt'],
+                        required: false,
+                        include: [
+                            {
+                                model: db.Appointment,
+                                as: 'appointments',
+                                attributes: ['id', 'bookingNumber', 'startTime', 'paymentStatus', 'status', 'paymentMethod', 'price'],
+                                required: false,
+                                include: [
+                                    {
+                                        model: db.Service,
+                                        as: 'service',
+                                        attributes: ['id', 'name_en', 'name_ar', 'duration'],
+                                        required: false
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
                         model: db.Order,
                         as: 'order',
                         attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'estimatedDeliveryDate'],
@@ -1480,8 +1523,8 @@ exports.getCustomerTransactions = async (req, res) => {
         const appointmentTransactionIds = new Set();
 
         gatewayTransactions.forEach((transaction) => {
-            const entityType = transaction.appointment ? 'appointment' : 'order';
-            const entityId = transaction.appointment?.id || transaction.order?.id || transaction.id;
+            const entityType = transaction.bookingSession ? 'booking_session' : (transaction.appointment ? 'appointment' : 'order');
+            const entityId = transaction.bookingSession?.id || transaction.appointment?.id || transaction.order?.id || transaction.id;
             const key = `gateway:${entityType}:${entityId}:${transaction.type}:${transaction.amount}:${transaction.status}`;
 
             if (seenRecords.has(key)) {
@@ -1492,14 +1535,22 @@ exports.getCustomerTransactions = async (req, res) => {
             if (transaction.appointment?.id) {
                 appointmentTransactionIds.add(transaction.appointment.id);
             }
+            if (Array.isArray(transaction.bookingSession?.appointments)) {
+                transaction.bookingSession.appointments.forEach((bookingAppointment) => {
+                    if (bookingAppointment?.id) {
+                        appointmentTransactionIds.add(bookingAppointment.id);
+                    }
+                });
+            }
             transactions.push(mapCustomerTransactionRecord({
                 id: transaction.id,
                 source: 'transaction',
                 kind: entityType,
                 entityId,
                 appointment: transaction.appointment,
+                bookingSession: transaction.bookingSession,
                 order: transaction.order,
-                reference: transaction.appointment?.bookingNumber || transaction.order?.orderNumber || transaction.transactionRef || transaction.id,
+                reference: transaction.appointment?.bookingNumber || transaction.bookingSession?.bookingReference || transaction.order?.orderNumber || transaction.transactionRef || transaction.id,
                 amount: transaction.amount,
                 currency: transaction.currency,
                 type: transaction.type,
@@ -1509,7 +1560,9 @@ exports.getCustomerTransactions = async (req, res) => {
                 notes: transaction.failureReason || transaction.notes || null,
                 processedAt: transaction.createdAt,
                 processor: transaction.paymentMethod?.user || null,
-                detailPath: transaction.appointment
+                detailPath: transaction.bookingSession?.appointments?.[0]?.id
+                    ? `/dashboard/appointments/${transaction.bookingSession.appointments[0].id}`
+                    : transaction.appointment
                     ? `/dashboard/appointments/${transaction.appointment.id}`
                     : transaction.order?.id
                         ? `/dashboard/orders/${transaction.order.id}`
@@ -1518,8 +1571,8 @@ exports.getCustomerTransactions = async (req, res) => {
         });
 
         ledgerTransactions.forEach((transaction) => {
-            const entityType = transaction.appointment ? 'appointment' : 'order';
-            const entityId = transaction.appointment?.id || transaction.order?.id || transaction.id;
+            const entityType = transaction.bookingSession ? 'booking_session' : (transaction.appointment ? 'appointment' : 'order');
+            const entityId = transaction.bookingSession?.id || transaction.appointment?.id || transaction.order?.id || transaction.id;
             const key = `ledger:${entityType}:${entityId}:${transaction.type}:${transaction.amount}:${transaction.status}`;
 
             if (seenRecords.has(key)) {
@@ -1530,14 +1583,22 @@ exports.getCustomerTransactions = async (req, res) => {
             if (transaction.appointment?.id) {
                 appointmentTransactionIds.add(transaction.appointment.id);
             }
+            if (Array.isArray(transaction.bookingSession?.appointments)) {
+                transaction.bookingSession.appointments.forEach((bookingAppointment) => {
+                    if (bookingAppointment?.id) {
+                        appointmentTransactionIds.add(bookingAppointment.id);
+                    }
+                });
+            }
             transactions.push(mapCustomerTransactionRecord({
                 id: transaction.id,
                 source: 'ledger',
                 kind: entityType,
                 entityId,
                 appointment: transaction.appointment,
+                bookingSession: transaction.bookingSession,
                 order: transaction.order,
-                reference: transaction.appointment?.bookingNumber || transaction.order?.orderNumber || transaction.transactionRef || transaction.id,
+                reference: transaction.appointment?.bookingNumber || transaction.bookingSession?.bookingReference || transaction.order?.orderNumber || transaction.transactionRef || transaction.id,
                 amount: transaction.amount,
                 currency: transaction.currency,
                 type: transaction.type,
@@ -1547,7 +1608,9 @@ exports.getCustomerTransactions = async (req, res) => {
                 notes: transaction.notes || null,
                 processedAt: transaction.processedAt,
                 processor: transaction.processor,
-                detailPath: transaction.appointment
+                detailPath: transaction.bookingSession?.appointments?.[0]?.id
+                    ? `/dashboard/appointments/${transaction.bookingSession.appointments[0].id}`
+                    : transaction.appointment
                     ? `/dashboard/appointments/${transaction.appointment.id}`
                     : transaction.order?.id
                         ? `/dashboard/orders/${transaction.order.id}`

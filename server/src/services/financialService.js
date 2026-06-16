@@ -555,11 +555,12 @@ class FinancialService {
         t.name as tenant_name,
         CASE
           WHEN tr.type = 'refund' THEN 'refund'
+          WHEN bs.id IS NOT NULL THEN 'booking'
           WHEN a.id IS NOT NULL THEN 'appointment'
           WHEN o.id IS NOT NULL THEN 'product'
           ELSE 'other'
         END as transaction_type,
-        COALESCE(s.name_en, o."orderNumber", 'N/A') as item_name,
+        COALESCE(bs."bookingReference", s.name_en, o."orderNumber", 'N/A') as item_name,
         ROUND(CAST(tr.amount as NUMERIC), 2) as amount,
         ROUND(CAST(tr."platformFee" as NUMERIC), 2) as your_fee,
         ROUND(CAST(tr."tenantRevenue" as NUMERIC), 2) as tenant_revenue,
@@ -567,6 +568,7 @@ class FinancialService {
         COALESCE(tr.metadata->>'paymentMethod', 'N/A') as "paymentMethod"
       FROM transactions tr
       JOIN tenants t ON tr."tenantId" = t.id
+      LEFT JOIN booking_sessions bs ON tr."bookingSessionId" = bs.id
       LEFT JOIN appointments a ON tr."appointmentId" = a.id
       LEFT JOIN services s ON a."serviceId" = s.id
       LEFT JOIN orders o ON tr.order_id = o.id

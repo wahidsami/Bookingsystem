@@ -37,6 +37,18 @@ const normalizeNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const BOOKING_CHECKOUT_PAYMENT_METHODS = new Set([
+    'cash',
+    'card_pos',
+    'wallet',
+    'bank_transfer',
+    'gift_card_code',
+    'online',
+    'split'
+]);
+
+const normalizeCheckoutPaymentMethod = (method) => `${method || ''}`.trim().toLowerCase();
+
 const resolveDiscountAmount = (baseRawPrice, discountType, discountValue) => {
     const amount = normalizeNumber(baseRawPrice, 0);
     if (amount <= 0) {
@@ -733,6 +745,54 @@ class BookingService {
                     bookingPaymentPlan: paymentPlanMetadata
                 }
             }, { transaction: finalTransaction });
+
+            const checkoutPaymentMethod = paymentPlanMetadata.paymentCollectionMode === 'customized'
+                ? 'split'
+                : normalizeCheckoutPaymentMethod(paymentMethod || sessionPaymentMethod);
+            const bookingCheckoutAmount = paymentPlanMetadata.paymentCollectionMode === 'customized'
+                ? totalAmount
+                : (checkoutPaymentMethod === 'booking-fee' ? bookingFeeAmount : totalAmount);
+            const shouldRecordBookingTransaction = paymentPlanMetadata.paymentCollectionMode === 'customized'
+                || BOOKING_CHECKOUT_PAYMENT_METHODS.has(checkoutPaymentMethod)
+                || checkoutPaymentMethod === 'booking-fee';
+
+            if (shouldRecordBookingTransaction && Number(bookingCheckoutAmount) > 0) {
+                const bookingPaymentTransactionRef = `APT-BOOKING-${session.bookingReference || session.id.slice(0, 8).toUpperCase()}`;
+                const bookingCheckoutTotal = parseFloat(Number(bookingCheckoutAmount).toFixed(2));
+                const bookingPlatformFee = checkoutPaymentMethod === 'booking-fee'
+                    ? parseFloat((platformFee * (bookingCheckoutTotal / Math.max(totalAmount, 0.01))).toFixed(2))
+                    : parseFloat(platformFee.toFixed(2));
+                const bookingTenantRevenue = parseFloat((bookingCheckoutTotal - bookingPlatformFee).toFixed(2));
+
+                await db.Transaction.create({
+                    platformUserId,
+                    tenantId,
+                    bookingSessionId: session.id,
+                    amount: bookingCheckoutTotal,
+                    currency: 'SAR',
+                    type: 'booking',
+                    status: 'completed',
+                    platformFee: bookingPlatformFee,
+                    tenantRevenue: bookingTenantRevenue,
+                    metadata: {
+                        source: 'tenant_booking_checkout',
+                        paymentMethod: checkoutPaymentMethod,
+                        paymentAllocations: paymentPlanMetadata.paymentAllocations,
+                        bookingReference: session.bookingReference,
+                        bookingPaymentTransactionRef,
+                        notes: normalizedNotes || null
+                    }
+                }, { transaction: finalTransaction });
+
+                await session.update({
+                    metadata: {
+                        ...(session.metadata && typeof session.metadata === 'object' ? session.metadata : {}),
+                        bookingPaymentPlan: paymentPlanMetadata,
+                        bookingPaymentTransactionRef,
+                        bookingPaymentAmount: bookingCheckoutTotal
+                    }
+                }, { transaction: finalTransaction });
+            }
 
             const paymentSummary = {
                 atCenterAmount: parseFloat(atCenterAmount.toFixed(2)),

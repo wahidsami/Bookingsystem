@@ -19,6 +19,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'appointment'
             });
 
+            Transaction.belongsTo(models.BookingSession, {
+                foreignKey: 'bookingSessionId',
+                as: 'bookingSession'
+            });
+
             Transaction.belongsTo(models.Order, {
                 foreignKey: 'orderId',
                 as: 'order'
@@ -58,6 +63,14 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             references: {
                 model: 'appointments',
+                key: 'id'
+            }
+        },
+        bookingSessionId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'booking_sessions',
                 key: 'id'
             }
         },
@@ -124,7 +137,19 @@ module.exports = (sequelize, DataTypes) => {
         tableName: 'transactions',
         schema: 'public',
         timestamps: true,
-        underscored: false
+        underscored: false,
+        validate: {
+            hasReference() {
+                const references = [this.appointmentId, this.bookingSessionId, this.orderId].filter(Boolean);
+                if (references.length === 0) {
+                    throw new Error('Must have either appointmentId, bookingSessionId, or orderId');
+                }
+
+                if (references.length > 1) {
+                    throw new Error('Cannot have more than one transaction reference');
+                }
+            }
+        }
     });
 
     return Transaction;

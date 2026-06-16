@@ -600,6 +600,9 @@ const ensurePaymentTransactionSchema = async () => {
             DECLARE
                 payment_method_udt_name TEXT;
             BEGIN
+                ALTER TABLE public.transactions
+                    ADD COLUMN IF NOT EXISTS "bookingSessionId" UUID NULL;
+
                 SELECT c.udt_name
                 INTO payment_method_udt_name
                 FROM information_schema.columns c
@@ -615,6 +618,10 @@ const ensurePaymentTransactionSchema = async () => {
                         WHEN duplicate_object THEN NULL;
                     END;
                 END IF;
+
+                CREATE INDEX IF NOT EXISTS idx_transactions_booking_session
+                    ON public.transactions ("bookingSessionId")
+                    WHERE "bookingSessionId" IS NOT NULL;
             END $$;
         `);
 
