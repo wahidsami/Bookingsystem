@@ -1469,9 +1469,9 @@ export function AppointmentDetailsDrawer({
           </button>
         </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white px-3.5 py-4 shadow-sm">
+        <div className="rounded-[28px] border border-gray-200 bg-white px-3 py-3.5 shadow-sm">
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-base font-semibold text-gray-900">
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-900">
               {customerAvatarSrc ? (
                 <img src={customerAvatarSrc} alt={customerDisplayName} className="h-full w-full object-cover" />
               ) : (
@@ -1498,65 +1498,17 @@ export function AppointmentDetailsDrawer({
                 </span>
               ) : null}
             </div>
-            <div className="mt-4 grid w-full grid-cols-2 gap-2.5">
-              <Link
-                href={customerProfileLink}
-                onClick={onClose}
-                className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-              >
-                {locale === "ar" ? "الملف" : "Profile"}
-              </Link>
-              <div className="relative">
-                <button
-                  type="button"
-                  ref={moreActionsButtonRef}
-                  onClick={() => {
-                    setMoreActionsOpen((current) => {
-                      const nextOpen = !current;
-                      if (nextOpen && moreActionsButtonRef.current) {
-                        const rect = moreActionsButtonRef.current.getBoundingClientRect();
-                        const menuWidth = 224;
-                        const left = Math.max(12, Math.min(rect.left, window.innerWidth - menuWidth - 12));
-                        setMoreActionsMenuStyle({
-                          top: rect.bottom + 8,
-                          left
-                        });
-                      } else {
-                        setMoreActionsMenuStyle(null);
-                      }
-                      return nextOpen;
-                    });
-                  }}
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                >
-                  {locale === "ar" ? "الإجراءات" : "Actions"}
-                </button>
-                {moreActionsOpen ? (
-                  <div
-                    className="fixed z-[120] w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl"
-                    style={moreActionsMenuStyle ? { top: moreActionsMenuStyle.top, left: moreActionsMenuStyle.left } : undefined}
-                  >
-                    {[
-                      { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
-                      { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
-                      { key: "mark_refunded", label: locale === "ar" ? "وضع علامة مسترد" : "Mark refunded" },
-                      { key: "open_full_page", label: locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page" }
-                    ].map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => triggerMoreAction(item.key as any)}
-                        className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                      >
-                        {item.label}
-                      </button>
-                    ))}
+                  <div className="mt-4">
+                    <Link
+                      href={customerProfileLink}
+                      onClick={onClose}
+                      className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "الملف" : "Profile"}
+                    </Link>
                   </div>
-                ) : null}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
 
         {customerIsWalkIn ? (
           <WorkspacePanel
@@ -1584,8 +1536,8 @@ export function AppointmentDetailsDrawer({
     );
 
     return (
-      <div className="h-full p-4 lg:p-5">
-        <div className="grid h-full gap-4 overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="h-full p-3 lg:p-4">
+        <div className="grid h-full gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="min-h-0 overflow-y-auto pr-1">
             {renderCustomerPanel()}
           </aside>
@@ -2113,6 +2065,9 @@ export function AppointmentDetailsDrawer({
 
   const renderCustomerWorkspace = () => {
     const customerWorkspaceLoading = customerLoading || (viewMode === "customer" && !!appointment?.user?.id && !customerProfile);
+    const customerProfileLink = customerId
+      ? `/${locale}/dashboard/customers/${customerId}`
+      : `/${locale}/dashboard/customers`;
 
     if (!customerProfile && !customerWorkspaceLoading) {
       return (
@@ -2140,8 +2095,8 @@ export function AppointmentDetailsDrawer({
     };
 
     return (
-      <div className="h-full p-4 lg:p-5">
-        <div className="grid h-full gap-5 xl:grid-cols-[340px_220px_minmax(0,1fr)]">
+      <div className="h-full p-3 lg:p-4">
+        <div className="grid h-full gap-4 xl:grid-cols-[280px_190px_minmax(0,1fr)]">
           <div className="space-y-4">
             <WorkspacePanel
               title={locale === "ar" ? "مساحة العميل" : "Customer workspace"}
@@ -2156,57 +2111,45 @@ export function AppointmentDetailsDrawer({
                 </button>
               }
             >
-              <div className={`flex items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <div className="min-w-0">
-                  <div className={`mt-4 flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
-                      {customerProfile?.profileImage ? (
-                        <img
-                          src={avatarUrl(customerProfile.profileImage)}
-                          alt={customerFullName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        `${customerProfile?.firstName?.[0] || ""}${customerProfile?.lastName?.[0] || ""}`.toUpperCase() || "?"
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">{customerFullName}</p>
-                      <p className="text-xs text-gray-500">
-                        {locale === "ar" ? "مساحة العميل" : "Customer workspace"}
-                      </p>
-                    </div>
+              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-3.5 shadow-sm">
+                <div className={`flex flex-col items-center text-center ${isRTL ? "rtl" : ""}`}>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-gray-200">
+                    {customerProfile?.profileImage ? (
+                      <img
+                        src={avatarUrl(customerProfile.profileImage)}
+                        alt={customerFullName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      `${customerProfile?.firstName?.[0] || ""}${customerProfile?.lastName?.[0] || ""}`.toUpperCase() || "?"
+                    )}
                   </div>
+                  <p className="mt-2 truncate text-sm font-semibold text-gray-900">{customerFullName}</p>
+                  <p className="mt-1 truncate text-sm text-gray-600">{customerProfile?.email || "-"}</p>
+                  <p className="mt-0.5 truncate text-sm text-gray-600">{customerProfile?.phone || "-"}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                    {customerProfile?.loyaltyTier ? (
+                      <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                        {customerProfile.loyaltyTier}
+                      </span>
+                    ) : null}
+                    {customerIsWalkIn ? (
+                      <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                        {locale === "ar" ? "حضور مباشر" : "Walk-in"}
+                      </span>
+                    ) : null}
+                  </div>
+            <div className="mt-4">
+              <Link
+                href={customerProfileLink}
+                onClick={onClose}
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                {locale === "ar" ? "الملف" : "Profile"}
+              </Link>
+            </div>
                 </div>
               </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <MetricTile label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={customerProfile?.totalBookings ?? 0} />
-                <MetricTile
-                  label={locale === "ar" ? "إجمالي المدفوع" : "Total spent"}
-                  value={<Currency amount={Number(customerProfile?.totalSpent || 0)} />}
-                />
-                <MetricTile
-                  label={locale === "ar" ? "أول زيارة" : "First visit"}
-                  value={customerProfile?.firstVisit ? formatDateTime(customerProfile.firstVisit, locale) : "-"}
-                />
-                <MetricTile
-                  label={locale === "ar" ? "آخر زيارة" : "Last visit"}
-                  value={customerProfile?.lastVisit ? formatDateTime(customerProfile.lastVisit, locale) : "-"}
-                />
-              </div>
-
-              <WorkspacePanel title={locale === "ar" ? "ملف العميل" : "Customer profile"} className="mt-4 bg-gray-50">
-                <div className="mt-3 grid grid-cols-1 gap-3">
-                  <MetricTile label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={customerProfile?.email || "-"} className="bg-white" />
-                  <MetricTile label={locale === "ar" ? "الهاتف" : "Phone"} value={customerProfile?.phone || "-"} className="bg-white" />
-                  <MetricTile
-                    label={locale === "ar" ? "اللغة" : "Language"}
-                    value={customerProfile?.preferredLanguage || "-"}
-                    className="bg-white"
-                  />
-                </div>
-              </WorkspacePanel>
 
               {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
                 <WorkspacePanel title={locale === "ar" ? "ملاحظات" : "Notes"}>
