@@ -83,6 +83,10 @@ function formatPaymentMethodLabel(paymentMethod) {
 }
 
 function formatTransactionTitle(record) {
+    if (record.type === 'refund') {
+        return 'Refund';
+    }
+
     if (record.source === 'transaction') {
         if (record.kind === 'appointment') {
             return record.appointment?.service

@@ -302,45 +302,78 @@ const refundPayment = async (appointmentId, refundData) => {
         throw new Error('No payments to refund');
     }
 
-    // Record refund transaction
-    const transaction = await createAppointmentTransaction({
-        appointmentId,
-        type: 'refund',
-        amount,
-        paymentMethod: resolveLedgerPaymentMethod(appointment.paymentMethod, 'online'),
-        status: 'refunded',
-        transactionRef: transactionRef || `APT-REFUND-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
-        processedBy,
-        processedAt: new Date(),
-        notes: reason,
-        metadata: {
-            source: 'appointment_refund',
-            paymentStatusBefore: appointment.paymentStatus,
-            totalPaidBefore: parseFloat(appointment.totalPaid || 0)
-        }
-    });
-
-    // Update appointment
-    const newTotalPaid = parseFloat(appointment.totalPaid) - parseFloat(amount);
-    const isFullRefund = newTotalPaid === 0;
-
-    await appointment.update({
-        totalPaid: newTotalPaid,
-        paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
-        depositPaid: newTotalPaid >= appointment.depositAmount,
-        remainderPaid: newTotalPaid >= parseFloat(appointment.price)
-    });
-
-    const invoice = await ensureAppointmentInvoice(appointment.id, {
-        triggerSource: 'appointment_refund'
-    });
-    if (invoice?.id) {
-        sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
-            console.warn('Refund invoice email warning:', error.message);
-        });
+    const numericAmount = parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        throw new Error('Refund amount must be greater than zero');
     }
+    if (numericAmount - parseFloat(appointment.totalPaid || 0) > 0.01) {
+        throw new Error('Refund amount cannot exceed the amount already paid');
+    }
+    const resolvedPaymentMethod = resolveLedgerPaymentMethod(appointment.paymentMethod, 'online');
 
-    return transaction;
+    return db.sequelize.transaction(async (transaction) => {
+        const refundLedgerTransaction = await createAppointmentTransaction({
+            appointmentId,
+            type: 'refund',
+            amount: numericAmount,
+            paymentMethod: resolvedPaymentMethod,
+            status: 'refunded',
+            transactionRef: transactionRef || `APT-REFUND-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+            processedBy,
+            processedAt: new Date(),
+            notes: reason,
+            metadata: {
+                source: 'appointment_refund',
+                paymentStatusBefore: appointment.paymentStatus,
+                totalPaidBefore: parseFloat(appointment.totalPaid || 0)
+            }
+        }, { transaction });
+
+        const platformFee = parseFloat((numericAmount * 0.025).toFixed(2));
+        const tenantRevenue = parseFloat((numericAmount - platformFee).toFixed(2));
+        const refundTransactionRef = transactionRef || `APT-REFUND-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
+
+        await db.Transaction.create({
+            platformUserId: appointment.platformUserId,
+            tenantId: appointment.tenantId,
+            appointmentId: appointment.id,
+            amount: numericAmount,
+            currency: 'SAR',
+            type: 'refund',
+            status: 'refunded',
+            platformFee,
+            tenantRevenue,
+            metadata: {
+                source: 'appointment_refund',
+                paymentMethod: resolvedPaymentMethod,
+                paymentTransactionRef: refundTransactionRef,
+                refundAmount: numericAmount,
+                notes: reason || null
+            }
+        }, { transaction });
+
+        const newTotalPaid = parseFloat(appointment.totalPaid) - numericAmount;
+        const isFullRefund = newTotalPaid === 0;
+
+        await appointment.update({
+            totalPaid: newTotalPaid,
+            paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
+            depositPaid: newTotalPaid >= appointment.depositAmount,
+            remainderPaid: newTotalPaid >= parseFloat(appointment.price)
+        }, { transaction });
+
+        const invoice = await ensureAppointmentInvoice(appointment.id, {
+            transaction,
+            triggerSource: 'appointment_refund'
+        });
+        if (invoice?.id) {
+            sendCustomerInvoiceLifecycleEmail(invoice.id).catch((error) => {
+                console.warn('Refund invoice email warning:', error.message);
+            });
+        }
+
+        return refundLedgerTransaction;
+    });
 };
 
 module.exports = {

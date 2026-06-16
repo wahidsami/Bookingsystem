@@ -16,14 +16,29 @@ class FinancialService {
     try {
       const transactionQuery = `
         SELECT
-          ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
-          ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as your_earnings,
-          ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_earnings,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST(amount as NUMERIC))
+              ELSE ABS(CAST(amount as NUMERIC))
+            END
+          ), 2) as total_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("platformFee" as NUMERIC))
+              ELSE ABS(CAST("platformFee" as NUMERIC))
+            END
+          ), 2) as your_earnings,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST("tenantRevenue" as NUMERIC))
+            END
+          ), 2) as tenant_earnings,
           COUNT(*) as total_transactions,
           COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_transactions
         FROM transactions
-        WHERE status = 'completed'
-          AND type IN ('booking', 'product_purchase')
+        WHERE status IN ('completed', 'refunded')
+          AND type IN ('booking', 'product_purchase', 'refund')
           ${buildDateClause('"createdAt"', startDate, endDate)}
       `;
 
@@ -82,17 +97,37 @@ class FinancialService {
           t.name,
           t.plan,
           t.status as tenant_status,
-          COUNT(*) as total_bookings,
-          ROUND(SUM(CAST(tr.amount as NUMERIC)), 2) as gross_revenue,
-          ROUND(SUM(CAST(tr."platformFee" as NUMERIC)), 2) as platform_commission,
-          ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)), 2) as net_revenue,
-          ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)) / NULLIF(COUNT(*), 0), 2) as avg_booking_value,
+          COUNT(CASE WHEN tr.type <> 'refund' THEN 1 END) as total_bookings,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr.amount as NUMERIC))
+              ELSE ABS(CAST(tr.amount as NUMERIC))
+            END
+          ), 2) as gross_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."platformFee" as NUMERIC))
+              ELSE ABS(CAST(tr."platformFee" as NUMERIC))
+            END
+          ), 2) as platform_commission,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST(tr."tenantRevenue" as NUMERIC))
+            END
+          ), 2) as net_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST(tr."tenantRevenue" as NUMERIC))
+            END
+          ) / NULLIF(COUNT(CASE WHEN tr.type <> 'refund' THEN 1 END), 0), 2) as avg_booking_value,
           COUNT(CASE WHEN tr.status = 'pending' THEN 1 END) as pending_transactions,
           COUNT(CASE WHEN tr.status = 'failed' THEN 1 END) as failed_transactions
         FROM transactions tr
         JOIN tenants t ON tr."tenantId" = t.id
-        WHERE tr.status = 'completed'
-          AND tr.type IN ('booking', 'product_purchase')
+        WHERE tr.status IN ('completed', 'refunded')
+          AND tr.type IN ('booking', 'product_purchase', 'refund')
           ${tenantId ? 'AND t.id = :tenantId' : ''}
           ${buildDateClause('tr."createdAt"', startDate, endDate)}
         GROUP BY t.id, t.name, t.plan, t.status
@@ -119,16 +154,36 @@ class FinancialService {
           t.id,
           t.name,
           t.plan,
-          COUNT(*) as bookings,
-          ROUND(SUM(CAST(tr.amount as NUMERIC)), 2) as gross_revenue,
-          ROUND(SUM(CAST(tr."platformFee" as NUMERIC)), 2) as your_commission,
-          ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)), 2) as tenant_earned,
-          ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)) / NULLIF(COUNT(*), 0), 2) as avg_per_booking,
+          COUNT(CASE WHEN tr.type <> 'refund' THEN 1 END) as bookings,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr.amount as NUMERIC))
+              ELSE ABS(CAST(tr.amount as NUMERIC))
+            END
+          ), 2) as gross_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."platformFee" as NUMERIC))
+              ELSE ABS(CAST(tr."platformFee" as NUMERIC))
+            END
+          ), 2) as your_commission,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST(tr."tenantRevenue" as NUMERIC))
+            END
+          ), 2) as tenant_earned,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST(tr."tenantRevenue" as NUMERIC))
+            END
+          ) / NULLIF(COUNT(CASE WHEN tr.type <> 'refund' THEN 1 END), 0), 2) as avg_per_booking,
           COUNT(DISTINCT DATE(tr."createdAt")) as active_days
         FROM transactions tr
         JOIN tenants t ON tr."tenantId" = t.id
-        WHERE tr.status = 'completed'
-          AND tr.type IN ('booking', 'product_purchase')
+        WHERE tr.status IN ('completed', 'refunded')
+          AND tr.type IN ('booking', 'product_purchase', 'refund')
           ${buildDateClause('tr."createdAt"', startDate, endDate)}
         GROUP BY t.id, t.name, t.plan
         ORDER BY tenant_earned DESC
@@ -186,14 +241,29 @@ class FinancialService {
       const transactionQuery = `
         SELECT
           DATE_TRUNC('month', "createdAt")::date as month,
-          ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
-          ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as your_earnings,
-          ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_earnings,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST(amount as NUMERIC))
+              ELSE ABS(CAST(amount as NUMERIC))
+            END
+          ), 2) as total_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("platformFee" as NUMERIC))
+              ELSE ABS(CAST("platformFee" as NUMERIC))
+            END
+          ), 2) as your_earnings,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST("tenantRevenue" as NUMERIC))
+            END
+          ), 2) as tenant_earnings,
           COUNT(*) as transaction_count,
           COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count
         FROM transactions
-        WHERE status = 'completed'
-          AND type IN ('booking', 'product_purchase')
+        WHERE status IN ('completed', 'refunded')
+          AND type IN ('booking', 'product_purchase', 'refund')
         GROUP BY DATE_TRUNC('month', "createdAt")
       `;
 
@@ -270,12 +340,27 @@ class FinancialService {
         SELECT
           type,
           COUNT(*) as count,
-          ROUND(SUM(CAST(amount as NUMERIC)), 2) as amount,
-          ROUND(SUM(CAST("platformFee" as NUMERIC)), 2) as platform_fee,
-          ROUND(SUM(CAST("tenantRevenue" as NUMERIC)), 2) as tenant_revenue
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST(amount as NUMERIC))
+              ELSE ABS(CAST(amount as NUMERIC))
+            END
+          ), 2) as amount,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("platformFee" as NUMERIC))
+              ELSE ABS(CAST("platformFee" as NUMERIC))
+            END
+          ), 2) as platform_fee,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST("tenantRevenue" as NUMERIC))
+            END
+          ), 2) as tenant_revenue
         FROM transactions
-        WHERE status = 'completed'
-          AND type IN ('booking', 'product_purchase')
+        WHERE status IN ('completed', 'refunded')
+          AND type IN ('booking', 'product_purchase', 'refund')
           ${buildDateClause('"createdAt"', startDate, endDate)}
         GROUP BY type
       `;
@@ -303,6 +388,7 @@ class FinancialService {
       const result = {
         booking: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
         product_purchase: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+        refund: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
         subscription: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
       };
 
@@ -330,6 +416,7 @@ class FinancialService {
       return {
         booking: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
         product_purchase: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
+        refund: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
         subscription: { count: 0, amount: 0, platformFee: 0, tenantRevenue: 0 },
       };
     }
@@ -414,9 +501,24 @@ class FinancialService {
           COALESCE(sp.name, 'Unknown') as plan,
           COUNT(DISTINCT t.id) as tenant_count,
           COUNT(tr.id) as total_transactions,
-          ROUND(SUM(CAST(tr.amount as NUMERIC)), 2) as total_revenue,
-          ROUND(SUM(CAST(tr."platformFee" as NUMERIC)), 2) as your_earnings,
-          ROUND(SUM(CAST(tr."tenantRevenue" as NUMERIC)), 2) as tenant_earnings
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr.amount as NUMERIC))
+              ELSE ABS(CAST(tr.amount as NUMERIC))
+            END
+          ), 2) as total_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."platformFee" as NUMERIC))
+              ELSE ABS(CAST(tr."platformFee" as NUMERIC))
+            END
+          ), 2) as your_earnings,
+          ROUND(SUM(
+            CASE
+              WHEN tr.type = 'refund' THEN -ABS(CAST(tr."tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST(tr."tenantRevenue" as NUMERIC))
+            END
+          ), 2) as tenant_earnings
         FROM transactions tr
         JOIN tenants t ON tr."tenantId" = t.id
         LEFT JOIN LATERAL (
@@ -426,8 +528,8 @@ class FinancialService {
           LIMIT 1
         ) ts ON true
         LEFT JOIN subscription_packages sp ON sp.id = ts."packageId"
-        WHERE tr.status = 'completed'
-          AND tr.type IN ('booking', 'product_purchase')
+        WHERE tr.status IN ('completed', 'refunded')
+          AND tr.type IN ('booking', 'product_purchase', 'refund')
           ${buildDateClause('tr."createdAt"', startDate, endDate)}
         GROUP BY sp.id, sp.name
         ORDER BY your_earnings DESC
@@ -446,12 +548,13 @@ class FinancialService {
   }
 
   static async getTransactionDetails(tenantId, limit = 50, offset = 0) {
-    const query = `
+      const query = `
       SELECT
         tr.id,
         tr."createdAt",
         t.name as tenant_name,
         CASE
+          WHEN tr.type = 'refund' THEN 'refund'
           WHEN a.id IS NOT NULL THEN 'appointment'
           WHEN o.id IS NOT NULL THEN 'product'
           ELSE 'other'
@@ -468,8 +571,8 @@ class FinancialService {
       LEFT JOIN services s ON a."serviceId" = s.id
       LEFT JOIN orders o ON tr.order_id = o.id
       WHERE tr."tenantId" = :tenantId
-        AND tr.status = 'completed'
-        AND tr.type IN ('booking', 'product_purchase')
+        AND tr.status IN ('completed', 'refunded')
+        AND tr.type IN ('booking', 'product_purchase', 'refund')
       ORDER BY tr."createdAt" DESC
       LIMIT :limit
       OFFSET :offset
