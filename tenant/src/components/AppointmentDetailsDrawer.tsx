@@ -2359,7 +2359,7 @@ export function AppointmentDetailsDrawer({
 
     return (
       <div className="h-full p-3 lg:p-4">
-        <div className="grid h-full gap-4 xl:grid-cols-[300px_190px_minmax(0,1fr)]">
+        <div className="grid h-full gap-4 xl:grid-cols-[320px_200px_minmax(0,1fr)]">
           <div className="space-y-4">
             <WorkspacePanel
               title={locale === "ar" ? "الملف الشخصي" : "Customer profile"}
@@ -2469,31 +2469,51 @@ export function AppointmentDetailsDrawer({
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
                   {locale === "ar" ? "تفاصيل سريعة" : "Quick details"}
                 </p>
-                <div className="mt-3 space-y-3">
-                  {customerProfile?.gender ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-gray-600">{locale === "ar" ? "النوع" : "Gender"}</span>
-                      <span className="text-sm font-semibold text-gray-900 capitalize">{customerProfile.gender}</span>
-                    </div>
-                  ) : null}
-                  {customerProfile?.dateOfBirth ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-gray-600">{locale === "ar" ? "تاريخ الميلاد" : "Date of birth"}</span>
-                      <span className="text-sm font-semibold text-gray-900">{formatDateTime(customerProfile.dateOfBirth, locale).split(",")[0] || "-"}</span>
-                    </div>
-                  ) : null}
-                  {customerProfile?.preferredLanguage ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-gray-600">{locale === "ar" ? "اللغة المفضلة" : "Preferred language"}</span>
-                      <span className="text-sm font-semibold text-gray-900">{customerProfile.preferredLanguage.toUpperCase()}</span>
-                    </div>
-                  ) : null}
-                  {customerProfile?.joinedAt ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-gray-600">{locale === "ar" ? "تاريخ الإنشاء" : "Created at"}</span>
-                      <span className="text-sm font-semibold text-gray-900">{formatDateTime(customerProfile.joinedAt, locale).split(",")[0] || "-"}</span>
-                    </div>
-                  ) : null}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      {locale === "ar" ? "الرصيد" : "Wallet"}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-900">
+                      <Currency amount={Number(customerProfile?.walletBalance || 0)} />
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      {locale === "ar" ? "الحجوزات" : "Bookings"}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-900">{customerProfile?.totalBookings ?? 0}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      {locale === "ar" ? "المدفوع" : "Spent"}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-900">
+                      <Currency amount={Number(customerProfile?.totalSpent || 0)} />
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      {locale === "ar" ? "اللغة" : "Language"}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-900">
+                      {customerProfile?.preferredLanguage ? customerProfile.preferredLanguage.toUpperCase() : "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      {locale === "ar" ? "النوع" : "Gender"}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-900 capitalize">{customerProfile?.gender || "-"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      {locale === "ar" ? "الإنشاء" : "Joined"}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-gray-900">
+                      {customerProfile?.joinedAt ? formatDateTime(customerProfile.joinedAt, locale).split(",")[0] || "-" : "-"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
