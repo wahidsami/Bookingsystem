@@ -553,6 +553,7 @@ export function AppointmentDetailsDrawer({
   const [paymentCollectionMode, setPaymentCollectionMode] = useState<"full" | "remainder">("full");
   const [paymentCollectionRows, setPaymentCollectionRows] = useState<PaymentCollectionRow[]>([]);
   const [paymentCollectionSubmitting, setPaymentCollectionSubmitting] = useState(false);
+  const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<AppointmentItem["status"] | null>(null);
   const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
   const [recordRemainderMethod, setRecordRemainderMethod] = useState("cash");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
@@ -563,6 +564,8 @@ export function AppointmentDetailsDrawer({
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [moreActionsMenuStyle, setMoreActionsMenuStyle] = useState<{ top: number; left: number } | null>(null);
+  const moreActionsButtonRef = useRef<HTMLButtonElement | null>(null);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [editingServiceStartTime, setEditingServiceStartTime] = useState("");
   const [editingServiceSubmitting, setEditingServiceSubmitting] = useState(false);
@@ -581,6 +584,7 @@ export function AppointmentDetailsDrawer({
       setPaymentCollectionMode("full");
       setPaymentCollectionRows([]);
       setPaymentCollectionSubmitting(false);
+      setPendingStatusAfterPayment(null);
       setCustomerTab("overview");
       setRecordRemainderMethod("cash");
       setTransactionTypeFilter("all");
@@ -592,6 +596,7 @@ export function AppointmentDetailsDrawer({
       setError("");
       setActionNotice(null);
       setMoreActionsOpen(false);
+      setMoreActionsMenuStyle(null);
       setEditingServiceId(null);
       setEditingServiceStartTime("");
       setEditingServiceSubmitting(false);
@@ -943,6 +948,7 @@ export function AppointmentDetailsDrawer({
           message: locale === "ar" ? "تمت إعادة الجدولة بنجاح." : "Rescheduled successfully."
         });
         setMoreActionsOpen(false);
+        setMoreActionsMenuStyle(null);
       } catch (err: any) {
       console.error("Failed to reschedule from drawer:", err);
       setActionNotice({
@@ -1042,6 +1048,7 @@ export function AppointmentDetailsDrawer({
       await refreshAppointment();
       cancelServiceEdit();
       setMoreActionsOpen(false);
+      setMoreActionsMenuStyle(null);
       setActionNotice({
         kind: "success",
         message: locale === "ar" ? "تم تحديث الخدمة داخل البطاقة." : "Service updated inline."
@@ -1243,6 +1250,7 @@ export function AppointmentDetailsDrawer({
 
     const triggerMoreAction = (action: "rebook" | "reschedule" | "mark_refunded" | "open_full_page") => {
       setMoreActionsOpen(false);
+      setMoreActionsMenuStyle(null);
       if (action === "rebook") {
         handleRebook();
         return;
@@ -1262,6 +1270,7 @@ export function AppointmentDetailsDrawer({
 
     const handlePayNow = async () => {
       if (paymentDueAmount > 0) {
+        setPendingStatusAfterPayment(null);
         openPaymentCollection();
         return;
       }
@@ -1296,7 +1305,10 @@ export function AppointmentDetailsDrawer({
       giftCardCode: overrides?.giftCardCode || ""
     });
 
-    const openPaymentCollection = (mode: "full" | "remainder" = currentPaymentStatus === "deposit_paid" ? "remainder" : "full") => {
+    const openPaymentCollection = (
+      mode: "full" | "remainder" = currentPaymentStatus === "deposit_paid" ? "remainder" : "full",
+      afterStatus: AppointmentItem["status"] | null = null
+    ) => {
       if (paymentDueAmount <= 0) {
         setActionNotice({
           kind: "error",
@@ -1307,6 +1319,7 @@ export function AppointmentDetailsDrawer({
         return;
       }
 
+      setPendingStatusAfterPayment(afterStatus);
       setPaymentCollectionMode(mode);
       setPaymentCollectionRows([createPaymentRow()]);
       setPaymentCollectionOpen(true);
@@ -1316,6 +1329,7 @@ export function AppointmentDetailsDrawer({
     const closePaymentCollection = () => {
       setPaymentCollectionOpen(false);
       setPaymentCollectionRows([]);
+      setPendingStatusAfterPayment(null);
     };
 
     const updatePaymentCollectionRow = (rowId: string, patch: Partial<PaymentCollectionRow>) => {
@@ -1415,8 +1429,16 @@ export function AppointmentDetailsDrawer({
           return;
         }
 
+        if (pendingStatusAfterPayment && appointment?.status !== pendingStatusAfterPayment) {
+          const statusResponse = await tenantApi.updateAppointmentStatus(appointment.id, pendingStatusAfterPayment);
+          if (statusResponse?.success && statusResponse?.appointment) {
+            setAppointment((prev) => prev ? { ...prev, status: statusResponse.appointment.status } : prev);
+          }
+        }
+
         await refreshAppointment();
         closePaymentCollection();
+        setPendingStatusAfterPayment(null);
         setActionNotice({
           kind: "success",
           message: locale === "ar" ? "تم تسجيل الدفعة بنجاح." : "Payment recorded successfully."
@@ -1487,13 +1509,33 @@ export function AppointmentDetailsDrawer({
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setMoreActionsOpen((current) => !current)}
+                  ref={moreActionsButtonRef}
+                  onClick={() => {
+                    setMoreActionsOpen((current) => {
+                      const nextOpen = !current;
+                      if (nextOpen && moreActionsButtonRef.current) {
+                        const rect = moreActionsButtonRef.current.getBoundingClientRect();
+                        const menuWidth = 224;
+                        const left = Math.max(12, Math.min(rect.left, window.innerWidth - menuWidth - 12));
+                        setMoreActionsMenuStyle({
+                          top: rect.bottom + 8,
+                          left
+                        });
+                      } else {
+                        setMoreActionsMenuStyle(null);
+                      }
+                      return nextOpen;
+                    });
+                  }}
                   className="inline-flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
                 >
                   {locale === "ar" ? "الإجراءات" : "Actions"}
                 </button>
                 {moreActionsOpen ? (
-                  <div className={`absolute bottom-full left-0 z-50 mb-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl ${isRTL ? "right-0 left-auto" : ""}`}>
+                  <div
+                    className="fixed z-[120] w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl"
+                    style={moreActionsMenuStyle ? { top: moreActionsMenuStyle.top, left: moreActionsMenuStyle.left } : undefined}
+                  >
                     {[
                       { key: "rebook", label: locale === "ar" ? "إعادة الحجز" : "Rebook" },
                       { key: "reschedule", label: locale === "ar" ? "إعادة الجدولة" : "Reschedule" },
@@ -1606,6 +1648,17 @@ export function AppointmentDetailsDrawer({
                         onChange={(event) => {
                           const nextStatus = event.target.value as AppointmentItem["status"];
                           if (nextStatus === appointment.status) return;
+                          if (nextStatus === "checked_in" && paymentDueAmount > 0) {
+                            setPendingStatusAfterPayment("checked_in");
+                            openPaymentCollection(currentPaymentStatus === "deposit_paid" ? "remainder" : "full", "checked_in");
+                            setActionNotice({
+                              kind: "success",
+                              message: locale === "ar"
+                                ? "أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول."
+                                : "Collect payment first, then we will mark the appointment as arrived."
+                            });
+                            return;
+                          }
                           if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
                             void handleQuickStatusUpdate(nextStatus);
                             return;
