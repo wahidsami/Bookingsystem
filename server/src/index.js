@@ -568,6 +568,38 @@ const ensureAppointmentSchema = async () => {
     }
 };
 
+const ensurePaymentTransactionSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            DECLARE
+                payment_method_udt_name TEXT;
+            BEGIN
+                SELECT c.udt_name
+                INTO payment_method_udt_name
+                FROM information_schema.columns c
+                WHERE c.table_schema = 'public'
+                  AND c.table_name = 'payment_transactions'
+                  AND c.column_name = 'payment_method';
+
+                IF payment_method_udt_name IS NOT NULL
+                   AND payment_method_udt_name NOT IN ('varchar', 'text', 'bpchar') THEN
+                    BEGIN
+                        EXECUTE 'ALTER TYPE "' || payment_method_udt_name || '" ADD VALUE IF NOT EXISTS ''gift_card_code''';
+                    EXCEPTION
+                        WHEN duplicate_object THEN NULL;
+                    END;
+                END IF;
+            END $$;
+        `);
+
+        console.log('Payment transaction schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure payment transaction schema:', error);
+        throw error;
+    }
+};
+
 const ensurePlatformUserAuthSchema = async () => {
     try {
         await db.sequelize.query(`
@@ -679,6 +711,7 @@ const startServer = async () => {
         await db.Review.sync({ force: false }); // Customer reviews
         await db.CustomerInsight.sync({ force: false });
         await db.Transaction.sync({ force: false });
+        await ensurePaymentTransactionSchema();
         await db.TenantPushCampaignRecipient.sync({ force: false }); // Marketing push recipients
         await db.StaffPayroll.sync({ force: false }); // Payroll records
         await db.Order.sync({ force: false }); // Order system

@@ -5,7 +5,8 @@ const DIRECT_PAYMENT_METHODS = new Set([
     'cash',
     'card_pos',
     'wallet',
-    'bank_transfer'
+    'bank_transfer',
+    'gift_card_code'
 ]);
 
 const resolveLedgerPaymentMethod = (paymentMethod, fallbackSource = 'cash') => {

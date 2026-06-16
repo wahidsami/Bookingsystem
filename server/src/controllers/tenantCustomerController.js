@@ -75,6 +75,7 @@ function formatPaymentMethodLabel(paymentMethod) {
         card_pos: 'Card POS',
         wallet: 'Wallet',
         bank_transfer: 'Bank transfer',
+        gift_card_code: 'Gift card code',
         pay_on_visit: 'Pay on visit',
         cash_on_delivery: 'Cash on delivery'
     }[paymentMethod] || paymentMethod || 'Not set');

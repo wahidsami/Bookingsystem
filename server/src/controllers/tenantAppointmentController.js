@@ -13,7 +13,11 @@ const customerNotificationService = require('../services/customerNotificationSer
 const bookingService = require('../services/bookingService');
 const appointmentLifecycleService = require('../services/appointmentLifecycleService');
 const { createStaffAppointmentMessage } = require('../services/staffNotificationService');
-const { calculateSplitPayment } = require('../services/splitPaymentService');
+const {
+    calculateSplitPayment,
+    createAppointmentPaymentTransactions,
+    normalizePaymentAllocations
+} = require('../services/splitPaymentService');
 const userService = require('../services/userService');
 const {
     createAppointmentTransaction,
@@ -1909,7 +1913,7 @@ exports.updatePaymentStatus = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { paymentStatus, paymentMethod, transactionRef, notes } = req.body;
+        const { paymentStatus, paymentMethod, paymentAllocations, transactionRef, notes } = req.body;
         const requestId = `pay_${Date.now()}_${id}`;
 
         const validPaymentStatuses = [
@@ -1962,9 +1966,6 @@ exports.updatePaymentStatus = async (req, res) => {
         });
 
         appointment.paymentStatus = paymentStatus;
-        if (paymentMethod) {
-            appointment.paymentMethod = paymentMethod;
-        }
         if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
             appointment.paidAt = new Date();
             appointment.depositAmount = 0;
@@ -2003,10 +2004,26 @@ exports.updatePaymentStatus = async (req, res) => {
             appointment.totalPaid = 0;
         }
 
-        await appointment.save({ transaction });
-
         const nextTotalPaid = parseFloat(appointment.totalPaid || 0);
         const paymentDelta = parseFloat((nextTotalPaid - previousTotalPaid).toFixed(2));
+        const normalizedPaymentAllocations = paymentDelta > 0 && Array.isArray(paymentAllocations) && paymentAllocations.length > 0
+            ? normalizePaymentAllocations({
+                amount: paymentDelta,
+                paymentMethod,
+                paymentAllocations,
+                fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
+            })
+            : null;
+        const resolvedPaymentMethod = normalizedPaymentAllocations
+            ? (normalizedPaymentAllocations.length > 1
+                ? 'split'
+                : normalizedPaymentAllocations[0]?.paymentMethod || paymentMethod || appointment.paymentMethod || null)
+            : (paymentMethod || appointment.paymentMethod || null);
+        if (resolvedPaymentMethod) {
+            appointment.paymentMethod = resolvedPaymentMethod;
+        }
+
+        await appointment.save({ transaction });
 
         await createAppointmentEventSafe({
             appointmentId: appointment.id,
@@ -2036,32 +2053,48 @@ exports.updatePaymentStatus = async (req, res) => {
                 : previousPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
                     ? 'remainder'
                     : 'full';
-
-            await createAppointmentTransaction({
-                appointmentId: appointment.id,
-                type: transactionType,
-                amount: paymentDelta,
-                paymentMethod: resolveLedgerPaymentMethod(
-                    paymentMethod || appointment.paymentMethod,
-                    paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
-                        ? appointment.paymentMethod || 'cash'
-                        : 'cash'
-                ),
-                status: 'completed',
-                transactionRef: transactionRef || `APT-PAY-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
-                processedBy: null,
-                processedAt: appointment.paidAt || new Date(),
-                notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                    ? 'Deposit collected from tenant dashboard'
-                    : 'Full payment collected from tenant dashboard'),
-                metadata: {
+            if (normalizedPaymentAllocations) {
+                await createAppointmentPaymentTransactions({
+                    appointment,
+                    type: transactionType,
+                    amount: paymentDelta,
+                    paymentMethod: resolvedPaymentMethod || paymentMethod || appointment.paymentMethod || 'cash',
+                    paymentAllocations: normalizedPaymentAllocations,
+                    processedBy: null,
+                    transactionRef: transactionRef || `APT-PAY-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+                    notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                        ? 'Deposit collected from tenant dashboard'
+                        : 'Full payment collected from tenant dashboard'),
                     source: 'tenant_appointment_payment_status_update',
-                    previousTotalPaid,
-                    nextTotalPaid,
-                    previousPaymentStatus,
-                    nextPaymentStatus: paymentStatus
-                }
-            }, { transaction });
+                    transaction
+                });
+            } else {
+                await createAppointmentTransaction({
+                    appointmentId: appointment.id,
+                    type: transactionType,
+                    amount: paymentDelta,
+                    paymentMethod: resolveLedgerPaymentMethod(
+                        paymentMethod || appointment.paymentMethod,
+                        paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
+                            ? appointment.paymentMethod || 'cash'
+                            : 'cash'
+                    ),
+                    status: 'completed',
+                    transactionRef: transactionRef || `APT-PAY-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+                    processedBy: null,
+                    processedAt: appointment.paidAt || new Date(),
+                    notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+                        ? 'Deposit collected from tenant dashboard'
+                        : 'Full payment collected from tenant dashboard'),
+                    metadata: {
+                        source: 'tenant_appointment_payment_status_update',
+                        previousTotalPaid,
+                        nextTotalPaid,
+                        previousPaymentStatus,
+                        nextPaymentStatus: paymentStatus
+                    }
+                }, { transaction });
+            }
         }
 
         if (appointment.platformUserId && paymentDelta > 0) {

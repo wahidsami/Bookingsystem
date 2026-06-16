@@ -1275,7 +1275,16 @@ class TenantApiClient {
     id: string,
     paymentStatus: string,
     paymentMethod?: string,
-    paymentData?: { transactionRef?: string; notes?: string }
+    paymentData?: {
+      transactionRef?: string;
+      notes?: string;
+      paymentAllocations?: Array<{
+        paymentMethod: string;
+        amount: number;
+        giftCardCode?: string;
+        notes?: string;
+      }>;
+    }
   ): Promise<any> {
     return this.request(`/tenant/appointments/${id}/payment`, {
       method: 'PATCH',
@@ -1283,7 +1292,8 @@ class TenantApiClient {
         paymentStatus,
         paymentMethod,
         transactionRef: paymentData?.transactionRef,
-        notes: paymentData?.notes
+        notes: paymentData?.notes,
+        paymentAllocations: paymentData?.paymentAllocations
       })
     });
   }
@@ -1311,6 +1321,12 @@ class TenantApiClient {
       paymentMethod: string;
       notes?: string;
       transactionRef?: string;
+      paymentAllocations?: Array<{
+        paymentMethod: string;
+        amount: number;
+        giftCardCode?: string;
+        notes?: string;
+      }>;
     }
   ): Promise<any> {
     return this.request(`/tenant/appointments/${id}/record-payment`, {

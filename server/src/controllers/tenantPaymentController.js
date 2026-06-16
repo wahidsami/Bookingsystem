@@ -54,7 +54,7 @@ const recordPayment = async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.tenantId;
-        const { amount, paymentMethod, notes, transactionRef } = req.body;
+        const { amount, paymentMethod, paymentAllocations, notes, transactionRef } = req.body;
 
         // Verify appointment belongs to tenant
         const appointment = await db.Appointment.findByPk(id, {
@@ -72,12 +72,20 @@ const recordPayment = async (req, res) => {
             });
         }
 
-        // Validate payment method
-        const validMethods = ['cash', 'card_pos', 'wallet', 'bank_transfer'];
-        if (!validMethods.includes(paymentMethod)) {
+        const validMethods = ['cash', 'card_pos', 'wallet', 'bank_transfer', 'gift_card_code'];
+        if ((!Array.isArray(paymentAllocations) || paymentAllocations.length === 0) && !validMethods.includes(paymentMethod)) {
             return res.status(400).json({
                 success: false,
                 message: `Payment method must be one of: ${validMethods.join(', ')}`
+            });
+        }
+
+        if (Array.isArray(paymentAllocations) && paymentAllocations.length > 0) {
+            paymentAllocations.forEach((allocation, index) => {
+                const method = `${allocation?.paymentMethod || ''}`.trim().toLowerCase();
+                if (!['cash', 'card_pos', 'wallet', 'bank_transfer', 'gift_card_code'].includes(method)) {
+                    throw new Error(`Invalid payment method in allocation ${index + 1}`);
+                }
             });
         }
 
@@ -85,6 +93,7 @@ const recordPayment = async (req, res) => {
         const updatedAppointment = await splitPaymentService.recordRemainderPayment(id, {
             amount: parseFloat(amount),
             paymentMethod,
+            paymentAllocations,
             processedBy: null,
             notes,
             transactionRef

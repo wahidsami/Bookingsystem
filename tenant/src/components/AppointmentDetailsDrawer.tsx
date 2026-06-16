@@ -106,7 +106,7 @@ interface PaymentTransaction {
   id: string;
   type: "deposit" | "remainder" | "full" | "refund";
   amount: number;
-  paymentMethod: "online" | "cash" | "card_pos" | "wallet" | "bank_transfer";
+  paymentMethod: "online" | "cash" | "card_pos" | "wallet" | "bank_transfer" | "gift_card_code";
   status: "pending" | "completed" | "failed" | "refunded" | "cancelled";
   transactionRef?: string | null;
   notes?: string | null;
@@ -115,6 +115,15 @@ interface PaymentTransaction {
     id: string;
     name: string;
   } | null;
+}
+
+type PaymentCollectionMethod = "cash" | "card_pos" | "wallet" | "bank_transfer" | "gift_card_code";
+
+interface PaymentCollectionRow {
+  id: string;
+  paymentMethod: PaymentCollectionMethod;
+  amount: string;
+  giftCardCode: string;
 }
 
 interface CustomerAppointmentHistoryItem {
@@ -540,6 +549,10 @@ export function AppointmentDetailsDrawer({
   const [viewMode, setViewMode] = useState<"appointment" | "customer">("appointment");
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [paymentUpdating, setPaymentUpdating] = useState(false);
+  const [paymentCollectionOpen, setPaymentCollectionOpen] = useState(false);
+  const [paymentCollectionMode, setPaymentCollectionMode] = useState<"full" | "remainder">("full");
+  const [paymentCollectionRows, setPaymentCollectionRows] = useState<PaymentCollectionRow[]>([]);
+  const [paymentCollectionSubmitting, setPaymentCollectionSubmitting] = useState(false);
   const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
   const [recordRemainderMethod, setRecordRemainderMethod] = useState("cash");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
@@ -564,6 +577,10 @@ export function AppointmentDetailsDrawer({
       setCustomerTransactionsLoading(false);
       setViewMode("appointment");
       setPaymentUpdating(false);
+      setPaymentCollectionOpen(false);
+      setPaymentCollectionMode("full");
+      setPaymentCollectionRows([]);
+      setPaymentCollectionSubmitting(false);
       setCustomerTab("overview");
       setRecordRemainderMethod("cash");
       setTransactionTypeFilter("all");
@@ -812,7 +829,6 @@ export function AppointmentDetailsDrawer({
             timestamp
           };
         }
-
         if (event.eventType === "tenant_payment_status_changed") {
           return {
             label: locale === "ar" ? "تحديث الدفع" : "Payment updated",
@@ -1197,7 +1213,16 @@ export function AppointmentDetailsDrawer({
     const depositAmount = Number(appointment.depositAmount || 0);
     const paidAmount = Number(appointment.totalPaid || 0);
     const totalAmount = Number(appointment.price || 0);
-    const remainingAmount = Math.max(0, Number(appointment.remainderAmount ?? (totalAmount - paidAmount)));
+    const outstandingAmount = Math.max(0, Number(appointment.outstandingAmount ?? (totalAmount - paidAmount)));
+    const remainingAmount = currentPaymentStatus === "deposit_paid"
+      ? Math.max(0, Number(appointment.remainderAmount ?? outstandingAmount))
+      : outstandingAmount;
+    const paymentDueAmount = Math.max(
+      0,
+      currentPaymentStatus === "deposit_paid"
+        ? remainingAmount
+        : outstandingAmount
+    );
     const serviceCards = (() => {
       const sessionAppointments = appointment.bookingSession?.appointments || [];
       if (!sessionAppointments.length) {
@@ -1236,8 +1261,8 @@ export function AppointmentDetailsDrawer({
     };
 
     const handlePayNow = async () => {
-      if (remainingAmount > 0) {
-        await handleCollectRemainder();
+      if (paymentDueAmount > 0) {
+        openPaymentCollection();
         return;
       }
       await handleMarkFullyPaid(recordRemainderMethod);
@@ -1254,6 +1279,157 @@ export function AppointmentDetailsDrawer({
         return;
       }
       await handleQuickStatusUpdate("completed");
+    };
+
+    const paymentMethodOptions: Array<{ value: PaymentCollectionMethod; label: string }> = [
+      { value: "cash", label: locale === "ar" ? "نقداً" : "Cash" },
+      { value: "card_pos", label: locale === "ar" ? "بطاقة عند المركز" : "Card POS" },
+      { value: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
+      { value: "bank_transfer", label: locale === "ar" ? "تحويل بنكي" : "Bank transfer" },
+      { value: "gift_card_code", label: locale === "ar" ? "رمز بطاقة هدية" : "Gift card code" }
+    ];
+
+    const createPaymentRow = (overrides?: Partial<PaymentCollectionRow>): PaymentCollectionRow => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      paymentMethod: overrides?.paymentMethod || (recordRemainderMethod as PaymentCollectionMethod) || "cash",
+      amount: overrides?.amount || `${paymentDueAmount.toFixed(2)}`,
+      giftCardCode: overrides?.giftCardCode || ""
+    });
+
+    const openPaymentCollection = (mode: "full" | "remainder" = currentPaymentStatus === "deposit_paid" ? "remainder" : "full") => {
+      if (paymentDueAmount <= 0) {
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
+            ? "لا يوجد مبلغ متبقٍ للتحصيل."
+            : "There is no remaining amount to collect."
+        });
+        return;
+      }
+
+      setPaymentCollectionMode(mode);
+      setPaymentCollectionRows([createPaymentRow()]);
+      setPaymentCollectionOpen(true);
+      setActionNotice(null);
+    };
+
+    const closePaymentCollection = () => {
+      setPaymentCollectionOpen(false);
+      setPaymentCollectionRows([]);
+    };
+
+    const updatePaymentCollectionRow = (rowId: string, patch: Partial<PaymentCollectionRow>) => {
+      setPaymentCollectionRows((current) => current.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
+    };
+
+    const addPaymentCollectionRow = () => {
+      setPaymentCollectionRows((current) => [...current, createPaymentRow()]);
+    };
+
+    const removePaymentCollectionRow = (rowId: string) => {
+      setPaymentCollectionRows((current) => (current.length > 1 ? current.filter((row) => row.id !== rowId) : current));
+    };
+
+    const paymentCollectionTotal = paymentCollectionRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const paymentCollectionMismatch = Math.abs(paymentCollectionTotal - paymentDueAmount) > 0.01;
+
+    const submitPaymentCollection = async () => {
+      if (!appointment || paymentCollectionSubmitting) return;
+      if (paymentDueAmount <= 0) {
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
+            ? "لا يوجد مبلغ متبقٍ للتحصيل."
+            : "There is no remaining amount to collect."
+        });
+        return;
+      }
+
+      const normalizedRows = paymentCollectionRows
+        .map((row) => ({
+          paymentMethod: row.paymentMethod,
+          amount: Number(row.amount || 0),
+          giftCardCode: row.paymentMethod === "gift_card_code" ? row.giftCardCode.trim() : undefined
+        }))
+        .filter((row) => Number.isFinite(row.amount) && row.amount > 0);
+
+      if (!normalizedRows.length) {
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
+            ? "أضف طريقة دفع واحدة على الأقل."
+            : "Add at least one payment method."
+        });
+        return;
+      }
+
+      const allocationsTotal = normalizedRows.reduce((sum, row) => sum + row.amount, 0);
+      if (Math.abs(allocationsTotal - paymentDueAmount) > 0.01) {
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
+            ? "يجب أن يساوي مجموع الدفعات المبلغ المستحق."
+            : "The payment split must match the amount due."
+        });
+        return;
+      }
+
+      if (normalizedRows.some((row) => row.paymentMethod === "gift_card_code" && !row.giftCardCode)) {
+        setActionNotice({
+          kind: "error",
+          message: locale === "ar"
+            ? "أدخل رمز بطاقة الهدية لكل سطر يستخدم هذه الطريقة."
+            : "Enter a gift card code for every gift card payment row."
+        });
+        return;
+      }
+
+      try {
+        setPaymentCollectionSubmitting(true);
+        const payload = {
+          amount: paymentDueAmount,
+          paymentMethod: normalizedRows.length === 1 ? normalizedRows[0].paymentMethod : "cash",
+          notes: locale === "ar" ? "تحصيل دفع من لوحة التفاصيل" : "Collected payment from details drawer",
+          paymentAllocations: normalizedRows.map((row) => ({
+            paymentMethod: row.paymentMethod,
+            amount: row.amount,
+            giftCardCode: row.giftCardCode || undefined
+          }))
+        };
+
+        const response = paymentCollectionMode === "remainder" || currentPaymentStatus === "deposit_paid"
+          ? await tenantApi.recordRemainderPayment(appointment.id, {
+              ...payload,
+              transactionRef: undefined
+            })
+          : await tenantApi.updatePaymentStatus(appointment.id, "fully_paid", payload.paymentMethod, {
+              notes: payload.notes,
+              paymentAllocations: payload.paymentAllocations
+            });
+
+        if (!response?.success) {
+          setActionNotice({
+            kind: "error",
+            message: response?.message || (locale === "ar" ? "تعذر تسجيل الدفعة." : "Failed to record payment.")
+          });
+          return;
+        }
+
+        await refreshAppointment();
+        closePaymentCollection();
+        setActionNotice({
+          kind: "success",
+          message: locale === "ar" ? "تم تسجيل الدفعة بنجاح." : "Payment recorded successfully."
+        });
+      } catch (err: any) {
+        console.error("Failed to submit payment collection:", err);
+        setActionNotice({
+          kind: "error",
+          message: err?.message || (locale === "ar" ? "تعذر تسجيل الدفعة." : "Failed to record payment.")
+        });
+      } finally {
+        setPaymentCollectionSubmitting(false);
+      }
     };
 
     const renderCustomerPanel = () => (
@@ -1693,6 +1869,152 @@ export function AppointmentDetailsDrawer({
                   </div>
                 </WorkspacePanel>
               </div>
+
+              {paymentCollectionOpen ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-4 backdrop-blur-sm">
+                  <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-2xl">
+                    <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">
+                          {locale === "ar" ? "تحصيل الدفع" : "Collect payment"}
+                        </p>
+                        <h3 className="mt-1 text-lg font-bold text-gray-900">
+                          {locale === "ar" ? "اختر طريقة أو أكثر للدفع" : "Choose one or more payment methods"}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {locale === "ar"
+                            ? "يمكنك الدفع بطريقة واحدة أو تقسيم المبلغ بين أكثر من وسيلة."
+                            : "You can pay with one method or split the amount across multiple methods."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={closePaymentCollection}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50"
+                        aria-label={locale === "ar" ? "إغلاق" : "Close"}
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 px-5 py-4">
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-gray-600">{locale === "ar" ? "المبلغ المستحق" : "Amount due"}</span>
+                          <Currency amount={paymentDueAmount} className="text-base font-bold text-gray-900" />
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                          <span className="text-gray-600">{locale === "ar" ? "المجموع الحالي" : "Current split total"}</span>
+                          <Currency amount={paymentCollectionTotal} className="font-semibold text-gray-900" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {paymentCollectionRows.map((row, index) => (
+                          <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="grid flex-1 gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
+                                <label className="block">
+                                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                    {locale === "ar" ? "طريقة الدفع" : "Payment method"}
+                                  </span>
+                                  <select
+                                    value={row.paymentMethod}
+                                    onChange={(event) => updatePaymentCollectionRow(row.id, { paymentMethod: event.target.value as PaymentCollectionMethod })}
+                                    className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                  >
+                                    {paymentMethodOptions.map((option) => (
+                                      <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label className="block">
+                                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                    {locale === "ar" ? "المبلغ" : "Amount"}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={row.amount}
+                                    onChange={(event) => updatePaymentCollectionRow(row.id, { amount: event.target.value })}
+                                    className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                  />
+                                </label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {paymentCollectionRows.length > 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePaymentCollectionRow(row.id)}
+                                    className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                                  >
+                                    {locale === "ar" ? "حذف" : "Remove"}
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            {row.paymentMethod === "gift_card_code" ? (
+                              <label className="mt-3 block">
+                                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                                  {locale === "ar" ? "رمز بطاقة الهدية" : "Gift card code"}
+                                </span>
+                                <input
+                                  type="text"
+                                  value={row.giftCardCode}
+                                  onChange={(event) => updatePaymentCollectionRow(row.id, { giftCardCode: event.target.value })}
+                                  placeholder={locale === "ar" ? "أدخل الرمز" : "Enter code"}
+                                  className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                              </label>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={addPaymentCollectionRow}
+                          className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary/40 hover:bg-purple-50"
+                        >
+                          {locale === "ar" ? "إضافة طريقة" : "Add method"}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={closePaymentCollection}
+                            className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                          >
+                            {locale === "ar" ? "إلغاء" : "Cancel"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void submitPaymentCollection()}
+                            disabled={paymentCollectionSubmitting || paymentCollectionMismatch}
+                            className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {paymentCollectionSubmitting
+                              ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                              : (locale === "ar" ? "تطبيق الدفع" : "Apply payment")}
+                          </button>
+                        </div>
+                      </div>
+
+                      {paymentCollectionMismatch ? (
+                        <p className="text-sm font-medium text-amber-700">
+                          {locale === "ar"
+                            ? "يجب أن يساوي مجموع الطرق المبلغ المستحق."
+                            : "The split total must match the amount due."}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 pt-3 backdrop-blur">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm">

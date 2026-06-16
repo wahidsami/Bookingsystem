@@ -81,9 +81,9 @@ module.exports = (sequelize, DataTypes) => {
 
         // Payment Method
         paymentMethod: {
-            type: DataTypes.ENUM('online', 'cash', 'card_pos', 'wallet', 'bank_transfer'),
+            type: DataTypes.ENUM('online', 'cash', 'card_pos', 'wallet', 'bank_transfer', 'gift_card_code'),
             allowNull: false,
-            comment: 'online = credit card online, cash = at salon, card_pos = POS terminal, wallet = digital wallet'
+            comment: 'online = credit card online, cash = at salon, card_pos = POS terminal, wallet = digital wallet, gift_card_code = gift card redemption code'
         },
 
         // Status

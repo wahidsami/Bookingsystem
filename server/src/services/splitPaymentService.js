@@ -27,6 +27,125 @@ const calculateSplitPayment = async (tenantId, totalPrice) => {
     return calculateServiceDeposit(totalPrice, paymentSettings);
 };
 
+const SUPPORTED_PAYMENT_METHODS = new Set([
+    'online',
+    'cash',
+    'card_pos',
+    'wallet',
+    'bank_transfer',
+    'gift_card_code'
+]);
+
+const normalizePaymentMethod = (method, fallbackSource = 'cash') => {
+    const cleaned = `${method || ''}`.trim().toLowerCase();
+    if (SUPPORTED_PAYMENT_METHODS.has(cleaned)) {
+        return cleaned;
+    }
+
+    if (['online-full', 'booking-fee', 'mock_online', 'mock_booking_fee', 'online'].includes(cleaned)) {
+        return 'online';
+    }
+
+    if (['pay_on_visit', 'cash_on_delivery', 'at-center', 'at_center', 'cash'].includes(cleaned)) {
+        return 'cash';
+    }
+
+    if (SUPPORTED_PAYMENT_METHODS.has(`${fallbackSource || ''}`.trim().toLowerCase())) {
+        return `${fallbackSource || ''}`.trim().toLowerCase();
+    }
+
+    return 'cash';
+};
+
+const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations, fallbackSource = 'cash' }) => {
+    const safeAmount = Number(amount);
+    if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+        throw new Error('Payment amount must be greater than zero');
+    }
+
+    const sourceAllocations = Array.isArray(paymentAllocations) && paymentAllocations.length > 0
+        ? paymentAllocations
+        : [{
+            paymentMethod,
+            amount: safeAmount
+        }];
+
+    const normalizedAllocations = sourceAllocations.map((allocation, index) => {
+        const allocationAmount = Number(allocation?.amount);
+        if (!Number.isFinite(allocationAmount) || allocationAmount <= 0) {
+            throw new Error(`Invalid payment allocation amount at position ${index + 1}`);
+        }
+
+        const normalizedMethod = normalizePaymentMethod(
+            allocation?.paymentMethod || paymentMethod || fallbackSource,
+            fallbackSource
+        );
+
+        return {
+            paymentMethod: normalizedMethod,
+            amount: parseFloat(allocationAmount.toFixed(2)),
+            giftCardCode: `${allocation?.giftCardCode || allocation?.giftCardCodeNumber || ''}`.trim() || null,
+            notes: `${allocation?.notes || ''}`.trim() || null
+        };
+    });
+
+    const totalAllocations = normalizedAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+    if (Math.abs(totalAllocations - safeAmount) > 0.01) {
+        throw new Error('Payment allocations must add up to the payment amount');
+    }
+
+    return normalizedAllocations;
+};
+
+const createAppointmentPaymentTransactions = async ({
+    appointment,
+    type,
+    amount,
+    paymentMethod,
+    paymentAllocations,
+    processedBy = null,
+    transactionRef = null,
+    notes = null,
+    source = 'tenant_dashboard_payment_collection',
+    transaction = null
+}) => {
+    const allocations = normalizePaymentAllocations({
+        amount,
+        paymentMethod,
+        paymentAllocations,
+        fallbackSource: paymentMethod || appointment?.paymentMethod || 'cash'
+    });
+
+    const baseReference = `${transactionRef || `APT-PAY-${appointment?.bookingNumber || appointment?.id?.slice(0, 8)?.toUpperCase() || 'TX'}`}`.trim();
+
+    for (let index = 0; index < allocations.length; index += 1) {
+        const allocation = allocations[index];
+        await createAppointmentTransaction({
+            appointmentId: appointment.id,
+            type,
+            amount: allocation.amount,
+            paymentMethod: allocation.paymentMethod,
+            status: 'completed',
+            transactionRef: allocations.length > 1 ? `${baseReference}-${index + 1}` : baseReference,
+            processedBy,
+            processedAt: new Date(),
+            notes: allocation.notes || notes,
+            metadata: {
+                source,
+                paymentAllocation: allocation,
+                paymentAllocations: allocations,
+                paymentSummaryMethod: allocations.length > 1 ? 'split' : allocation.paymentMethod
+            }
+        }, { transaction });
+    }
+
+    return {
+        allocations,
+        paymentMethod: allocations.length > 1 ? 'split' : allocations[0]?.paymentMethod || paymentMethod || 'cash',
+        totalAmount: allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0)
+    };
+};
+
 /**
  * Record remainder payment (at salon)
  * @param {string} appointmentId - Appointment UUID
@@ -34,7 +153,7 @@ const calculateSplitPayment = async (tenantId, totalPrice) => {
  * @returns {Promise<Object>} Updated appointment
  */
 const recordRemainderPayment = async (appointmentId, paymentData) => {
-    const { amount, paymentMethod, processedBy, notes, transactionRef } = paymentData;
+    const { amount, paymentMethod, paymentAllocations, processedBy, notes, transactionRef } = paymentData;
 
     const appointment = await db.Appointment.findByPk(appointmentId);
     if (!appointment) {
@@ -49,32 +168,38 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
         throw new Error('Remainder already paid');
     }
 
-    // Record transaction
-    await createAppointmentTransaction({
-        appointmentId,
-        type: 'remainder',
+    const normalizedAllocations = normalizePaymentAllocations({
         amount,
         paymentMethod,
-        status: 'completed',
-        transactionRef: transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+        paymentAllocations,
+        fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
+    });
+
+    await createAppointmentPaymentTransactions({
+        appointment,
+        type: 'remainder',
+        amount,
+        paymentMethod: paymentMethod || appointment.paymentMethod || 'cash',
+        paymentAllocations: normalizedAllocations,
         processedBy,
-        processedAt: new Date(),
+        transactionRef: transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
         notes,
-        metadata: {
-            source: 'tenant_remainder_collection',
-            previousPaymentStatus: appointment.paymentStatus,
-            previousTotalPaid: parseFloat(appointment.totalPaid || 0),
-            remainingBalanceBefore: parseFloat(appointment.remainderAmount || 0)
-        }
+        source: 'tenant_remainder_collection'
     });
 
     // Update appointment
     const newTotalPaid = parseFloat(appointment.totalPaid) + parseFloat(amount);
+    const resolvedPaymentMethod = normalizedAllocations.length > 1
+        ? 'split'
+        : normalizedAllocations[0]?.paymentMethod || paymentMethod || appointment.paymentMethod || 'cash';
 
     await appointment.update({
+        paymentMethod: resolvedPaymentMethod,
         remainderPaid: true,
+        remainderAmount: 0,
         totalPaid: newTotalPaid,
-        paymentStatus: 'fully_paid'
+        paymentStatus: 'fully_paid',
+        paidAt: appointment.paidAt || new Date()
     });
 
     const invoice = await ensureAppointmentInvoice(appointment.id, {
@@ -187,6 +312,8 @@ const refundPayment = async (appointmentId, refundData) => {
 
 module.exports = {
     calculateSplitPayment,
+    createAppointmentPaymentTransactions,
+    normalizePaymentAllocations,
     recordRemainderPayment,
     getPaymentSummary,
     refundPayment
