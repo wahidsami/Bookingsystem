@@ -1559,7 +1559,7 @@ export function AppointmentDetailsDrawer({
                   </div>
                 }
               >
-                <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-2.5">
+                <div className="rounded-[22px] border border-primary/20 bg-primary/5 p-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
                       {getStatusLabel(appointment.status, locale)}
@@ -1583,14 +1583,14 @@ export function AppointmentDetailsDrawer({
                     ) : null}
                   </div>
 
-                  <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
+                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                         {locale === "ar" ? "تاريخ الخدمة" : "Service date"}
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
                     </div>
-                    <div className="min-w-[200px] sm:ml-auto">
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                         {locale === "ar" ? "الحالة" : "Status"}
                       </p>
