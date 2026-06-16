@@ -246,6 +246,42 @@ interface CustomerProfile {
   allOrders?: CustomerOrderHistoryItem[];
   recentAppointments?: CustomerAppointmentHistoryItem[];
   recentOrders?: CustomerOrderHistoryItem[];
+  walletSummary?: {
+    currentBalance: number;
+    walletLedgerCount: number;
+    sentGiftCardCount: number;
+    receivedGiftCardCount: number;
+  };
+  walletLedgerEntries?: Array<{
+    id: string;
+    type: string;
+    direction: "credit" | "debit";
+    amount: number;
+    currency: string;
+    balanceBefore: number;
+    balanceAfter: number;
+    referenceType?: string | null;
+    referenceId?: string | null;
+    metadata?: Record<string, any>;
+    createdAt: string;
+  }>;
+  giftCardTransactions?: Array<{
+    id: string;
+    packageTitle: string;
+    purchaseAmount: number;
+    creditAmount: number;
+    bonusAmount: number;
+    totalCreditAmount: number;
+    status: string;
+    deliveryChannel: string;
+    senderPlatformUserId?: string | null;
+    recipientPlatformUserId?: string | null;
+    recipientEmail?: string | null;
+    recipientPhone?: string | null;
+    deliveryMode?: string | null;
+    createdAt: string;
+    claimedAt?: string | null;
+  }>;
   reviews?: Array<{
     id: string;
     rating?: number | null;
@@ -554,7 +590,7 @@ export function AppointmentDetailsDrawer({
   const [paymentCollectionRows, setPaymentCollectionRows] = useState<PaymentCollectionRow[]>([]);
   const [paymentCollectionSubmitting, setPaymentCollectionSubmitting] = useState(false);
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<AppointmentItem["status"] | null>(null);
-  const [customerTab, setCustomerTab] = useState<"overview" | "appointments" | "transactions">("overview");
+  const [customerTab, setCustomerTab] = useState<"overview" | "wallet" | "profile" | "appointments" | "transactions" | "reviews">("overview");
   const [recordRemainderMethod, setRecordRemainderMethod] = useState("cash");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "appointment" | "order" | "ledger">("all");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"all" | "completed" | "pending" | "refunded" | "failed" | "cancelled">("all");
@@ -670,8 +706,9 @@ export function AppointmentDetailsDrawer({
     const loadCustomer = async () => {
       try {
         setCustomerLoading(true);
-        const [customerResult, transactionsResult] = await Promise.allSettled([
+        const [customerResult, walletResult, transactionsResult] = await Promise.allSettled([
           tenantApi.getCustomer(customerId),
+          tenantApi.getCustomerWalletHistory(customerId),
           tenantApi.getCustomerTransactions(customerId, { limit: 100 })
         ]);
 
@@ -679,8 +716,19 @@ export function AppointmentDetailsDrawer({
           setCustomerProfile(customerResult.value.data || null);
         }
 
+        if (!cancelled && walletResult.status === "fulfilled" && walletResult.value.success) {
+          setCustomerProfile((current) => ({
+            ...(current || {}),
+            ...(walletResult.value.data || {})
+          } as CustomerProfile));
+        }
+
         if (!cancelled && customerResult.status === "rejected") {
           console.error("Failed to load customer profile:", customerResult.reason);
+        }
+
+        if (!cancelled && walletResult.status === "rejected") {
+          console.error("Failed to load customer wallet history:", walletResult.reason);
         }
 
         if (!cancelled && transactionsResult.status === "fulfilled" && transactionsResult.value.success) {
@@ -1232,6 +1280,19 @@ export function AppointmentDetailsDrawer({
     month: "short",
     year: "numeric"
   }).format(new Date(appointment.startTime)) : "";
+  const customerWalletLedgerEntries = customerProfile?.walletLedgerEntries || [];
+  const customerGiftCardTransactions = customerProfile?.giftCardTransactions || [];
+  const customerReviews = customerProfile?.reviews || [];
+  const walletRechargeEntries = customerWalletLedgerEntries.filter((entry) => {
+    const normalizedType = `${entry.type || ""}`.toLowerCase();
+    return normalizedType.includes("recharge") || normalizedType.includes("topup") || normalizedType.includes("top_up") || normalizedType.includes("credit");
+  });
+  const walletDebitEntries = customerWalletLedgerEntries.filter((entry) => {
+    const normalizedType = `${entry.type || ""}`.toLowerCase();
+    return normalizedType.includes("debit") || normalizedType.includes("payment") || normalizedType.includes("purchase");
+  });
+  const giftCardsSent = customerGiftCardTransactions.filter((tx) => tx.senderPlatformUserId === customerProfile?.id);
+  const giftCardsReceived = customerGiftCardTransactions.filter((tx) => tx.recipientPlatformUserId === customerProfile?.id);
 
   const toggleCustomerActionsMenu = () => {
     if (customerActionsOpen) {
@@ -2342,24 +2403,33 @@ export function AppointmentDetailsDrawer({
 
     const customerTabs: Array<{ key: typeof customerTab; label: string }> = [
       { key: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+      { key: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
+      { key: "profile", label: locale === "ar" ? "الملف" : "Profile" },
       { key: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
-      { key: "transactions", label: locale === "ar" ? "المعاملات" : "Transactions" }
+      { key: "transactions", label: locale === "ar" ? "المعاملات" : "Transactions" },
+      { key: "reviews", label: locale === "ar" ? "المراجعات" : "Reviews" }
     ];
 
     const renderCustomerTabContent = () => {
       switch (customerTab) {
         case "overview":
           return renderOverview();
+        case "wallet":
+          return renderWallet();
+        case "profile":
+          return renderProfile();
         case "appointments":
           return renderAppointments();
         case "transactions":
           return renderTransactions();
+        case "reviews":
+          return renderReviews();
       }
     };
 
     return (
       <div className="h-full p-3 lg:p-4">
-        <div className="grid h-full gap-4 xl:grid-cols-[320px_200px_minmax(0,1fr)]">
+        <div className="grid h-full gap-4 xl:grid-cols-[320px_220px_minmax(0,1fr)]">
           <div className="space-y-4">
             <WorkspacePanel
               title={locale === "ar" ? "الملف الشخصي" : "Customer profile"}
@@ -2537,13 +2607,13 @@ export function AppointmentDetailsDrawer({
           </div>
 
           <div className="sticky top-4 z-10 rounded-3xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
-            <div className="space-y-2">
+            <div className="grid gap-2">
               {customerTabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setCustomerTab(tab.key)}
-                  className={`w-full rounded-2xl px-3 py-2 text-left text-sm font-semibold transition ${
+                  className={`w-full rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                     customerTab === tab.key
                       ? "bg-primary text-white"
                       : "bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100"
@@ -2685,6 +2755,268 @@ export function AppointmentDetailsDrawer({
       )}
     </div>
   );
+
+  const renderWallet = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-2xl font-bold text-gray-900">{locale === "ar" ? "المحفظة" : "Wallet"}</h3>
+        <Link
+          href={customerProfile ? `/${locale}/dashboard/customers/${customerProfile.id}/wallet` : customerProfileLink}
+          onClick={onClose}
+          className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+        >
+          {locale === "ar" ? "فتح المحفظة" : "Open wallet"}
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M7 5h8v8M15 5l-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MetricTile label={locale === "ar" ? "الرصيد" : "Balance"} value={<Currency amount={Number(customerProfile?.walletBalance || 0)} />} />
+        <MetricTile label={locale === "ar" ? "إيداعات" : "Recharges"} value={walletRechargeEntries.length} />
+        <MetricTile label={locale === "ar" ? "بطاقات الهدايا" : "Gift cards"} value={customerGiftCardTransactions.length} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">
+              $
+            </span>
+            <h4 className="text-lg font-semibold text-gray-900">
+              {locale === "ar" ? "نشاط المحفظة" : "Wallet activity"}
+            </h4>
+          </div>
+          <div className="space-y-3">
+            {customerWalletLedgerEntries.length > 0 ? customerWalletLedgerEntries.map((entry) => (
+              <article key={entry.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {entry.type.split('_').join(' ')}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {formatDateTime(entry.createdAt, locale)}
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {locale === "ar" ? "قبل" : "Before"} <Currency amount={entry.balanceBefore} /> {' '}
+                      {locale === "ar" ? "بعد" : "after"} <Currency amount={entry.balanceAfter} />
+                    </p>
+                    {(entry.referenceType || entry.referenceId) && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        {entry.referenceType || '-'}
+                        {entry.referenceId ? ` #${entry.referenceId}` : ''}
+                      </p>
+                    )}
+                  </div>
+                    <div className={`text-sm font-bold ${entry.direction === 'credit' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {entry.direction === 'credit' ? '+' : '-'}<Currency amount={entry.amount} />
+                  </div>
+                </div>
+              </article>
+            )) : (
+              <p className="text-sm text-gray-500">
+                {locale === "ar" ? "لا توجد حركات محفظة حتى الآن." : "No wallet activity yet."}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">
+              G
+            </span>
+            <h4 className="text-lg font-semibold text-gray-900">
+              {locale === "ar" ? "بطاقات الهدايا" : "Gift cards"}
+            </h4>
+          </div>
+          <div className="space-y-3">
+            {customerGiftCardTransactions.length > 0 ? customerGiftCardTransactions.map((tx) => {
+              const isSent = tx.senderPlatformUserId === customerProfile?.id;
+              return (
+                <article key={tx.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{tx.packageTitle}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {isSent ? (locale === "ar" ? "مرسلة" : "Sent") : (locale === "ar" ? "مستلمة" : "Received")}
+                        {' • '}
+                        {formatDateTime(tx.createdAt, locale)}
+                      </p>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {locale === "ar" ? "الحالة" : "Status"}: {tx.status}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {locale === "ar" ? "القناة" : "Channel"}: {tx.deliveryChannel}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">
+                        <Currency amount={tx.totalCreditAmount} />
+                      </p>
+                      {tx.claimedAt ? (
+                        <p className="mt-1 text-xs text-emerald-600">
+                          {locale === "ar" ? "تم الاستلام" : "Claimed"}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              );
+            }) : (
+              <p className="text-sm text-gray-500">
+                {locale === "ar" ? "لا توجد بطاقات هدايا حتى الآن." : "No gift cards yet."}
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderProfile = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-2xl font-bold text-gray-900">{locale === "ar" ? "الملف" : "Profile"}</h3>
+        <Link
+          href={customerProfileLink}
+          onClick={onClose}
+          className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+        >
+          {locale === "ar" ? "فتح الملف الكامل" : "Open full profile"}
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M7 5h8v8M15 5l-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      </div>
+
+      <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xl font-bold text-primary ring-1 ring-gray-200">
+            {customerProfile?.profileImage ? (
+              <img
+                src={avatarUrl(customerProfile.profileImage)}
+                alt={customerFullName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              `${customerProfile?.firstName?.[0] || ""}${customerProfile?.lastName?.[0] || ""}`.toUpperCase() || "?"
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="truncate text-xl font-bold text-gray-900">{customerFullName}</h4>
+            <p className="mt-1 truncate text-sm text-gray-600">{customerProfile?.email || "-"}</p>
+            <p className="mt-0.5 truncate text-sm text-gray-600">{customerProfile?.phone || "-"}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {customerProfile?.loyaltyTier ? (
+                <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                  {customerProfile.loyaltyTier}
+                </span>
+              ) : null}
+              {customerIsWalkIn ? (
+                <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                  {locale === "ar" ? "حضور مباشر" : "Walk-in"}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <MetricTile label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={customerProfile?.email || "-"} />
+        <MetricTile label={locale === "ar" ? "الهاتف" : "Phone"} value={customerProfile?.phone || "-"} />
+        <MetricTile label={locale === "ar" ? "النوع" : "Gender"} value={customerProfile?.gender || "-"} />
+        <MetricTile
+          label={locale === "ar" ? "تاريخ الميلاد" : "Date of birth"}
+          value={customerProfile?.dateOfBirth ? formatDateTime(customerProfile.dateOfBirth, locale).split(",")[0] || "-" : "-"}
+        />
+        <MetricTile
+          label={locale === "ar" ? "اللغة المفضلة" : "Preferred language"}
+          value={customerProfile?.preferredLanguage ? customerProfile.preferredLanguage.toUpperCase() : "-"}
+        />
+        <MetricTile
+          label={locale === "ar" ? "تاريخ الإنشاء" : "Joined"}
+          value={customerProfile?.joinedAt ? formatDateTime(customerProfile.joinedAt, locale).split(",")[0] || "-" : "-"}
+        />
+      </div>
+
+      {(customerProfile?.notes || (customerProfile?.tags && customerProfile.tags.length > 0)) && (
+        <WorkspacePanel title={locale === "ar" ? "ملاحظات" : "Notes"}>
+          <div id="customer-overview-notes">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+              {customerProfile?.notes || (locale === "ar" ? "لا توجد ملاحظات." : "No notes yet.")}
+            </p>
+            {customerProfile?.tags && customerProfile.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {customerProfile.tags.map((tag) => (
+                  <span key={tag} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </WorkspacePanel>
+      )}
+    </div>
+  );
+
+  const renderReviews = () => {
+    const reviewRatings = customerReviews
+      .map((review) => Number(review.rating || 0))
+      .filter((rating) => Number.isFinite(rating) && rating > 0);
+    const averageRating = reviewRatings.length
+      ? reviewRatings.reduce((sum, rating) => sum + rating, 0) / reviewRatings.length
+      : 0;
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-2xl font-bold text-gray-900">{locale === "ar" ? "المراجعات" : "Reviews"}</h3>
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+            {customerReviews.length} {locale === "ar" ? "مراجعة" : "reviews"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <MetricTile label={locale === "ar" ? "المعدل" : "Average"} value={averageRating ? `${averageRating.toFixed(1)} ★` : "-"} />
+          <MetricTile label={locale === "ar" ? "الموجودة" : "Available"} value={customerReviews.length} />
+          <MetricTile label={locale === "ar" ? "الخدمات" : "Services"} value={customerReviews.length ? "Yes" : "-"} />
+        </div>
+
+        <div className="space-y-3">
+          {customerReviews.length > 0 ? customerReviews.map((review) => (
+            <article key={review.id} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                      {locale === "ar" ? "مراجعة" : "Review"}
+                    </span>
+                    {review.rating ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        {review.rating} ★
+                      </span>
+                    ) : null}
+                  </div>
+                  <h4 className="mt-2 text-base font-bold text-gray-900">{review.serviceName || "-"}</h4>
+                  <p className="mt-1 text-sm text-gray-500">{review.date ? formatDateTime(review.date, locale) : "-"}</p>
+                  {review.comment ? <p className="mt-3 text-sm leading-6 text-gray-700">{review.comment}</p> : null}
+                </div>
+              </div>
+            </article>
+          )) : (
+            <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+              {locale === "ar" ? "لا توجد مراجعات لهذا العميل." : "No reviews from this customer yet."}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderAppointments = () => (
     <div className="space-y-3">
