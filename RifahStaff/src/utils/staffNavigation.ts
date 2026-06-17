@@ -17,7 +17,6 @@ type StaffLike = User | null | undefined;
 
 export const staffIconMap = {
     appointments: 'calendar-outline',
-    schedule: 'calendar-outline',
     customers: 'people-outline',
     reviews: 'star-outline',
     messages: 'mail-outline',
@@ -41,17 +40,6 @@ export function getStaffNavSections(user: StaffLike, language: string): StaffNav
             descriptionEn: 'Live bookings and appointment actions.',
             descriptionAr: 'المواعيد المباشرة وإجراءات الحجز.',
             enabled: true,
-        },
-        {
-            route: 'schedule',
-            href: '/(tabs)/schedule',
-            kind: 'tab',
-            labelEn: 'Schedule',
-            labelAr: 'الجدول',
-            icon: 'schedule',
-            descriptionEn: 'Shifts, availability, and time blocks.',
-            descriptionAr: 'الدوام، التوفر، وفترات الحجز.',
-            enabled: user?.features?.schedule !== false,
         },
         {
             route: 'customers',

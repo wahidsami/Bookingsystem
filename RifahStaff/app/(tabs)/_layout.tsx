@@ -64,7 +64,7 @@ export default function TabLayout() {
         }}
       />
 
-      {['appointments', 'schedule', 'customers', 'reviews', 'messages', 'notifications', 'earnings', 'profile', 'more', 'pos', 'explore'].map((routeName) => {
+      {['appointments', 'customers', 'reviews', 'messages', 'notifications', 'earnings', 'profile', 'more', 'pos', 'explore'].map((routeName) => {
         if (routeName === 'more') {
           if (!hasMoreTab) {
             return <Tabs.Screen key={routeName} name={routeName} options={{ href: null }} />;
