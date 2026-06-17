@@ -1490,15 +1490,17 @@ export function AppointmentDetailsDrawer({
     };
 
   const handleCheckout = async () => {
-      if (currentPaymentStatus !== "fully_paid" && currentPaymentStatus !== "paid" && remainingAmount > 0) {
-        setActionNotice({
-          kind: "error",
-          message: locale === "ar"
-            ? "أكمل الدفع أولاً قبل إنهاء العملية."
-            : "Please collect payment before checkout."
-        });
-        return;
-      }
+    if (remainingAmount > 0) {
+      setPendingStatusAfterPayment("completed");
+      openPaymentCollection(currentPaymentStatus === "deposit_paid" ? "remainder" : "full", "completed");
+      setActionNotice({
+        kind: "success",
+        message: locale === "ar"
+          ? "أكمل تحصيل الدفع أولاً ثم سننهي الموعد."
+          : "Collect payment first, then we will complete the appointment."
+      });
+      return;
+    }
     await handleQuickStatusUpdate("completed");
   };
 
