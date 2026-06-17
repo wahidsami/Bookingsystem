@@ -165,6 +165,48 @@ export default function CustomerDetailPage() {
     }
   }, [customerId]);
 
+  useEffect(() => {
+    const handleWalletUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        customerId?: string;
+        walletBalance?: number;
+        totalSpent?: number;
+      }>;
+
+      if (!customEvent.detail || customEvent.detail.customerId !== customerId) {
+        return;
+      }
+
+      setCustomer((current) => {
+        if (!current) return current;
+
+        const nextWalletBalance = Number.isFinite(Number(customEvent.detail.walletBalance))
+          ? Number(customEvent.detail.walletBalance)
+          : Number(current.walletBalance ?? current.walletSummary?.currentBalance ?? 0);
+        const nextTotalSpent = Number.isFinite(Number(customEvent.detail.totalSpent))
+          ? Number(customEvent.detail.totalSpent)
+          : Number(current.totalSpent || 0);
+
+        return {
+          ...current,
+          walletBalance: nextWalletBalance,
+          totalSpent: nextTotalSpent,
+          walletSummary: current.walletSummary
+            ? {
+                ...current.walletSummary,
+                currentBalance: nextWalletBalance
+              }
+            : current.walletSummary
+        };
+      });
+    };
+
+    window.addEventListener('rifah:customer-wallet-updated', handleWalletUpdate as EventListener);
+    return () => {
+      window.removeEventListener('rifah:customer-wallet-updated', handleWalletUpdate as EventListener);
+    };
+  }, [customerId]);
+
   const handleSaveNotes = async () => {
     try {
       setSaving(true);

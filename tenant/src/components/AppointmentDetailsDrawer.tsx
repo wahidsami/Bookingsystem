@@ -1122,6 +1122,20 @@ export function AppointmentDetailsDrawer({
           : current.walletSummary
       };
     });
+
+    if (appointment?.user?.id) {
+      window.dispatchEvent(new CustomEvent('rifah:customer-wallet-updated', {
+        detail: {
+          customerId: appointment.user.id,
+          walletBalance: safeWalletAmount > 0
+            ? Math.max(0, roundMoney(Number(customerProfile?.walletBalance ?? customerProfile?.walletSummary?.currentBalance ?? 0) - safeWalletAmount))
+            : Number(customerProfile?.walletBalance ?? customerProfile?.walletSummary?.currentBalance ?? 0),
+          totalSpent: safePaymentAmount > 0
+            ? roundMoney(Number(customerProfile?.totalSpent || 0) + safePaymentAmount)
+            : Number(customerProfile?.totalSpent || 0)
+        }
+      }));
+    }
   };
 
   const beginServiceEdit = (item: AppointmentItem) => {
