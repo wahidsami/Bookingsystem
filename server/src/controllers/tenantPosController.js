@@ -289,30 +289,83 @@ const buildTenantScopedTransactionWhere = (entityScope, filters = {}) => {
     return where;
 };
 
-const mapAppointmentQueueItem = (appointment) => ({
-    id: `appointment-${appointment.id}`,
-    entityType: 'appointment',
-    entityId: appointment.id,
-    reference: appointment.bookingNumber || appointment.id,
-    customerName: getCustomerName(appointment.user),
-    customerPhone: appointment.user?.phone || null,
-    title: getServiceName(appointment.service),
-    employeeName: appointment.staff?.name || null,
-    scheduledAt: appointment.startTime,
-    status: appointment.status,
-    paymentStatus: appointment.paymentStatus,
-    paymentIntent: appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-        ? 'deposit_remainder_due'
-        : ['online', 'online-full', 'booking-fee'].includes(appointment.paymentMethod)
-            ? 'online_payment_pending'
-            : 'pay_at_center',
-    paymentMethod: appointment.paymentMethod || 'cash',
-    paymentMethodLabel: formatPaymentMethodLabel(appointment.paymentMethod || 'cash'),
-    totalAmount: parseFloat(appointment.price || 0),
-    paidAmount: parseFloat(appointment.totalPaid || 0),
-    dueAmount: getAppointmentDueAmount(appointment),
-    detailPath: `/dashboard/appointments/${appointment.id}`
+const getAppointmentQueueGroupKey = (appointment) => appointment.bookingSessionId || appointment.id;
+
+const buildAppointmentQueueTotals = (appointments = []) => appointments.reduce((acc, current) => {
+    const itemTotal = parseFloat(current?.price || 0);
+    const itemPaid = parseFloat(current?.totalPaid || 0);
+    const itemRawPrice = parseFloat(current?.rawPrice || 0);
+    const itemTaxAmount = parseFloat(current?.taxAmount || 0);
+    const itemPlatformFee = parseFloat(current?.platformFee || 0);
+
+    acc.totalAmount += Number.isFinite(itemTotal) ? itemTotal : 0;
+    acc.paidAmount += Number.isFinite(itemPaid) ? itemPaid : 0;
+    acc.subtotal += Number.isFinite(itemRawPrice) ? itemRawPrice : 0;
+    acc.taxAmount += Number.isFinite(itemTaxAmount) ? itemTaxAmount : 0;
+    acc.platformFee += Number.isFinite(itemPlatformFee) ? itemPlatformFee : 0;
+    return acc;
+}, {
+    totalAmount: 0,
+    paidAmount: 0,
+    subtotal: 0,
+    taxAmount: 0,
+    platformFee: 0
 });
+
+const mapAppointmentQueueItem = (appointments) => {
+    const sortedAppointments = [...appointments].sort((left, right) => {
+        const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+        const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+        if (leftIndex !== rightIndex) {
+            return leftIndex - rightIndex;
+        }
+        return toTimestamp(left.startTime) - toTimestamp(right.startTime);
+    });
+
+    const appointment = sortedAppointments[0];
+    const sessionAppointments = appointment?.bookingSession?.appointments || [];
+    const groupedAppointments = sessionAppointments.length > 0 ? sessionAppointments : sortedAppointments;
+    const totals = buildAppointmentQueueTotals(groupedAppointments);
+    const reference = appointment?.bookingSession?.bookingReference
+        || appointment?.bookingReference
+        || appointment?.bookingNumber
+        || appointment?.id;
+    const serviceNames = groupedAppointments
+        .map((item) => getServiceName(item.service))
+        .filter(Boolean);
+    const title = serviceNames.length > 1
+        ? `${serviceNames[0]} +${serviceNames.length - 1} more`
+        : (serviceNames[0] || getServiceName(appointment?.service));
+    const paymentStatus = `${appointment?.paymentStatus || ''}`.trim().toLowerCase();
+    const anyDepositPaid = groupedAppointments.some((item) => `${item.paymentStatus || ''}`.trim().toLowerCase() === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID);
+    const anyOnlinePayment = groupedAppointments.some((item) => ['online', 'online-full', 'booking-fee'].includes(`${item.paymentMethod || ''}`.trim().toLowerCase()));
+    const dueAmount = parseFloat(Math.max(0, totals.totalAmount - totals.paidAmount).toFixed(2));
+
+    return {
+        id: `appointment-${appointment.id}`,
+        entityType: 'appointment',
+        entityId: appointment.id,
+        reference,
+        customerName: getCustomerName(appointment.user),
+        customerPhone: appointment.user?.phone || null,
+        title,
+        employeeName: appointment.staff?.name || null,
+        scheduledAt: appointment.startTime,
+        status: appointment.status,
+        paymentStatus: appointment.paymentStatus,
+        paymentIntent: anyDepositPaid || paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
+            ? 'deposit_remainder_due'
+            : anyOnlinePayment
+                ? 'online_payment_pending'
+                : 'pay_at_center',
+        paymentMethod: appointment.bookingSession?.paymentMethod || appointment.paymentMethod || 'cash',
+        paymentMethodLabel: formatPaymentMethodLabel(appointment.bookingSession?.paymentMethod || appointment.paymentMethod || 'cash'),
+        totalAmount: parseFloat(totals.totalAmount.toFixed(2)),
+        paidAmount: parseFloat(totals.paidAmount.toFixed(2)),
+        dueAmount,
+        detailPath: `/dashboard/appointments/${appointment.id}`
+    };
+};
 
 const logGiftCardAudit = (event, payload = {}) => {
     if (!GIFT_CARD_AUDIT_ENABLED) return;
@@ -1407,6 +1460,32 @@ const fetchQueueData = async (tenantId, search = '', limit = POS_QUEUE_LIMIT) =>
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                     required: false
+                },
+                {
+                    model: db.BookingSession,
+                    as: 'bookingSession',
+                    required: false,
+                    include: [
+                        {
+                            model: db.Appointment,
+                            as: 'appointments',
+                            required: false,
+                            include: [
+                                {
+                                    model: db.Service,
+                                    as: 'service',
+                                    attributes: ['id', 'name_en', 'name_ar'],
+                                    required: false
+                                },
+                                {
+                                    model: db.PlatformUser,
+                                    as: 'user',
+                                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
                 }
             ],
             order: [['startTime', 'ASC']],
@@ -1440,8 +1519,17 @@ const fetchQueueData = async (tenantId, search = '', limit = POS_QUEUE_LIMIT) =>
         })
     ]);
 
+    const groupedAppointments = appointments.reduce((map, appointment) => {
+        const key = getAppointmentQueueGroupKey(appointment);
+        if (!map.has(key)) {
+            map.set(key, []);
+        }
+        map.get(key).push(appointment);
+        return map;
+    }, new Map());
+
     const queue = [
-        ...appointments.map(mapAppointmentQueueItem),
+        ...Array.from(groupedAppointments.values()).map(mapAppointmentQueueItem),
         ...orders.map(mapOrderQueueItem)
     ]
         .filter((item) => item.dueAmount > 0)

@@ -1431,19 +1431,50 @@ export function AppointmentDetailsDrawer({
     const customerProfileLink = customerId
       ? `/${locale}/dashboard/customers/${customerId}`
       : `/${locale}/dashboard/customers`;
+    const sessionAppointments = appointment.bookingSession?.appointments || [];
+    const hasSessionAppointments = sessionAppointments.length > 0;
+    const summedSessionTotals = hasSessionAppointments
+      ? sessionAppointments.reduce(
+          (acc, sessionAppointment) => {
+            acc.subtotal += Number(sessionAppointment.rawPrice ?? 0);
+            acc.taxAmount += Number(sessionAppointment.taxAmount ?? 0);
+            acc.platformFee += Number(sessionAppointment.platformFee ?? 0);
+            acc.totalAmount += Number(sessionAppointment.price ?? 0);
+            acc.paidAmount += Number(sessionAppointment.totalPaid ?? 0);
+            return acc;
+          },
+          { subtotal: 0, taxAmount: 0, platformFee: 0, totalAmount: 0, paidAmount: 0 }
+        )
+      : null;
     const sessionTotals = appointment.bookingSession || null;
     const subtotalAmount = Number(
+      summedSessionTotals?.subtotal ??
       sessionTotals?.subtotal ??
       appointment.rawPrice ??
       appointment.price ??
       0
     );
-    const taxAmount = Number(sessionTotals?.taxAmount ?? appointment.taxAmount ?? 0);
+    const taxAmount = Number(
+      summedSessionTotals?.taxAmount ??
+      sessionTotals?.taxAmount ??
+      appointment.taxAmount ??
+      0
+    );
     const discountAmount = 0;
     const depositAmount = Number(appointment.depositAmount || 0);
-    const paidAmount = Number(appointment.totalPaid || 0);
-    const platformFeeAmount = Number(sessionTotals?.platformFee ?? appointment.platformFee ?? 0);
+    const paidAmount = Number(
+      summedSessionTotals?.paidAmount ??
+      appointment.totalPaid ??
+      0
+    );
+    const platformFeeAmount = Number(
+      summedSessionTotals?.platformFee ??
+      sessionTotals?.platformFee ??
+      appointment.platformFee ??
+      0
+    );
     const totalAmount = Number(
+      summedSessionTotals?.totalAmount ??
       sessionTotals?.totalAmount ??
       appointment.price ??
       (subtotalAmount + taxAmount + platformFeeAmount)
@@ -1459,7 +1490,6 @@ export function AppointmentDetailsDrawer({
         : outstandingAmount
     );
     const serviceCards = (() => {
-      const sessionAppointments = appointment.bookingSession?.appointments || [];
       if (!sessionAppointments.length) {
         return [appointment];
       }
