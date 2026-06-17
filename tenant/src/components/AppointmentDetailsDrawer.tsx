@@ -81,6 +81,11 @@ interface AppointmentBookingSession {
   id: string;
   bookingReference?: string | null;
   itemCount?: number | null;
+  subtotal?: number | null;
+  taxAmount?: number | null;
+  platformFee?: number | null;
+  totalAmount?: number | null;
+  paymentMethod?: string | null;
   appointments?: AppointmentSessionItem[];
 }
 
@@ -1426,12 +1431,23 @@ export function AppointmentDetailsDrawer({
     const customerProfileLink = customerId
       ? `/${locale}/dashboard/customers/${customerId}`
       : `/${locale}/dashboard/customers`;
-    const subtotalAmount = Number(appointment.rawPrice || appointment.price || 0);
-    const taxAmount = Number(appointment.taxAmount || 0);
+    const sessionTotals = appointment.bookingSession || null;
+    const subtotalAmount = Number(
+      sessionTotals?.subtotal ??
+      appointment.rawPrice ??
+      appointment.price ??
+      0
+    );
+    const taxAmount = Number(sessionTotals?.taxAmount ?? appointment.taxAmount ?? 0);
     const discountAmount = 0;
     const depositAmount = Number(appointment.depositAmount || 0);
     const paidAmount = Number(appointment.totalPaid || 0);
-    const totalAmount = Number(appointment.price || 0);
+    const platformFeeAmount = Number(sessionTotals?.platformFee ?? appointment.platformFee ?? 0);
+    const totalAmount = Number(
+      sessionTotals?.totalAmount ??
+      appointment.price ??
+      (subtotalAmount + taxAmount + platformFeeAmount)
+    );
     const outstandingAmount = Math.max(0, Number(appointment.outstandingAmount ?? (totalAmount - paidAmount)));
     const remainingAmount = currentPaymentStatus === "deposit_paid"
       ? Math.max(0, Number(appointment.remainderAmount ?? outstandingAmount))
