@@ -97,6 +97,36 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
     return normalizedAllocations;
 };
 
+const decrementCustomerWalletBalance = async (appointment, amount, transaction) => {
+    if (!appointment?.platformUserId) {
+        throw new Error('Customer wallet account not found');
+    }
+
+    const walletUser = await db.PlatformUser.findByPk(appointment.platformUserId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+    });
+
+    if (!walletUser) {
+        throw new Error('Customer wallet account not found');
+    }
+
+    const walletBalanceBefore = parseFloat(walletUser.walletBalance || 0);
+    const numericAmount = parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        throw new Error('Invalid wallet amount');
+    }
+
+    if (walletBalanceBefore + 0.01 < numericAmount) {
+        throw new Error('Insufficient wallet balance');
+    }
+
+    await walletUser.decrement('walletBalance', {
+        by: numericAmount,
+        transaction
+    });
+};
+
 const createAppointmentPaymentTransactions = async ({
     appointment,
     type,
@@ -120,6 +150,9 @@ const createAppointmentPaymentTransactions = async ({
 
     for (let index = 0; index < allocations.length; index += 1) {
         const allocation = allocations[index];
+        if (allocation.paymentMethod === 'wallet') {
+            await decrementCustomerWalletBalance(appointment, allocation.amount, transaction);
+        }
         await createAppointmentTransaction({
             appointmentId: appointment.id,
             type,
