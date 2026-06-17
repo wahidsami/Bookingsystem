@@ -4,7 +4,7 @@ const updateUrl = easProjectId ? `https://u.expo.dev/${easProjectId}` : undefine
 
 module.exports = {
   expo: {
-    name: 'Refah - Beauty & Wellness',
+    name: 'Refah Staff',
     slug: 'refah-mobile',
     scheme: 'com.refah.mobile',
     version: '1.0.0',

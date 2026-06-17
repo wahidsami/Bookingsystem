@@ -96,71 +96,9 @@ export function DashboardScreen() {
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
             >
-                {/* Stats Cards */}
-                <View style={styles.statsContainer}>
-                    <LinearGradient
-                        colors={['#8B5CF6', '#7C3AED']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.statCard}
-                    >
-                        <Text style={styles.statLabel}>{t('upcomingBookings')}</Text>
-                        <Text style={styles.statValue}>{stats.upcomingCount}</Text>
-                        <View style={styles.statIconWrap}>
-                            <AppIcon name="bookings" size={22} color={colors.textInverse} />
-                        </View>
-                    </LinearGradient>
-                    <LinearGradient
-                        colors={['#0EA5E9', '#0284C7']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.statCard}
-                    >
-                        <Text style={styles.statLabel}>{t('payments')}</Text>
-                        <Text style={styles.statValue}>{stats.pendingPayment}</Text>
-                        <View style={styles.statIconWrap}>
-                            <AppIcon name="card" size={22} color={colors.textInverse} />
-                        </View>
-                    </LinearGradient>
-                </View>
-
-                {/* Quick Actions */}
-                <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('quickActions')}</Text>
-                <View style={styles.actionsGrid}>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => navigation.navigate('Browse')}
-                    >
-                        <View style={styles.actionIconContainer}>
-                            <AppIcon name="search" size={24} color={colors.primary} />
-                        </View>
-                        <Text style={styles.actionText}>{t('findSalon')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => navigation.navigate('Bookings')}
-                    >
-                        <View style={[styles.actionIconContainer, { backgroundColor: '#E0F2FE' }]}>
-                            <AppIcon name="bookings" size={24} color={colors.primary} />
-                        </View>
-                        <Text style={styles.actionText}>{t('bookings')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => navigation.navigate('MyPurchases')}
-                    >
-                        <View style={[styles.actionIconContainer, { backgroundColor: '#FCE7F3' }]}>
-                            <AppIcon name="purchases" size={24} color={colors.primary} />
-                        </View>
-                        <Text style={styles.actionText}>{t('myPurchases')}</Text>
-                    </TouchableOpacity>
-                </View>
-
                 {/* Recent/Upcoming Bookings Preview */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>{t('upcomingBookings')}</Text>
+                    <Text style={styles.sectionTitle}>{t('appointments')}</Text>
                     <TouchableOpacity onPress={() => navigation.navigate('Bookings')}>
                         <Text style={styles.viewAll}>{t('viewAll')}</Text>
                     </TouchableOpacity>
@@ -202,6 +140,34 @@ export function DashboardScreen() {
                         </TouchableOpacity>
                     </View>
                 )}
+
+                {/* Stats Cards */}
+                <View style={styles.statsContainer}>
+                    <LinearGradient
+                        colors={['#8B5CF6', '#7C3AED']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.statCard}
+                    >
+                        <Text style={styles.statLabel}>{t('upcomingBookings')}</Text>
+                        <Text style={styles.statValue}>{stats.upcomingCount}</Text>
+                        <View style={styles.statIconWrap}>
+                            <AppIcon name="bookings" size={22} color={colors.textInverse} />
+                        </View>
+                    </LinearGradient>
+                    <LinearGradient
+                        colors={['#0EA5E9', '#0284C7']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.statCard}
+                    >
+                        <Text style={styles.statLabel}>{t('payments')}</Text>
+                        <Text style={styles.statValue}>{stats.pendingPayment}</Text>
+                        <View style={styles.statIconWrap}>
+                            <AppIcon name="card" size={22} color={colors.textInverse} />
+                        </View>
+                    </LinearGradient>
+                </View>
 
             </ScrollView>
         </View>
@@ -309,42 +275,6 @@ const styles = StyleSheet.create({
     },
     rtlText: {
         textAlign: 'right',
-    },
-    actionsGrid: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginBottom: spacing.lg,
-    },
-    actionButton: {
-        flex: 1,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 3,
-    },
-    actionIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#F3E8FF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.sm,
-    },
-    actionIcon: {
-        fontSize: 24,
-    },
-    actionText: {
-        fontSize: fontSize.xs,
-        fontWeight: '600',
-        color: colors.text,
-        textAlign: 'center',
     },
     bookingCard: {
         backgroundColor: colors.surface,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ThemedText } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { BookingsScreen } from '../screens/BookingsScreen';
 import type { StaffProfile } from '../api/client';
@@ -19,8 +20,8 @@ function StaffPlaceholderScreen({ title, subtitle, icon }: { title: string; subt
                 <View style={styles.placeholderIconWrap}>
                     <AppIcon name={icon} size={28} color={colors.primary} />
                 </View>
-                <Text style={[styles.placeholderTitle, isRTL && styles.rtlText]}>{title}</Text>
-                <Text style={[styles.placeholderSubtitle, isRTL && styles.rtlText]}>{subtitle}</Text>
+                <ThemedText style={[styles.placeholderTitle, isRTL && styles.rtlText]}>{title}</ThemedText>
+                <ThemedText style={[styles.placeholderSubtitle, isRTL && styles.rtlText]}>{subtitle}</ThemedText>
             </View>
         </View>
     );
@@ -33,12 +34,12 @@ function StaffMoreScreen({ sections, navigation }: { sections: StaffOverflowSect
 
     return (
         <ScrollView contentContainerStyle={styles.moreContainer}>
-            <Text style={[styles.moreTitle, isRTL && styles.rtlText]}>{language === 'ar' ? 'المزيد' : 'More'}</Text>
-            <Text style={[styles.moreSubtitle, isRTL && styles.rtlText]}>
+            <ThemedText style={[styles.moreTitle, isRTL && styles.rtlText]}>{language === 'ar' ? 'المزيد' : 'More'}</ThemedText>
+            <ThemedText style={[styles.moreSubtitle, isRTL && styles.rtlText]}>
                 {sections.length > 0
                     ? (isRTL ? 'الأقسام الإضافية المتاحة من المدير تظهر هنا.' : 'Additional admin-enabled sections appear here.')
                     : (isRTL ? 'لا توجد أقسام إضافية مفعّلة لهذا الحساب.' : 'No additional sections are enabled for this account.')}
-            </Text>
+            </ThemedText>
             <View style={styles.moreGrid}>
                 {sections.length > 0 ? sections.map((section) => (
                     <TouchableOpacity
@@ -48,11 +49,11 @@ function StaffMoreScreen({ sections, navigation }: { sections: StaffOverflowSect
                         onPress={() => navigation.navigate(section.name)}
                     >
                         <AppIcon name={section.icon} size={20} color={colors.primary} />
-                        <Text style={styles.moreItemText}>{language === 'ar' ? section.labelAr : section.labelEn}</Text>
+                        <ThemedText style={styles.moreItemText}>{language === 'ar' ? section.labelAr : section.labelEn}</ThemedText>
                     </TouchableOpacity>
                 )) : (
                     <View style={styles.moreItem}>
-                        <Text style={styles.moreItemText}>{isRTL ? 'غير متاح' : 'Not enabled'}</Text>
+                        <ThemedText style={styles.moreItemText}>{isRTL ? 'غير متاح' : 'Not enabled'}</ThemedText>
                     </View>
                 )}
             </View>
@@ -79,12 +80,12 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
     const insets = useSafeAreaInsets();
     const bottomPadding = Math.max(insets.bottom, 14);
 
-    const hasReviews = Boolean(profile?.permissions?.view_reviews);
-    const hasClients = Boolean(profile?.permissions?.view_clients);
-    const hasEarnings = Boolean(profile?.permissions?.view_earnings);
-    const hasMessages = Boolean(profile?.features?.messages);
-    const hasSchedule = Boolean(profile?.features?.schedule);
-    const hasTimeOff = Boolean(profile?.features?.timeOff);
+    const hasReviews = profile?.permissions?.view_reviews ?? true;
+    const hasClients = profile?.permissions?.view_clients ?? false;
+    const hasEarnings = profile?.permissions?.view_earnings ?? false;
+    const hasMessages = profile?.features?.messages ?? false;
+    const hasSchedule = profile?.features?.schedule ?? true;
+    const hasTimeOff = profile?.features?.timeOff ?? true;
 
     const tabCandidates: StaffTabConfig[] = [
         {
@@ -104,7 +105,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             render: () => (
                 <StaffPlaceholderScreen
                     title={language === 'ar' ? 'الجدول' : 'Schedule'}
-                    subtitle="Weekly schedule and availability will live here."
+                    subtitle={language === 'ar'
+                        ? 'سيظهر هنا جدول الأسبوع والتوفر.'
+                        : 'Weekly schedule and availability will live here.'}
                     icon="event"
                 />
             ),
@@ -118,7 +121,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             render: () => (
                 <StaffPlaceholderScreen
                     title={language === 'ar' ? 'العملاء' : 'Clients'}
-                    subtitle="Client summaries and notes will appear here."
+                    subtitle={language === 'ar'
+                        ? 'ستظهر هنا ملخصات العملاء والملاحظات.'
+                        : 'Client summaries and notes will appear here.'}
                     icon="profile"
                 />
             ),
@@ -132,7 +137,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             render: () => (
                 <StaffPlaceholderScreen
                     title={language === 'ar' ? 'المراجعات' : 'Reviews'}
-                    subtitle="Customer reviews and replies are shown here."
+                    subtitle={language === 'ar'
+                        ? 'ستظهر هنا تقييمات العملاء والردود.'
+                        : 'Customer reviews and replies are shown here.'}
                     icon="star"
                 />
             ),
@@ -146,7 +153,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             render: () => (
                 <StaffPlaceholderScreen
                     title={language === 'ar' ? 'الأرباح' : 'Earnings'}
-                    subtitle="Earnings and payout summaries will appear here."
+                    subtitle={language === 'ar'
+                        ? 'ستظهر هنا الأرباح وملخصات الصرف.'
+                        : 'Earnings and payout summaries will appear here.'}
                     icon="dashboard"
                 />
             ),
@@ -160,7 +169,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             render: () => (
                 <StaffPlaceholderScreen
                     title={language === 'ar' ? 'الرسائل' : 'Messages'}
-                    subtitle="Staff messages and conversations will appear here."
+                    subtitle={language === 'ar'
+                        ? 'ستظهر هنا رسائل الموظفين والمحادثات.'
+                        : 'Staff messages and conversations will appear here.'}
                     icon="message"
                 />
             ),
@@ -174,7 +185,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             render: () => (
                 <StaffPlaceholderScreen
                     title={language === 'ar' ? 'الغياب' : 'Time off'}
-                    subtitle="Leave requests and schedule exceptions will appear here."
+                    subtitle={language === 'ar'
+                        ? 'ستظهر هنا طلبات الإجازات والاستثناءات.'
+                        : 'Leave requests and schedule exceptions will appear here.'}
                     icon="calendar"
                 />
             ),
@@ -198,12 +211,13 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
                     borderTopColor: '#E5E7EB',
                     paddingTop: 8,
                     paddingBottom: bottomPadding,
-                    height: 62 + bottomPadding,
+                    minHeight: 62 + bottomPadding,
                     backgroundColor: '#FFFFFF',
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,
                     fontWeight: '600',
+                    fontFamily: language === 'ar' ? 'Cairo-Regular' : undefined,
                 },
             }}
         >
@@ -246,7 +260,7 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
                     )}
                     options={{
                         tabBarLabel: language === 'ar' ? 'المزيد' : 'More',
-                        tabBarIcon: ({ color, size }) => <AppIcon name="dashboard" size={size} color={color} />,
+                        tabBarIcon: ({ color, size }) => <AppIcon name="folder" size={size} color={color} />,
                     }}
                 />
             ) : null}
