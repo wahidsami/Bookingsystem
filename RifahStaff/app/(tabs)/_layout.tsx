@@ -21,15 +21,22 @@ export default function TabLayout() {
           backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#ffffff',
           borderTopWidth: 1,
           borderTopColor: colorScheme === 'dark' ? '#374151' : '#e5e7eb',
-          height: 64 + bottom,
-          paddingBottom: Math.max(12, bottom),
-          paddingTop: 8,
+          height: 72 + bottom,
+          paddingBottom: Math.max(16, bottom + 8),
+          paddingTop: 10,
           paddingHorizontal: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
-          marginBottom: 2,
+          marginBottom: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 2,
+        },
+        tabBarItemStyle: {
+          paddingTop: 4,
+          paddingBottom: 4,
         },
       }}>
       <Tabs.Screen
