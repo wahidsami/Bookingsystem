@@ -1,12 +1,14 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTranslation } from 'react-i18next';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
+  const { bottom } = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -19,9 +21,15 @@ export default function TabLayout() {
           backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#ffffff',
           borderTopWidth: 1,
           borderTopColor: colorScheme === 'dark' ? '#374151' : '#e5e7eb',
-          height: 64,
-          paddingBottom: 8,
+          height: 64 + bottom,
+          paddingBottom: Math.max(12, bottom),
           paddingTop: 8,
+          paddingHorizontal: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginBottom: 2,
         },
       }}>
       <Tabs.Screen
@@ -33,8 +41,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: t('dashboard') || 'Home',
-          tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
