@@ -340,11 +340,11 @@ export default function CustomerDetailPage() {
         )}
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)] gap-8">
           {/* Left Column - Customer Info & Notes */}
           <div className="space-y-6">
             {/* Profile Card */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-start justify-between gap-3 mb-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -365,7 +365,7 @@ export default function CustomerDetailPage() {
               </div>
 
               <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center mb-4 relative overflow-hidden">
+                <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center mb-4 relative overflow-hidden ring-4 ring-primary-50 shadow-md">
                   {customer.profileImage ? (
                     <>
                       <img
@@ -390,7 +390,7 @@ export default function CustomerDetailPage() {
                     </span>
                   )}
                 </div>
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-gray-900">
                       {customer.firstName} {customer.lastName}
                     </h2>
@@ -414,6 +414,56 @@ export default function CustomerDetailPage() {
                       {customer.customerType === 'product_only' && '🛍️ ' + (t('productsOnly') || 'Products Only')}
                     </span>
                   )}
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    onClick={() => setEditingProfile(true)}
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-primary-200 bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition-colors"
+                  >
+                    {t('profile') || 'Profile'}
+                  </button>
+                  <Link
+                    href={`/${locale}/dashboard/customers/${customer.id}/wallet`}
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    {t('wallet') || 'Wallet'}
+                  </Link>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-3 w-full">
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      {locale === 'ar' ? 'الانضمام' : 'Joined'}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900">
+                      {formatDate(customer.createdAt)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      {locale === 'ar' ? 'آخر زيارة' : 'Last visit'}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900">
+                      {formatDate(customer.lastVisit)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      {locale === 'ar' ? 'الحجوزات' : 'Bookings'}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900">
+                      {customer.totalBookings}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                      {locale === 'ar' ? 'اللغة' : 'Language'}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900">
+                      {customer.preferredLanguage ? customer.preferredLanguage.toUpperCase() : '-'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -510,33 +560,48 @@ export default function CustomerDetailPage() {
                 ) : (
                   <div className="space-y-3">
                     {customer.email && (
-                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <EnvelopeIcon className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">{customer.email}</span>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === 'ar' ? 'البريد' : 'Email'}</p>
+                          <span className="text-sm font-medium text-gray-800">{customer.email}</span>
+                        </div>
                       </div>
                     )}
                     {customer.phone && (
-                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <PhoneIcon className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">{customer.phone}</span>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === 'ar' ? 'الجوال' : 'Phone'}</p>
+                          <span className="text-sm font-medium text-gray-800">{customer.phone}</span>
+                        </div>
                       </div>
                     )}
                     {customer.gender && (
-                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <UserIcon className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-600 capitalize">{customer.gender}</span>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === 'ar' ? 'النوع' : 'Gender'}</p>
+                          <span className="text-sm font-medium text-gray-800 capitalize">{customer.gender}</span>
+                        </div>
                       </div>
                     )}
                     {customer.dateOfBirth && (
-                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <CalendarIcon className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">{formatDate(customer.dateOfBirth)}</span>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === 'ar' ? 'تاريخ الميلاد' : 'Birth date'}</p>
+                          <span className="text-sm font-medium text-gray-800">{formatDate(customer.dateOfBirth)}</span>
+                        </div>
                       </div>
                     )}
                     {customer.preferredLanguage && (
-                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                         <ClockIcon className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">{customer.preferredLanguage.toUpperCase()}</span>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === 'ar' ? 'اللغة المفضلة' : 'Preferred language'}</p>
+                          <span className="text-sm font-medium text-gray-800">{customer.preferredLanguage.toUpperCase()}</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -545,7 +610,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Notes & Tags */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <h3 className="text-lg font-semibold text-gray-900">{t('notesAndTags') || 'Notes & Tags'}</h3>
                 {!editingNotes && (
@@ -644,7 +709,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Wallet & Gifts */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {t('wallet') || 'Wallet'}
@@ -785,30 +850,30 @@ export default function CustomerDetailPage() {
           </div>
 
           {/* Right Column - Statistics & Preferences */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
             {/* Statistics */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t('statistics') || 'Statistics'}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
                   <p className="text-2xl font-bold text-blue-600">{customer.totalBookings}</p>
                   <p className="text-sm text-gray-600 mt-1">{t('totalBookings') || 'Total Bookings'}</p>
                 </div>
                 {customer.totalOrders !== undefined && (
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-center p-4 bg-green-50 rounded-2xl border border-green-100">
                     <p className="text-2xl font-bold text-green-600">{customer.totalOrders}</p>
                     <p className="text-sm text-gray-600 mt-1">{t('totalOrders') || 'Total Orders'}</p>
                   </div>
                 )}
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-center p-4 bg-purple-50 rounded-2xl border border-purple-100">
                   <p className="text-2xl font-bold text-purple-600">
                     <Currency amount={customer.totalSpent} />
                   </p>
                   <p className="text-sm text-gray-600 mt-1">{t('totalSpent') || 'Total Spent'}</p>
                 </div>
-                <div className="text-center p-4 bg-amber-50 rounded-lg">
+                <div className="text-center p-4 bg-amber-50 rounded-2xl border border-amber-100">
                   <p className="text-2xl font-bold text-amber-600">{customer.completedBookings}</p>
                   <p className="text-sm text-gray-600 mt-1">{t('completed') || 'Completed'}</p>
                 </div>
@@ -816,7 +881,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Preferences */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                 {t('preferences') || 'Preferences'}
               </h3>
@@ -880,7 +945,7 @@ export default function CustomerDetailPage() {
         </div>
 
         {/* Complete History Section */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           {/* Header with Tabs */}
           <div className="mb-6">
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', textAlign: isRTL ? 'right' : 'left' }}>
