@@ -1154,7 +1154,10 @@ export function AppointmentDetailsDrawer({
     if (!appointment || paymentUpdating) return;
     try {
       setPaymentUpdating(true);
-      const response = await tenantApi.updatePaymentStatus(appointment.id, "fully_paid", paymentMethod);
+      const paymentAmount = Number((appointment as any).outstandingAmount ?? appointment.price ?? 0);
+      const response = await tenantApi.updatePaymentStatus(appointment.id, "fully_paid", paymentMethod, {
+        amount: paymentAmount > 0 ? paymentAmount : undefined
+      });
       if (!response?.success) {
         setActionNotice({
           kind: "error",
@@ -1482,7 +1485,9 @@ export function AppointmentDetailsDrawer({
       appointment.price ??
       (subtotalAmount + taxAmount + platformFeeAmount)
     );
-    const outstandingAmount = Math.max(0, Number(appointment.outstandingAmount ?? (totalAmount - paidAmount)));
+    const outstandingAmount = hasSessionAppointments
+      ? Math.max(0, totalAmount - paidAmount)
+      : Math.max(0, Number(appointment.outstandingAmount ?? (totalAmount - paidAmount)));
     const remainingAmount = currentPaymentStatus === "deposit_paid"
       ? Math.max(0, Number(appointment.remainderAmount ?? outstandingAmount))
       : outstandingAmount;
@@ -1746,6 +1751,7 @@ export function AppointmentDetailsDrawer({
               transactionRef: undefined
             })
           : await tenantApi.updatePaymentStatus(appointment.id, "fully_paid", payload.paymentMethod, {
+              amount: payload.amount,
               notes: payload.notes,
               paymentAllocations: payload.paymentAllocations
             });

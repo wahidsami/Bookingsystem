@@ -1282,6 +1282,7 @@ class TenantApiClient {
     paymentStatus: string,
     paymentMethod?: string,
     paymentData?: {
+      amount?: number;
       transactionRef?: string;
       notes?: string;
       paymentAllocations?: Array<{
@@ -1297,6 +1298,7 @@ class TenantApiClient {
       body: JSON.stringify({
         paymentStatus,
         paymentMethod,
+        amount: paymentData?.amount,
         transactionRef: paymentData?.transactionRef,
         notes: paymentData?.notes,
         paymentAllocations: paymentData?.paymentAllocations

@@ -190,7 +190,22 @@ export default function AppointmentDetailsPage() {
     
     setUpdating(true);
     try {
-      const response = await tenantApi.updatePaymentStatus(appointment.id, paymentStatus, paymentMethod);
+      const sessionAppointments = Array.isArray((appointment as any)?.bookingSession?.appointments)
+        ? (appointment as any).bookingSession.appointments
+        : [];
+      const sessionTotals = sessionAppointments.length > 0
+        ? sessionAppointments.reduce((acc: { totalAmount: number; paidAmount: number }, item: any) => {
+            acc.totalAmount += Number(item?.price || 0);
+            acc.paidAmount += Number(item?.totalPaid || 0);
+            return acc;
+          }, { totalAmount: 0, paidAmount: 0 })
+        : null;
+      const paymentAmount = paymentStatus === "fully_paid"
+        ? Number(sessionTotals ? Math.max(0, sessionTotals.totalAmount - sessionTotals.paidAmount) : ((appointment as any).outstandingAmount ?? appointment.price ?? 0))
+        : Number(sessionTotals ? Math.max(0, sessionTotals.totalAmount - sessionTotals.paidAmount) : (appointment.remainderAmount ?? (appointment as any).outstandingAmount ?? 0));
+      const response = await tenantApi.updatePaymentStatus(appointment.id, paymentStatus, paymentMethod, {
+        amount: paymentAmount > 0 ? paymentAmount : undefined
+      });
       if (response.success) {
         loadAppointment();
       } else {
@@ -214,7 +229,17 @@ export default function AppointmentDetailsPage() {
 
   const handleRecordRemainder = async () => {
     if (!appointment) return;
-    const remainder = Number(appointment.remainderAmount ?? 0);
+    const sessionAppointments = Array.isArray((appointment as any)?.bookingSession?.appointments)
+      ? (appointment as any).bookingSession.appointments
+      : [];
+    const sessionTotals = sessionAppointments.length > 0
+      ? sessionAppointments.reduce((acc: { totalAmount: number; paidAmount: number }, item: any) => {
+          acc.totalAmount += Number(item?.price || 0);
+          acc.paidAmount += Number(item?.totalPaid || 0);
+          return acc;
+        }, { totalAmount: 0, paidAmount: 0 })
+      : null;
+    const remainder = Number(sessionTotals ? Math.max(0, sessionTotals.totalAmount - sessionTotals.paidAmount) : (appointment.remainderAmount ?? 0));
     if (remainder <= 0) return;
     setUpdating(true);
     try {

@@ -368,7 +368,11 @@ export default function TenantPosPage() {
         } else if (selectedItem.paymentStatus === "deposit_paid") {
           await tenantApi.recordRemainderPayment(selectedItem.entityId, { amount: selectedItem.dueAmount, paymentMethod: collectionMethod, notes: collectionNotes || undefined, transactionRef: transactionRef || undefined });
         } else {
-          await tenantApi.updatePaymentStatus(selectedItem.entityId, "fully_paid", collectionMethod, { transactionRef: transactionRef || undefined, notes: collectionNotes || undefined });
+          await tenantApi.updatePaymentStatus(selectedItem.entityId, "fully_paid", collectionMethod, {
+            amount: selectedItem.dueAmount,
+            transactionRef: transactionRef || undefined,
+            notes: collectionNotes || undefined
+          });
         }
       } else {
         if (collectionMethod === "gift_card") {
