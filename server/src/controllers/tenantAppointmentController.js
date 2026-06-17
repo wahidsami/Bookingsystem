@@ -432,6 +432,61 @@ async function sendAppointmentInviteEmail({ to, customerName, tenantName, invite
     });
 }
 
+async function sendAppointmentRescheduleEmail({
+    to,
+    customerName,
+    tenantName,
+    startTime,
+    serviceName,
+    oldStartTime,
+    newStaffName,
+    oldStaffName,
+    bookingReference,
+    locale = 'en'
+}) {
+    if (!to) {
+        return;
+    }
+
+    if (`${to}`.toLowerCase().endsWith('@guest.refah.local')) {
+        return;
+    }
+
+    const appointmentDate = new Date(startTime).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+
+    const previousAppointmentDate = oldStartTime
+        ? new Date(oldStartTime).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        })
+        : '';
+
+    await sendEmail({
+        to,
+        subject: locale === 'ar' ? 'تم تحديث موعدك في رفاه' : 'Your Refah appointment has been updated',
+        template: 'customer_appointment_rescheduled',
+        data: {
+            customerName: customerName || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer'),
+            tenantName: tenantName || 'Refah',
+            serviceName: serviceName || (locale === 'ar' ? 'الخدمة' : 'Service'),
+            appointmentDate,
+            previousAppointmentDate,
+            newStaffName: newStaffName || (locale === 'ar' ? 'مقدم الخدمة الجديد' : 'New staff member'),
+            oldStaffName: oldStaffName || (locale === 'ar' ? 'مقدم الخدمة السابق' : 'Previous staff member'),
+            bookingReference: bookingReference || ''
+        }
+    });
+}
+
 function appendGroupGuestToNotes(notes, groupGuest) {
     if (!groupGuest || typeof groupGuest !== 'object') {
         return notes;
@@ -2450,7 +2505,7 @@ exports.reassignAppointmentStaff = async (req, res) => {
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'preferredLanguage'],
                     required: false
                 }
             ],
@@ -2687,6 +2742,12 @@ exports.rescheduleAppointment = async (req, res) => {
                     as: 'staff',
                     where: { tenantId },
                     required: true
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'preferredLanguage'],
+                    required: false
                 }
             ],
             transaction
@@ -2836,6 +2897,7 @@ exports.rescheduleAppointment = async (req, res) => {
                 ? `${appointment.user.firstName || ''} ${appointment.user.lastName || ''}`.trim()
                 : 'A customer';
             const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+            const customerLocale = appointment.user?.preferredLanguage === 'ar' ? 'ar' : 'en';
             const appointmentDate = requestedStart.toLocaleString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -2853,6 +2915,19 @@ exports.rescheduleAppointment = async (req, res) => {
                     startTime: requestedStart.toISOString(),
                     staffId: requestedStaffId
                 }
+            });
+
+            await sendAppointmentRescheduleEmail({
+                to: appointment.user?.email,
+                customerName,
+                tenantName: 'Refah',
+                startTime: requestedStart,
+                serviceName,
+                oldStartTime: previousStartTime,
+                newStaffName: assignedStaff?.name || '',
+                oldStaffName: appointment.staff?.name || '',
+                bookingReference: appointment.bookingNumber || appointment.bookingReference || '',
+                locale: customerLocale
             });
 
             if (appointment.staffId) {
@@ -3108,6 +3183,21 @@ exports.reassignRescheduleAppointment = async (req, res) => {
                         startTime: requestedStart.toISOString(),
                         staffId
                     }
+                });
+
+                await sendAppointmentRescheduleEmail({
+                    to: appointment.user?.email,
+                    customerName: appointment.user
+                        ? `${appointment.user.firstName || ''} ${appointment.user.lastName || ''}`.trim()
+                        : 'A customer',
+                    tenantName: 'Refah',
+                    startTime: requestedStart,
+                    serviceName: appointment.service?.name_en || appointment.service?.name_ar || 'service',
+                    oldStartTime: previousStartTime,
+                    newStaffName: assignedStaff?.name || '',
+                    oldStaffName: appointment.staff?.name || '',
+                    bookingReference: appointment.bookingNumber || appointment.bookingReference || '',
+                    locale: appointment.user?.preferredLanguage === 'ar' ? 'ar' : 'en'
                 });
             } catch (notificationError) {
                 console.warn('Board drag-drop customer notification warning:', notificationError.message);
