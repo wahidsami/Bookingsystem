@@ -19,6 +19,30 @@ const getDashboardStats = async (req, res) => {
         const safeSum = async (model, col, opts = {}) => {
             try { return (await model.sum(col, opts)) || 0; } catch (e) { console.warn('safeSum error:', e.message); return 0; }
         };
+        const safeBookingCount = async (startDate, endDate) => {
+            try {
+                const rows = await db.sequelize.query(
+                    `
+                        SELECT COUNT(DISTINCT COALESCE("bookingSessionId", id)) AS count
+                        FROM appointments
+                        WHERE "createdAt" >= :startDate
+                          AND "createdAt" < :endDate
+                    `,
+                    {
+                        replacements: {
+                            startDate,
+                            endDate
+                        },
+                        type: db.sequelize.QueryTypes.SELECT
+                    }
+                );
+
+                return Number(rows?.[0]?.count || 0);
+            } catch (e) {
+                console.warn('safeBookingCount error:', e.message);
+                return 0;
+            }
+        };
 
         // Tenant stats (pending = pending_approval, approved/active = active)
         const [totalTenants, pendingTenants, approvedTenants, suspendedTenants, newTenantsThisMonth, newTenantsLastMonth] = await Promise.all([
@@ -46,9 +70,9 @@ const getDashboardStats = async (req, res) => {
 
         // Booking stats
         const [totalBookings, bookingsThisMonth, bookingsLastMonth] = await Promise.all([
-            safeCount(db.Appointment),
-            safeCount(db.Appointment, { where: { createdAt: { [Op.gte]: thisMonthStart } } }),
-            safeCount(db.Appointment, { where: { createdAt: { [Op.gte]: lastMonthStart, [Op.lt]: thisMonthStart } } }),
+            safeBookingCount(new Date(0), new Date('9999-12-31T23:59:59.999Z')),
+            safeBookingCount(thisMonthStart, new Date(today.getFullYear(), today.getMonth() + 1, 1)),
+            safeBookingCount(lastMonthStart, thisMonthStart),
         ]);
 
         // Tenant by type breakdown
@@ -169,13 +193,39 @@ const getChartData = async (req, res) => {
             }
         };
 
+        const safeBookingChartQuery = async () => {
+            try {
+                return await db.sequelize.query(
+                    `
+                        SELECT
+                            DATE("createdAt") AS date,
+                            COUNT(DISTINCT COALESCE("bookingSessionId", id)) AS count
+                        FROM appointments
+                        WHERE "createdAt" >= :startDate
+                        GROUP BY DATE("createdAt")
+                        ORDER BY DATE("createdAt") ASC
+                    `,
+                    {
+                        replacements: { startDate },
+                        type: db.sequelize.QueryTypes.SELECT
+                    }
+                );
+            } catch (e) {
+                console.warn('Chart query failed for appointments:', e.message);
+                return [];
+            }
+        };
+
         const [userRows, tenantRows, bookingRows] = await Promise.all([
             safeChartQuery(db.PlatformUser),
             safeChartQuery(db.Tenant),
-            safeChartQuery(db.Appointment),
+            safeBookingChartQuery(),
         ]);
 
-        const mapRows = rows => rows.map(r => ({ date: r.getDataValue('date'), count: parseInt(r.getDataValue('count')) }));
+        const mapRows = rows => rows.map((r) => ({
+            date: typeof r?.getDataValue === 'function' ? r.getDataValue('date') : r?.date,
+            count: parseInt(typeof r?.getDataValue === 'function' ? r.getDataValue('count') : r?.count, 10) || 0
+        }));
 
         res.json({
             success: true,
