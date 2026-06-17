@@ -63,6 +63,8 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
         throw new Error('Payment amount must be greater than zero');
     }
 
+    const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
+
     const sourceAllocations = Array.isArray(paymentAllocations) && paymentAllocations.length > 0
         ? paymentAllocations
         : [{
@@ -90,8 +92,23 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
     });
 
     const totalAllocations = normalizedAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
-    if (Math.abs(totalAllocations - safeAmount) > 0.01) {
+    const allocationDifference = roundMoney(safeAmount - totalAllocations);
+
+    if (Math.abs(allocationDifference) > 0.5) {
         throw new Error('Payment allocations must add up to the payment amount');
+    }
+
+    if (Math.abs(allocationDifference) > 0.0001 && normalizedAllocations.length > 0) {
+        const lastIndex = normalizedAllocations.length - 1;
+        const adjustedLastAmount = roundMoney(Number(normalizedAllocations[lastIndex].amount || 0) + allocationDifference);
+        if (adjustedLastAmount <= 0) {
+            throw new Error('Payment allocations must add up to the payment amount');
+        }
+
+        normalizedAllocations[lastIndex] = {
+            ...normalizedAllocations[lastIndex],
+            amount: adjustedLastAmount
+        };
     }
 
     return normalizedAllocations;
