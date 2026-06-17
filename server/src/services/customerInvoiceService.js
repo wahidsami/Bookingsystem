@@ -2,6 +2,7 @@ const db = require('../models');
 const { Op } = require('sequelize');
 
 const INVOICE_PREFIX = 'CINV';
+const INVOICE_RENDER_VERSION = 2;
 
 function formatAmount(value) {
     const n = Number(value || 0);
@@ -168,7 +169,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
             paymentStatusSnapshot: { orderPaymentStatus: order.paymentStatus },
             issuedAt: order.createdAt || new Date(),
             paidAt: order.paymentStatus === 'paid' ? (order.paidAt || new Date()) : null,
-            metadata: { source: 'order' }
+            metadata: { source: 'order', invoiceRenderVersion: INVOICE_RENDER_VERSION }
         }, { transaction });
 
         if (Array.isArray(order.items) && order.items.length > 0) {
@@ -236,7 +237,12 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
         dueAmount,
         paidAt: nextStatus === 'PAID' ? (order.paidAt || new Date()) : invoice.paidAt,
         paymentMethodSnapshot: { paymentMethod: order.paymentMethod },
-        paymentStatusSnapshot: { orderPaymentStatus: order.paymentStatus }
+        paymentStatusSnapshot: { orderPaymentStatus: order.paymentStatus },
+        metadata: {
+            ...(safeJsonObject(invoice.metadata)),
+            source: 'order',
+            invoiceRenderVersion: INVOICE_RENDER_VERSION
+        }
     }, { transaction });
 
     if (prevStatus !== nextStatus) {
@@ -335,7 +341,10 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             },
             issuedAt: appointment.createdAt || new Date(),
             paidAt: status === 'PAID' ? (appointment.paidAt || new Date()) : null,
-            metadata: invoiceMetadata
+            metadata: {
+                ...invoiceMetadata,
+                invoiceRenderVersion: INVOICE_RENDER_VERSION
+            }
         }, { transaction });
 
         await db.CustomerInvoiceItem.create({
@@ -384,7 +393,8 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             },
             metadata: {
                 ...(safeJsonObject(invoice.metadata)),
-                ...invoiceMetadata
+                ...invoiceMetadata,
+                invoiceRenderVersion: INVOICE_RENDER_VERSION
             }
         }, { transaction });
 

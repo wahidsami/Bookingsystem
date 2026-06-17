@@ -5,6 +5,7 @@ const db = require('../models');
 
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 const invoicesRoot = path.join(uploadsRoot, 'customer-invoices');
+const INVOICE_RENDER_VERSION = 2;
 
 function ensureDirectory(directoryPath) {
     fs.mkdirSync(directoryPath, { recursive: true });
@@ -49,6 +50,10 @@ function formatPaymentMethodLabel(value) {
         split: 'Split payment'
     };
     return labels[normalized] || (value ? `${value}` : 'Payment');
+}
+
+function getInvoiceItemSectionTitle(invoice) {
+    return invoice?.entityType === 'appointment' ? 'Services' : 'Items';
 }
 
 function getDocumentPaths(invoice, kind) {
@@ -134,7 +139,8 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
         ]);
 
         let cursorY = infoTop + 116;
-        doc.fillColor(text).font('Helvetica-Bold').fontSize(12).text('Items', margin, cursorY);
+        const itemSectionTitle = getInvoiceItemSectionTitle(loadedInvoice);
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(12).text(itemSectionTitle, margin, cursorY);
         cursorY += 18;
         doc.moveTo(margin, cursorY).lineTo(pageWidth - margin, cursorY).strokeColor(border).stroke();
         cursorY += 10;
@@ -233,6 +239,13 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
         await db.CustomerInvoice.update({ invoicePdfPath: relativePath }, { where: { id: invoice.id } });
     }
 
+    await db.CustomerInvoice.update({
+        metadata: {
+            ...((invoice.metadata && typeof invoice.metadata === 'object') ? invoice.metadata : {}),
+            invoiceRenderVersion: INVOICE_RENDER_VERSION
+        }
+    }, { where: { id: invoice.id } });
+
     return { relativePath, absolutePath };
 }
 
@@ -241,7 +254,7 @@ async function ensureCustomerInvoicePdf(invoiceRecord) {
     if (!invoice) return null;
 
     const existingPath = resolveUploadPath(invoice.invoicePdfPath);
-    if (existingPath && fs.existsSync(existingPath)) {
+    if (existingPath && fs.existsSync(existingPath) && Number(invoice?.metadata?.invoiceRenderVersion || 0) >= INVOICE_RENDER_VERSION) {
         return { relativePath: invoice.invoicePdfPath, absolutePath: existingPath };
     }
     return renderCustomerInvoicePdf(invoice, 'invoice');
@@ -256,7 +269,7 @@ async function ensureCustomerReceiptPdf(invoiceRecord) {
     }
 
     const existingPath = resolveUploadPath(invoice.receiptPdfPath);
-    if (existingPath && fs.existsSync(existingPath)) {
+    if (existingPath && fs.existsSync(existingPath) && Number(invoice?.metadata?.invoiceRenderVersion || 0) >= INVOICE_RENDER_VERSION) {
         return { relativePath: invoice.receiptPdfPath, absolutePath: existingPath };
     }
     return renderCustomerInvoicePdf(invoice, 'receipt');

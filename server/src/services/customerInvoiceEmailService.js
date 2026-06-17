@@ -24,6 +24,26 @@ function formatDate(value, locale = 'en') {
     });
 }
 
+function buildMapsUrl(tenant = {}) {
+    const googleMapLink = `${tenant.googleMapLink || tenant.mapUrl || ''}`.trim();
+    if (googleMapLink) {
+        if (/^https?:\/\//i.test(googleMapLink)) {
+            return googleMapLink;
+        }
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapLink)}`;
+    }
+
+    const coordinates = tenant.coordinates && typeof tenant.coordinates === 'object' ? tenant.coordinates : null;
+    if (coordinates && Number.isFinite(Number(coordinates.lat)) && Number.isFinite(Number(coordinates.lng))) {
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${coordinates.lat},${coordinates.lng}`)}`;
+    }
+
+    const fallbackQuery = [tenant.name_ar || tenant.name_en || tenant.name || 'Refah', tenant.city, tenant.address]
+        .filter(Boolean)
+        .join(' ');
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || 'Refah')}`;
+}
+
 function statusToTemplate(status) {
     if (status === 'PAID') return 'customer_invoice_paid';
     if (status === 'PARTIALLY_PAID') return 'customer_invoice_partial';
@@ -110,6 +130,60 @@ function formatPaymentMethod(value, locale = 'en') {
     return (locale === 'ar' ? ar[normalized] : en[normalized]) || value;
 }
 
+function formatInvoiceSectionLabel(invoice) {
+    return invoice.entityType === 'appointment'
+        ? 'Services'
+        : 'Items';
+}
+
+function formatInvoiceSectionLabelAr(invoice) {
+    return invoice.entityType === 'appointment'
+        ? 'الخدمات'
+        : 'العناصر';
+}
+
+function buildInvoiceItemsHtml(invoice, locale = 'en') {
+    const items = Array.isArray(invoice.items) ? invoice.items : [];
+    if (items.length === 0) {
+        return '';
+    }
+
+    const sectionTitle = locale === 'ar' ? formatInvoiceSectionLabelAr(invoice) : formatInvoiceSectionLabel(invoice);
+    const tableRows = items.map((item, index) => {
+        const name = locale === 'ar'
+            ? (item.nameAr || item.nameEn || `Item ${index + 1}`)
+            : (item.nameEn || item.nameAr || `Item ${index + 1}`);
+        const qty = Number(item.quantity || 1);
+        const unit = formatMoney(item.unitPrice, invoice.currency, locale);
+        const total = formatMoney(item.lineTotal, invoice.currency, locale);
+        return `
+            <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;">${escapeHtml(name)}</td>
+                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;text-align:center;">${escapeHtml(String(qty))}</td>
+                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;">${escapeHtml(unit)}</td>
+                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;text-align:right;">${escapeHtml(total)}</td>
+            </tr>`;
+    }).join('');
+
+    return `
+        <div style="margin-top:18px;padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#ffffff;">
+            <p style="margin:0 0 12px;font-weight:700;color:#374151;">${locale === 'ar' ? formatInvoiceSectionLabelAr(invoice) : sectionTitle}</p>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;color:#374151;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الاسم' : 'Name'}</th>
+                        <th style="text-align:center;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الكمية' : 'Qty'}</th>
+                        <th style="text-align:left;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'السعر' : 'Unit price'}</th>
+                        <th style="text-align:right;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        </div>`;
+}
+
 function formatPaymentBreakdown(invoice, locale = 'en') {
     const metadata = invoice.metadata || {};
     const paymentBreakdown = Array.isArray(metadata.paymentBreakdown)
@@ -162,6 +236,11 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
         const invoice = await db.CustomerInvoice.findByPk(invoiceId, {
             include: [
                 {
+                    model: db.CustomerInvoiceItem,
+                    as: 'items',
+                    required: false
+                },
+                {
                     model: db.PlatformUser,
                     as: 'platformUser',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'preferredLanguage'],
@@ -170,7 +249,7 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
                 {
                     model: db.Tenant,
                     as: 'tenant',
-                    attributes: ['id', 'name', 'name_en', 'name_ar', 'settings'],
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'settings', 'googleMapLink', 'mapUrl', 'coordinates', 'city', 'address'],
                     required: false
                 }
             ]
@@ -185,6 +264,7 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
         const template = options.template || statusToTemplate(invoice.status);
         const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || (locale === 'ar' ? 'عميلنا الكريم' : 'Valued Customer');
         const tenantName = invoice.tenant?.name_ar || invoice.tenant?.name_en || invoice.tenant?.name || 'Refah';
+        const rankUsUrl = buildMapsUrl(invoice.tenant || {});
         const paymentMethodSnapshot = invoice.paymentMethodSnapshot || {};
         const paymentStatusSnapshot = invoice.paymentStatusSnapshot || {};
         const paymentOptionRaw =
@@ -224,6 +304,12 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
                     </table>
                 </div>`
             : '';
+        const servicesSection = buildInvoiceItemsHtml(invoice, locale);
+        const rankUsLabel = locale === 'ar' ? 'قيّمنا على خرائط Google' : 'Rank us on Google Maps';
+        const rankUsButtonSection = `
+            <div style="margin-top:18px;text-align:center;">
+                <a href="${escapeHtml(rankUsUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#7c3aed;color:#ffffff !important;text-decoration:none;font-weight:700;">${escapeHtml(rankUsLabel)}</a>
+            </div>`;
 
         const subject = locale === 'ar'
             ? `رفاه - ${invoice.status === 'PAID' ? 'إيصال سداد' : 'فاتورة'} ${invoice.invoiceNumber}`
@@ -265,6 +351,8 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
                 dueAmountText: formatMoney(invoice.dueAmount, invoice.currency, locale),
                 paymentOptionText,
                 paymentMethodUsedText,
+                servicesSection,
+                rankUsButtonSection,
                 paymentBreakdownHtml,
                 paymentBreakdownSummaryText,
                 paymentBreakdownSection,
