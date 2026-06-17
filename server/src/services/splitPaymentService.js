@@ -188,27 +188,31 @@ const createAppointmentPaymentTransactions = async ({
 const recordRemainderPayment = async (appointmentId, paymentData) => {
     const { amount, paymentMethod, paymentAllocations, processedBy, notes, transactionRef } = paymentData;
 
-    const appointment = await db.Appointment.findByPk(appointmentId);
-    if (!appointment) {
-        throw new Error('Appointment not found');
-    }
+    return await db.sequelize.transaction(async (transaction) => {
+        const appointment = await db.Appointment.findByPk(appointmentId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        });
 
-    if (!appointment.depositPaid) {
-        throw new Error('Deposit must be paid before recording remainder');
-    }
+        if (!appointment) {
+            throw new Error('Appointment not found');
+        }
 
-    if (appointment.remainderPaid) {
-        throw new Error('Remainder already paid');
-    }
+        if (!appointment.depositPaid) {
+            throw new Error('Deposit must be paid before recording remainder');
+        }
 
-    const normalizedAllocations = normalizePaymentAllocations({
-        amount,
-        paymentMethod,
-        paymentAllocations,
-        fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
-    });
+        if (appointment.remainderPaid) {
+            throw new Error('Remainder already paid');
+        }
 
-    return db.sequelize.transaction(async (transaction) => {
+        const normalizedAllocations = normalizePaymentAllocations({
+            amount,
+            paymentMethod,
+            paymentAllocations,
+            fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
+        });
+
         await createAppointmentPaymentTransactions({
             appointment,
             type: 'remainder',
@@ -324,27 +328,28 @@ const getPaymentSummary = async (appointmentId) => {
  * @returns {Promise<Object>} Refund transaction
  */
 const refundPayment = async (appointmentId, refundData) => {
-    const { amount, reason, processedBy, transactionRef } = refundData;
+    const { amount, reason, processedBy, transactionRef, paymentMethod } = refundData;
+    const normalizedMethod = `${paymentMethod || ''}`.trim().toLowerCase();
 
-    const appointment = await db.Appointment.findByPk(appointmentId);
-    if (!appointment) {
-        throw new Error('Appointment not found');
-    }
+    return await db.sequelize.transaction(async (transaction) => {
+        const appointment = await db.Appointment.findByPk(appointmentId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        });
 
-    if (appointment.totalPaid === 0) {
-        throw new Error('No payments to refund');
-    }
+        if (!appointment) {
+            throw new Error('Appointment not found');
+        }
 
-    const numericAmount = parseFloat(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-        throw new Error('Refund amount must be greater than zero');
-    }
-    if (numericAmount - parseFloat(appointment.totalPaid || 0) > 0.01) {
-        throw new Error('Refund amount cannot exceed the amount already paid');
-    }
-    const resolvedPaymentMethod = resolveLedgerPaymentMethod(appointment.paymentMethod, 'online');
+        const numericAmount = parseFloat(amount);
+        if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+            throw new Error('Refund amount must be greater than zero');
+        }
+        if (numericAmount - parseFloat(appointment.totalPaid || 0) > 0.01) {
+            throw new Error('Refund amount cannot exceed the amount already paid');
+        }
 
-    return db.sequelize.transaction(async (transaction) => {
+        const resolvedPaymentMethod = resolveLedgerPaymentMethod(normalizedMethod || appointment.paymentMethod, 'online');
         const refundLedgerTransaction = await createAppointmentTransaction({
             appointmentId,
             type: 'refund',
@@ -361,6 +366,22 @@ const refundPayment = async (appointmentId, refundData) => {
                 totalPaidBefore: parseFloat(appointment.totalPaid || 0)
             }
         }, { transaction });
+
+        if (resolvedPaymentMethod === 'wallet') {
+            const walletUser = await db.PlatformUser.findByPk(appointment.platformUserId, {
+                transaction,
+                lock: transaction.LOCK.UPDATE
+            });
+
+            if (!walletUser) {
+                throw new Error('Customer wallet account not found');
+            }
+
+            await walletUser.increment('walletBalance', {
+                by: numericAmount,
+                transaction
+            });
+        }
 
         const platformFee = parseFloat((numericAmount * 0.025).toFixed(2));
         const tenantRevenue = parseFloat((numericAmount - platformFee).toFixed(2));

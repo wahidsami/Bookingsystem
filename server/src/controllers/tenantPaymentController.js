@@ -124,8 +124,9 @@ const recordPayment = async (req, res) => {
 const refundPayment = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.tenantId;
-        const { amount, reason } = req.body;
+        const tenantId = req.tenantId || req.user?.tenantId;
+        const staffId = req.userId || req.user?.id;
+        const { amount, reason, paymentMethod } = req.body;
 
         // Verify appointment belongs to tenant
         const appointment = await db.Appointment.findByPk(id, {
@@ -147,7 +148,8 @@ const refundPayment = async (req, res) => {
         const refundTransaction = await splitPaymentService.refundPayment(id, {
             amount: parseFloat(amount),
             reason,
-            processedBy: null
+            processedBy: staffId,
+            paymentMethod
         });
 
         // Get updated payment summary
@@ -167,7 +169,6 @@ const refundPayment = async (req, res) => {
         });
     }
 };
-
 module.exports = {
     getPaymentSummary,
     recordPayment,
