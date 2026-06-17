@@ -1948,7 +1948,7 @@ exports.updatePaymentStatus = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { paymentStatus, paymentMethod, paymentAllocations, transactionRef, notes } = req.body;
+        const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes } = req.body;
         const requestId = `pay_${Date.now()}_${id}`;
 
         const validPaymentStatuses = [
@@ -2053,8 +2053,15 @@ exports.updatePaymentStatus = async (req, res) => {
             const sessionDueAmount = roundMoney(
                 payableSessionAppointments.reduce((sum, entry) => sum + entry.dueAmount, 0)
             );
+            const numericRequestedAmount = Number(amount);
+            const normalizedRequestedAmount = Number.isFinite(numericRequestedAmount) && numericRequestedAmount > 0
+                ? roundMoney(numericRequestedAmount)
+                : null;
+            const paymentAmount = normalizedRequestedAmount && Math.abs(normalizedRequestedAmount - sessionDueAmount) <= 0.5
+                ? normalizedRequestedAmount
+                : sessionDueAmount;
             const normalizedSessionPaymentAllocations = normalizePaymentAllocations({
-                amount: sessionDueAmount,
+                amount: paymentAmount,
                 paymentMethod,
                 paymentAllocations,
                 fallbackSource: paymentMethod || bookingSession.paymentMethod || appointment.paymentMethod || 'cash'

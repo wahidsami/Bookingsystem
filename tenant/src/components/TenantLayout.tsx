@@ -270,12 +270,15 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     if (!user) return;
 
     try {
+      const canLoadAdminAlerts = !isDashboardAccount || Boolean(permissions?.manage_accounts || permissions?.view_subscription || permissions?.view_settings);
+      const canLoadPosAlerts = !isDashboardAccount || Boolean(permissions?.view_pos);
+
       const [limitsResponse, consumptionResponse, alertsResponse, posResponse, settingsResponse] = await Promise.all([
-        tenantApi.getSubscriptionLimits(),
-        tenantApi.getSubscriptionConsumption().catch(() => null),
-        tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null),
-        tenantApi.getPosAlerts({ limit: 12 }).catch(() => null),
-        tenantApi.getSettings().catch(() => null)
+        canLoadAdminAlerts ? tenantApi.getSubscriptionLimits().catch(() => null) : Promise.resolve(null),
+        canLoadAdminAlerts ? tenantApi.getSubscriptionConsumption().catch(() => null) : Promise.resolve(null),
+        canLoadAdminAlerts ? tenantApi.getSubscriptionAlerts({ limit: 3, unacknowledgedOnly: true }).catch(() => null) : Promise.resolve(null),
+        canLoadPosAlerts ? tenantApi.getPosAlerts({ limit: 12 }).catch(() => null) : Promise.resolve(null),
+        canLoadAdminAlerts ? tenantApi.getSettings().catch(() => null) : Promise.resolve(null)
       ]);
 
       const resolvedLimits = limitsResponse?.success && limitsResponse?.limits
@@ -295,9 +298,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
           ? settingsResponse.data?.settings?.enableVoiceAlerts !== false
           : true
       };
-        if (posResponse?.success) {
-          const nextPosAlerts = Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 12) : [];
-          const nextAppointmentAlertIds = nextPosAlerts
+
+      if (posResponse?.success) {
+        const nextPosAlerts = Array.isArray(posResponse.alerts) ? posResponse.alerts.slice(0, 12) : [];
+        const nextAppointmentAlertIds = nextPosAlerts
           .filter((alert: any) => alert?.kind === 'appointment')
           .map((alert: any) => String(alert.id));
 

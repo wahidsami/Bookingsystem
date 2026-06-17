@@ -116,6 +116,22 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
 
 const roundMoney = (value) => parseFloat(Number(value || 0).toFixed(2));
 
+const resolvePaymentAmount = (requestedAmount, fallbackAmount) => {
+    const computedAmount = roundMoney(fallbackAmount);
+    const numericRequestedAmount = Number(requestedAmount);
+
+    if (!Number.isFinite(numericRequestedAmount) || numericRequestedAmount <= 0) {
+        return computedAmount;
+    }
+
+    const normalizedRequestedAmount = roundMoney(numericRequestedAmount);
+    if (Math.abs(normalizedRequestedAmount - computedAmount) <= 0.5) {
+        return normalizedRequestedAmount;
+    }
+
+    return computedAmount;
+};
+
 const loadAppointmentPaymentContext = async (appointmentId, { transaction = null, lock = false } = {}) => {
     const appointment = await db.Appointment.findByPk(appointmentId, {
         transaction,
@@ -368,8 +384,9 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
             const sessionDueAmount = roundMoney(
                 payableSessionAppointments.reduce((sum, entry) => sum + entry.dueAmount, 0)
             );
+            const paymentAmount = resolvePaymentAmount(amount, sessionDueAmount);
             const normalizedSessionPaymentAllocations = normalizePaymentAllocations({
-                amount: sessionDueAmount,
+                amount: paymentAmount,
                 paymentMethod,
                 paymentAllocations,
                 fallbackSource: paymentSource
