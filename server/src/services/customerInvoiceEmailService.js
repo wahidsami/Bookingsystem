@@ -35,6 +35,15 @@ function normalizeValue(value) {
     return `${value || ''}`.trim().toLowerCase();
 }
 
+function escapeHtml(value) {
+    return `${value || ''}`
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function formatPaymentOption(value, locale = 'en') {
     const normalized = normalizeValue(value);
     if (!normalized) return locale === 'ar' ? 'غير محدد' : 'Not specified';
@@ -80,6 +89,7 @@ function formatPaymentMethod(value, locale = 'en') {
         mastercard: 'ماستركارد',
         mada: 'مدى',
         cash: 'نقداً عند المركز',
+        split: 'دفع مقسم',
         'at-center': 'الدفع عند الوصول',
         'at_center': 'الدفع عند الوصول'
     };
@@ -92,11 +102,59 @@ function formatPaymentMethod(value, locale = 'en') {
         mastercard: 'Mastercard',
         mada: 'Mada',
         cash: 'Cash at center',
+        split: 'Split payment',
         'at-center': 'Pay on arrival',
         'at_center': 'Pay on arrival'
     };
 
     return (locale === 'ar' ? ar[normalized] : en[normalized]) || value;
+}
+
+function formatPaymentBreakdown(invoice, locale = 'en') {
+    const metadata = invoice.metadata || {};
+    const paymentBreakdown = Array.isArray(metadata.paymentBreakdown)
+        ? metadata.paymentBreakdown
+        : (invoice.paymentMethodSnapshot?.paymentBreakdown || []);
+
+    if (!Array.isArray(paymentBreakdown) || paymentBreakdown.length === 0) {
+        return {
+            rows: [],
+            html: '',
+            summary: null
+        };
+    }
+
+    const rows = paymentBreakdown.map((item) => {
+        const amount = Number(item.amount || 0);
+        const absoluteAmount = Math.abs(amount);
+        const isRefund = amount < 0 || `${item.status || ''}`.toLowerCase() === 'refunded';
+        const methodLabel = formatPaymentMethod(item.paymentMethod, locale);
+        const typeLabel = locale === 'ar'
+            ? (item.type === 'refund' ? 'استرداد' : item.type === 'deposit' ? 'دفعة مقدمة' : item.type === 'remainder' ? 'الرصيد المتبقي' : 'دفعة')
+            : (item.type === 'refund' ? 'Refund' : item.type === 'deposit' ? 'Deposit' : item.type === 'remainder' ? 'Remainder' : 'Payment');
+
+        return {
+            typeLabel,
+            methodLabel,
+            amountText: formatMoney(absoluteAmount, invoice.currency, locale),
+            signText: isRefund ? (locale === 'ar' ? 'تم الاسترداد' : 'Refunded') : (locale === 'ar' ? 'تم السداد' : 'Paid'),
+            transactionRef: item.transactionRef || ''
+        };
+    });
+
+    const summary = paymentBreakdown.length > 1
+        ? (locale === 'ar' ? 'دفع مقسم' : 'Split payment')
+        : rows[0]?.methodLabel || null;
+
+    const html = rows.map((row) => (
+        `<tr>
+            <td style="padding:10px 0;border-bottom:1px solid #eef2f7;">${escapeHtml(row.typeLabel)}</td>
+            <td style="padding:10px 0;border-bottom:1px solid #eef2f7;">${escapeHtml(row.methodLabel)}</td>
+            <td style="padding:10px 0;border-bottom:1px solid #eef2f7;text-align:right;">${escapeHtml(row.amountText)}</td>
+        </tr>`
+    )).join('');
+
+    return { rows, html, summary };
 }
 
 async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
@@ -144,6 +202,28 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
             || null;
         const paymentOptionText = formatPaymentOption(paymentOptionRaw, locale);
         const paymentMethodUsedText = formatPaymentMethod(paymentMethodRaw, locale);
+        const paymentBreakdown = formatPaymentBreakdown(invoice, locale);
+        const paymentBreakdownHtml = paymentBreakdown.html;
+        const paymentBreakdownSummaryText = paymentBreakdown.summary || '';
+        const paymentBreakdownSection = paymentBreakdownHtml
+            ? `
+                <div style="margin-top:18px;padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#f8fafc;">
+                    <p style="margin:0 0 12px;font-weight:700;color:#374151;">${locale === 'ar' ? 'تفاصيل السداد' : 'Payment breakdown'}</p>
+                    ${paymentBreakdownSummaryText ? `<p style="margin:0 0 12px;color:#6b7280;"><strong>${locale === 'ar' ? 'الطريقة:' : 'Method:'}</strong> ${escapeHtml(paymentBreakdownSummaryText)}</p>` : ''}
+                    <table style="width:100%;border-collapse:collapse;font-size:14px;color:#374151;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'النوع' : 'Type'}</th>
+                                <th style="text-align:left;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الطريقة' : 'Method'}</th>
+                                <th style="text-align:right;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'المبلغ' : 'Amount'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${paymentBreakdownHtml}
+                        </tbody>
+                    </table>
+                </div>`
+            : '';
 
         const subject = locale === 'ar'
             ? `رفاه - ${invoice.status === 'PAID' ? 'إيصال سداد' : 'فاتورة'} ${invoice.invoiceNumber}`
@@ -185,6 +265,9 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
                 dueAmountText: formatMoney(invoice.dueAmount, invoice.currency, locale),
                 paymentOptionText,
                 paymentMethodUsedText,
+                paymentBreakdownHtml,
+                paymentBreakdownSummaryText,
+                paymentBreakdownSection,
                 portalUrl
             }
         });

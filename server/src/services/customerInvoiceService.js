@@ -26,6 +26,67 @@ function normalizeInvoiceAmounts(totalInput, vatInput) {
     };
 }
 
+function safeJsonObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function buildAppointmentPaymentBreakdown(paymentTransactions = []) {
+    const transactions = [...(Array.isArray(paymentTransactions) ? paymentTransactions : [])]
+        .filter((transaction) => transaction && ['completed', 'refunded'].includes(`${transaction.status || ''}`.toLowerCase()))
+        .sort((a, b) => new Date(a.processedAt || a.createdAt || 0) - new Date(b.processedAt || b.createdAt || 0));
+
+    const breakdown = transactions.map((transaction, index) => {
+        const metadata = safeJsonObject(transaction.metadata);
+        const amount = formatAmount(transaction.amount);
+        const isRefund = `${transaction.status || ''}`.toLowerCase() === 'refunded' || `${transaction.type || ''}`.toLowerCase() === 'refund';
+        return {
+            id: transaction.id || `tx-${index + 1}`,
+            type: transaction.type || null,
+            status: transaction.status || null,
+            amount: isRefund ? -amount : amount,
+            paymentMethod: transaction.paymentMethod || null,
+            transactionRef: transaction.transactionRef || null,
+            processedAt: transaction.processedAt || transaction.createdAt || null,
+            notes: transaction.notes || metadata.notes || null,
+            source: metadata.source || null
+        };
+    });
+
+    const positiveTotal = breakdown
+        .filter((item) => Number(item.amount) > 0)
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const negativeTotal = breakdown
+        .filter((item) => Number(item.amount) < 0)
+        .reduce((sum, item) => sum + Math.abs(Number(item.amount || 0)), 0);
+    const paymentMethods = [...new Set(breakdown.map((item) => item.paymentMethod).filter(Boolean))];
+
+    return {
+        paymentCollectionMode: breakdown.length > 1 ? 'split' : (breakdown[0]?.paymentMethod || null),
+        paymentSummaryMethod: breakdown.length > 1 ? 'split' : (breakdown[0]?.paymentMethod || null),
+        paymentBreakdown: breakdown,
+        paymentMethods,
+        breakdownCount: breakdown.length,
+        paidTotal: formatAmount(positiveTotal),
+        refundedTotal: formatAmount(negativeTotal),
+        hasSplitPayments: breakdown.length > 1
+    };
+}
+
+function buildAppointmentInvoicePaymentSnapshot(appointment) {
+    const breakdown = buildAppointmentPaymentBreakdown(appointment?.paymentTransactions || []);
+    const paymentMethod = appointment?.paymentMethod || breakdown.paymentSummaryMethod || null;
+
+    return {
+        paymentMethod,
+        paymentCollectionMode: breakdown.paymentCollectionMode,
+        paymentSummaryMethod: breakdown.paymentSummaryMethod,
+        paymentMethods: breakdown.paymentMethods,
+        paymentBreakdown: breakdown.paymentBreakdown,
+        breakdownCount: breakdown.breakdownCount,
+        hasSplitPayments: breakdown.hasSplitPayments
+    };
+}
+
 async function generateInvoiceNumber(transaction) {
     const now = new Date();
     const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -199,7 +260,14 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
     const triggerSource = options.triggerSource || 'system';
 
     const appointment = await db.Appointment.findByPk(appointmentId, {
-        include: [{ model: db.Service, as: 'service' }],
+        include: [
+            { model: db.Service, as: 'service' },
+            {
+                model: db.PaymentTransaction,
+                as: 'paymentTransactions',
+                required: false
+            }
+        ],
         transaction
     });
     if (!appointment) {
@@ -213,6 +281,17 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
     } = normalizeInvoiceAmounts(appointment.price, appointment.taxAmount);
     const paidAmount = formatAmount(appointment.totalPaid);
     const dueAmount = formatAmount(Math.max(0, totalAmount - paidAmount));
+    const paymentSnapshot = buildAppointmentInvoicePaymentSnapshot(appointment);
+    const invoiceMetadata = {
+        source: 'appointment',
+        bookingNumber: appointment.bookingNumber || null,
+        paymentCollectionMode: paymentSnapshot.paymentCollectionMode,
+        paymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
+        paymentBreakdown: paymentSnapshot.paymentBreakdown,
+        paymentBreakdownCount: paymentSnapshot.breakdownCount,
+        paymentMethods: paymentSnapshot.paymentMethods,
+        hasSplitPayments: paymentSnapshot.hasSplitPayments
+    };
 
     let status = 'UNPAID';
     if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
@@ -242,11 +321,21 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             totalAmount,
             paidAmount,
             dueAmount,
-            paymentMethodSnapshot: { paymentMethod: appointment.paymentMethod },
-            paymentStatusSnapshot: { appointmentPaymentStatus: appointment.paymentStatus },
+            paymentMethodSnapshot: {
+                paymentMethod: paymentSnapshot.paymentMethod,
+                paymentCollectionMode: paymentSnapshot.paymentCollectionMode,
+                paymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
+                paymentMethods: paymentSnapshot.paymentMethods,
+                paymentBreakdown: paymentSnapshot.paymentBreakdown
+            },
+            paymentStatusSnapshot: {
+                appointmentPaymentStatus: appointment.paymentStatus,
+                appointmentPaymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
+                appointmentPaymentCollectionMode: paymentSnapshot.paymentCollectionMode
+            },
             issuedAt: appointment.createdAt || new Date(),
             paidAt: status === 'PAID' ? (appointment.paidAt || new Date()) : null,
-            metadata: { source: 'appointment' }
+            metadata: invoiceMetadata
         }, { transaction });
 
         await db.CustomerInvoiceItem.create({
@@ -281,8 +370,22 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             paidAmount,
             dueAmount,
             paidAt: status === 'PAID' ? (appointment.paidAt || new Date()) : invoice.paidAt,
-            paymentMethodSnapshot: { paymentMethod: appointment.paymentMethod },
-            paymentStatusSnapshot: { appointmentPaymentStatus: appointment.paymentStatus }
+            paymentMethodSnapshot: {
+                paymentMethod: paymentSnapshot.paymentMethod,
+                paymentCollectionMode: paymentSnapshot.paymentCollectionMode,
+                paymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
+                paymentMethods: paymentSnapshot.paymentMethods,
+                paymentBreakdown: paymentSnapshot.paymentBreakdown
+            },
+            paymentStatusSnapshot: {
+                appointmentPaymentStatus: appointment.paymentStatus,
+                appointmentPaymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
+                appointmentPaymentCollectionMode: paymentSnapshot.paymentCollectionMode
+            },
+            metadata: {
+                ...(safeJsonObject(invoice.metadata)),
+                ...invoiceMetadata
+            }
         }, { transaction });
 
         if (prevStatus !== status) {
