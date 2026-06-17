@@ -2,5 +2,5 @@ import React from 'react';
 import { Redirect } from 'expo-router';
 
 export default function TodayScreenRedirect() {
-  return <Redirect href={'/home' as never} />;
+  return <Redirect href={'/appointments' as never} />;
 }

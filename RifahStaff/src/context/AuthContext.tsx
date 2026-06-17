@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useRouter, useSegments } from 'expo-router';
 import api from '../services/api';
 
-interface User {
+export interface User {
     id: string;
     name: string;
     email: string;

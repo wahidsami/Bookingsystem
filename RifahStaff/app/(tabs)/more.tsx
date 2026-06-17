@@ -4,74 +4,59 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-
-const sections = [
-  {
-    label: 'Schedule Board',
-    description: 'Live provider lanes, time slots, and appointment actions.',
-    icon: 'calendar-outline',
-    href: '/(tabs)/schedule',
-  },
-  {
-    label: 'Messages',
-    description: 'Admin messages, replies, and inbox history.',
-    icon: 'mail-outline',
-    href: '/(tabs)/messages',
-  },
-  {
-    label: 'Notifications',
-    description: 'System and push notifications for staff.',
-    icon: 'notifications-outline',
-    href: '/(tabs)/notifications',
-  },
-  {
-    label: 'Reviews',
-    description: 'Review replies and customer feedback.',
-    icon: 'star-outline',
-    href: '/(tabs)/reviews',
-  },
-  {
-    label: 'Profile',
-    description: 'Account, language, and password actions.',
-    icon: 'person-outline',
-    href: '/(tabs)/profile',
-  },
-  {
-    label: 'Earnings',
-    description: 'Revenue and payout visibility.',
-    icon: 'cash-outline',
-    href: '/(tabs)/earnings',
-  },
-];
+import { useLanguage } from '../../src/context/LanguageContext';
+import { getOverflowStaffSections, staffIconMap } from '../../src/utils/staffNavigation';
 
 export default function MoreScreen() {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { language } = useLanguage();
+  const overflowSections = getOverflowStaffSections(user, language);
+  const isArabic = language === 'ar';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>More</Text>
-        <Text style={styles.subtitle}>Operational shortcuts for the active Refah Partners workflow.</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>{isArabic ? 'المزيد' : 'More'}</Text>
+            <Text style={styles.subtitle}>
+              {isArabic
+                ? 'الأقسام الإضافية المعتمدة لهذا الحساب تظهر هنا.'
+                : 'Additional sections approved for this staff account appear here.'}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.grid}>
-          {sections.map((section) => (
+          {overflowSections.map((section) => (
             <TouchableOpacity
-              key={section.label}
+              key={section.route}
               style={styles.card}
               activeOpacity={0.85}
               onPress={() => router.push(section.href as never)}
             >
               <View style={styles.iconWrap}>
-                <Ionicons name={section.icon as React.ComponentProps<typeof Ionicons>['name']} size={20} color="#8B5ADF" />
+                <Ionicons name={staffIconMap[section.icon] as React.ComponentProps<typeof Ionicons>['name']} size={20} color="#8B5ADF" />
               </View>
-              <Text style={styles.cardTitle}>{section.label}</Text>
-              <Text style={styles.cardText}>{section.description}</Text>
+              <Text style={styles.cardTitle}>{language === 'ar' ? section.labelAr : section.labelEn}</Text>
+              <Text style={styles.cardText}>{language === 'ar' ? section.descriptionAr : section.descriptionEn}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
+        {overflowSections.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>{isArabic ? 'لا توجد أقسام إضافية' : 'No additional sections'}</Text>
+            <Text style={styles.emptyText}>
+              {isArabic
+                ? 'كل الأقسام المسموح بها تظهر مباشرة في شريط التنقل السفلي.'
+                : 'All allowed sections are already shown in the bottom tab bar.'}
+            </Text>
+          </View>
+        ) : null}
+
         <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{isArabic ? 'تسجيل الخروج' : 'Logout'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -80,9 +65,14 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FAF8FC' },
-  content: { padding: 16, gap: 14 },
+  content: { padding: 16, gap: 14, paddingBottom: 24 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937' },
-  subtitle: { fontSize: 14, color: '#6b7280' },
+  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 4, lineHeight: 20 },
   grid: {
     gap: 12,
   },
@@ -104,6 +94,16 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 15, fontWeight: '700', color: '#312e81' },
   cardText: { fontSize: 13, color: '#4b5563', lineHeight: 18 },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ede9fe',
+    padding: 16,
+    gap: 6,
+  },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: '#1f2937' },
+  emptyText: { fontSize: 13, color: '#6b7280', lineHeight: 18 },
   logoutButton: {
     backgroundColor: '#7c3aed',
     borderRadius: 12,

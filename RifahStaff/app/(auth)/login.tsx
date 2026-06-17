@@ -68,7 +68,7 @@ export default function LoginScreen() {
                 colors={['#8B5ADF', '#683AB7']}
                 style={styles.header}
             >
-                <Text style={styles.headerTitle}>RefahStaff</Text>
+                <Text style={styles.headerTitle}>Refah Staff</Text>
                 <Text style={styles.headerSubtitle}>{t('auth.subtitle')}</Text>
             </LinearGradient>
 

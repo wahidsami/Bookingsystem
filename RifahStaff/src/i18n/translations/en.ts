@@ -113,6 +113,7 @@ export default {
         language: 'Language',
         chooseLanguage: 'Choose Language',
         availability: 'Availability',
+        notifications: 'Notifications',
         logout: 'Log Out',
         version: 'App Version',
     },

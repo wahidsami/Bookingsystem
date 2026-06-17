@@ -105,7 +105,7 @@ export default function ProfileScreen() {
                     >
                         <View style={styles.menuItemLeft}>
                             <Ionicons name="notifications-outline" size={24} color="#4b5563" />
-                            <Text style={styles.menuItemText}>Notifications</Text>
+                            <Text style={styles.menuItemText}>{t('profile.notifications')}</Text>
                         </View>
                         <Ionicons name={language === 'ar' || language === 'ur' ? 'chevron-back' : 'chevron-forward'} size={20} color="#9ca3af" />
                     </TouchableOpacity>
@@ -116,7 +116,7 @@ export default function ProfileScreen() {
                     <Text style={styles.logoutText}>{t('profile.logout')}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.versionText}>RefahStaff v1.0.0</Text>
+                <Text style={styles.versionText}>Refah Staff v1.0.0</Text>
             </ScrollView>
 
             <Modal visible={showLangModal} animationType="slide" transparent={true} onRequestClose={() => setShowLangModal(false)}>

@@ -7,6 +7,7 @@ export default {
         success: 'نجاح',
         yes: 'نعم',
         no: 'لا',
+        ok: 'حسناً',
     },
     auth: {
         login: 'تسجيل الدخول',
@@ -97,6 +98,7 @@ export default {
         language: 'اللغة',
         chooseLanguage: 'اختر اللغة',
         availability: 'التوافر',
+        notifications: 'الإشعارات',
         logout: 'تسجيل الخروج',
         version: 'إصدار التطبيق',
     },

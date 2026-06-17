@@ -3,12 +3,23 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../src/context/AuthContext';
+import {
+  getOverflowStaffSections,
+  getVisibleStaffTabSections,
+  staffIconMap,
+} from '../../src/utils/staffNavigation';
+import { useLanguage } from '../../src/context/LanguageContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { language } = useLanguage();
+  const visibleSections = getVisibleStaffTabSections(user, language);
+  const overflowSections = getOverflowStaffSections(user, language);
+  const hasMoreTab = overflowSections.some((section) => section.kind === 'tab');
+  const isArabic = language === 'ar';
 
   return (
     <Tabs
@@ -17,26 +28,27 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#8B5ADF',
         tabBarInactiveTintColor: colorScheme === 'dark' ? '#9ca3af' : '#6b7280',
         headerShown: false,
+        tabBarShowLabel: true,
         tabBarStyle: {
           backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#ffffff',
           borderTopWidth: 1,
           borderTopColor: colorScheme === 'dark' ? '#374151' : '#e5e7eb',
-          height: 72 + bottom,
-          paddingBottom: Math.max(16, bottom + 8),
-          paddingTop: 10,
+          height: 76 + bottom,
+          paddingBottom: Math.max(20, bottom + 16),
+          paddingTop: 8,
           paddingHorizontal: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginBottom: 0,
+          marginBottom: 2,
         },
         tabBarIconStyle: {
-          marginTop: 2,
+          marginTop: 0,
         },
         tabBarItemStyle: {
-          paddingTop: 4,
-          paddingBottom: 4,
+          paddingTop: 2,
+          paddingBottom: 2,
         },
       }}>
       <Tabs.Screen
@@ -51,41 +63,43 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      <Tabs.Screen
-        name="appointments"
-        options={{
-          title: t('appointments') || 'Appointments',
-          tabBarIcon: ({ color }) => <Ionicons name="calendar-outline" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="pos"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="customers"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: t('settings') || 'More',
-          tabBarIcon: ({ color }) => <Ionicons name="menu-outline" size={22} color={color} />
-        }}
-      />
 
-      {/* Legacy staff tabs hidden while Refah Partners shell is being built */}
-      <Tabs.Screen name="schedule" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
-      <Tabs.Screen name="messages" options={{ href: null }} />
-      <Tabs.Screen name="profile" options={{ href: null }} />
-      <Tabs.Screen name="earnings" options={{ href: null }} />
-      <Tabs.Screen name="reviews" options={{ href: null }} />
-      <Tabs.Screen name="explore" options={{ href: null }} />
+      {['appointments', 'schedule', 'customers', 'reviews', 'messages', 'notifications', 'earnings', 'profile', 'more', 'pos', 'explore'].map((routeName) => {
+        if (routeName === 'more') {
+          if (!hasMoreTab) {
+            return <Tabs.Screen key={routeName} name={routeName} options={{ href: null }} />;
+          }
+
+          return (
+            <Tabs.Screen
+              key={routeName}
+              name={routeName}
+              options={{
+                title: isArabic ? 'المزيد' : 'More',
+                tabBarIcon: ({ color }) => <Ionicons name="menu-outline" size={22} color={color} />,
+              }}
+            />
+          );
+        }
+
+        const section = visibleSections.find((item) => item.route === routeName);
+        if (section) {
+          return (
+            <Tabs.Screen
+              key={routeName}
+              name={routeName}
+              options={{
+                title: language === 'ar' ? section.labelAr : section.labelEn,
+                tabBarIcon: ({ color }) => (
+                  <Ionicons name={staffIconMap[section.icon] as React.ComponentProps<typeof Ionicons>['name']} size={22} color={color} />
+                ),
+              }}
+            />
+          );
+        }
+
+        return <Tabs.Screen key={routeName} name={routeName} options={{ href: null }} />;
+      })}
     </Tabs>
   );
 }
