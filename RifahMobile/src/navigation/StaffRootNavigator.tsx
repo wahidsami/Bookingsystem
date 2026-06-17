@@ -28,7 +28,7 @@ function StaffPlaceholderScreen({ title, subtitle, icon }: { title: string; subt
 
 type StaffOverflowSection = Pick<StaffTabConfig, 'name' | 'labelEn' | 'labelAr' | 'icon'>;
 
-function StaffMoreScreen({ sections }: { sections: StaffOverflowSection[] }) {
+function StaffMoreScreen({ sections, navigation }: { sections: StaffOverflowSection[]; navigation: any }) {
     const { isRTL, language } = useLanguage();
 
     return (
@@ -41,10 +41,15 @@ function StaffMoreScreen({ sections }: { sections: StaffOverflowSection[] }) {
             </Text>
             <View style={styles.moreGrid}>
                 {sections.length > 0 ? sections.map((section) => (
-                    <View key={section.name} style={styles.moreItem}>
+                    <TouchableOpacity
+                        key={section.name}
+                        style={styles.moreItem}
+                        activeOpacity={0.86}
+                        onPress={() => navigation.navigate(section.name)}
+                    >
                         <AppIcon name={section.icon} size={20} color={colors.primary} />
                         <Text style={styles.moreItemText}>{language === 'ar' ? section.labelAr : section.labelEn}</Text>
-                    </View>
+                    </TouchableOpacity>
                 )) : (
                     <View style={styles.moreItem}>
                         <Text style={styles.moreItemText}>{isRTL ? 'غير متاح' : 'Not enabled'}</Text>
@@ -228,8 +233,9 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
             {overflowTabs.length > 0 ? (
                 <Tab.Screen
                     name="More"
-                    children={() => (
+                    children={(props) => (
                         <StaffMoreScreen
+                            navigation={props.navigation}
                             sections={overflowTabs.map((tab) => ({
                                 name: tab.name,
                                 labelEn: tab.labelEn,
@@ -244,6 +250,27 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
                     }}
                 />
             ) : null}
+            {overflowTabs.map((tab) =>
+                tab.component ? (
+                    <Tab.Screen
+                        key={`hidden-${tab.name}`}
+                        name={tab.name}
+                        component={tab.component}
+                        options={{
+                            tabBarButton: () => null,
+                        }}
+                    />
+                ) : (
+                    <Tab.Screen
+                        key={`hidden-${tab.name}`}
+                        name={tab.name}
+                        children={tab.render as () => React.ReactNode}
+                        options={{
+                            tabBarButton: () => null,
+                        }}
+                    />
+                )
+            )}
         </Tab.Navigator>
     );
 }
