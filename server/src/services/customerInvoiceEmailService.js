@@ -38,10 +38,7 @@ function buildMapsUrl(tenant = {}) {
         return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${coordinates.lat},${coordinates.lng}`)}`;
     }
 
-    const fallbackQuery = [tenant.name_ar || tenant.name_en || tenant.name || 'Refah', tenant.city, tenant.address]
-        .filter(Boolean)
-        .join(' ');
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || 'Refah')}`;
+    return null;
 }
 
 function statusToTemplate(status) {
@@ -306,10 +303,12 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
             : '';
         const servicesSection = buildInvoiceItemsHtml(invoice, locale);
         const rankUsLabel = locale === 'ar' ? 'قيّمنا على خرائط Google' : 'Rank us on Google Maps';
-        const rankUsButtonSection = `
-            <div style="margin-top:18px;text-align:center;">
-                <a href="${escapeHtml(rankUsUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#7c3aed;color:#ffffff !important;text-decoration:none;font-weight:700;">${escapeHtml(rankUsLabel)}</a>
-            </div>`;
+        const rankUsButtonSection = rankUsUrl
+            ? `
+                <div style="margin-top:18px;text-align:center;">
+                    <a href="${escapeHtml(rankUsUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#7c3aed;color:#ffffff !important;text-decoration:none;font-weight:700;">${escapeHtml(rankUsLabel)}</a>
+                </div>`
+            : '';
 
         const subject = locale === 'ar'
             ? `رفاه - ${invoice.status === 'PAID' ? 'إيصال سداد' : 'فاتورة'} ${invoice.invoiceNumber}`
