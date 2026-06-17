@@ -20,6 +20,7 @@ import { navigationRef, navigateToAppointmentInvite, navigateToGiftClaim, naviga
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthInitialRoute, AuthNavigator } from './src/navigation/AuthNavigator';
 import { StaffRootNavigator } from './src/navigation/StaffRootNavigator';
+import type { StaffProfile } from './src/api/client';
 
 type AppPhase = 'splash' | 'onboarding' | 'auth' | 'home';
 type AppMode = 'customer' | 'staff';
@@ -47,6 +48,7 @@ function AppContent() {
   const [authInitialRoute, setAuthInitialRoute] = useState<AuthInitialRoute>('Welcome');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [appMode, setAppMode] = useState<AppMode>('customer');
+  const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null);
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
@@ -224,8 +226,9 @@ function AppContent() {
   };
 
   const resolveAppMode = async (): Promise<AppMode> => {
-    const staffProfile = await api.getStaffProfile().catch(() => null);
-    const nextMode: AppMode = staffProfile ? 'staff' : 'customer';
+    const nextStaffProfile = await api.getStaffProfile().catch(() => null);
+    setStaffProfile(nextStaffProfile);
+    const nextMode: AppMode = nextStaffProfile ? 'staff' : 'customer';
     setAppMode(nextMode);
     return nextMode;
   };
@@ -256,6 +259,7 @@ function AppContent() {
         setAppPhase('home');
       } else {
         setAppMode('customer');
+        setStaffProfile(null);
         setAppPhase('auth');
       }
     }
@@ -292,6 +296,7 @@ function AppContent() {
     setIsAuthenticated(false);
     setAuthInitialRoute('Welcome');
     setAppMode('customer');
+    setStaffProfile(null);
     setAppPhase('auth');
   };
 
@@ -383,7 +388,7 @@ function AppContent() {
                 .catch(() => undefined);
             }}
           >
-            {appMode === 'staff' ? <StaffRootNavigator /> : <RootNavigator />}
+            {appMode === 'staff' ? <StaffRootNavigator profile={staffProfile} /> : <RootNavigator />}
           </NavigationContainer>
           <StatusBar style="dark" />
         </ServiceBookingCartProvider>
