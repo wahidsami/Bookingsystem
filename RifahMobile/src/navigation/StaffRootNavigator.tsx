@@ -26,15 +26,10 @@ function StaffPlaceholderScreen({ title, subtitle, icon }: { title: string; subt
     );
 }
 
-function StaffMoreScreen({ profile }: { profile: StaffProfile | null }) {
-    const { isRTL, language } = useLanguage();
+type StaffOverflowSection = Pick<StaffTabConfig, 'name' | 'labelEn' | 'labelAr' | 'icon'>;
 
-    const sections = [
-        profile?.permissions?.view_earnings ? (language === 'ar' ? 'الأرباح' : 'Earnings') : null,
-        profile?.features?.messages ? (language === 'ar' ? 'الرسائل' : 'Messages') : null,
-        profile?.permissions?.view_clients ? (language === 'ar' ? 'العملاء' : 'Clients') : null,
-        profile?.features?.timeOff ? (language === 'ar' ? 'الغياب' : 'Time off') : null,
-    ].filter(Boolean) as string[];
+function StaffMoreScreen({ sections }: { sections: StaffOverflowSection[] }) {
+    const { isRTL, language } = useLanguage();
 
     return (
         <ScrollView contentContainerStyle={styles.moreContainer}>
@@ -46,8 +41,9 @@ function StaffMoreScreen({ profile }: { profile: StaffProfile | null }) {
             </Text>
             <View style={styles.moreGrid}>
                 {sections.length > 0 ? sections.map((section) => (
-                    <View key={section} style={styles.moreItem}>
-                        <Text style={styles.moreItemText}>{section}</Text>
+                    <View key={section.name} style={styles.moreItem}>
+                        <AppIcon name={section.icon} size={20} color={colors.primary} />
+                        <Text style={styles.moreItemText}>{language === 'ar' ? section.labelAr : section.labelEn}</Text>
                     </View>
                 )) : (
                     <View style={styles.moreItem}>
@@ -58,6 +54,16 @@ function StaffMoreScreen({ profile }: { profile: StaffProfile | null }) {
         </ScrollView>
     );
 }
+
+type StaffTabConfig = {
+    name: string;
+    labelEn: string;
+    labelAr: string;
+    icon: any;
+    enabled: boolean;
+    component?: React.ComponentType<any>;
+    render?: () => React.ReactNode;
+};
 
 interface StaffRootNavigatorProps {
     profile: StaffProfile | null;
@@ -73,6 +79,106 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
     const hasEarnings = Boolean(profile?.permissions?.view_earnings);
     const hasMessages = Boolean(profile?.features?.messages);
     const hasSchedule = Boolean(profile?.features?.schedule);
+    const hasTimeOff = Boolean(profile?.features?.timeOff);
+
+    const tabCandidates: StaffTabConfig[] = [
+        {
+            name: 'Appointments',
+            labelEn: 'Appointments',
+            labelAr: 'المواعيد',
+            icon: 'bookings',
+            enabled: true,
+            component: BookingsScreen,
+        },
+        {
+            name: 'Schedule',
+            labelEn: 'Schedule',
+            labelAr: 'الجدول',
+            icon: 'event',
+            enabled: hasSchedule,
+            render: () => (
+                <StaffPlaceholderScreen
+                    title={language === 'ar' ? 'الجدول' : 'Schedule'}
+                    subtitle="Weekly schedule and availability will live here."
+                    icon="event"
+                />
+            ),
+        },
+        {
+            name: 'Clients',
+            labelEn: 'Clients',
+            labelAr: 'العملاء',
+            icon: 'profile',
+            enabled: hasClients,
+            render: () => (
+                <StaffPlaceholderScreen
+                    title={language === 'ar' ? 'العملاء' : 'Clients'}
+                    subtitle="Client summaries and notes will appear here."
+                    icon="profile"
+                />
+            ),
+        },
+        {
+            name: 'Reviews',
+            labelEn: 'Reviews',
+            labelAr: 'المراجعات',
+            icon: 'star',
+            enabled: hasReviews,
+            render: () => (
+                <StaffPlaceholderScreen
+                    title={language === 'ar' ? 'المراجعات' : 'Reviews'}
+                    subtitle="Customer reviews and replies are shown here."
+                    icon="star"
+                />
+            ),
+        },
+        {
+            name: 'Earnings',
+            labelEn: 'Earnings',
+            labelAr: 'الأرباح',
+            icon: 'dashboard',
+            enabled: hasEarnings,
+            render: () => (
+                <StaffPlaceholderScreen
+                    title={language === 'ar' ? 'الأرباح' : 'Earnings'}
+                    subtitle="Earnings and payout summaries will appear here."
+                    icon="dashboard"
+                />
+            ),
+        },
+        {
+            name: 'Messages',
+            labelEn: 'Messages',
+            labelAr: 'الرسائل',
+            icon: 'message',
+            enabled: hasMessages,
+            render: () => (
+                <StaffPlaceholderScreen
+                    title={language === 'ar' ? 'الرسائل' : 'Messages'}
+                    subtitle="Staff messages and conversations will appear here."
+                    icon="message"
+                />
+            ),
+        },
+        {
+            name: 'TimeOff',
+            labelEn: 'Time off',
+            labelAr: 'الغياب',
+            icon: 'calendar',
+            enabled: hasTimeOff,
+            render: () => (
+                <StaffPlaceholderScreen
+                    title={language === 'ar' ? 'الغياب' : 'Time off'}
+                    subtitle="Leave requests and schedule exceptions will appear here."
+                    icon="calendar"
+                />
+            ),
+        },
+    ];
+
+    const enabledTabs = tabCandidates.filter((tab) => tab.enabled);
+    const primaryTabs = enabledTabs.slice(0, 4);
+    const overflowTabs = enabledTabs.slice(4);
 
     return (
         <Tab.Navigator
@@ -96,66 +202,42 @@ export function StaffRootNavigator({ profile }: StaffRootNavigatorProps) {
                 },
             }}
         >
-            <Tab.Screen
-                name="Appointments"
-                component={BookingsScreen}
-                options={{
-                    tabBarLabel: language === 'ar' ? 'المواعيد' : 'Appointments',
-                    tabBarIcon: ({ color, size }) => <AppIcon name="bookings" size={size} color={color} />,
-                }}
-            />
-            {hasSchedule ? (
-                <Tab.Screen
-                    name="Schedule"
-                    children={() => (
-                        <StaffPlaceholderScreen
-                            title={language === 'ar' ? 'الجدول' : 'Schedule'}
-                            subtitle="Weekly schedule and availability will live here."
-                            icon="event"
-                        />
-                    )}
-                    options={{
-                        tabBarLabel: language === 'ar' ? 'الجدول' : 'Schedule',
-                        tabBarIcon: ({ color, size }) => <AppIcon name="event" size={size} color={color} />,
-                    }}
-                />
-            ) : null}
-            {hasReviews ? (
-                <Tab.Screen
-                    name="Reviews"
-                    children={() => (
-                        <StaffPlaceholderScreen
-                            title={language === 'ar' ? 'المراجعات' : 'Reviews'}
-                            subtitle="Customer reviews and replies are shown here."
-                            icon="star"
-                        />
-                    )}
-                    options={{
-                        tabBarLabel: language === 'ar' ? 'المراجعات' : 'Reviews',
-                        tabBarIcon: ({ color, size }) => <AppIcon name="star" size={size} color={color} />,
-                    }}
-                />
-            ) : null}
-            {hasClients ? (
-                <Tab.Screen
-                    name="Clients"
-                    children={() => (
-                        <StaffPlaceholderScreen
-                            title={language === 'ar' ? 'العملاء' : 'Clients'}
-                            subtitle="Client summaries and notes will appear here."
-                            icon="profile"
-                        />
-                    )}
-                    options={{
-                        tabBarLabel: language === 'ar' ? 'العملاء' : 'Clients',
-                        tabBarIcon: ({ color, size }) => <AppIcon name="profile" size={size} color={color} />,
-                    }}
-                />
-            ) : null}
-            {hasEarnings || hasMessages ? (
+            {primaryTabs.map((tab) =>
+                tab.component ? (
+                    <Tab.Screen
+                        key={tab.name}
+                        name={tab.name}
+                        component={tab.component}
+                        options={{
+                            tabBarLabel: language === 'ar' ? tab.labelAr : tab.labelEn,
+                            tabBarIcon: ({ color, size }) => <AppIcon name={tab.icon} size={size} color={color} />,
+                        }}
+                    />
+                ) : (
+                    <Tab.Screen
+                        key={tab.name}
+                        name={tab.name}
+                        children={tab.render as () => React.ReactNode}
+                        options={{
+                            tabBarLabel: language === 'ar' ? tab.labelAr : tab.labelEn,
+                            tabBarIcon: ({ color, size }) => <AppIcon name={tab.icon} size={size} color={color} />,
+                        }}
+                    />
+                )
+            )}
+            {overflowTabs.length > 0 ? (
                 <Tab.Screen
                     name="More"
-                    children={() => <StaffMoreScreen profile={profile} />}
+                    children={() => (
+                        <StaffMoreScreen
+                            sections={overflowTabs.map((tab) => ({
+                                name: tab.name,
+                                labelEn: tab.labelEn,
+                                labelAr: tab.labelAr,
+                                icon: tab.icon,
+                            }))}
+                        />
+                    )}
                     options={{
                         tabBarLabel: language === 'ar' ? 'المزيد' : 'More',
                         tabBarIcon: ({ color, size }) => <AppIcon name="dashboard" size={size} color={color} />,
@@ -230,6 +312,9 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
         borderWidth: 1,
         borderColor: colors.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
     },
     moreItemText: {
         fontSize: fontSize.md,
