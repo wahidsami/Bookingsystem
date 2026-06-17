@@ -12,14 +12,17 @@ import { hasCompletedOnboarding, markOnboardingComplete } from './src/utils/onbo
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { ThemedAlertProvider } from './src/components/ThemedAlertProvider';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
 import { navigationRef, navigateToAppointmentInvite, navigateToGiftClaim, navigateToNotifications, navigateToReview } from './src/navigation/navigationService';
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthInitialRoute, AuthNavigator } from './src/navigation/AuthNavigator';
+import { StaffRootNavigator } from './src/navigation/StaffRootNavigator';
 
 type AppPhase = 'splash' | 'onboarding' | 'auth' | 'home';
+type AppMode = 'customer' | 'staff';
 
 // Load Cairo fonts
 const loadFonts = async () => {
@@ -43,6 +46,7 @@ function AppContent() {
   const [hasSavedLanguage, setHasSavedLanguage] = useState(false);
   const [authInitialRoute, setAuthInitialRoute] = useState<AuthInitialRoute>('Welcome');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [appMode, setAppMode] = useState<AppMode>('customer');
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
@@ -219,6 +223,13 @@ function AppContent() {
     await checkAppState();
   };
 
+  const resolveAppMode = async (): Promise<AppMode> => {
+    const staffProfile = await api.getStaffProfile().catch(() => null);
+    const nextMode: AppMode = staffProfile ? 'staff' : 'customer';
+    setAppMode(nextMode);
+    return nextMode;
+  };
+
   const checkAppState = async () => {
     const savedLanguage = await getLanguage();
     setHasSavedLanguage(Boolean(savedLanguage));
@@ -240,7 +251,13 @@ function AppContent() {
       const authenticated = await api.hasActiveSession();
       setIsAuthenticated(authenticated);
       setAuthInitialRoute('Welcome');
-      setAppPhase(authenticated ? 'home' : 'auth');
+      if (authenticated) {
+        await resolveAppMode().catch(() => undefined);
+        setAppPhase('home');
+      } else {
+        setAppMode('customer');
+        setAppPhase('auth');
+      }
     }
   };
 
@@ -257,12 +274,14 @@ function AppContent() {
 
   const handleLoginSuccess = () => {
     api.touchSession().catch(() => undefined);
+    void resolveAppMode().catch(() => undefined);
     setIsAuthenticated(true);
     setAppPhase('home');
   };
 
   const handleRegisterSuccess = () => {
     api.touchSession().catch(() => undefined);
+    void resolveAppMode().catch(() => undefined);
     setIsAuthenticated(true);
     setAppPhase('home');
   };
@@ -272,6 +291,7 @@ function AppContent() {
     await api.clearTokens();
     setIsAuthenticated(false);
     setAuthInitialRoute('Welcome');
+    setAppMode('customer');
     setAppPhase('auth');
   };
 
@@ -363,7 +383,7 @@ function AppContent() {
                 .catch(() => undefined);
             }}
           >
-            <RootNavigator />
+            {appMode === 'staff' ? <StaffRootNavigator /> : <RootNavigator />}
           </NavigationContainer>
           <StatusBar style="dark" />
         </ServiceBookingCartProvider>
@@ -378,7 +398,9 @@ export default function App() {
       <ErrorBoundary>
         <LanguageProvider>
           <CartProvider>
-            <AppContent />
+            <ThemedAlertProvider>
+              <AppContent />
+            </ThemedAlertProvider>
           </CartProvider>
         </LanguageProvider>
       </ErrorBoundary>

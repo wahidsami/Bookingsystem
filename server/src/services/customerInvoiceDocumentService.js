@@ -72,43 +72,113 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
         output.on('error', reject);
         doc.on('error', reject);
 
-        doc.fontSize(20).fillColor('#4a2bbf').text(kind === 'receipt' ? 'Payment Receipt' : 'Invoice');
-        doc.moveDown(0.5);
-        doc.fontSize(10).fillColor('#111827');
-        doc.text(`Invoice #: ${loadedInvoice.invoiceNumber}`);
-        doc.text(`Status: ${loadedInvoice.status}`);
-        doc.text(`Tenant: ${tenantName}`);
-        doc.text(`Customer: ${customerName}`);
-        doc.text(`Issued at: ${formatDateTime(loadedInvoice.issuedAt)}`);
-        doc.text(`Paid at: ${formatDateTime(loadedInvoice.paidAt)}`);
-        doc.moveDown(1);
+        const pageWidth = doc.page.width;
+        const margin = 40;
+        const accent = '#7c3aed';
+        const accentSoft = '#f5f3ff';
+        const text = '#111827';
+        const muted = '#6b7280';
+        const border = '#e5e7eb';
 
-        doc.fontSize(11).fillColor('#111827').text('Items', { underline: true });
-        doc.moveDown(0.3);
+        const drawCard = (x, y, w, h, title, lines = []) => {
+            doc.roundedRect(x, y, w, h, 16).fillAndStroke('#ffffff', border);
+            doc.fillColor(muted).fontSize(8).font('Helvetica-Bold').text(title.toUpperCase(), x + 14, y + 12, { width: w - 28 });
+            doc.fillColor(text).fontSize(10).font('Helvetica');
+            let offsetY = y + 30;
+            lines.forEach((line) => {
+                doc.text(line, x + 14, offsetY, { width: w - 28 });
+                offsetY += 14;
+            });
+        };
+
+        const drawPill = (x, y, label, fill = accentSoft, color = accent) => {
+            const width = Math.max(66, doc.widthOfString(label, { font: 'Helvetica-Bold', size: 9 }) + 22);
+            doc.roundedRect(x, y, width, 24, 12).fillAndStroke(fill, fill);
+            doc.fillColor(color).fontSize(9).font('Helvetica-Bold').text(label, x, y + 7, { width, align: 'center' });
+            return width;
+        };
+
+        doc.rect(0, 0, pageWidth, 118).fill(accent);
+        doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(22).text(kind === 'receipt' ? 'Payment Receipt' : 'Invoice', margin, 28);
+        doc.fillColor('#ede9fe').font('Helvetica').fontSize(10).text(`Invoice #: ${loadedInvoice.invoiceNumber}`, margin, 60);
+        doc.fillColor('#ede9fe').text(`Issued at: ${formatDateTime(loadedInvoice.issuedAt)}`, margin, 76);
+        if (loadedInvoice.paidAt) {
+            doc.fillColor('#ede9fe').text(`Paid at: ${formatDateTime(loadedInvoice.paidAt)}`, margin, 92);
+        }
+        drawPill(pageWidth - margin - 120, 34, loadedInvoice.status || 'DRAFT', '#ffffff', accent);
+
+        const infoTop = 144;
+        const infoCardWidth = (pageWidth - (margin * 2) - 12) / 2;
+        drawCard(margin, infoTop, infoCardWidth, 90, 'Tenant', [
+            tenantName,
+            loadedInvoice?.tenant?.city ? `City: ${loadedInvoice.tenant.city}` : `Currency: ${currency}`
+        ]);
+        drawCard(margin + infoCardWidth + 12, infoTop, infoCardWidth, 90, 'Customer', [
+            customerName,
+            loadedInvoice?.platformUser?.email ? `Email: ${loadedInvoice.platformUser.email}` : '-',
+            loadedInvoice?.platformUser?.phone ? `Phone: ${loadedInvoice.platformUser.phone}` : '-'
+        ]);
+
+        let cursorY = infoTop + 116;
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(12).text('Items', margin, cursorY);
+        cursorY += 18;
+        doc.moveTo(margin, cursorY).lineTo(pageWidth - margin, cursorY).strokeColor(border).stroke();
+        cursorY += 10;
 
         if (rows.length === 0) {
-            doc.fontSize(10).text('No line items');
+            doc.fillColor(muted).font('Helvetica').fontSize(10).text('No line items', margin, cursorY);
+            cursorY += 18;
         } else {
             rows.forEach((item, index) => {
                 const name = item.nameEn || item.nameAr || `Item ${index + 1}`;
                 const qty = Number(item.quantity || 1);
                 const unit = formatMoney(item.unitPrice, currency);
                 const total = formatMoney(item.lineTotal, currency);
-                doc.fontSize(10).text(`${index + 1}. ${name}`);
-                doc.fontSize(9).fillColor('#4b5563').text(`Qty: ${qty} | Unit: ${unit} | Line total: ${total}`);
-                doc.fillColor('#111827');
+                const rowHeight = 42;
+                doc.roundedRect(margin, cursorY, pageWidth - (margin * 2), rowHeight, 12).fillAndStroke('#ffffff', border);
+                doc.fillColor(text).font('Helvetica-Bold').fontSize(10).text(name, margin + 12, cursorY + 10, { width: 220 });
+                doc.fillColor(muted).font('Helvetica').fontSize(9).text(`Qty ${qty}`, margin + 250, cursorY + 10);
+                doc.text(`Unit ${unit}`, margin + 310, cursorY + 10);
+                doc.fillColor(accent).font('Helvetica-Bold').text(total, pageWidth - margin - 110, cursorY + 10, { width: 100, align: 'right' });
+                cursorY += rowHeight + 8;
             });
         }
 
-        doc.moveDown(1);
-        doc.fontSize(10).text(`Subtotal: ${formatMoney(loadedInvoice.subtotalAmount, currency)}`);
-        doc.text(`VAT: ${formatMoney(loadedInvoice.vatAmount, currency)}`);
-        doc.text(`Total: ${formatMoney(loadedInvoice.totalAmount, currency)}`);
-        doc.text(`Paid: ${formatMoney(loadedInvoice.paidAmount, currency)}`);
-        doc.text(`Due: ${formatMoney(loadedInvoice.dueAmount, currency)}`);
+        cursorY += 6;
+        const summaryWidth = 220;
+        const summaryX = pageWidth - margin - summaryWidth;
+        doc.roundedRect(summaryX, cursorY, summaryWidth, 150, 16).fillAndStroke(accentSoft, border);
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(11).text('Summary', summaryX + 14, cursorY + 14);
 
-        doc.moveDown(1.5);
-        doc.fontSize(9).fillColor('#6b7280').text('Generated by Refah platform');
+        const summaryRows = [
+            ['Subtotal', formatMoney(loadedInvoice.subtotalAmount, currency)],
+            ['VAT', formatMoney(loadedInvoice.vatAmount, currency)],
+            ['Total', formatMoney(loadedInvoice.totalAmount, currency)],
+            ['Paid', formatMoney(loadedInvoice.paidAmount, currency)],
+            ['Due', formatMoney(loadedInvoice.dueAmount, currency)],
+        ];
+
+        let summaryY = cursorY + 34;
+        summaryRows.forEach(([label, value], index) => {
+            const isTotal = index === 2;
+            doc.fillColor(isTotal ? accent : muted)
+                .font(isTotal ? 'Helvetica-Bold' : 'Helvetica')
+                .fontSize(isTotal ? 11 : 9)
+                .text(label, summaryX + 14, summaryY, { width: 100 });
+            doc.fillColor(isTotal ? text : text)
+                .font(isTotal ? 'Helvetica-Bold' : 'Helvetica')
+                .fontSize(isTotal ? 11 : 9)
+                .text(value, summaryX + 116, summaryY, { width: 90, align: 'right' });
+            summaryY += isTotal ? 24 : 18;
+            if (isTotal) {
+                doc.moveTo(summaryX + 14, summaryY - 2).lineTo(summaryX + summaryWidth - 14, summaryY - 2).strokeColor(border).stroke();
+            }
+        });
+
+        const footerY = Math.max(cursorY + 170, 730);
+        doc.moveTo(margin, footerY).lineTo(pageWidth - margin, footerY).strokeColor(border).stroke();
+        doc.fillColor(muted).font('Helvetica').fontSize(8)
+            .text('Generated by Refah platform', margin, footerY + 10, { align: 'center', width: pageWidth - (margin * 2) });
         doc.end();
     });
 
@@ -153,4 +223,3 @@ module.exports = {
     renderCustomerInvoicePdf,
     resolveUploadPath
 };
-

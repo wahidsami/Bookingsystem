@@ -106,6 +106,43 @@ export interface User {
     };
 }
 
+export interface StaffProfile {
+    id: string;
+    tenantId?: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    nationality?: string | null;
+    bio?: string | null;
+    experience?: string | null;
+    skills?: string[];
+    photo?: string | null;
+    rating?: number | null;
+    totalBookings?: number | null;
+    salary?: number | null;
+    commissionRate?: number | null;
+    scheduleVisibilityWeeks?: number | null;
+    isActive?: boolean;
+    must_change_password?: boolean;
+    permissions?: {
+        view_earnings?: boolean;
+        view_reviews?: boolean;
+        reply_reviews?: boolean;
+        view_clients?: boolean;
+        view_booking_notes?: boolean;
+        can_start_service?: boolean;
+        can_mark_no_show?: boolean;
+    };
+    features?: Record<string, boolean>;
+    tenant?: {
+        id: string;
+        businessName?: string;
+        businessType?: string | string[];
+        city?: string | null;
+        logo?: string | null;
+    } | null;
+}
+
 export interface Tenant {
     id: string;
     name: string;
@@ -1360,6 +1397,11 @@ class ApiClient {
     async getProfile(): Promise<User> {
         const response = await this.get<{ success: boolean; user: User }>('/users/profile');
         return normalizeUser(response.user);
+    }
+
+    async getStaffProfile(): Promise<StaffProfile> {
+        const response = await this.get<{ success: boolean; staff: StaffProfile }>('/staff/me');
+        return response.staff;
     }
 
     /**
