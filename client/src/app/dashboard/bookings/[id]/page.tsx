@@ -121,29 +121,42 @@ function BookingDetailsContent() {
         }
     };
 
-    const bookingRows = Array.isArray((booking as any)?.bookingItems)
-        ? (booking as any).bookingItems
-        : Array.isArray((booking as any)?.items)
-            ? (booking as any).items
-            : booking
-                ? [booking]
-                : [];
+    const bookingSession = (booking as any)?.bookingSession;
+    const bookingRows = Array.isArray(bookingSession?.appointments)
+        ? bookingSession.appointments
+        : Array.isArray((booking as any)?.bookingItems)
+            ? (booking as any).bookingItems
+            : Array.isArray((booking as any)?.items)
+                ? (booking as any).items
+                : booking
+                    ? [booking]
+                    : [];
 
-    const isGroupedBooking = bookingRows.length > 1 || Boolean((booking as any)?.bookingSessionId || (booking as any)?.bookingReference);
+    const isGroupedBooking = bookingRows.length > 1 || Boolean(bookingSession?.id || (booking as any)?.bookingSessionId || (booking as any)?.bookingReference);
 
-    const subtotalAmount = bookingRows.reduce((sum: number, item: any) => {
-        const itemSubtotal = item?.rawPrice ?? item?.price ?? 0;
-        return sum + Number(itemSubtotal || 0);
-    }, 0);
+    const subtotalAmount = bookingSession?.subtotal != null
+        ? Number(bookingSession.subtotal || 0)
+        : bookingRows.reduce((sum: number, item: any) => {
+            const itemSubtotal = item?.rawPrice ?? item?.price ?? 0;
+            return sum + Number(itemSubtotal || 0);
+        }, 0);
 
-    const taxAmount = bookingRows.reduce((sum: number, item: any) => sum + Number(item?.taxAmount || 0), 0);
-    const platformFeeAmount = bookingRows.reduce((sum: number, item: any) => sum + Number(item?.platformFee || 0), 0);
-    const totalAmount = isGroupedBooking
-        ? parseFloat((subtotalAmount + taxAmount + platformFeeAmount).toFixed(2))
-        : Number((booking as any)?.price ?? subtotalAmount);
+    const taxAmount = bookingSession?.taxAmount != null
+        ? Number(bookingSession.taxAmount || 0)
+        : bookingRows.reduce((sum: number, item: any) => sum + Number(item?.taxAmount || 0), 0);
+    const platformFeeAmount = bookingSession?.platformFee != null
+        ? Number(bookingSession.platformFee || 0)
+        : bookingRows.reduce((sum: number, item: any) => sum + Number(item?.platformFee || 0), 0);
+    const totalAmount = bookingSession?.totalAmount != null
+        ? Number(bookingSession.totalAmount || 0)
+        : isGroupedBooking
+            ? parseFloat((subtotalAmount + taxAmount + platformFeeAmount).toFixed(2))
+            : Number((booking as any)?.price ?? subtotalAmount);
     const paidAmount = Number((booking as any)?.totalPaid ?? 0);
     const depositAmount = Number((booking as any)?.depositAmount ?? 0);
-    const remainingAmount = Math.max(0, totalAmount - paidAmount);
+    const remainingAmount = Number.isFinite(Number((booking as any)?.remainderAmount))
+        ? Math.max(0, Number((booking as any)?.remainderAmount || 0))
+        : Math.max(0, totalAmount - paidAmount);
     const serviceCount = bookingRows.length;
 
     if (loading) {
