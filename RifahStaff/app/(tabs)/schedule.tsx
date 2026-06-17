@@ -48,6 +48,9 @@ const getAppointmentPrice = (appointment: Appointment) =>
 const getAppointmentServiceLabel = (appointment: Appointment) =>
     appointment.service?.name_en || appointment.service?.name_ar || 'Service';
 
+const getAppointmentCardLabel = (appointment: Appointment, groupCount: number) =>
+    groupCount > 1 ? `${groupCount} services` : getAppointmentServiceLabel(appointment);
+
 const parseClockToMinutes = (value?: string | null): number | null => {
     if (!value) return null;
     const [hoursRaw, minutesRaw] = `${value}`.split(':');
@@ -490,7 +493,6 @@ export default function ScheduleScreen() {
         : appointments;
 
     const selectedDayShiftMinutes = shiftsForSelectedDate.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
-    const appointmentsForSelectedDate = appointments;
 
     const upcomingTimeOff = timeOff
         .filter((item) => item.startDate > getRiyadhDateKey())
@@ -914,21 +916,23 @@ export default function ScheduleScreen() {
                             <ActivityIndicator size="small" color="#8B5ADF" />
                             <Text style={styles.infoCardText}>Loading appointments for this day...</Text>
                         </View>
-                    ) : appointmentsForSelectedDate.length === 0 ? (
+                    ) : appointmentGroups.length === 0 ? (
                         <View style={styles.infoCard}>
                             <Ionicons name="calendar-outline" size={18} color="#6b7280" />
                             <Text style={styles.infoCardText}>No appointments for this day.</Text>
                         </View>
                     ) : (
-                        appointmentsForSelectedDate.map((appointment) => {
+                        appointmentGroups.map((group) => {
+                            const appointment = group.primary;
                             const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
-                            const amount = Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
+                            const amount = Number(group.totalPrice || appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
                             const urgency = getUrgencyInfo(appointment);
                             const isStarted = appointment.status === 'started';
                             const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
+                            const groupedCount = group.count || 1;
 
                             return (
-                                <View key={appointment.id} style={[styles.appointmentCard, isCompleted && styles.appointmentCardCompleted]}>
+                                <View key={group.key} style={[styles.appointmentCard, isCompleted && styles.appointmentCardCompleted]}>
                                     <View style={styles.appointmentCardHeader}>
                                         <View>
                                             <Text style={styles.appointmentTime}>
@@ -972,7 +976,14 @@ export default function ScheduleScreen() {
                                             </View>
                                         </View>
 
-                                        <Text style={styles.appointmentServiceName}>{appointment.service?.name_en || 'Service'}</Text>
+                                        <Text style={styles.appointmentServiceName} numberOfLines={1}>
+                                            {getAppointmentCardLabel(appointment, groupedCount)}
+                                        </Text>
+                                        {groupedCount > 1 ? (
+                                            <Text style={styles.appointmentServiceHint} numberOfLines={1}>
+                                                Tap for full service breakdown
+                                            </Text>
+                                        ) : null}
 
                                         <View style={styles.appointmentMetaRow}>
                                             <View style={styles.appointmentMetaBadge}>
@@ -1408,7 +1419,7 @@ export default function ScheduleScreen() {
                                     </Text>
                                 </View>
                                 <View style={styles.dayOverviewStats}>
-                                    <Text style={styles.dayOverviewValue}>{appointmentsForSelectedDate.length}</Text>
+                                    <Text style={styles.dayOverviewValue}>{appointmentGroups.length}</Text>
                                     <Text style={styles.dayOverviewLabel}>Appointments</Text>
                                 </View>
                             </View>
@@ -2514,6 +2525,12 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#4b5563',
     },
+    appointmentServiceHint: {
+        marginTop: 4,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#8b5cf6',
+    },
     groupSummaryCard: {
         marginTop: 10,
         padding: 12,
@@ -2676,8 +2693,8 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     settingsPanel: {
-        width: '88%',
-        maxWidth: 380,
+        width: '94%',
+        maxWidth: 460,
         height: '100%',
         backgroundColor: '#ffffff',
         paddingHorizontal: 18,
@@ -2780,6 +2797,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
         borderRadius: 18,
         padding: 16,
+        width: '100%',
+        maxWidth: 560,
+        alignSelf: 'center',
+        maxHeight: '92%',
     },
     modalHeader: {
         flexDirection: 'row',
