@@ -97,6 +97,141 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
     return normalizedAllocations;
 };
 
+const roundMoney = (value) => parseFloat(Number(value || 0).toFixed(2));
+
+const loadAppointmentPaymentContext = async (appointmentId, { transaction = null, lock = false } = {}) => {
+    const appointment = await db.Appointment.findByPk(appointmentId, {
+        transaction,
+        lock: lock && transaction ? transaction.LOCK.UPDATE : undefined,
+        include: [
+            {
+                model: db.Service,
+                as: 'service',
+                required: false
+            },
+            {
+                model: db.PaymentTransaction,
+                as: 'paymentTransactions',
+                required: false,
+                include: [{
+                    model: db.Staff,
+                    as: 'processor',
+                    attributes: ['id', 'name'],
+                    required: false
+                }]
+            },
+            {
+                model: db.BookingSession,
+                as: 'bookingSession',
+                required: false,
+                include: [{
+                    model: db.Appointment,
+                    as: 'appointments',
+                    required: false,
+                    include: [
+                        {
+                            model: db.Service,
+                            as: 'service',
+                            required: false
+                        },
+                        {
+                            model: db.PaymentTransaction,
+                            as: 'paymentTransactions',
+                            required: false,
+                            include: [{
+                                model: db.Staff,
+                                as: 'processor',
+                                attributes: ['id', 'name'],
+                                required: false
+                            }]
+                        }
+                    ]
+                }]
+            }
+        ]
+    });
+
+    if (!appointment) {
+        return null;
+    }
+
+    const sessionAppointments = Array.isArray(appointment.bookingSession?.appointments)
+        ? appointment.bookingSession.appointments
+            .filter((sessionAppointment) => sessionAppointment && `${sessionAppointment.status || ''}`.trim().toLowerCase() !== 'cancelled')
+            .slice()
+            .sort((left, right) => {
+                const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+                const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+                if (leftIndex !== rightIndex) {
+                    return leftIndex - rightIndex;
+                }
+                return new Date(left.startTime || 0) - new Date(right.startTime || 0);
+            })
+        : [];
+
+    const appointments = sessionAppointments.length > 0 ? sessionAppointments : [appointment];
+
+    return {
+        appointment,
+        bookingSession: appointment.bookingSession || null,
+        appointments
+    };
+};
+
+const getAppointmentDueAmount = (appointment) => {
+    const totalAmount = Number(appointment?.price || 0);
+    const totalPaid = Number(appointment?.totalPaid || 0);
+    return roundMoney(Math.max(totalAmount - totalPaid, 0));
+};
+
+const buildPaymentSummaryFromAppointments = (appointments = [], fallbackAppointment = null) => {
+    const sortedAppointments = Array.isArray(appointments)
+        ? appointments.slice().sort((left, right) => {
+            const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+            const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+            if (leftIndex !== rightIndex) {
+                return leftIndex - rightIndex;
+            }
+            return new Date(left.startTime || 0) - new Date(right.startTime || 0);
+        })
+        : [];
+
+    const sourceAppointments = sortedAppointments.length > 0 && sortedAppointments.some(Boolean)
+        ? sortedAppointments
+        : (fallbackAppointment ? [fallbackAppointment] : []);
+
+    const transactions = sourceAppointments
+        .flatMap((appointment) => Array.isArray(appointment?.paymentTransactions) ? appointment.paymentTransactions : [])
+        .filter(Boolean)
+        .slice()
+        .sort((left, right) => new Date(left.processedAt || left.createdAt || 0) - new Date(right.processedAt || right.createdAt || 0));
+
+    const totalPrice = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.price || 0), 0));
+    const depositAmount = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.depositAmount || 0), 0));
+    const remainderAmount = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.remainderAmount || 0), 0));
+    const totalPaid = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.totalPaid || 0), 0));
+    const remainingBalance = roundMoney(Math.max(totalPrice - totalPaid, 0));
+    const allPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Number(appointment?.totalPaid || 0) + 0.01 >= Number(appointment?.price || 0));
+    const anyDepositPaid = sourceAppointments.some((appointment) => Boolean(appointment?.depositPaid));
+    const allDepositPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Boolean(appointment?.depositPaid));
+    const allRemainderPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Boolean(appointment?.remainderPaid));
+    const paymentStatus = allPaid
+        ? 'fully_paid'
+        : (allDepositPaid || anyDepositPaid ? 'deposit_paid' : (fallbackAppointment?.paymentStatus || sourceAppointments[0]?.paymentStatus || 'pending'));
+
+    return {
+        totalPrice,
+        depositAmount,
+        remainderAmount,
+        totalPaid,
+        depositPaid: allDepositPaid || anyDepositPaid,
+        remainderPaid: allRemainderPaid,
+        paymentStatus,
+        remainingBalance,
+        transactions
+    };
+};
+
 const decrementCustomerWalletBalance = async (appointment, amount, transaction) => {
     if (!appointment?.platformUserId) {
         throw new Error('Customer wallet account not found');
@@ -189,17 +324,150 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
     const { amount, paymentMethod, paymentAllocations, processedBy, notes, transactionRef } = paymentData;
 
     return await db.sequelize.transaction(async (transaction) => {
-        const appointment = await db.Appointment.findByPk(appointmentId, {
+        const context = await loadAppointmentPaymentContext(appointmentId, {
             transaction,
-            lock: transaction.LOCK.UPDATE
+            lock: true
         });
-
-        if (!appointment) {
+        if (!context?.appointment) {
             throw new Error('Appointment not found');
         }
 
+        const { appointment, bookingSession, appointments: sessionAppointments } = context;
+
         if (!appointment.depositPaid) {
             throw new Error('Deposit must be paid before recording remainder');
+        }
+
+        const paymentSource = paymentMethod || bookingSession?.paymentMethod || appointment.paymentMethod || 'cash';
+        const payableSessionAppointments = sessionAppointments
+            .map((sessionAppointment) => ({
+                appointment: sessionAppointment,
+                dueAmount: getAppointmentDueAmount(sessionAppointment)
+            }))
+            .filter((entry) => entry.dueAmount > 0.009);
+        const hasSessionCheckout = Boolean(bookingSession?.id && payableSessionAppointments.length > 1);
+
+        if (hasSessionCheckout) {
+            const sessionDueAmount = roundMoney(
+                payableSessionAppointments.reduce((sum, entry) => sum + entry.dueAmount, 0)
+            );
+            const normalizedSessionPaymentAllocations = normalizePaymentAllocations({
+                amount: sessionDueAmount,
+                paymentMethod,
+                paymentAllocations,
+                fallbackSource: paymentSource
+            });
+            const allocationBuckets = normalizedSessionPaymentAllocations.map((allocation) => ({
+                ...allocation,
+                remaining: roundMoney(allocation.amount)
+            }));
+
+            const allocateForAppointment = (targetAmount) => {
+                let remainingTarget = roundMoney(targetAmount);
+                const assignedAllocations = [];
+
+                for (const bucket of allocationBuckets) {
+                    if (remainingTarget <= 0) {
+                        break;
+                    }
+
+                    const allocationAmount = Math.min(bucket.remaining, remainingTarget);
+                    if (allocationAmount <= 0) {
+                        continue;
+                    }
+
+                    assignedAllocations.push({
+                        ...bucket,
+                        amount: roundMoney(allocationAmount)
+                    });
+                    bucket.remaining = roundMoney(bucket.remaining - allocationAmount);
+                    remainingTarget = roundMoney(remainingTarget - allocationAmount);
+                }
+
+                if (remainingTarget > 0.01) {
+                    throw new Error('Payment allocations must add up to the payment amount');
+                }
+
+                return assignedAllocations.filter((allocation) => allocation.amount > 0);
+            };
+
+            const sessionTransactionRefBase = transactionRef || `APT-REMAINDER-${bookingSession.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
+
+            for (let index = 0; index < payableSessionAppointments.length; index += 1) {
+                const target = payableSessionAppointments[index];
+                const targetAppointment = target.appointment;
+                const targetAllocations = allocateForAppointment(target.dueAmount);
+                const resolvedPaymentMethod = targetAllocations.length > 1
+                    ? 'split'
+                    : targetAllocations[0]?.paymentMethod || paymentSource;
+
+                await createAppointmentPaymentTransactions({
+                    appointment: targetAppointment,
+                    type: 'remainder',
+                    amount: target.dueAmount,
+                    paymentMethod: resolvedPaymentMethod,
+                    paymentAllocations: targetAllocations,
+                    processedBy,
+                    transactionRef: payableSessionAppointments.length > 1
+                        ? `${sessionTransactionRefBase}-${index + 1}`
+                        : sessionTransactionRefBase,
+                    notes,
+                    source: 'tenant_remainder_collection',
+                    transaction
+                });
+
+                const numericAmount = roundMoney(target.dueAmount);
+                const platformFee = roundMoney(numericAmount * 0.025);
+                const tenantRevenue = roundMoney(numericAmount - platformFee);
+
+                await db.Transaction.create({
+                    platformUserId: targetAppointment.platformUserId,
+                    tenantId: targetAppointment.tenantId,
+                    appointmentId: targetAppointment.id,
+                    amount: numericAmount,
+                    currency: 'SAR',
+                    type: 'booking',
+                    status: 'completed',
+                    platformFee,
+                    tenantRevenue,
+                    metadata: {
+                        source: 'tenant_remainder_collection',
+                        bookingSessionId: bookingSession.id,
+                        paymentMethod: resolvedPaymentMethod,
+                        paymentAllocations: targetAllocations,
+                        paymentTransactionRef: payableSessionAppointments.length > 1
+                            ? `${sessionTransactionRefBase}-${index + 1}`
+                            : sessionTransactionRefBase,
+                        notes: notes || null
+                    }
+                }, { transaction });
+
+                const newTotalPaid = roundMoney(Number(targetAppointment.totalPaid || 0) + numericAmount);
+                await targetAppointment.update({
+                    paymentMethod: resolvedPaymentMethod,
+                    remainderPaid: true,
+                    remainderAmount: 0,
+                    totalPaid: newTotalPaid,
+                    paymentStatus: newTotalPaid + 0.01 >= roundMoney(targetAppointment.price) ? 'fully_paid' : 'deposit_paid',
+                    paidAt: targetAppointment.paidAt || new Date()
+                }, { transaction });
+            }
+
+            await bookingSession.update({
+                paymentMethod: paymentSource,
+                status: 'completed'
+            }, { transaction });
+
+            const invoice = await ensureAppointmentInvoice(appointment.id, {
+                transaction,
+                triggerSource: 'tenant_remainder_collection'
+            });
+
+            return {
+                appointment,
+                invoice,
+                paymentTransactionRef: sessionTransactionRefBase
+            };
         }
 
         if (appointment.remainderPaid) {
@@ -210,14 +478,14 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
             amount,
             paymentMethod,
             paymentAllocations,
-            fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
+            fallbackSource: paymentSource
         });
 
         await createAppointmentPaymentTransactions({
             appointment,
             type: 'remainder',
             amount,
-            paymentMethod: paymentMethod || appointment.paymentMethod || 'cash',
+            paymentMethod: paymentSource,
             paymentAllocations: normalizedAllocations,
             processedBy,
             transactionRef: transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
@@ -228,10 +496,10 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
 
         const resolvedPaymentMethod = normalizedAllocations.length > 1
             ? 'split'
-            : normalizedAllocations[0]?.paymentMethod || paymentMethod || appointment.paymentMethod || 'cash';
+            : normalizedAllocations[0]?.paymentMethod || paymentSource;
         const numericAmount = parseFloat(amount);
-        const platformFee = parseFloat((numericAmount * 0.025).toFixed(2));
-        const tenantRevenue = parseFloat((numericAmount - platformFee).toFixed(2));
+        const platformFee = roundMoney(numericAmount * 0.025);
+        const tenantRevenue = roundMoney(numericAmount - platformFee);
         const paymentTransactionRef = transactionRef || `APT-REMAINDER-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
 
         await db.Transaction.create({
@@ -253,7 +521,7 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
             }
         }, { transaction });
 
-        const newTotalPaid = parseFloat(appointment.totalPaid) + numericAmount;
+        const newTotalPaid = roundMoney(Number(appointment.totalPaid || 0) + numericAmount);
         await appointment.update({
             paymentMethod: resolvedPaymentMethod,
             remainderPaid: true,
@@ -290,34 +558,24 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
  * @returns {Promise<Object>} Payment summary with transactions
  */
 const getPaymentSummary = async (appointmentId) => {
-    const appointment = await db.Appointment.findByPk(appointmentId, {
-        include: [{
-            model: db.PaymentTransaction,
-            as: 'paymentTransactions',
-            include: [{
-                model: db.Staff,
-                as: 'processor',
-                attributes: ['id', 'name'],
-                required: false
-            }],
-            order: [['processedAt', 'ASC']]
-        }]
-    });
-
-    if (!appointment) {
+    const context = await loadAppointmentPaymentContext(appointmentId);
+    if (!context?.appointment) {
         throw new Error('Appointment not found');
     }
 
+    const { appointment, appointments: sessionAppointments } = context;
+    const summary = buildPaymentSummaryFromAppointments(sessionAppointments, appointment);
+
     return {
-        totalPrice: parseFloat(appointment.price),
-        depositAmount: parseFloat(appointment.depositAmount),
-        remainderAmount: parseFloat(appointment.remainderAmount),
-        totalPaid: parseFloat(appointment.totalPaid),
-        depositPaid: appointment.depositPaid,
-        remainderPaid: appointment.remainderPaid,
-        paymentStatus: appointment.paymentStatus,
-        remainingBalance: parseFloat(appointment.price) - parseFloat(appointment.totalPaid),
-        transactions: appointment.paymentTransactions || []
+        totalPrice: summary.totalPrice,
+        depositAmount: summary.depositAmount,
+        remainderAmount: summary.remainderAmount,
+        totalPaid: summary.totalPaid,
+        depositPaid: summary.depositPaid,
+        remainderPaid: summary.remainderPaid,
+        paymentStatus: summary.paymentStatus,
+        remainingBalance: summary.remainingBalance,
+        transactions: summary.transactions
     };
 };
 
@@ -332,89 +590,134 @@ const refundPayment = async (appointmentId, refundData) => {
     const normalizedMethod = `${paymentMethod || ''}`.trim().toLowerCase();
 
     return await db.sequelize.transaction(async (transaction) => {
-        const appointment = await db.Appointment.findByPk(appointmentId, {
+        const context = await loadAppointmentPaymentContext(appointmentId, {
             transaction,
-            lock: transaction.LOCK.UPDATE
+            lock: true
         });
-
-        if (!appointment) {
+        if (!context?.appointment) {
             throw new Error('Appointment not found');
         }
+
+        const { appointment, bookingSession, appointments: sessionAppointments } = context;
 
         const numericAmount = parseFloat(amount);
         if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
             throw new Error('Refund amount must be greater than zero');
         }
-        if (numericAmount - parseFloat(appointment.totalPaid || 0) > 0.01) {
+
+        const resolvedPaymentMethod = resolveLedgerPaymentMethod(normalizedMethod || appointment.paymentMethod, 'online');
+        const totalPaidAcrossContext = roundMoney(
+            sessionAppointments.reduce((sum, sessionAppointment) => sum + Number(sessionAppointment.totalPaid || 0), 0)
+        );
+        if (numericAmount - totalPaidAcrossContext > 0.01) {
             throw new Error('Refund amount cannot exceed the amount already paid');
         }
 
-        const resolvedPaymentMethod = resolveLedgerPaymentMethod(normalizedMethod || appointment.paymentMethod, 'online');
-        const refundLedgerTransaction = await createAppointmentTransaction({
-            appointmentId,
-            type: 'refund',
-            amount: numericAmount,
-            paymentMethod: resolvedPaymentMethod,
-            status: 'refunded',
-            transactionRef: transactionRef || `APT-REFUND-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
-            processedBy,
-            processedAt: new Date(),
-            notes: reason,
-            metadata: {
-                source: 'appointment_refund',
-                paymentStatusBefore: appointment.paymentStatus,
-                totalPaidBefore: parseFloat(appointment.totalPaid || 0)
-            }
-        }, { transaction });
+        const refundTransactionRef = transactionRef || `APT-REFUND-${bookingSession?.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
 
-        if (resolvedPaymentMethod === 'wallet') {
-            const walletUser = await db.PlatformUser.findByPk(appointment.platformUserId, {
-                transaction,
-                lock: transaction.LOCK.UPDATE
-            });
+        const targetAppointments = bookingSession?.id && sessionAppointments.length > 1
+            ? sessionAppointments
+                .map((sessionAppointment) => ({
+                    appointment: sessionAppointment,
+                    refundableAmount: roundMoney(Number(sessionAppointment.totalPaid || 0))
+                }))
+                .filter((entry) => entry.refundableAmount > 0)
+            : [{
+                appointment,
+                refundableAmount: roundMoney(Number(appointment.totalPaid || 0))
+            }];
 
-            if (!walletUser) {
-                throw new Error('Customer wallet account not found');
+        let remainingRefund = roundMoney(numericAmount);
+        let refundLedgerTransaction = null;
+
+        for (let index = 0; index < targetAppointments.length; index += 1) {
+            if (remainingRefund <= 0) {
+                break;
             }
 
-            await walletUser.increment('walletBalance', {
-                by: numericAmount,
-                transaction
-            });
+            const target = targetAppointments[index];
+            const targetAppointment = target.appointment;
+            const targetRefund = roundMoney(Math.min(target.refundableAmount, remainingRefund));
+            if (targetRefund <= 0) {
+                continue;
+            }
+
+            refundLedgerTransaction = await createAppointmentTransaction({
+                appointmentId: targetAppointment.id,
+                type: 'refund',
+                amount: targetRefund,
+                paymentMethod: resolvedPaymentMethod,
+                status: 'refunded',
+                transactionRef: targetAppointments.length > 1
+                    ? `${refundTransactionRef}-${index + 1}`
+                    : refundTransactionRef,
+                processedBy,
+                processedAt: new Date(),
+                notes: reason,
+                metadata: {
+                    source: 'appointment_refund',
+                    paymentStatusBefore: targetAppointment.paymentStatus,
+                    totalPaidBefore: roundMoney(Number(targetAppointment.totalPaid || 0))
+                }
+            }, { transaction });
+
+            if (resolvedPaymentMethod === 'wallet') {
+                const walletUser = await db.PlatformUser.findByPk(targetAppointment.platformUserId, {
+                    transaction,
+                    lock: transaction.LOCK.UPDATE
+                });
+
+                if (!walletUser) {
+                    throw new Error('Customer wallet account not found');
+                }
+
+                await walletUser.increment('walletBalance', {
+                    by: targetRefund,
+                    transaction
+                });
+            }
+
+            const platformFee = roundMoney(targetRefund * 0.025);
+            const tenantRevenue = roundMoney(targetRefund - platformFee);
+
+            await db.Transaction.create({
+                platformUserId: targetAppointment.platformUserId,
+                tenantId: targetAppointment.tenantId,
+                appointmentId: targetAppointment.id,
+                amount: targetRefund,
+                currency: 'SAR',
+                type: 'refund',
+                status: 'refunded',
+                platformFee,
+                tenantRevenue,
+                metadata: {
+                    source: 'appointment_refund',
+                    paymentMethod: resolvedPaymentMethod,
+                    paymentTransactionRef: targetAppointments.length > 1
+                        ? `${refundTransactionRef}-${index + 1}`
+                        : refundTransactionRef,
+                    refundAmount: targetRefund,
+                    notes: reason || null,
+                    bookingSessionId: bookingSession?.id || null
+                }
+            }, { transaction });
+
+            const newTotalPaid = roundMoney(Number(targetAppointment.totalPaid || 0) - targetRefund);
+            const isFullRefund = newTotalPaid <= 0;
+
+            await targetAppointment.update({
+                totalPaid: newTotalPaid,
+                paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
+                depositPaid: newTotalPaid >= Number(targetAppointment.depositAmount || 0),
+                remainderPaid: newTotalPaid >= Number(targetAppointment.price || 0)
+            }, { transaction });
+
+            remainingRefund = roundMoney(remainingRefund - targetRefund);
         }
 
-        const platformFee = parseFloat((numericAmount * 0.025).toFixed(2));
-        const tenantRevenue = parseFloat((numericAmount - platformFee).toFixed(2));
-        const refundTransactionRef = transactionRef || `APT-REFUND-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
-
-        await db.Transaction.create({
-            platformUserId: appointment.platformUserId,
-            tenantId: appointment.tenantId,
-            appointmentId: appointment.id,
-            amount: numericAmount,
-            currency: 'SAR',
-            type: 'refund',
-            status: 'refunded',
-            platformFee,
-            tenantRevenue,
-            metadata: {
-                source: 'appointment_refund',
-                paymentMethod: resolvedPaymentMethod,
-                paymentTransactionRef: refundTransactionRef,
-                refundAmount: numericAmount,
-                notes: reason || null
-            }
-        }, { transaction });
-
-        const newTotalPaid = parseFloat(appointment.totalPaid) - numericAmount;
-        const isFullRefund = newTotalPaid === 0;
-
-        await appointment.update({
-            totalPaid: newTotalPaid,
-            paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
-            depositPaid: newTotalPaid >= appointment.depositAmount,
-            remainderPaid: newTotalPaid >= parseFloat(appointment.price)
-        }, { transaction });
+        if (remainingRefund > 0.01) {
+            throw new Error('Refund amount cannot exceed the amount already paid');
+        }
 
         const invoice = await ensureAppointmentInvoice(appointment.id, {
             transaction,

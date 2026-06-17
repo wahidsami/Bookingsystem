@@ -73,9 +73,12 @@ function buildAppointmentPaymentBreakdown(paymentTransactions = []) {
     };
 }
 
-function buildAppointmentInvoicePaymentSnapshot(appointment) {
-    const breakdown = buildAppointmentPaymentBreakdown(appointment?.paymentTransactions || []);
-    const paymentMethod = appointment?.paymentMethod || breakdown.paymentSummaryMethod || null;
+function buildAppointmentInvoicePaymentSnapshot(appointment, overrides = {}) {
+    const paymentTransactions = Array.isArray(overrides.paymentTransactions)
+        ? overrides.paymentTransactions
+        : (appointment?.paymentTransactions || []);
+    const breakdown = buildAppointmentPaymentBreakdown(paymentTransactions);
+    const paymentMethod = overrides.paymentMethod || appointment?.paymentMethod || breakdown.paymentSummaryMethod || null;
 
     return {
         paymentMethod,
@@ -280,32 +283,80 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
         throw new Error('Appointment not found while ensuring invoice');
     }
 
-    const {
-        subtotalAmount,
-        vatAmount,
-        totalAmount
-    } = normalizeInvoiceAmounts(appointment.price, appointment.taxAmount);
-    const paidAmount = formatAmount(appointment.totalPaid);
+    const sessionAppointments = Array.isArray(appointment.bookingSession?.appointments)
+        ? appointment.bookingSession.appointments
+            .filter((sessionAppointment) => sessionAppointment && `${sessionAppointment.status || ''}`.trim().toLowerCase() !== 'cancelled')
+            .slice()
+            .sort((left, right) => {
+                const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+                const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+                if (leftIndex !== rightIndex) {
+                    return leftIndex - rightIndex;
+                }
+                return new Date(left.startTime || 0) - new Date(right.startTime || 0);
+            })
+        : [];
+    const isSessionInvoice = Boolean(appointment.bookingSession?.id && sessionAppointments.length > 1);
+    const invoiceAppointments = isSessionInvoice ? sessionAppointments : [appointment];
+    const paymentTransactions = invoiceAppointments
+        .flatMap((sessionAppointment) => Array.isArray(sessionAppointment.paymentTransactions) ? sessionAppointment.paymentTransactions : []);
+    const paymentSnapshot = buildAppointmentInvoicePaymentSnapshot(appointment, {
+        paymentTransactions,
+        paymentMethod: isSessionInvoice
+            ? (appointment.bookingSession?.paymentMethod || appointment.paymentMethod || null)
+            : undefined
+    });
+
+    const subtotalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.rawPrice || 0), 0));
+    const vatAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.taxAmount || 0), 0));
+    const totalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.price || 0), 0));
+    const paidAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.totalPaid || 0), 0));
     const dueAmount = formatAmount(Math.max(0, totalAmount - paidAmount));
-    const paymentSnapshot = buildAppointmentInvoicePaymentSnapshot(appointment);
+    const invoiceItems = invoiceAppointments.map((sourceAppointment, index) => ({
+        itemType: 'service',
+        itemRefId: sourceAppointment.serviceId || null,
+        nameEn: sourceAppointment.service?.name_en || 'Service',
+        nameAr: sourceAppointment.service?.name_ar || sourceAppointment.service?.name_en || 'Service',
+        quantity: 1,
+        unitPrice: formatAmount(sourceAppointment.price),
+        lineTotal: formatAmount(sourceAppointment.price),
+        taxAmount: formatAmount(sourceAppointment.taxAmount),
+        metadata: {
+            bookingNumber: sourceAppointment.bookingNumber || null,
+            bookingSessionId: sourceAppointment.bookingSessionId || null,
+            bookingReference: appointment.bookingSession?.bookingReference || sourceAppointment.bookingReference || null,
+            bookingItemIndex: sourceAppointment.bookingItemIndex ?? index
+        }
+    }));
     const invoiceMetadata = {
-        source: 'appointment',
+        source: isSessionInvoice ? 'booking_session' : 'appointment',
         bookingNumber: appointment.bookingNumber || null,
+        bookingReference: appointment.bookingSession?.bookingReference || null,
+        bookingSessionId: appointment.bookingSession?.id || null,
         paymentCollectionMode: paymentSnapshot.paymentCollectionMode,
         paymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
         paymentBreakdown: paymentSnapshot.paymentBreakdown,
         paymentBreakdownCount: paymentSnapshot.breakdownCount,
         paymentMethods: paymentSnapshot.paymentMethods,
-        hasSplitPayments: paymentSnapshot.hasSplitPayments
+        hasSplitPayments: paymentSnapshot.hasSplitPayments,
+        itemCount: invoiceAppointments.length
     };
 
+    const allPaid = invoiceAppointments.length > 0
+        && invoiceAppointments.every((current) => Number(current.totalPaid || 0) + 0.01 >= Number(current.price || 0));
+    const allRefunded = invoiceAppointments.length > 0
+        && invoiceAppointments.every((current) => ['refunded', 'partially_refunded'].includes(`${current.paymentStatus || ''}`.trim().toLowerCase())
+            || Number(current.totalPaid || 0) <= 0.01);
+    const anyPaid = invoiceAppointments.some((current) => Number(current.totalPaid || 0) > 0);
     let status = 'UNPAID';
-    if (appointment.paymentStatus === 'fully_paid' || appointment.paymentStatus === 'paid') {
+    if (allPaid) {
         status = 'PAID';
+    } else if (allRefunded && !anyPaid) {
+        status = 'REFUNDED';
+    } else if (anyPaid) {
+        status = 'PARTIALLY_PAID';
     } else if (appointment.paymentStatus === 'deposit_paid') {
         status = 'PARTIALLY_PAID';
-    } else if (appointment.paymentStatus === 'refunded' || appointment.paymentStatus === 'partially_refunded') {
-        status = 'REFUNDED';
     }
 
     let invoice = await db.CustomerInvoice.findOne({
@@ -335,7 +386,9 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 paymentBreakdown: paymentSnapshot.paymentBreakdown
             },
             paymentStatusSnapshot: {
-                appointmentPaymentStatus: appointment.paymentStatus,
+                appointmentPaymentStatus: isSessionInvoice
+                    ? (allPaid ? 'fully_paid' : (anyPaid ? 'deposit_paid' : appointment.paymentStatus))
+                    : appointment.paymentStatus,
                 appointmentPaymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
                 appointmentPaymentCollectionMode: paymentSnapshot.paymentCollectionMode
             },
@@ -347,27 +400,21 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             }
         }, { transaction });
 
-        await db.CustomerInvoiceItem.create({
+        await db.CustomerInvoiceItem.bulkCreate(invoiceItems.map((item) => ({
             invoiceId: invoice.id,
-            itemType: 'service',
-            itemRefId: appointment.serviceId || null,
-            nameEn: appointment.service?.name_en || 'Service',
-            nameAr: appointment.service?.name_ar || appointment.service?.name_en || 'Service',
-            quantity: 1,
-            unitPrice: totalAmount,
-            lineTotal: totalAmount,
-            taxAmount: vatAmount,
-            metadata: {
-                bookingNumber: appointment.bookingNumber || null
-            }
-        }, { transaction });
+            ...item
+        })), { transaction });
 
         await appendEvent(invoice.id, {
             eventType: 'invoice_created',
             fromStatus: null,
             toStatus: status,
             triggerSource,
-            payload: { entityType: 'appointment', entityId: appointment.id }
+            payload: {
+                entityType: 'appointment',
+                entityId: appointment.id,
+                bookingSessionId: appointment.bookingSession?.id || null
+            }
         }, transaction);
     } else {
         const prevStatus = invoice.status;
@@ -387,7 +434,9 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 paymentBreakdown: paymentSnapshot.paymentBreakdown
             },
             paymentStatusSnapshot: {
-                appointmentPaymentStatus: appointment.paymentStatus,
+                appointmentPaymentStatus: isSessionInvoice
+                    ? (allPaid ? 'fully_paid' : (anyPaid ? 'deposit_paid' : appointment.paymentStatus))
+                    : appointment.paymentStatus,
                 appointmentPaymentSummaryMethod: paymentSnapshot.paymentSummaryMethod,
                 appointmentPaymentCollectionMode: paymentSnapshot.paymentCollectionMode
             },
@@ -398,6 +447,18 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             }
         }, { transaction });
 
+        if (isSessionInvoice) {
+            await db.CustomerInvoiceItem.destroy({
+                where: { invoiceId: invoice.id },
+                transaction
+            });
+
+            await db.CustomerInvoiceItem.bulkCreate(invoiceItems.map((item) => ({
+                invoiceId: invoice.id,
+                ...item
+            })), { transaction });
+        }
+
         if (prevStatus !== status) {
             await appendEvent(invoice.id, {
                 eventType: 'payment_status_changed',
@@ -406,7 +467,10 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 triggerSource,
                 payload: {
                     appointmentId: appointment.id,
-                    appointmentPaymentStatus: appointment.paymentStatus
+                    appointmentPaymentStatus: isSessionInvoice
+                        ? (allPaid ? 'fully_paid' : (anyPaid ? 'deposit_paid' : appointment.paymentStatus))
+                        : appointment.paymentStatus,
+                    bookingSessionId: appointment.bookingSession?.id || null
                 }
             }, transaction);
         }
