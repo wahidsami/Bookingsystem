@@ -121,6 +121,31 @@ function BookingDetailsContent() {
         }
     };
 
+    const bookingRows = Array.isArray((booking as any)?.bookingItems)
+        ? (booking as any).bookingItems
+        : Array.isArray((booking as any)?.items)
+            ? (booking as any).items
+            : booking
+                ? [booking]
+                : [];
+
+    const isGroupedBooking = bookingRows.length > 1 || Boolean((booking as any)?.bookingSessionId || (booking as any)?.bookingReference);
+
+    const subtotalAmount = bookingRows.reduce((sum: number, item: any) => {
+        const itemSubtotal = item?.rawPrice ?? item?.price ?? 0;
+        return sum + Number(itemSubtotal || 0);
+    }, 0);
+
+    const taxAmount = bookingRows.reduce((sum: number, item: any) => sum + Number(item?.taxAmount || 0), 0);
+    const platformFeeAmount = bookingRows.reduce((sum: number, item: any) => sum + Number(item?.platformFee || 0), 0);
+    const totalAmount = isGroupedBooking
+        ? parseFloat((subtotalAmount + taxAmount + platformFeeAmount).toFixed(2))
+        : Number((booking as any)?.price ?? subtotalAmount);
+    const paidAmount = Number((booking as any)?.totalPaid ?? 0);
+    const depositAmount = Number((booking as any)?.depositAmount ?? 0);
+    const remainingAmount = Math.max(0, totalAmount - paidAmount);
+    const serviceCount = bookingRows.length;
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -193,31 +218,69 @@ function BookingDetailsContent() {
 
                 {/* Booking Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    {/* Service Information */}
+                    {/* Service Information / Services List */}
                     <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
                         <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                            {locale === 'ar' ? 'معلومات الخدمة' : 'Service Information'}
+                            {serviceCount > 1
+                                ? (locale === 'ar' ? 'الخدمات' : 'Services')
+                                : (locale === 'ar' ? 'معلومات الخدمة' : 'Service Information')}
                         </h2>
                         <div className="space-y-3 text-sm">
-                            <div>
-                                <span className="font-medium text-gray-600">{locale === 'ar' ? 'الخدمة:' : 'Service:'}</span>
-                                <p className="text-gray-900 mt-1">
-                                    {locale === 'ar' ? (booking.service?.name_ar || booking.service?.name_en) : booking.service?.name_en}
-                                </p>
-                            </div>
-                            {booking.service?.description_en && (
-                                <div>
-                                    <span className="font-medium text-gray-600">{locale === 'ar' ? 'الوصف:' : 'Description:'}</span>
-                                    <p className="text-gray-700 mt-1">
-                                        {locale === 'ar' ? booking.service?.description_ar : booking.service?.description_en}
+                            {serviceCount > 1 ? (
+                                <div className="space-y-3">
+                                    <p className="text-gray-600 text-sm">
+                                        {locale === 'ar'
+                                            ? `${serviceCount} خدمات مرتبطة بهذا الموعد`
+                                            : `${serviceCount} services are linked to this appointment`}
                                     </p>
+                                    {bookingRows.map((item: any, index: number) => (
+                                        <div key={item.id || index} className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-gray-900">
+                                                        {locale === 'ar'
+                                                            ? (item.service?.name_ar || item.service?.name_en || booking.service?.name_ar || booking.service?.name_en)
+                                                            : (item.service?.name_en || item.service?.name_ar || booking.service?.name_en || booking.service?.name_ar)}
+                                                    </p>
+                                                    {(item.serviceVariantName || item.serviceVariantDescription) && (
+                                                        <p className="text-gray-600 mt-1">
+                                                            {item.serviceVariantName || item.serviceVariantDescription}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-gray-600 mt-1">
+                                                        {item.staff?.name || booking.staff?.name || "N/A"}
+                                                    </p>
+                                                </div>
+                                                <div className="text-primary font-semibold whitespace-nowrap">
+                                                    <Currency amount={parseFloat(String(item.price ?? 0))} locale={locale} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
-                            {booking.service?.duration && (
-                                <div>
-                                    <span className="font-medium text-gray-600">{locale === 'ar' ? 'المدة:' : 'Duration:'}</span>
-                                    <p className="text-gray-900 mt-1">{booking.service.duration} {locale === 'ar' ? 'دقيقة' : 'minutes'}</p>
-                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <span className="font-medium text-gray-600">{locale === 'ar' ? 'الخدمة:' : 'Service:'}</span>
+                                        <p className="text-gray-900 mt-1">
+                                            {locale === 'ar' ? (booking.service?.name_ar || booking.service?.name_en) : booking.service?.name_en}
+                                        </p>
+                                    </div>
+                                    {booking.service?.description_en && (
+                                        <div>
+                                            <span className="font-medium text-gray-600">{locale === 'ar' ? 'الوصف:' : 'Description:'}</span>
+                                            <p className="text-gray-700 mt-1">
+                                                {locale === 'ar' ? booking.service?.description_ar : booking.service?.description_en}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {booking.service?.duration && (
+                                        <div>
+                                            <span className="font-medium text-gray-600">{locale === 'ar' ? 'المدة:' : 'Duration:'}</span>
+                                            <p className="text-gray-900 mt-1">{booking.service.duration} {locale === 'ar' ? 'دقيقة' : 'minutes'}</p>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -273,9 +336,39 @@ function BookingDetailsContent() {
                             <div>
                                 <span className="font-medium text-gray-600">{t("bookings.price")}:</span>
                                 <p className="text-primary font-bold text-lg mt-1">
-                                    <Currency amount={parseFloat(booking.price.toString())} locale={locale} />
+                                    <Currency amount={totalAmount} locale={locale} />
                                 </p>
                             </div>
+                            <div>
+                                <span className="font-medium text-gray-600">{locale === 'ar' ? 'الإجمالي الفرعي:' : 'Subtotal:'}</span>
+                                <p className="text-gray-900 mt-1">
+                                    <Currency amount={subtotalAmount} locale={locale} />
+                                </p>
+                            </div>
+                            {platformFeeAmount > 0 ? (
+                                <div>
+                                    <span className="font-medium text-gray-600">{locale === 'ar' ? 'رسوم المنصة:' : 'Platform Fee:'}</span>
+                                    <p className="text-gray-900 mt-1">
+                                        <Currency amount={platformFeeAmount} locale={locale} />
+                                    </p>
+                                </div>
+                            ) : null}
+                            {taxAmount > 0 ? (
+                                <div>
+                                    <span className="font-medium text-gray-600">{locale === 'ar' ? 'الضريبة:' : 'Tax:'}</span>
+                                    <p className="text-gray-900 mt-1">
+                                        <Currency amount={taxAmount} locale={locale} />
+                                    </p>
+                                </div>
+                            ) : null}
+                            {depositAmount > 0 ? (
+                                <div>
+                                    <span className="font-medium text-gray-600">{locale === 'ar' ? 'العربون:' : 'Deposit:'}</span>
+                                    <p className="text-gray-900 mt-1">
+                                        <Currency amount={depositAmount} locale={locale} />
+                                    </p>
+                                </div>
+                            ) : null}
                             {booking.paymentStatus && (
                                 <div>
                                     <span className="font-medium text-gray-600">{locale === 'ar' ? 'حالة الدفع:' : 'Payment Status:'}</span>
@@ -294,6 +387,18 @@ function BookingDetailsContent() {
                                     <p className="text-gray-900 mt-1">{formatDate(booking.paidAt)} {formatTime(booking.paidAt)}</p>
                                 </div>
                             )}
+                            <div>
+                                <span className="font-medium text-gray-600">{locale === 'ar' ? 'المدفوع:' : 'Paid:'}</span>
+                                <p className="text-gray-900 mt-1">
+                                    <Currency amount={paidAmount} locale={locale} />
+                                </p>
+                            </div>
+                            <div>
+                                <span className="font-medium text-gray-600">{locale === 'ar' ? 'المتبقي:' : 'Remaining:'}</span>
+                                <p className="text-gray-900 mt-1">
+                                    <Currency amount={remainingAmount} locale={locale} />
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
