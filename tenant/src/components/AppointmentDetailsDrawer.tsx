@@ -67,6 +67,9 @@ interface AppointmentSessionItem {
   paymentStatus: AppointmentItem["paymentStatus"];
   price: number;
   rawPrice?: number;
+  taxAmount?: number;
+  platformFee?: number;
+  totalPaid?: number;
   notes?: string;
   serviceVariantId?: string | null;
   serviceVariantName?: string | null;
