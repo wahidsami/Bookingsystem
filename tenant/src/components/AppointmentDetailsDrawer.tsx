@@ -1092,6 +1092,38 @@ export function AppointmentDetailsDrawer({
     }
   };
 
+  const updateCustomerProfileAfterPayment = (paymentAmount: number, walletAmount: number = 0) => {
+    const safePaymentAmount = Number.isFinite(paymentAmount) ? Math.max(0, Number(paymentAmount)) : 0;
+    const safeWalletAmount = Number.isFinite(walletAmount) ? Math.max(0, Number(walletAmount)) : 0;
+    if (safePaymentAmount <= 0 && safeWalletAmount <= 0) return;
+
+    const roundMoney = (value: number) => Number.parseFloat(Number(value || 0).toFixed(2));
+
+    setCustomerProfile((current) => {
+      if (!current) return current;
+
+      const previousWalletBalance = Number(current.walletBalance ?? current.walletSummary?.currentBalance ?? 0);
+      const nextWalletBalance = safeWalletAmount > 0
+        ? Math.max(0, roundMoney(previousWalletBalance - safeWalletAmount))
+        : previousWalletBalance;
+      const nextTotalSpent = safePaymentAmount > 0
+        ? roundMoney(Number(current.totalSpent || 0) + safePaymentAmount)
+        : Number(current.totalSpent || 0);
+
+      return {
+        ...current,
+        walletBalance: nextWalletBalance,
+        totalSpent: nextTotalSpent,
+        walletSummary: current.walletSummary
+          ? {
+              ...current.walletSummary,
+              currentBalance: nextWalletBalance
+            }
+          : current.walletSummary
+      };
+    });
+  };
+
   const beginServiceEdit = (item: AppointmentItem) => {
     setActionNotice(null);
     setEditingServiceId((current) => (current === item.id ? null : item.id));
@@ -1155,6 +1187,7 @@ export function AppointmentDetailsDrawer({
     try {
       setPaymentUpdating(true);
       const paymentAmount = Number((appointment as any).outstandingAmount ?? appointment.price ?? 0);
+      const walletAmount = paymentMethod === "wallet" ? paymentAmount : 0;
       const response = await tenantApi.updatePaymentStatus(appointment.id, "fully_paid", paymentMethod, {
         amount: paymentAmount > 0 ? paymentAmount : undefined
       });
@@ -1165,6 +1198,7 @@ export function AppointmentDetailsDrawer({
         });
         return;
       }
+      updateCustomerProfileAfterPayment(paymentAmount, walletAmount);
       await refreshAppointment();
       setActionNotice({
         kind: "success",
@@ -1763,6 +1797,11 @@ export function AppointmentDetailsDrawer({
           });
           return;
         }
+
+        const walletAllocationTotal = normalizedRows
+          .filter((row) => row.paymentMethod === "wallet")
+          .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+        updateCustomerProfileAfterPayment(paymentDueAmount, walletAllocationTotal);
 
         if (pendingStatusAfterPayment && appointment?.status !== pendingStatusAfterPayment) {
           const statusResponse = await tenantApi.updateAppointmentStatus(appointment.id, pendingStatusAfterPayment);
