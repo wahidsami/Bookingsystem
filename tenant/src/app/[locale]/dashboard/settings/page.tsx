@@ -806,57 +806,68 @@ export default function SettingsPage() {
 
                 <div className="space-y-4">
                   {days.map((day) => (
-                    <div key={day} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                      <div className="w-28">
-                        <label className="flex items-center gap-2 cursor-pointer" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                          <input
-                            type="checkbox"
-                            checked={workingHours[day].isOpen}
-                            onChange={(e) => setWorkingHours(prev => ({
-                              ...prev,
-                              [day]: { ...prev[day], isOpen: e.target.checked }
-                            }))}
-                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                          />
-                          <span className="font-medium text-gray-700">{t(day)}</span>
-                        </label>
-                      </div>
-                      {workingHours[day].isOpen && (
-                        <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                          <select
-                            value={workingHours[day].open}
-                            onChange={(e) => setWorkingHours(prev => ({
-                              ...prev,
-                              [day]: { ...prev[day], open: e.target.value }
-                            }))}
-                            className="px-3 py-2 border border-gray-300 rounded-lg"
-                          >
-                            {timeOptions.map((option) => (
-                              <option key={`open-${day}-${option.value}`} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="text-gray-500">{t('to')}</span>
-                          <select
-                            value={workingHours[day].close}
-                            onChange={(e) => setWorkingHours(prev => ({
-                              ...prev,
-                              [day]: { ...prev[day], close: e.target.value }
-                            }))}
-                            className="px-3 py-2 border border-gray-300 rounded-lg"
-                          >
-                            {timeOptions.map((option) => (
-                              <option key={`close-${day}-${option.value}`} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                    <div
+                      key={day}
+                      dir={isRTL ? 'rtl' : 'ltr'}
+                      className="rounded-lg bg-gray-50 p-4"
+                    >
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className={`w-full lg:w-36 ${isRTL ? 'lg:text-right' : 'lg:text-left'}`}>
+                          <label className={`flex items-center gap-2 cursor-pointer ${isRTL ? 'justify-end' : 'justify-start'}`}>
+                            <input
+                              type="checkbox"
+                              checked={workingHours[day].isOpen}
+                              onChange={(e) => setWorkingHours(prev => ({
+                                ...prev,
+                                [day]: { ...prev[day], isOpen: e.target.checked }
+                              }))}
+                              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="font-medium text-gray-700">{t(day)}</span>
+                          </label>
                         </div>
-                      )}
-                      {!workingHours[day].isOpen && (
-                        <span className="text-gray-400">{t('closed')}</span>
-                      )}
+
+                        {workingHours[day].isOpen ? (
+                          <div
+                            className={`flex flex-wrap items-center gap-2 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'} ${isRTL ? 'lg:justify-start' : 'lg:justify-end'}`}
+                            dir="ltr"
+                          >
+                            <select
+                              value={workingHours[day].open}
+                              onChange={(e) => setWorkingHours(prev => ({
+                                ...prev,
+                                [day]: { ...prev[day], open: e.target.value }
+                              }))}
+                              className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                            >
+                              {timeOptions.map((option) => (
+                                <option key={`open-${day}-${option.value}`} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-gray-500">{t('to')}</span>
+                            <select
+                              value={workingHours[day].close}
+                              onChange={(e) => setWorkingHours(prev => ({
+                                ...prev,
+                                [day]: { ...prev[day], close: e.target.value }
+                              }))}
+                              className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                            >
+                              {timeOptions.map((option) => (
+                                <option key={`close-${day}-${option.value}`} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <span className={`text-gray-400 ${isRTL ? 'lg:text-left' : 'lg:text-right'}`}>
+                            {t('closed')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
