@@ -188,6 +188,13 @@ const login = async (req, res) => {
         });
       }
 
+      if (!tenant.password) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        });
+      }
+
       const isPasswordValid = await bcrypt.compare(password, tenant.password);
 
       if (!isPasswordValid) {
@@ -245,6 +252,13 @@ const login = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'This dashboard account is disabled'
+      });
+    }
+
+    if (!dashboardAccount.password) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
       });
     }
 
