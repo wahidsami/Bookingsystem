@@ -282,11 +282,15 @@ export function AppointmentBoardCartDrawer({
     try {
       setSubmitting(true);
 
-      const paymentAllocations = paymentRows.map((row) => ({
-        paymentMethod: row.paymentMethod,
-        amount: normalizeNumber(row.amount)
-      }));
       const paymentMethod = paymentRows[0]?.paymentMethod || "cash";
+      const paymentAllocations = paymentRows.length > 1
+        ? paymentRows
+            .map((row) => ({
+              paymentMethod: row.paymentMethod,
+              amount: Number(normalizeNumber(row.amount).toFixed(2))
+            }))
+            .filter((row) => row.amount > 0)
+        : undefined;
 
       if (mode === "gift_card") {
         if (!selectedPackage) {

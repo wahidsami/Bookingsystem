@@ -432,12 +432,6 @@ exports.purchaseProducts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'At least one product is required' });
     }
 
-    const normalizedAllocations = normalizeAllocations(
-      items.reduce((sum, item) => sum + Number(item?.totalPrice || item?.price || 0), 0),
-      paymentMethod || 'cash',
-      paymentAllocations
-    );
-
     const { customer: recipient, created: createdGuest } = await resolveCustomer({
       customerId,
       customerName,
@@ -472,17 +466,11 @@ exports.purchaseProducts = async (req, res) => {
     });
 
     const orderTotal = parseMoney(order?.totalAmount || 0);
-    const allocationTotal = parseMoney(normalizedAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0));
-    const allocationDifference = parseMoney(orderTotal - allocationTotal);
-    if (Math.abs(allocationDifference) > 0.5) {
-      throw new Error('Payment allocations must add up to the payment amount');
-    }
-    if (Math.abs(allocationDifference) > 0.0001 && normalizedAllocations.length > 0) {
-      normalizedAllocations[normalizedAllocations.length - 1] = {
-        ...normalizedAllocations[normalizedAllocations.length - 1],
-        amount: parseMoney(Number(normalizedAllocations[normalizedAllocations.length - 1].amount || 0) + allocationDifference)
-      };
-    }
+    const normalizedAllocations = normalizeAllocations(
+      orderTotal,
+      paymentMethod || 'cash',
+      paymentAllocations
+    );
 
     await orderService.updatePaymentStatus(order.id, 'paid', {
       paymentMethod: paymentMethod || 'cash',
