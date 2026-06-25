@@ -375,7 +375,11 @@ export function AppointmentActionDrawer({
   const [paymentCollectionRows, setPaymentCollectionRows] = useState<PaymentCollectionRow[]>([]);
   const [notes, setNotes] = useState("");
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
-  const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
+  const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", serviceIds: [] as string[], isFree: false });
+  const [showGuestServicePicker, setShowGuestServicePicker] = useState(false);
+  const [guestServiceDraftIds, setGuestServiceDraftIds] = useState<string[]>([]);
+  const [guestServiceSearch, setGuestServiceSearch] = useState("");
+  const [selectedGuestServiceCategory, setSelectedGuestServiceCategory] = useState("all");
   const [queuedServices, setQueuedServices] = useState<BookingDraftItem[]>([]);
   const [stagedServiceIds, setStagedServiceIds] = useState<string[]>([]);
   const [showServicePicker, setShowServicePicker] = useState(false);
@@ -457,7 +461,11 @@ export function AppointmentActionDrawer({
       setPaymentCollectionRows([]);
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
-      setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", isFree: false });
+      setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", serviceIds: [], isFree: false });
+      setShowGuestServicePicker(false);
+      setGuestServiceDraftIds([]);
+      setGuestServiceSearch("");
+      setSelectedGuestServiceCategory("all");
       setShowServicePicker(true);
       setEditingServiceIndex(null);
       setServiceSearch("");
@@ -605,13 +613,14 @@ export function AppointmentActionDrawer({
     }
 
     setGroupGuest((prev) => {
-      if (prev.serviceId) {
+      if (prev.serviceIds.length > 0 || prev.serviceId) {
         return prev;
       }
 
       return {
         ...prev,
-        serviceId: queuedServices[0]?.serviceId || selectedServiceId || ""
+        serviceId: "",
+        serviceIds: []
       };
     });
   }, [includeGroupGuest, queuedServices, selectedServiceId]);
@@ -661,17 +670,28 @@ export function AppointmentActionDrawer({
       ? (locale === "ar" ? "عميل جديد" : "New customer")
       : (locale === "ar" ? "حجز حضوري" : "Walk-in customer");
   const appointmentSummaryTimeLabel = `${appointmentDate || "-"} ${appointmentTime ? formatTime12Hour(appointmentTime, locale) : "-"}`;
-  const selectedGuestService = useMemo(
-    () => services.find((service) => service.id === groupGuest.serviceId) || null,
-    [services, groupGuest.serviceId]
+  const selectedGuestServiceIds = groupGuest.serviceIds.length > 0
+    ? groupGuest.serviceIds
+    : groupGuest.serviceId
+      ? [groupGuest.serviceId]
+      : [];
+  const selectedGuestServices = useMemo(
+    () =>
+      selectedGuestServiceIds
+        .map((serviceId) => services.find((service) => service.id === serviceId) || null)
+        .filter((service): service is ServiceItem => Boolean(service)),
+    [services, selectedGuestServiceIds.join("|")]
   );
-  const selectedGuestServiceName = selectedGuestService
-    ? (locale === "ar" ? selectedGuestService.name_ar : selectedGuestService.name_en) || selectedGuestService.name_en || selectedGuestService.name_ar || ""
-    : "";
+  const selectedGuestServicesSubtotal = useMemo(
+    () =>
+      toSafeMoneyNumber(
+        selectedGuestServices.reduce((sum, service) => sum + toSafeMoneyNumber(service.finalPrice || 0), 0)
+      ),
+    [selectedGuestServices]
+  );
   const guestServicePrice = includeGroupGuest
-    ? (groupGuest.isFree ? 0 : toSafeMoneyNumber(selectedGuestService?.finalPrice ?? 0))
+    ? (groupGuest.isFree ? 0 : selectedGuestServicesSubtotal)
     : 0;
-  const displayTotalPrice = toSafeMoneyNumber(displayServicePrice + guestServicePrice);
   const getQueueItemService = (item: BookingDraftItem) => {
     const service = services.find((entry) => entry.id === item.serviceId) || null;
     const variant = parseArrayValue<ServiceVariant>(service?.variants).find((entry) => entry.id === item.variantId) || null;
@@ -770,6 +790,20 @@ export function AppointmentActionDrawer({
         }),
     [groupedServices, selectedServiceCategory, serviceSearch]
   );
+  const guestServiceCategoryTabs = serviceCategoryTabs;
+  const guestFilteredServices = useMemo(
+    () =>
+      groupedServices
+        .flatMap((group) => group.items)
+        .filter((service) => {
+          const serviceName = `${service.name_en} ${service.name_ar} ${service.category || ""} ${service.parentName || ""} ${service.parentService || ""}`.toLowerCase();
+          const matchesSearch = !guestServiceSearch.trim() || serviceName.includes(guestServiceSearch.trim().toLowerCase());
+          const serviceCategory = (service.category || service.parentName || service.parentService || "").trim();
+          const matchesCategory = selectedGuestServiceCategory === "all" || serviceCategory === selectedGuestServiceCategory;
+          return matchesSearch && matchesCategory;
+        }),
+    [groupedServices, guestServiceSearch, selectedGuestServiceCategory]
+  );
   const visibleCustomers = customers.slice(0, 6);
   const currentAppointmentStepLabel = appointmentStep === 1
     ? (locale === "ar" ? "الخدمات" : "Services")
@@ -781,7 +815,7 @@ export function AppointmentActionDrawer({
   const guestReady = customerMode === "guest"
     ? Boolean(newCustomer.firstName.trim()) && Boolean(newCustomer.email.trim())
     : true;
-  const groupGuestReady = !includeGroupGuest || (Boolean(groupGuest.firstName.trim()) && Boolean(groupGuest.serviceId.trim()));
+  const groupGuestReady = !includeGroupGuest || (Boolean(groupGuest.firstName.trim()) && selectedGuestServices.length > 0);
   const customerStepReady = customerMode === "existing"
     ? Boolean(selectedCustomer)
     : customerMode === "guest"
@@ -895,6 +929,48 @@ export function AppointmentActionDrawer({
       const nextStep = Math.min(3, current + 1) as 1 | 2 | 3;
       setShowServicePicker(nextStep === 1);
       return nextStep;
+    });
+  };
+
+  const openGuestServicePicker = (seedIds: string[] = selectedGuestServiceIds) => {
+    setGuestServiceDraftIds([...seedIds]);
+    setGuestServiceSearch("");
+    setSelectedGuestServiceCategory("all");
+    setShowGuestServicePicker(true);
+  };
+
+  const commitGuestServicePicker = () => {
+    const nextIds = guestServiceDraftIds
+      .map((serviceId) => `${serviceId}`.trim())
+      .filter(Boolean);
+
+    setGroupGuest((current) => ({
+      ...current,
+      serviceIds: nextIds,
+      serviceId: nextIds[0] || ""
+    }));
+    setShowGuestServicePicker(false);
+  };
+
+  const removeGuestService = (serviceId: string) => {
+    const trimmedServiceId = `${serviceId || ""}`.trim();
+    if (!trimmedServiceId) {
+      return;
+    }
+
+    setGroupGuest((current) => {
+      const currentIds = current.serviceIds.length > 0
+        ? current.serviceIds
+        : current.serviceId
+          ? [current.serviceId]
+          : [];
+      const nextIds = currentIds.filter((item) => item !== trimmedServiceId);
+
+      return {
+        ...current,
+        serviceIds: nextIds,
+        serviceId: nextIds[0] || ""
+      };
     });
   };
 
@@ -1137,8 +1213,8 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    if (includeGroupGuest && !groupGuest.serviceId.trim()) {
-      setError(locale === "ar" ? "الرجاء اختيار خدمة الضيف الإضافي." : "Please choose the additional guest service.");
+    if (includeGroupGuest && selectedGuestServices.length === 0) {
+      setError(locale === "ar" ? "الرجاء اختيار خدمة أو أكثر للضيف الإضافي." : "Please choose one or more additional guest services.");
       return;
     }
 
@@ -1215,14 +1291,20 @@ export function AppointmentActionDrawer({
           ...splitFullName(groupGuest.firstName.trim()),
           lastName: splitFullName(groupGuest.firstName.trim()).lastName || groupGuest.lastName.trim(),
           phone: groupGuest.phone.trim() || undefined,
-          serviceId: groupGuest.serviceId.trim() || undefined,
+          serviceId: (groupGuest.serviceIds[0] || groupGuest.serviceId || "").trim() || undefined,
+          serviceIds: (groupGuest.serviceIds.length > 0 ? groupGuest.serviceIds : groupGuest.serviceId ? [groupGuest.serviceId] : []).map((serviceId) => `${serviceId}`.trim()).filter(Boolean),
           isFree: Boolean(groupGuest.isFree),
           serviceName: (() => {
-            const matchedService = services.find((service) => service.id === groupGuest.serviceId);
-            if (!matchedService) {
+            const matchedServices = (groupGuest.serviceIds.length > 0 ? groupGuest.serviceIds : groupGuest.serviceId ? [groupGuest.serviceId] : [])
+              .map((serviceId) => services.find((service) => service.id === serviceId))
+              .filter((service): service is ServiceItem => Boolean(service));
+            if (!matchedServices.length) {
               return undefined;
             }
-            return (locale === "ar" ? matchedService.name_ar : matchedService.name_en) || matchedService.name_en || matchedService.name_ar || undefined;
+            return matchedServices
+              .map((service) => (locale === "ar" ? service.name_ar : service.name_en) || service.name_en || service.name_ar || "")
+              .filter(Boolean)
+              .join(" • ") || undefined;
           })()
         } : undefined,
         platformUserId: resolvedCustomerMode === "existing" ? selectedCustomer?.id : undefined,
@@ -1557,28 +1639,20 @@ export function AppointmentActionDrawer({
                       </label>
 
                       {includeGroupGuest ? (
-                        <div className="mt-4 space-y-3">
+                        <div className="mt-4 space-y-4">
                           <input
                             value={groupGuest.firstName}
                             onChange={(event) => setGroupGuest((current) => ({ ...current, firstName: event.target.value }))}
                             placeholder={locale === "ar" ? "اسم الضيف" : "Guest name"}
                             className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                           />
-                          <select
-                            value={groupGuest.serviceId}
-                            onChange={(event) => setGroupGuest((current) => ({ ...current, serviceId: event.target.value }))}
+                          <input
+                            value={groupGuest.phone}
+                            onChange={(event) => setGroupGuest((current) => ({ ...current, phone: event.target.value }))}
+                            placeholder={locale === "ar" ? "هاتف الضيف (اختياري)" : "Guest phone (optional)"}
                             className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">{locale === "ar" ? "اختر خدمة الضيف" : "Choose guest service"}</option>
-                            {services.map((service) => {
-                              const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
-                              return (
-                                <option key={service.id} value={service.id}>
-                                  {serviceName}
-                                </option>
-                              );
-                            })}
-                          </select>
+                          />
+
                           <label className="flex items-center gap-2 text-sm text-gray-700">
                             <input
                               type="checkbox"
@@ -1586,14 +1660,83 @@ export function AppointmentActionDrawer({
                               onChange={(event) => setGroupGuest((current) => ({ ...current, isFree: event.target.checked }))}
                               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                             />
-                            <span>{locale === "ar" ? "الخدمة مجانية" : "Free service"}</span>
+                            <span>{locale === "ar" ? "الخدمات مجانية" : "Free services"}</span>
                           </label>
-                          <input
-                            value={groupGuest.phone}
-                            onChange={(event) => setGroupGuest((current) => ({ ...current, phone: event.target.value }))}
-                            placeholder={locale === "ar" ? "هاتف الضيف (اختياري)" : "Guest phone (optional)"}
-                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                          />
+
+                          <div className="rounded-3xl border border-purple-200 bg-white p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+                                  {locale === "ar" ? "خدمات الضيف" : "Guest services"}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-500">
+                                  {locale === "ar"
+                                    ? "اختر خدمة واحدة أو عدة خدمات للضيف."
+                                    : "Choose one or more services for the guest."}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openGuestServicePicker()}
+                                className="rounded-full border border-purple-200 bg-purple-50 px-4 py-2 text-xs font-semibold text-purple-700 transition hover:bg-purple-100"
+                              >
+                                {selectedGuestServices.length
+                                  ? (locale === "ar" ? "تعديل" : "Edit")
+                                  : (locale === "ar" ? "اختيار" : "Choose")}
+                              </button>
+                            </div>
+
+                            {selectedGuestServices.length > 0 ? (
+                              <div className="mt-4 grid gap-3">
+                                {selectedGuestServices.map((service) => {
+                                  const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                                  return (
+                                    <div
+                                      key={service.id}
+                                      className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="truncate text-sm font-semibold text-fuchsia-950">{serviceName}</p>
+                                          <p className="mt-0.5 text-xs text-fuchsia-700">
+                                            {formatMinutesLabel(service.duration, locale)}
+                                          </p>
+                                        </div>
+                                        <div className="text-sm font-semibold text-fuchsia-800">
+                                          {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
+                                        </div>
+                                      </div>
+                                      <div className="mt-3 flex items-center justify-between gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => openGuestServicePicker()}
+                                          className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                        >
+                                          {locale === "ar" ? "تعديل" : "Edit"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeGuestService(service.id)}
+                                          className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                        >
+                                          {locale === "ar" ? "حذف" : "Remove"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openGuestServicePicker()}
+                                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 transition hover:bg-purple-100"
+                              >
+                                <span className="text-lg leading-none">+</span>
+                                {locale === "ar" ? "إضافة خدمة للضيف" : "Add guest services"}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ) : null}
                     </div>
@@ -2249,6 +2392,31 @@ export function AppointmentActionDrawer({
                               <span className="text-gray-600">{locale === "ar" ? "الضريبة (0%)" : "Tax (0%)"}</span>
                               <span className="font-semibold text-gray-900"><Currency amount={0} /></span>
                             </div>
+                            {includeGroupGuest ? (
+                              <div className="mt-3 rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-3">
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                  <span className="font-semibold text-fuchsia-900">{locale === "ar" ? "خدمات الضيف" : "Guest services"}</span>
+                                  <span className="font-semibold text-fuchsia-900">
+                                    {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={guestServicePrice} />}
+                                  </span>
+                                </div>
+                                {selectedGuestServices.length > 0 ? (
+                                  <div className="mt-3 space-y-2">
+                                    {selectedGuestServices.map((service) => {
+                                      const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                                      return (
+                                        <div key={service.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2.5 text-sm">
+                                          <span className="min-w-0 truncate font-medium text-gray-900">{serviceName}</span>
+                                          <span className="font-semibold text-fuchsia-800">
+                                            {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div className="mt-3 border-t border-gray-200 pt-3">
                               <div className="flex items-center justify-between gap-3 text-base">
                                 <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
@@ -2553,6 +2721,136 @@ export function AppointmentActionDrawer({
               </div>
             )}
           </div>
+
+          {showGuestServicePicker ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+              <div className="w-full max-w-4xl overflow-hidden rounded-[32px] border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-5">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                      {locale === "ar" ? "اختيار خدمات الضيف" : "Guest services"}
+                    </p>
+                    <h4 className="mt-1 text-2xl font-semibold text-gray-900">
+                      {locale === "ar" ? "اختر خدمة واحدة أو أكثر" : "Pick one or more services"}
+                    </h4>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {locale === "ar"
+                        ? "يمكنك تعديل الاختيار قبل تطبيقه."
+                        : "You can adjust the selection before applying it."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowGuestServicePicker(false)}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إغلاق" : "Close"}
+                  </button>
+                </div>
+
+                <div className="space-y-5 px-6 py-5">
+                  <input
+                    type="text"
+                    value={guestServiceSearch}
+                    onChange={(e) => setGuestServiceSearch(e.target.value)}
+                    placeholder={locale === "ar" ? "ابحث عن خدمة..." : "Search a service..."}
+                    className="w-full rounded-[20px] border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    {guestServiceCategoryTabs.map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setSelectedGuestServiceCategory(tab)}
+                        className={`rounded-[18px] border px-4 py-2 text-sm font-semibold transition ${
+                          selectedGuestServiceCategory === tab
+                            ? "border-primary bg-white text-gray-900 shadow-sm"
+                            : "border-transparent bg-white text-gray-500 hover:border-gray-200 hover:text-gray-900"
+                        }`}
+                      >
+                        {tab === "all" ? (locale === "ar" ? "الكل" : "All") : tab}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {guestFilteredServices.map((service) => {
+                      const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                      const isSelected = guestServiceDraftIds.includes(service.id);
+                      return (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => {
+                            setGuestServiceDraftIds((current) =>
+                              current.includes(service.id)
+                                ? current.filter((item) => item !== service.id)
+                                : [...current, service.id]
+                            );
+                          }}
+                          className={`rounded-[24px] border p-5 text-left transition ${
+                            isSelected
+                              ? "border-fuchsia-500 bg-fuchsia-50 shadow-sm"
+                              : "border-gray-200 bg-white hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-base font-semibold text-gray-900">{serviceName}</p>
+                              <p className="mt-0.5 text-xs text-gray-500">
+                                {formatMinutesLabel(service.duration, locale)}
+                                {service.category || service.parentName || service.parentService ? ` • ${service.category || service.parentName || service.parentService}` : ""}
+                              </p>
+                            </div>
+                            <div className="text-sm font-semibold text-fuchsia-700">
+                              {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
+                            </div>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-gray-500">
+                            <span className="rounded-full bg-gray-100 px-3 py-1 ring-1 ring-gray-200">
+                              {service.employees?.length ? (locale === "ar" ? "محدد" : "Available") : (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
+                            </span>
+                            <span className="text-gray-400">{isSelected ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "أضفها" : "Add")}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {!guestFilteredServices.length ? (
+                    <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                      <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "لا توجد خدمات مطابقة" : "No matching services"}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-6 py-4">
+                  <p className="text-sm text-gray-500">
+                    {locale === "ar"
+                      ? `${guestServiceDraftIds.length} خدمة محددة`
+                      : `${guestServiceDraftIds.length} service${guestServiceDraftIds.length === 1 ? "" : "s"} selected`}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowGuestServicePicker(false)}
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إلغاء" : "Cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={commitGuestServicePicker}
+                      className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                    >
+                      {locale === "ar" ? "تطبيق" : "Apply"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="border-t border-gray-100 px-5 py-4">
             {mode === "appointment" ? (

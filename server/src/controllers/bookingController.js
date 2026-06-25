@@ -40,6 +40,11 @@ const appendGroupGuestToNotes = (notes, groupGuest) => {
     const lastName = `${groupGuest.lastName || ''}`.trim();
     const phone = `${groupGuest.phone || ''}`.trim();
     const serviceId = `${groupGuest.serviceId || ''}`.trim();
+    const serviceIds = Array.isArray(groupGuest.serviceIds)
+        ? groupGuest.serviceIds.map((entry) => `${entry || ''}`.trim()).filter(Boolean)
+        : serviceId
+            ? [serviceId]
+            : [];
     const serviceName = `${groupGuest.serviceName || ''}`.trim();
     const isFree = groupGuest.isFree === true || `${groupGuest.isFree || ''}`.trim().toLowerCase() === 'true';
     const fullName = `${firstName} ${lastName}`.trim();
@@ -52,6 +57,7 @@ const appendGroupGuestToNotes = (notes, groupGuest) => {
         fullName,
         phone: phone || null,
         serviceId: serviceId || null,
+        serviceIds: serviceIds.length > 0 ? serviceIds : null,
         serviceName: serviceName || null,
         isFree
     };

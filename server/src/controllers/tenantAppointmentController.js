@@ -496,6 +496,7 @@ function appendGroupGuestToNotes(notes, groupGuest) {
     const lastName = `${groupGuest.lastName || ''}`.trim();
     const phone = `${groupGuest.phone || ''}`.trim();
     const serviceId = `${groupGuest.serviceId || ''}`.trim();
+    const serviceIds = normalizeGuestServiceIds(groupGuest);
     const serviceName = `${groupGuest.serviceName || ''}`.trim();
     const fullName = `${firstName} ${lastName}`.trim();
     if (!fullName) {
@@ -506,6 +507,7 @@ function appendGroupGuestToNotes(notes, groupGuest) {
         fullName,
         phone: phone || null,
         serviceId: serviceId || null,
+        serviceIds: serviceIds.length > 0 ? serviceIds : null,
         serviceName: serviceName || null
     })}`;
     const base = `${notes || ''}`.trim();
@@ -516,13 +518,29 @@ function normalizeBooleanFlag(value) {
     return value === true || `${value || ''}`.trim().toLowerCase() === 'true';
 }
 
+function normalizeGuestServiceIds(groupGuest) {
+    if (!groupGuest || typeof groupGuest !== 'object') {
+        return [];
+    }
+
+    const rawServiceIds = Array.isArray(groupGuest.serviceIds)
+        ? groupGuest.serviceIds
+        : groupGuest.serviceId
+            ? [groupGuest.serviceId]
+            : [];
+
+    return rawServiceIds
+        .map((serviceId) => `${serviceId || ''}`.trim())
+        .filter(Boolean);
+}
+
 async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, groupGuest, transaction }) {
     if (!groupGuest || typeof groupGuest !== 'object') {
         return null;
     }
 
-    const requestedServiceId = `${groupGuest.serviceId || ''}`.trim();
-    if (!requestedServiceId) {
+    const requestedServiceIds = normalizeGuestServiceIds(groupGuest);
+    if (!requestedServiceIds.length) {
         return null;
     }
 
@@ -540,22 +558,46 @@ async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, group
         };
     }
 
-    const guestService = await db.Service.findOne({
-        where: { id: requestedServiceId, tenantId },
-        attributes: ['id', 'name_en', 'name_ar', 'rawPrice', 'taxRate', 'commissionRate', 'finalPrice'],
-        transaction
-    });
-
-    if (!guestService) {
-        throw new Error('Guest service not found');
-    }
-
     const staff = await db.Staff.findByPk(appointment.staffId, {
         transaction,
         attributes: ['id', 'commissionRate']
     });
 
-    const breakdown = db.Appointment.calculateRevenueBreakdown(guestService, staff);
+    const guestServices = await db.Service.findAll({
+        where: {
+            id: requestedServiceIds,
+            tenantId
+        },
+        attributes: ['id', 'name_en', 'name_ar', 'rawPrice', 'taxRate', 'commissionRate', 'finalPrice'],
+        transaction
+    });
+
+    if (guestServices.length !== requestedServiceIds.length) {
+        throw new Error('Guest service not found');
+    }
+
+    const breakdown = guestServices.reduce((accumulator, guestService) => {
+        const itemBreakdown = db.Appointment.calculateRevenueBreakdown(guestService, staff);
+        return {
+            price: Number(accumulator.price || 0) + Number(itemBreakdown.price || 0),
+            rawPrice: Number(accumulator.rawPrice || 0) + Number(itemBreakdown.rawPrice || 0),
+            taxAmount: Number(accumulator.taxAmount || 0) + Number(itemBreakdown.taxAmount || 0),
+            platformFee: Number(accumulator.platformFee || 0) + Number(itemBreakdown.platformFee || 0),
+            tenantRevenue: Number(accumulator.tenantRevenue || 0) + Number(itemBreakdown.tenantRevenue || 0),
+            employeeRevenue: Number(accumulator.employeeRevenue || 0) + Number(itemBreakdown.employeeRevenue || 0),
+            employeeCommissionRate: Number(itemBreakdown.employeeCommissionRate || accumulator.employeeCommissionRate || 0),
+            employeeCommission: Number(accumulator.employeeCommission || 0) + Number(itemBreakdown.employeeCommission || 0)
+        };
+    }, {
+        price: 0,
+        rawPrice: 0,
+        taxAmount: 0,
+        platformFee: 0,
+        tenantRevenue: 0,
+        employeeRevenue: 0,
+        employeeCommissionRate: Number(appointment.employeeCommissionRate || 0),
+        employeeCommission: 0
+    });
     return {
         extraPrice: Number(breakdown.price || 0),
         extraRawPrice: Number(breakdown.rawPrice || 0),
@@ -565,7 +607,8 @@ async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, group
         extraEmployeeRevenue: Number(breakdown.employeeRevenue || 0),
         extraEmployeeCommissionRate: Number(breakdown.employeeCommissionRate || 0),
         extraEmployeeCommission: Number(breakdown.employeeCommission || 0),
-        guestService
+        guestService: guestServices[0] || null,
+        guestServices
     };
 }
 
@@ -809,21 +852,37 @@ exports.createAppointment = async (req, res) => {
 
         let normalizedGroupGuest = groupGuest || null;
         if (groupGuest && typeof groupGuest === 'object') {
-            const requestedServiceId = `${groupGuest.serviceId || serviceId || ''}`.trim();
-            let resolvedGuestService = null;
-
-            if (requestedServiceId) {
-                resolvedGuestService = await db.Service.findOne({
-                    where: { id: requestedServiceId, tenantId },
+            const requestedServiceIds = normalizeGuestServiceIds({
+                ...groupGuest,
+                serviceIds: Array.isArray(groupGuest.serviceIds) && groupGuest.serviceIds.length > 0
+                    ? groupGuest.serviceIds
+                    : groupGuest.serviceId
+                        ? [groupGuest.serviceId]
+                        : serviceId
+                          ? [serviceId]
+                          : []
+            });
+            const resolvedGuestServices = requestedServiceIds.length > 0
+                ? await db.Service.findAll({
+                    where: {
+                        id: requestedServiceIds,
+                        tenantId
+                    },
                     attributes: ['id', 'name_en', 'name_ar'],
                     transaction
-                });
-            }
+                })
+                : [];
 
             normalizedGroupGuest = {
                 ...groupGuest,
-                serviceId: resolvedGuestService?.id || requestedServiceId || serviceId,
-                serviceName: `${resolvedGuestService?.name_en || resolvedGuestService?.name_ar || groupGuest.serviceName || ''}`.trim() || null,
+                serviceId: resolvedGuestServices[0]?.id || requestedServiceIds[0] || serviceId,
+                serviceIds: resolvedGuestServices.map((guestService) => guestService.id),
+                serviceName: resolvedGuestServices.length > 0
+                    ? resolvedGuestServices
+                        .map((guestService) => `${guestService.name_en || guestService.name_ar || ''}`.trim())
+                        .filter(Boolean)
+                        .join(' • ')
+                    : `${groupGuest.serviceName || ''}`.trim() || null,
                 isFree: normalizeBooleanFlag(groupGuest.isFree)
             };
         }
