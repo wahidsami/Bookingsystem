@@ -95,6 +95,16 @@ function normalizeNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function splitNameParts(fullName: string) {
+  const parts = `${fullName || ""}`.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts.shift() || "";
+  const lastName = parts.join(" ");
+  return {
+    firstName,
+    lastName
+  };
+}
+
 export function AppointmentBoardCartDrawer({
   open,
   locale,
@@ -113,11 +123,8 @@ export function AppointmentBoardCartDrawer({
   const [customerResults, setCustomerResults] = useState<CustomerItem[]>([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
-  const [walkInFirstName, setWalkInFirstName] = useState("");
-  const [walkInLastName, setWalkInLastName] = useState("");
+  const [walkInName, setWalkInName] = useState("");
   const [walkInEmail, setWalkInEmail] = useState("");
-  const [walkInPhone, setWalkInPhone] = useState("");
-  const [walkInBirthDate, setWalkInBirthDate] = useState("");
   const [giftCardSearch, setGiftCardSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [productCategory, setProductCategory] = useState("all");
@@ -188,11 +195,8 @@ export function AppointmentBoardCartDrawer({
     setSelectedCustomer(null);
     setCustomerResults([]);
     setCustomerSearch("");
-    setWalkInFirstName("");
-    setWalkInLastName("");
+    setWalkInName("");
     setWalkInEmail("");
-    setWalkInPhone("");
-    setWalkInBirthDate("");
     setSelectedPackageId(mode === "gift_card" ? giftCardPackages[0]?.id || "" : "");
     setSelectedProductQuantities({});
     setGiftMessage("");
@@ -291,7 +295,8 @@ export function AppointmentBoardCartDrawer({
 
         const existingCustomer = selectedCustomer;
         const normalizedEmail = walkInEmail.trim().toLowerCase();
-        const hasGuestData = walkInFirstName.trim() || walkInLastName.trim() || normalizedEmail || walkInPhone.trim();
+        const normalizedName = walkInName.trim();
+        const hasGuestData = normalizedName || normalizedEmail;
 
         if (!existingCustomer && !hasGuestData) {
           await dialog.alert({
@@ -304,7 +309,7 @@ export function AppointmentBoardCartDrawer({
           return;
         }
 
-        if (!existingCustomer && !walkInFirstName.trim()) {
+        if (!existingCustomer && !normalizedName) {
           await dialog.alert({
             title: locale === "ar" ? "الاسم مطلوب" : "Name required",
             message: locale === "ar"
@@ -341,15 +346,15 @@ export function AppointmentBoardCartDrawer({
           }
         }
 
+        const guestNameParts = splitNameParts(normalizedName);
         await tenantApi.purchaseCartGiftCard({
           packageId: selectedPackage.id,
           customerId: existingCustomer?.id,
-          customerName: `${walkInFirstName || formatName(existingCustomer) || ""} ${walkInLastName || ""}`.trim(),
-          customerFirstName: walkInFirstName || existingCustomer?.firstName,
-          customerLastName: walkInLastName || existingCustomer?.lastName,
+          customerName: normalizedName || formatName(existingCustomer) || "",
+          customerFirstName: guestNameParts.firstName || existingCustomer?.firstName,
+          customerLastName: guestNameParts.lastName || existingCustomer?.lastName,
           customerEmail: existingCustomer?.email || normalizedEmail,
-          customerPhone: existingCustomer?.phone || walkInPhone.trim(),
-          customerBirthDate: walkInBirthDate || undefined,
+          customerPhone: existingCustomer?.phone || undefined,
           amount: Number(selectedPackage.priceAmount || 0),
           paymentMethod,
           paymentAllocations,
@@ -381,7 +386,8 @@ export function AppointmentBoardCartDrawer({
 
       const existingCustomer = selectedCustomer;
       const normalizedEmail = walkInEmail.trim().toLowerCase();
-      const hasGuestData = walkInFirstName.trim() || walkInLastName.trim() || normalizedEmail || walkInPhone.trim();
+      const normalizedName = walkInName.trim();
+      const hasGuestData = normalizedName || normalizedEmail;
 
       if (!existingCustomer && !hasGuestData) {
         await dialog.alert({
@@ -394,7 +400,7 @@ export function AppointmentBoardCartDrawer({
         return;
       }
 
-      if (!existingCustomer && !walkInFirstName.trim()) {
+      if (!existingCustomer && !normalizedName) {
         await dialog.alert({
           title: locale === "ar" ? "الاسم مطلوب" : "Name required",
           message: locale === "ar"
@@ -431,6 +437,7 @@ export function AppointmentBoardCartDrawer({
         }
       }
 
+      const guestNameParts = splitNameParts(normalizedName);
       await tenantApi.purchaseCartProducts({
         items: selectedProducts.map((item) => ({
           productId: item.id,
@@ -439,12 +446,11 @@ export function AppointmentBoardCartDrawer({
           totalPrice: Number(item.price || 0) * Number(item.quantity || 0)
         })),
         customerId: existingCustomer?.id,
-        customerName: `${walkInFirstName || formatName(existingCustomer) || ""} ${walkInLastName || ""}`.trim(),
-        customerFirstName: walkInFirstName || existingCustomer?.firstName,
-        customerLastName: walkInLastName || existingCustomer?.lastName,
+        customerName: normalizedName || formatName(existingCustomer) || "",
+        customerFirstName: guestNameParts.firstName || existingCustomer?.firstName,
+        customerLastName: guestNameParts.lastName || existingCustomer?.lastName,
         customerEmail: existingCustomer?.email || normalizedEmail,
-        customerPhone: existingCustomer?.phone || walkInPhone.trim(),
-        customerBirthDate: walkInBirthDate || undefined,
+        customerPhone: existingCustomer?.phone || undefined,
         recipientType,
         notes: giftMessage || undefined,
         paymentMethod,
@@ -483,7 +489,7 @@ export function AppointmentBoardCartDrawer({
   const hasSelectedItems = mode === "gift_card" ? Boolean(selectedPackageId) : selectedProducts.length > 0;
   const customerReady = customerMode === "existing"
     ? Boolean(selectedCustomer)
-    : Boolean(walkInFirstName.trim() && walkInEmail.trim());
+    : Boolean(walkInName.trim() && walkInEmail.trim());
   const paymentReady = isBalanced && subtotal > 0;
 
   const stepLabel = (value: CartStep) => {
@@ -831,15 +837,9 @@ export function AppointmentBoardCartDrawer({
               ) : (
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input
-                    value={walkInFirstName}
-                    onChange={(event) => setWalkInFirstName(event.target.value)}
-                    placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                  />
-                  <input
-                    value={walkInLastName}
-                    onChange={(event) => setWalkInLastName(event.target.value)}
-                    placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
+                    value={walkInName}
+                    onChange={(event) => setWalkInName(event.target.value)}
+                    placeholder={locale === "ar" ? "اسم العميل" : "Customer name"}
                     className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
                   />
                   <input
@@ -848,21 +848,6 @@ export function AppointmentBoardCartDrawer({
                     placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
                     className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
                   />
-                  <input
-                    value={walkInPhone}
-                    onChange={(event) => setWalkInPhone(event.target.value)}
-                    placeholder={locale === "ar" ? "الجوال" : "Mobile"}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                  />
-                  {mode === "gift_card" ? (
-                    <input
-                      value={walkInBirthDate}
-                      onChange={(event) => setWalkInBirthDate(event.target.value)}
-                      type="date"
-                      placeholder={locale === "ar" ? "تاريخ الميلاد" : "Birth date"}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 sm:col-span-2"
-                    />
-                  ) : null}
                 </div>
               )}
 

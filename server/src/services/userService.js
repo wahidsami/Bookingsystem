@@ -3,11 +3,27 @@
  * Handles PlatformUser lookup, creation, and management
  */
 
+const crypto = require('crypto');
 const db = require('../models');
 const { Op } = require('sequelize');
 const { linkPendingGiftRecipients } = require('./giftRecipientLinkingService');
 
 class UserService {
+    async generateGuestPhonePlaceholder() {
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+            const candidate = `+99${crypto.randomInt(100000000000, 999999999999)}`;
+            const existing = await db.PlatformUser.findOne({
+                where: { phone: candidate }
+            });
+
+            if (!existing) {
+                return candidate;
+            }
+        }
+
+        return `+99${String(Date.now()).slice(-12)}`;
+    }
+
     /**
      * Find or create PlatformUser from customer info
      * Used for public bookings where user may not have an account
@@ -48,10 +64,9 @@ class UserService {
                 // No password set - user can claim account later via email/SMS
             };
 
-            // PlatformUser model requires phone, so generate a placeholder if missing
+            // PlatformUser model requires phone, so generate a valid placeholder if missing
             if (!userData.phone && userData.email) {
-                // Use email as temporary phone (will need to be updated)
-                userData.phone = `temp_${Date.now()}@email`;
+                userData.phone = await this.generateGuestPhonePlaceholder();
             } else if (!userData.phone) {
                 throw new Error('Phone number is required');
             }
