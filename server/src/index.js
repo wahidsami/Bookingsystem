@@ -757,12 +757,6 @@ const startServer = async () => {
         await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
         await ensurePlatformUserAuthSchema();
         await ensureTenantGiftCardSchema();
-        await db.GiftCardCode.sync({ force: false }); // Gift card code registry
-        await db.GiftCardCodeRedemption.sync({ force: false }); // Gift card redemption audit trail
-        await db.GiftCardTransaction.sync({ force: false }); // Legacy gift card sales
-        await db.TenantGiftCardPackage.sync({ force: false }); // Tenant gift card package catalog
-        await db.TenantGiftCardTransaction.sync({ force: false }); // Tenant gift card sales
-        await db.TenantGiftCardSettlement.sync({ force: false }); // Tenant gift card settlement tracking
         await db.PaymentMethod.sync({ force: false });
         await db.User.sync({ force: false });
         await db.Service.sync({ force: false });
