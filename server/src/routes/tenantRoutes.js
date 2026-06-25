@@ -25,6 +25,7 @@ const tenantMessagesController = require('../controllers/tenantMessagesControlle
 const tenantPayrollController = require('../controllers/tenantPayrollController');
 const tenantNotificationController = require('../controllers/tenantNotificationController');
 const tenantGiftCardController = require('../controllers/tenantGiftCardController');
+const tenantCartController = require('../controllers/tenantCartController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const aiController = require('../controllers/tenant/aiController');
@@ -224,6 +225,10 @@ router.get('/gift-cards/reports/summary', tenantGiftCardController.getSummaryRep
 router.get('/gift-cards/reports/transactions', tenantGiftCardController.getTransactionsReport);
 router.get('/gift-cards/reports/transactions.csv', tenantGiftCardController.exportTransactionsReportCsv);
 router.get('/gift-cards/reports/redemptions', tenantGiftCardController.getRedemptionsReport);
+
+// Compact cart sales
+router.post('/cart/gift-cards/purchase', tenantCartController.purchaseGiftCard);
+router.post('/cart/products/purchase', tenantCartController.purchaseProducts);
 
 // Settings management
 router.get('/settings/limits', tenantSettingsController.getSubscriptionLimits);

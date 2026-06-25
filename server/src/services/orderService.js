@@ -37,6 +37,8 @@ class OrderService {
     async createOrder(orderData, options = {}) {
         const transaction = options.transaction || await db.sequelize.transaction();
         const shouldCommit = !options.transaction;
+        const skipNotification = options.skipNotification === true;
+        const skipInvoiceEmail = options.skipInvoiceEmail === true;
 
         try {
             const {
@@ -203,33 +205,37 @@ class OrderService {
                 transaction: shouldCommit ? null : transaction
             });
 
-            try {
-                const tenantName = fullOrder?.tenant?.name_ar || fullOrder?.tenant?.name_en || fullOrder?.tenant?.name || 'the store';
-                await notificationOrchestrator.notifyCustomer({
-                    tenantId,
-                    platformUserId,
-                    eventType: 'order_created',
-                    title: 'Order created',
-                    body: `Your order ${fullOrder?.orderNumber || order.orderNumber} has been placed with ${tenantName}.`,
-                    data: {
-                        type: 'order_created',
-                        orderId: order.id,
-                        tenantId
-                    }
-                });
-            } catch (notificationError) {
-                console.warn('Order creation notification warning:', notificationError.message);
+            if (!skipNotification) {
+                try {
+                    const tenantName = fullOrder?.tenant?.name_ar || fullOrder?.tenant?.name_en || fullOrder?.tenant?.name || 'the store';
+                    await notificationOrchestrator.notifyCustomer({
+                        tenantId,
+                        platformUserId,
+                        eventType: 'order_created',
+                        title: 'Order created',
+                        body: `Your order ${fullOrder?.orderNumber || order.orderNumber} has been placed with ${tenantName}.`,
+                        data: {
+                            type: 'order_created',
+                            orderId: order.id,
+                            tenantId
+                        }
+                    });
+                } catch (notificationError) {
+                    console.warn('Order creation notification warning:', notificationError.message);
+                }
             }
 
-            try {
-                const invoice = await db.CustomerInvoice.findOne({
-                    where: { entityType: 'order', entityId: order.id }
-                });
-                if (invoice) {
-                    await sendCustomerInvoiceLifecycleEmail(invoice.id);
+            if (!skipInvoiceEmail) {
+                try {
+                    const invoice = await db.CustomerInvoice.findOne({
+                        where: { entityType: 'order', entityId: order.id }
+                    });
+                    if (invoice) {
+                        await sendCustomerInvoiceLifecycleEmail(invoice.id);
+                    }
+                } catch (invoiceMailError) {
+                    console.warn('Order invoice email warning:', invoiceMailError.message);
                 }
-            } catch (invoiceMailError) {
-                console.warn('Order invoice email warning:', invoiceMailError.message);
             }
 
             return fullOrder || order;
@@ -257,7 +263,8 @@ class OrderService {
             notes = null,
             transactionRef = null,
             gatewayResponse = {},
-            metadata = {}
+            metadata = {},
+            skipNotification = false
         } = options;
 
         try {
@@ -354,23 +361,25 @@ class OrderService {
                 await transaction.commit();
             }
 
-            try {
-                await notificationOrchestrator.notifyCustomer({
-                    tenantId: order.tenantId,
-                    platformUserId: order.platformUserId,
-                    eventType: 'order_payment_updated',
-                    title: paymentStatus === 'paid' ? 'Order payment confirmed' : 'Order payment updated',
-                    body: paymentStatus === 'paid'
-                        ? `Payment for order ${order.orderNumber} was confirmed successfully.`
-                        : `Payment status for order ${order.orderNumber} changed to ${paymentStatus}.`,
-                    data: {
-                        type: 'order_payment_updated',
-                        orderId: order.id,
-                        paymentStatus
-                    }
-                });
-            } catch (notificationError) {
-                console.warn('Order payment notification warning:', notificationError.message);
+            if (!skipNotification) {
+                try {
+                    await notificationOrchestrator.notifyCustomer({
+                        tenantId: order.tenantId,
+                        platformUserId: order.platformUserId,
+                        eventType: 'order_payment_updated',
+                        title: paymentStatus === 'paid' ? 'Order payment confirmed' : 'Order payment updated',
+                        body: paymentStatus === 'paid'
+                            ? `Payment for order ${order.orderNumber} was confirmed successfully.`
+                            : `Payment status for order ${order.orderNumber} changed to ${paymentStatus}.`,
+                        data: {
+                            type: 'order_payment_updated',
+                            orderId: order.id,
+                            paymentStatus
+                        }
+                    });
+                } catch (notificationError) {
+                    console.warn('Order payment notification warning:', notificationError.message);
+                }
             }
 
             if (previousPaymentStatus !== paymentStatus) {

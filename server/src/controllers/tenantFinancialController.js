@@ -136,6 +136,30 @@ exports.getFinancialOverview = async (req, res) => {
             ]
         });
 
+        const giftCardWhere = { tenantId };
+        const giftCardDateFilter = buildDateRangeWhere('createdAt', startDate, endDate);
+        if (giftCardDateFilter.createdAt) {
+            giftCardWhere.createdAt = giftCardDateFilter.createdAt;
+        }
+
+        const giftCards = await db.TenantGiftCardTransaction.findAll({
+            where: giftCardWhere,
+            attributes: ['id', 'purchaseAmount', 'createdAt', 'status']
+        }).catch(() => []);
+
+        const giftCardTotals = {
+            totalRevenue: 0,
+            totalTransactions: giftCards.length,
+            completedTransactions: 0
+        };
+
+        giftCards.forEach((giftCard) => {
+            giftCardTotals.totalRevenue += parseFloat(giftCard.purchaseAmount || 0);
+            if (!['cancelled', 'expired'].includes(giftCard.status)) {
+                giftCardTotals.completedTransactions++;
+            }
+        });
+
         // Calculate totals from appointments
         const appointmentTotals = {
             totalRevenue: 0,
@@ -203,13 +227,13 @@ exports.getFinancialOverview = async (req, res) => {
         // Combine totals
         const overview = {
             // Combined totals
-            totalRevenue: appointmentTotals.totalRevenue + orderTotals.totalRevenue,
+            totalRevenue: appointmentTotals.totalRevenue + orderTotals.totalRevenue + giftCardTotals.totalRevenue,
             totalRawPrice: appointmentTotals.totalRawPrice, // Only from appointments
             totalTax: appointmentTotals.totalTax, // Only from appointments
             totalPlatformFees: appointmentTotals.totalPlatformFees + orderTotals.totalPlatformFees,
-            totalTenantRevenue: appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue,
+            totalTenantRevenue: appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue + giftCardTotals.totalRevenue,
             totalEmployeeCommissions: appointmentTotals.totalEmployeeCommissions, // Only from appointments
-            netRevenue: (appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue) - appointmentTotals.totalEmployeeCommissions,
+            netRevenue: (appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue + giftCardTotals.totalRevenue) - appointmentTotals.totalEmployeeCommissions,
             // Booking/Order counts
             totalBookings: appointmentTotals.totalBookings,
             totalOrders: orderTotals.totalOrders,
@@ -230,8 +254,11 @@ exports.getFinancialOverview = async (req, res) => {
             // Separate breakdowns
             appointmentRevenue: appointmentTotals.totalRevenue,
             orderRevenue: orderTotals.totalRevenue,
+            giftCardRevenue: giftCardTotals.totalRevenue,
+            giftCardTransactions: giftCardTotals.totalTransactions,
             appointmentTenantRevenue: appointmentTotals.totalTenantRevenue,
-            orderTenantRevenue: orderTotals.totalTenantRevenue
+            orderTenantRevenue: orderTotals.totalTenantRevenue,
+            giftCardTenantRevenue: giftCardTotals.totalRevenue
         };
 
         // Round all values
@@ -241,7 +268,7 @@ exports.getFinancialOverview = async (req, res) => {
                 key !== 'paidBookings' && key !== 'paidOrders' &&
                 key !== 'completedBookings' && key !== 'completedOrders' &&
                 key !== 'cancelledBookings' && key !== 'noShowBookings' &&
-                key !== 'uniqueCustomers') {
+                key !== 'uniqueCustomers' && key !== 'giftCardTransactions') {
                 overview[key] = parseFloat(overview[key].toFixed(2));
             }
         });
@@ -522,6 +549,18 @@ exports.getDailyRevenue = async (req, res) => {
             order: [['createdAt', 'ASC']]
         });
 
+        const giftCards = await db.TenantGiftCardTransaction.findAll({
+            where: {
+                tenantId,
+                createdAt: {
+                    [Op.gte]: start,
+                    [Op.lte]: end
+                }
+            },
+            attributes: ['id', 'createdAt', 'purchaseAmount', 'status'],
+            order: [['createdAt', 'ASC']]
+        });
+
         // Group by date
         const dailyData = {};
         
@@ -563,6 +602,24 @@ exports.getDailyRevenue = async (req, res) => {
             dailyData[dateKey].tenantRevenue += tenantRevenue;
         });
 
+        giftCards.forEach((giftCard) => {
+            const dateKey = giftCard.createdAt.toISOString().split('T')[0];
+            if (!dailyData[dateKey]) {
+                dailyData[dateKey] = {
+                    date: dateKey,
+                    bookings: 0,
+                    orders: 0,
+                    giftCards: 0,
+                    revenue: 0,
+                    tenantRevenue: 0
+                };
+            }
+            const amount = parseFloat(giftCard.purchaseAmount || 0);
+            dailyData[dateKey].giftCards = (dailyData[dateKey].giftCards || 0) + 1;
+            dailyData[dateKey].revenue += amount;
+            dailyData[dateKey].tenantRevenue += amount;
+        });
+
         // Fill in missing dates with zeros
         const result = [];
         let current = new Date(start);
@@ -572,6 +629,7 @@ exports.getDailyRevenue = async (req, res) => {
                 date: dateKey,
                 bookings: 0,
                 orders: 0,
+                giftCards: 0,
                 revenue: 0,
                 tenantRevenue: 0
             });
@@ -582,6 +640,7 @@ exports.getDailyRevenue = async (req, res) => {
         result.forEach(day => {
             day.revenue = parseFloat(day.revenue.toFixed(2));
             day.tenantRevenue = parseFloat(day.tenantRevenue.toFixed(2));
+            day.giftCards = Number(day.giftCards || 0);
         });
 
         res.json({

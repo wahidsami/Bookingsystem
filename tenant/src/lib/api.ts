@@ -1214,6 +1214,56 @@ class TenantApiClient {
     });
   }
 
+  async purchaseCartGiftCard(data: {
+    packageId: string;
+    customerId?: string;
+    customerName?: string;
+    customerFirstName?: string;
+    customerLastName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerBirthDate?: string;
+    amount: number;
+    paymentMethod: string;
+    paymentAllocations?: Array<{
+      paymentMethod: string;
+      amount: number;
+      giftCardCode?: string;
+      notes?: string;
+    }>;
+    notes?: string;
+  }): Promise<any> {
+    return this.post('/tenant/cart/gift-cards/purchase', data);
+  }
+
+  async purchaseCartProducts(data: {
+    items: Array<{
+      productId: string;
+      quantity: number;
+      totalPrice?: number;
+      price?: number;
+    }>;
+    customerId?: string;
+    customerName?: string;
+    customerFirstName?: string;
+    customerLastName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerBirthDate?: string;
+    recipientType?: 'self' | 'gift';
+    notes?: string;
+    paymentMethod: string;
+    paymentAllocations?: Array<{
+      paymentMethod: string;
+      amount: number;
+      giftCardCode?: string;
+      notes?: string;
+    }>;
+    transactionRef?: string;
+  }): Promise<any> {
+    return this.post('/tenant/cart/products/purchase', data);
+  }
+
   async getCalendarAppointments(params?: {
     startDate?: string;
     endDate?: string;

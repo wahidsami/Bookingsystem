@@ -5,6 +5,7 @@ import { TenantLayout } from "@/components/TenantLayout";
 import { CalendarView } from "@/components/CalendarView";
 import { AppointmentActionDrawer, type AppointmentActionDrawerPrefill } from "@/components/AppointmentActionDrawer";
 import { AppointmentDetailsDrawer, type AppointmentItem } from "@/components/AppointmentDetailsDrawer";
+import { AppointmentBoardCartDrawer } from "@/components/AppointmentBoardCartDrawer";
 import { EmployeeWeeklyScheduleEditor } from "@/components/EmployeeWeeklyScheduleEditor";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { tenantApi } from "@/lib/api";
@@ -19,6 +20,8 @@ import {
   FunnelIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  GiftIcon,
+  ShoppingBagIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
 
@@ -279,6 +282,10 @@ export default function AppointmentsPage() {
   const [addServiceSourceAppointment, setAddServiceSourceAppointment] = useState<AppointmentItem | null>(null);
   const [addServicePickerQuery, setAddServicePickerQuery] = useState("");
   const [addServicePickerSelectedId, setAddServicePickerSelectedId] = useState<string>("");
+  const [showCartDrawer, setShowCartDrawer] = useState(false);
+  const [cartDrawerMode, setCartDrawerMode] = useState<'gift_card' | 'product'>('gift_card');
+  const [cartGiftCardPackages, setCartGiftCardPackages] = useState<any[]>([]);
+  const [cartProducts, setCartProducts] = useState<any[]>([]);
   const [appointmentSearch, setAppointmentSearch] = useState("");
   const [dashboardSearchResults, setDashboardSearchResults] = useState<{
     appointments: Appointment[];
@@ -1373,6 +1380,53 @@ export default function AppointmentsPage() {
     });
   };
 
+  const openCartDrawer = async (mode: 'gift_card' | 'product') => {
+    if (!boardContextMenu) return;
+    setBoardContextMenu(null);
+
+    try {
+      if (mode === 'gift_card') {
+        const response = await tenantApi.getTenantGiftCardPackages();
+        const packages = (response?.packages || response?.data?.packages || []).filter((item: any) => item?.isActive !== false);
+        if (packages.length === 0) {
+          await dialog.alert({
+            title: locale === "ar" ? "لا توجد بطاقات" : "No active cards",
+            message: locale === "ar"
+              ? "لا توجد بطاقات هدية نشطة. أضف بطاقة من إعدادات بطاقات الهدايا."
+              : "No active gift cards yet. Please add a gift card in Gift Cards settings.",
+            tone: "danger"
+          });
+          return;
+        }
+        setCartGiftCardPackages(packages);
+      } else {
+        const response = await tenantApi.getProducts({ isAvailable: true });
+        const products = (response?.products || response?.data?.products || []).filter((item: any) => item?.isAvailable !== false);
+        if (products.length === 0) {
+          await dialog.alert({
+            title: locale === "ar" ? "لا توجد منتجات" : "No active products",
+            message: locale === "ar"
+              ? "لا توجد منتجات نشطة. أضف منتجًا من صفحة المنتجات."
+              : "No active products yet. Please add a product in Products.",
+            tone: "danger"
+          });
+          return;
+        }
+        setCartProducts(products);
+      }
+
+      setCartDrawerMode(mode);
+      setShowCartDrawer(true);
+    } catch (error) {
+      console.error("Failed to open cart drawer:", error);
+      await dialog.alert({
+        title: locale === "ar" ? "تعذر التحميل" : "Load failed",
+        message: locale === "ar" ? "تعذر تحميل بيانات السلة." : "Failed to load cart data.",
+        tone: "danger"
+      });
+    }
+  };
+
   const handleOpenBlockedTimeFromMenu = () => {
     if (!boardContextMenu) {
       return;
@@ -1976,6 +2030,27 @@ export default function AppointmentsPage() {
               <PlusIcon className={`h-4 w-4 ${isContextSlotBlocked ? "text-rose-500" : "text-primary"}`} />
               <span>{locale === 'ar' ? 'إضافة موعد جديد' : 'Add new appointment'}</span>
             </button>
+            <div className="my-1 border-t border-gray-100 pt-1">
+              <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">
+                {locale === "ar" ? "Cart" : "Cart"}
+              </div>
+              <button
+                type="button"
+                onClick={() => void openCartDrawer("gift_card")}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                <GiftIcon className="h-4 w-4 text-primary" />
+                <span>{locale === 'ar' ? 'بطاقات الهدايا' : 'Gift Cards'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void openCartDrawer("product")}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                <ShoppingBagIcon className="h-4 w-4 text-primary" />
+                <span>{locale === 'ar' ? 'المنتجات' : 'Products'}</span>
+              </button>
+            </div>
             {isContextSlotBlocked ? (
               <div className="mt-1 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 bg-rose-50">
                 {locale === 'ar'
@@ -2685,6 +2760,27 @@ export default function AppointmentsPage() {
           </div>
         </div>
       ) : null}
+
+      <AppointmentBoardCartDrawer
+        open={showCartDrawer}
+        locale={locale}
+        isRTL={isRTL}
+        mode={cartDrawerMode}
+        giftCardPackages={cartGiftCardPackages}
+        products={cartProducts}
+        onClose={() => {
+          setShowCartDrawer(false);
+          setCartGiftCardPackages([]);
+          setCartProducts([]);
+        }}
+        onCompleted={() => {
+          if (viewMode === 'calendar') {
+            void loadAppointmentsBoard();
+          } else {
+            void loadAppointments();
+          }
+        }}
+      />
 
       <AppointmentDetailsDrawer
         open={showAppointmentDetailsDrawer}
