@@ -380,6 +380,7 @@ export function AppointmentActionDrawer({
   const [guestServiceDraftIds, setGuestServiceDraftIds] = useState<string[]>([]);
   const [guestServiceSearch, setGuestServiceSearch] = useState("");
   const [selectedGuestServiceCategory, setSelectedGuestServiceCategory] = useState("all");
+  const [editingGuestServiceId, setEditingGuestServiceId] = useState<string | null>(null);
   const [queuedServices, setQueuedServices] = useState<BookingDraftItem[]>([]);
   const [stagedServiceIds, setStagedServiceIds] = useState<string[]>([]);
   const [showServicePicker, setShowServicePicker] = useState(false);
@@ -466,6 +467,7 @@ export function AppointmentActionDrawer({
       setGuestServiceDraftIds([]);
       setGuestServiceSearch("");
       setSelectedGuestServiceCategory("all");
+      setEditingGuestServiceId(null);
       setShowServicePicker(true);
       setEditingServiceIndex(null);
       setServiceSearch("");
@@ -937,6 +939,7 @@ export function AppointmentActionDrawer({
     setGuestServiceSearch("");
     setSelectedGuestServiceCategory("all");
     setShowGuestServicePicker(true);
+    setEditingGuestServiceId(null);
   };
 
   const commitGuestServicePicker = () => {
@@ -949,6 +952,7 @@ export function AppointmentActionDrawer({
       serviceIds: nextIds,
       serviceId: nextIds[0] || ""
     }));
+    setEditingGuestServiceId(null);
     setShowGuestServicePicker(false);
   };
 
@@ -972,6 +976,7 @@ export function AppointmentActionDrawer({
         serviceId: nextIds[0] || ""
       };
     });
+    setEditingGuestServiceId((current) => (current === trimmedServiceId ? null : current));
   };
 
   const addQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
@@ -2425,16 +2430,68 @@ export function AppointmentActionDrawer({
                                     {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={guestServicePrice} />}
                                   </span>
                                 </div>
-                                {selectedGuestServices.length > 0 ? (
+                            {selectedGuestServices.length > 0 ? (
                                   <div className="mt-3 space-y-2">
                                     {selectedGuestServices.map((service) => {
                                       const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                                      const isExpanded = editingGuestServiceId === service.id;
                                       return (
-                                        <div key={service.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2.5 text-sm">
-                                          <span className="min-w-0 truncate font-medium text-gray-900">{serviceName}</span>
-                                          <span className="font-semibold text-fuchsia-800">
-                                            {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
-                                          </span>
+                                        <div key={service.id} className="overflow-hidden rounded-2xl border border-fuchsia-200 bg-white">
+                                          <div className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                                            <div className="min-w-0">
+                                              <p className="truncate font-semibold text-gray-900">{serviceName}</p>
+                                              <p className="mt-0.5 text-xs text-gray-500">{formatMinutesLabel(service.duration, locale)}</p>
+                                            </div>
+                                            <span className="font-semibold text-fuchsia-800">
+                                              {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center justify-end gap-2 border-t border-fuchsia-100 bg-fuchsia-50 px-3 py-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingGuestServiceId((current) => (current === service.id ? null : service.id))}
+                                              className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                            >
+                                              {isExpanded
+                                                ? (locale === "ar" ? "إغلاق" : "Close")
+                                                : (locale === "ar" ? "تعديل" : "Edit")}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => removeGuestService(service.id)}
+                                              className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                            >
+                                              {locale === "ar" ? "حذف" : "Remove"}
+                                            </button>
+                                          </div>
+                                          {isExpanded ? (
+                                            <div className="border-t border-fuchsia-100 bg-white px-3 py-3">
+                                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fuchsia-700">
+                                                {locale === "ar" ? "تعديل خدمة الضيف" : "Guest service edit"}
+                                              </p>
+                                              <p className="mt-1 text-sm text-gray-600">
+                                                {locale === "ar"
+                                                  ? "يمكنك تغيير مجموعة خدمات الضيف من نفس النافذة المنبثقة."
+                                                  : "You can change the guest service set from the same popup."}
+                                              </p>
+                                              <div className="mt-3 flex flex-wrap gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openGuestServicePicker()}
+                                                  className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                                >
+                                                  {locale === "ar" ? "تغيير الاختيار" : "Change selection"}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeGuestService(service.id)}
+                                                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                                                >
+                                                  {locale === "ar" ? "إزالة" : "Remove"}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : null}
                                         </div>
                                       );
                                     })}
