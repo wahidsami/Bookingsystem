@@ -150,6 +150,26 @@ function getInitials(firstName?: string, lastName?: string) {
   return `${first}${last}`.toUpperCase() || "?";
 }
 
+function splitFullName(fullName: string) {
+  const parts = `${fullName || ""}`
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return { firstName: "", lastName: "" };
+  }
+
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: "" };
+  }
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(" ")
+  };
+}
+
 function getTodayDateKey() {
   return new Date().toISOString().split("T")[0];
 }
@@ -334,6 +354,7 @@ export function AppointmentActionDrawer({
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
+  const [appointmentStep, setAppointmentStep] = useState<1 | 2 | 3>(1);
 
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
     firstName: "",
@@ -391,6 +412,7 @@ export function AppointmentActionDrawer({
     setSuccess("");
 
     if (mode === "appointment") {
+      setAppointmentStep(1);
       setCustomerMode("existing");
       setShowCustomerPicker(true);
       setCustomerSearch(prefill?.customer ? `${prefill.customer.firstName} ${prefill.customer.lastName}`.trim() : "");
@@ -476,11 +498,12 @@ export function AppointmentActionDrawer({
     setError("");
     setCustomerMode("guest");
     setShowCustomerPicker(true);
+    setAppointmentStep(2);
     setCustomerSearch("");
     setSelectedCustomer(null);
     setNewCustomer({
-      firstName: locale === "ar" ? "عميل" : "Customer",
-      lastName: "001",
+      firstName: "",
+      lastName: "",
       email: "",
       phone: "",
       gender: "",
@@ -636,7 +659,7 @@ export function AppointmentActionDrawer({
     ? (locale === "ar" ? "عميل موجود" : "Existing customer")
     : customerMode === "new"
       ? (locale === "ar" ? "عميل جديد" : "New customer")
-      : (locale === "ar" ? "ضيف" : "Guest");
+      : (locale === "ar" ? "حجز حضوري" : "Walk-in customer");
   const appointmentSummaryTimeLabel = `${appointmentDate || "-"} ${appointmentTime ? formatTime12Hour(appointmentTime, locale) : "-"}`;
   const selectedGuestService = useMemo(
     () => services.find((service) => service.id === groupGuest.serviceId) || null,
@@ -748,6 +771,23 @@ export function AppointmentActionDrawer({
     [groupedServices, selectedServiceCategory, serviceSearch]
   );
   const visibleCustomers = customers.slice(0, 6);
+  const currentAppointmentStepLabel = appointmentStep === 1
+    ? (locale === "ar" ? "الخدمات" : "Services")
+    : appointmentStep === 2
+      ? (locale === "ar" ? "العميل" : "Customer")
+      : (locale === "ar" ? "الدفع" : "Payment");
+  const canAdvanceFromServices = hasQueuedServices && !queueHasMissingRequiredStaff;
+  const guestNameInput = `${newCustomer.firstName || ""} ${newCustomer.lastName || ""}`.trim();
+  const guestReady = customerMode === "guest"
+    ? Boolean(newCustomer.firstName.trim()) && Boolean(newCustomer.email.trim())
+    : true;
+  const groupGuestReady = !includeGroupGuest || (Boolean(groupGuest.firstName.trim()) && Boolean(groupGuest.serviceId.trim()));
+  const customerStepReady = customerMode === "existing"
+    ? Boolean(selectedCustomer)
+    : customerMode === "guest"
+      ? guestReady
+      : Boolean(newCustomer.firstName.trim() && newCustomer.lastName.trim());
+  const canAdvanceFromCustomer = customerStepReady && groupGuestReady;
   const findQueuedServiceIndex = (serviceId: string) =>
     queuedServices.findIndex((item) => item.serviceId === serviceId);
   const toggleStagedService = (serviceId: string) => {
@@ -834,6 +874,28 @@ export function AppointmentActionDrawer({
   const disableCustomizedPaymentCollection = () => {
     setPaymentCollectionMode("single");
     setPaymentCollectionRows([]);
+  };
+  const goToPreviousAppointmentStep = () => {
+    setAppointmentStep((current) => {
+      const nextStep = Math.max(1, current - 1) as 1 | 2 | 3;
+      setShowServicePicker(nextStep === 1);
+      return nextStep;
+    });
+  };
+  const goToNextAppointmentStep = () => {
+    if (appointmentStep === 1 && !canAdvanceFromServices) {
+      return;
+    }
+
+    if (appointmentStep === 2 && !canAdvanceFromCustomer) {
+      return;
+    }
+
+    setAppointmentStep((current) => {
+      const nextStep = Math.min(3, current + 1) as 1 | 2 | 3;
+      setShowServicePicker(nextStep === 1);
+      return nextStep;
+    });
   };
 
   const addQueuedService = (serviceId: string, variantId?: string | null, staffId?: string | null) => {
@@ -1021,6 +1083,18 @@ export function AppointmentActionDrawer({
       return;
     }
 
+    if (customerMode === "guest") {
+      if (!newCustomer.firstName.trim()) {
+        setError(locale === "ar" ? "الرجاء إدخال اسم الضيف." : "Please enter the guest name.");
+        return;
+      }
+
+      if (!newCustomer.email.trim()) {
+        setError(locale === "ar" ? "الرجاء إدخال البريد الإلكتروني للضيف." : "Please enter the guest email.");
+        return;
+      }
+    }
+
     if (customerMode === "new") {
       const requiredFields = [
         newCustomer.firstName.trim(),
@@ -1031,14 +1105,6 @@ export function AppointmentActionDrawer({
         setError(locale === "ar" ? "الرجاء إدخال الاسم الأول والأخير للعميل." : "Please enter customer first and last name.");
         return;
       }
-    }
-
-    if (customerMode === "guest" && !newCustomer.firstName.trim() && !newCustomer.lastName.trim()) {
-      setNewCustomer((current) => ({
-        ...current,
-        firstName: locale === "ar" ? "عميل" : "Customer",
-        lastName: "001"
-      }));
     }
 
     const bookingStartDate = queuePreviewDate || appointmentDate;
@@ -1066,8 +1132,8 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    if (includeGroupGuest && (!groupGuest.firstName.trim() || !groupGuest.lastName.trim())) {
-      setError(locale === "ar" ? "الرجاء إدخال الاسم الكامل للضيف الإضافي." : "Please enter the additional guest full name.");
+    if (includeGroupGuest && !groupGuest.firstName.trim()) {
+      setError(locale === "ar" ? "الرجاء إدخال اسم الضيف الإضافي." : "Please enter the additional guest name.");
       return;
     }
 
@@ -1138,16 +1204,16 @@ export function AppointmentActionDrawer({
         }
       }
 
-      const payload = {
-        notes: notes.trim() || undefined,
-        paymentMethod: resolvedPaymentMethod,
+    const payload = {
+      notes: notes.trim() || undefined,
+      paymentMethod: resolvedPaymentMethod,
         paymentAllocations: normalizedPaymentAllocations.length > 0 ? normalizedPaymentAllocations : undefined,
         bookingSessionId: prefill?.bookingSessionId || undefined,
         bookingReference: prefill?.bookingReference || undefined,
         items: bookingItems,
         groupGuest: includeGroupGuest ? {
-          firstName: groupGuest.firstName.trim(),
-          lastName: groupGuest.lastName.trim(),
+          ...splitFullName(groupGuest.firstName.trim()),
+          lastName: splitFullName(groupGuest.firstName.trim()).lastName || groupGuest.lastName.trim(),
           phone: groupGuest.phone.trim() || undefined,
           serviceId: groupGuest.serviceId.trim() || undefined,
           isFree: Boolean(groupGuest.isFree),
@@ -1163,14 +1229,14 @@ export function AppointmentActionDrawer({
         customer: resolvedCustomerMode === "new" || resolvedCustomerMode === "guest"
           ? {
               ...newCustomer,
-              firstName: resolvedCustomerMode === "guest"
-                ? (newCustomer.firstName.trim() || (locale === "ar" ? "عميل" : "Customer"))
-                : newCustomer.firstName.trim(),
-              lastName: resolvedCustomerMode === "guest"
-                ? (newCustomer.lastName.trim() || "001")
-                : newCustomer.lastName.trim(),
-              email: resolvedCustomerMode === "guest" ? "" : newCustomer.email.trim(),
-              phone: resolvedCustomerMode === "guest" ? "" : newCustomer.phone.trim(),
+              ...(resolvedCustomerMode === "guest"
+                ? splitFullName(newCustomer.firstName.trim())
+                : {
+                    firstName: newCustomer.firstName.trim(),
+                    lastName: newCustomer.lastName.trim()
+                  }),
+              email: resolvedCustomerMode === "guest" ? newCustomer.email.trim() : newCustomer.email.trim(),
+              phone: newCustomer.phone.trim(),
               isGuest: resolvedCustomerMode === "guest"
             }
           : null,
@@ -1377,10 +1443,46 @@ export function AppointmentActionDrawer({
             )}
 
             {mode === "appointment" ? (
+              <div className="mb-4 rounded-3xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                      {locale === "ar" ? "خطوات الحجز" : "Booking steps"}
+                    </p>
+                    <h3 className="mt-1 text-base font-semibold text-gray-900">
+                      {currentAppointmentStepLabel}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3].map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => {
+                          const nextStep = step as 1 | 2 | 3;
+                          setAppointmentStep(nextStep);
+                          setShowServicePicker(nextStep === 1);
+                        }}
+                        className={`flex h-9 min-w-9 items-center justify-center rounded-full border px-3 text-sm font-semibold transition ${
+                          appointmentStep === step
+                            ? "border-primary bg-primary text-white"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-primary/40 hover:bg-purple-50"
+                        }`}
+                        aria-label={`${locale === "ar" ? "الخطوة" : "Step"} ${step}`}
+                      >
+                        {step}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {mode === "appointment" ? (
               <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
                 <div className="min-h-0">
                   <div className="h-full overflow-y-auto pr-1">
-                    <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className={`rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm ${appointmentStep === 1 ? "hidden" : ""}`}>
                     <div className="rounded-[24px] border border-dashed border-gray-200 px-6 py-8 text-center">
                       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500">
                         <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -1443,34 +1545,88 @@ export function AppointmentActionDrawer({
                       />
                     </div>
 
+                    <div className="mt-4 rounded-[22px] border border-gray-200 bg-gray-50 p-4">
+                      <label className="flex items-center gap-3 text-sm font-semibold text-gray-900">
+                        <input
+                          type="checkbox"
+                          checked={includeGroupGuest}
+                          onChange={(event) => setIncludeGroupGuest(event.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <span>{locale === "ar" ? "إضافة ضيف" : "Include guest"}</span>
+                      </label>
+
+                      {includeGroupGuest ? (
+                        <div className="mt-4 space-y-3">
+                          <input
+                            value={groupGuest.firstName}
+                            onChange={(event) => setGroupGuest((current) => ({ ...current, firstName: event.target.value }))}
+                            placeholder={locale === "ar" ? "اسم الضيف" : "Guest name"}
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          />
+                          <select
+                            value={groupGuest.serviceId}
+                            onChange={(event) => setGroupGuest((current) => ({ ...current, serviceId: event.target.value }))}
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          >
+                            <option value="">{locale === "ar" ? "اختر خدمة الضيف" : "Choose guest service"}</option>
+                            {services.map((service) => {
+                              const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                              return (
+                                <option key={service.id} value={service.id}>
+                                  {serviceName}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={groupGuest.isFree}
+                              onChange={(event) => setGroupGuest((current) => ({ ...current, isFree: event.target.checked }))}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span>{locale === "ar" ? "الخدمة مجانية" : "Free service"}</span>
+                          </label>
+                          <input
+                            value={groupGuest.phone}
+                            onChange={(event) => setGroupGuest((current) => ({ ...current, phone: event.target.value }))}
+                            placeholder={locale === "ar" ? "هاتف الضيف (اختياري)" : "Guest phone (optional)"}
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+
                     <div className="mt-3 space-y-0 overflow-hidden rounded-[22px] border border-gray-200 bg-white">
-                      {customerMode === "new" ? (
+                      {customerMode === "guest" ? (
                         <div className="grid gap-3 bg-gray-50 p-4">
-                          <div className="grid grid-cols-2 gap-3">
-                            <input
-                              value={newCustomer.firstName}
-                              onChange={(e) => setNewCustomer((current) => ({ ...current, firstName: e.target.value }))}
-                              placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
-                              className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                            />
-                            <input
-                              value={newCustomer.lastName}
-                              onChange={(e) => setNewCustomer((current) => ({ ...current, lastName: e.target.value }))}
-                              placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
-                              className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                            />
-                          </div>
+                          <input
+                            value={guestNameInput}
+                            onChange={(e) => {
+                              const next = splitFullName(e.target.value);
+                              setNewCustomer((current) => ({ ...current, firstName: next.firstName, lastName: next.lastName }));
+                            }}
+                            placeholder={locale === "ar" ? "اسم الضيف" : "Guest name"}
+                            className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          />
+                          <input
+                            value={newCustomer.email}
+                            onChange={(e) => setNewCustomer((current) => ({ ...current, email: e.target.value }))}
+                            placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                            className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                          />
                           <div className="grid grid-cols-2 gap-3">
                             <input
                               value={newCustomer.phone}
                               onChange={(e) => setNewCustomer((current) => ({ ...current, phone: e.target.value }))}
-                              placeholder={locale === "ar" ? "الهاتف" : "Phone"}
+                              placeholder={locale === "ar" ? "الهاتف (اختياري)" : "Phone (optional)"}
                               className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                             />
                             <input
-                              value={newCustomer.email}
-                              onChange={(e) => setNewCustomer((current) => ({ ...current, email: e.target.value }))}
-                              placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                              type="date"
+                              value={newCustomer.dateOfBirth}
+                              onChange={(e) => setNewCustomer((current) => ({ ...current, dateOfBirth: e.target.value }))}
                               className="rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
                             />
                           </div>
@@ -1484,12 +1640,13 @@ export function AppointmentActionDrawer({
                             <button
                               key={customer.id}
                               type="button"
-                              onClick={() => {
-                                setSelectedCustomer(customer);
-                                setCustomerMode("existing");
-                                setShowCustomerPicker(true);
-                                setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
-                              }}
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setCustomerMode("existing");
+                              setShowCustomerPicker(true);
+                              setCustomerSearch(`${customer.firstName} ${customer.lastName}`.trim());
+                              setAppointmentStep(2);
+                            }}
                               className={`flex w-full items-center gap-4 px-4 py-4 text-left transition ${index > 0 ? "border-t border-gray-200" : ""} ${active ? "bg-purple-50" : "bg-white hover:bg-gray-50"}`}
                             >
                               <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700">
@@ -1517,8 +1674,9 @@ export function AppointmentActionDrawer({
                     <button
                       type="button"
                       onClick={() => {
-                        setCustomerMode("new");
+                        setCustomerMode("guest");
                         setShowCustomerPicker(true);
+                        setAppointmentStep(2);
                       }}
                       className="mt-4 flex w-full items-center gap-3 rounded-[22px] border border-gray-200 bg-white px-5 py-4 text-left transition hover:border-primary/40 hover:bg-purple-50"
                     >
@@ -1527,7 +1685,7 @@ export function AppointmentActionDrawer({
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
                         </svg>
                       </div>
-                      <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "إضافة عميل جديد" : "Add new client"}</span>
+                      <span className="text-base font-semibold text-gray-900">{locale === "ar" ? "حجز حضوري" : "Walk-in"}</span>
                     </button>
                     </div>
                   </div>
@@ -2055,7 +2213,7 @@ export function AppointmentActionDrawer({
                     )}
                       </div>
 
-                      {hasQueuedServices ? (
+                      {appointmentStep === 3 && hasQueuedServices ? (
                         <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -2398,14 +2556,41 @@ export function AppointmentActionDrawer({
 
           <div className="border-t border-gray-100 px-5 py-4">
             {mode === "appointment" ? (
-              hasQueuedServices ? (
+              appointmentStep < 3 ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <button
                     type="button"
-                    disabled
+                    onClick={goToPreviousAppointmentStep}
+                    disabled={appointmentStep === 1}
                     className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {locale === "ar" ? "المزيد" : "More"}
+                    {locale === "ar" ? "السابق" : "Previous"}
+                  </button>
+                  <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={goToNextAppointmentStep}
+                      disabled={
+                        (appointmentStep === 1 && !canAdvanceFromServices) ||
+                        (appointmentStep === 2 && !canAdvanceFromCustomer)
+                      }
+                      className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {appointmentStep === 1
+                        ? (locale === "ar" ? "التالي" : "Next")
+                        : (locale === "ar" ? "التالي إلى الدفع" : "Next to payment")}
+                    </button>
+                  </div>
+                </div>
+              ) : hasQueuedServices ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={goToPreviousAppointmentStep}
+                    disabled={saving}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {locale === "ar" ? "السابق" : "Previous"}
                   </button>
                   <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
                     <button
