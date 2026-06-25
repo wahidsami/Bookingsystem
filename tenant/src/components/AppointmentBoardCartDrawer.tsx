@@ -17,6 +17,7 @@ import {
 type CartMode = "gift_card" | "product";
 type CustomerMode = "existing" | "walk_in";
 type RecipientType = "self" | "gift";
+type CartStep = 1 | 2 | 3;
 type PaymentMethod = "cash" | "card_pos" | "wallet" | "bank_transfer";
 
 interface GiftCardPackage {
@@ -105,6 +106,7 @@ export function AppointmentBoardCartDrawer({
   onCompleted
 }: Props) {
   const dialog = useAppDialog();
+  const [step, setStep] = useState<CartStep>(1);
   const [customerMode, setCustomerMode] = useState<CustomerMode>("existing");
   const [recipientType, setRecipientType] = useState<RecipientType>("self");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -179,6 +181,7 @@ export function AppointmentBoardCartDrawer({
       return;
     }
 
+    setStep(1);
     setGiftCardSearch("");
     setProductSearch("");
     setProductCategory("all");
@@ -479,8 +482,40 @@ export function AppointmentBoardCartDrawer({
     ? (locale === "ar" ? "سلة البطاقات" : "Gift Card Cart")
     : (locale === "ar" ? "سلة المنتجات" : "Product Cart");
   const subtitle = mode === "gift_card"
-    ? (locale === "ar" ? "اختر البطاقة والعميل والدفع فقط." : "Pick a package, a customer, and payment.")
-    : (locale === "ar" ? "اختر المنتجات والعميل والدفع فقط." : "Pick products, a customer, and payment.");
+    ? (locale === "ar" ? "اتبع الخطوات المختصرة لإكمال العملية." : "Follow the compact steps to complete the purchase.")
+    : (locale === "ar" ? "اتبع الخطوات المختصرة لإكمال العملية." : "Follow the compact steps to complete the purchase.");
+  const hasSelectedItems = mode === "gift_card" ? Boolean(selectedPackageId) : selectedProducts.length > 0;
+  const customerReady = customerMode === "existing"
+    ? Boolean(selectedCustomer)
+    : Boolean(walkInFirstName.trim() && walkInEmail.trim());
+  const paymentReady = isBalanced && subtotal > 0;
+
+  const stepLabel = (value: CartStep) => {
+    if (locale === "ar") {
+      return value === 1 ? "المنتجات" : value === 2 ? "العميل" : "الدفع";
+    }
+    return value === 1 ? "Items" : value === 2 ? "Customer" : "Payment";
+  };
+
+  const goNext = () => {
+    if (step === 1 && hasSelectedItems) {
+      setStep(2);
+      return;
+    }
+
+    if (step === 2 && customerReady) {
+      setStep(3);
+      return;
+    }
+
+    if (step === 3) {
+      void handleSubmit();
+    }
+  };
+
+  const goPrevious = () => {
+    setStep((current) => (current > 1 ? ((current - 1) as CartStep) : current));
+  };
 
   return (
     <div className="fixed inset-0 z-[120]">
@@ -510,48 +545,25 @@ export function AppointmentBoardCartDrawer({
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-gray-50 p-1">
-              <div className="inline-flex rounded-2xl bg-white p-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setCustomerMode("existing")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${customerMode === "existing" ? "bg-primary text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  {locale === "ar" ? "عميل" : "Customer"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomerMode("walk_in");
-                    setSelectedCustomer(null);
-                  }}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${customerMode === "walk_in" ? "bg-primary text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  {locale === "ar" ? "ضيف" : "Walk-in"}
-                </button>
-              </div>
-
-              {mode === "product" ? (
-                <div className="inline-flex rounded-2xl bg-white p-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setRecipientType("self")}
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${recipientType === "self" ? "bg-primary text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                  >
-                    {locale === "ar" ? "لنفسه" : "Self"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecipientType("gift")}
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${recipientType === "gift" ? "bg-primary text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                  >
-                    {locale === "ar" ? "هدية" : "Gift"}
-                  </button>
+            <div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${step === 1 ? "bg-primary/10 text-primary" : step > 1 ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${step === 1 ? "bg-primary text-white" : step > 1 ? "bg-emerald-600 text-white" : "bg-white text-gray-500"}`}>1</span>
+                  <span>{mode === "gift_card" ? (locale === "ar" ? "البطاقة" : "Item") : (locale === "ar" ? "المنتج" : "Item")}</span>
                 </div>
-              ) : null}
+                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${step === 2 ? "bg-primary/10 text-primary" : step > 2 ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${step === 2 ? "bg-primary text-white" : step > 2 ? "bg-emerald-600 text-white" : "bg-white text-gray-500"}`}>2</span>
+                  <span>{locale === "ar" ? "العميل" : "Customer"}</span>
+                </div>
+                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${step === 3 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-500"}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${step === 3 ? "bg-primary text-white" : "bg-white text-gray-500"}`}>3</span>
+                  <span>{locale === "ar" ? "الدفع" : "Payment"}</span>
+                </div>
+              </div>
             </div>
 
-            {mode === "gift_card" ? (
+            {step === 1 ? (
+              mode === "gift_card" ? (
               <section className="rounded-3xl border border-gray-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
@@ -610,7 +622,7 @@ export function AppointmentBoardCartDrawer({
                   ) : null}
                 </div>
               </section>
-            ) : (
+              ) : (
               <section className="rounded-3xl border border-gray-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
@@ -705,8 +717,10 @@ export function AppointmentBoardCartDrawer({
                   ) : null}
                 </div>
               </section>
-            )}
+              )}
+            ) : null}
 
+            {step === 2 ? (
             <section className="rounded-3xl border border-gray-200 bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
@@ -714,7 +728,7 @@ export function AppointmentBoardCartDrawer({
                     {locale === "ar" ? "العميل" : "Customer"}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {locale === "ar" ? "عميل Refah أو بيانات ضيف" : "Refah customer or guest details"}
+                    {locale === "ar" ? "اختر عميلًا أو استمر كضيف" : "Choose a customer or continue as walk-in"}
                   </div>
                 </div>
                 {selectedCustomer ? (
@@ -725,9 +739,55 @@ export function AppointmentBoardCartDrawer({
                 ) : null}
               </div>
 
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerMode("existing");
+                    setSelectedCustomer(null);
+                  }}
+                  className={`rounded-2xl border p-3 text-left transition ${customerMode === "existing" ? "border-primary bg-primary/5" : "border-gray-200 hover:bg-gray-50"}`}
+                >
+                  <div className="text-sm font-semibold text-gray-900">{locale === "ar" ? "عميل Refah" : "Refah customer"}</div>
+                  <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "ابحث واختر عميلًا موجودًا" : "Search and pick an existing client"}</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerMode("walk_in");
+                    setSelectedCustomer(null);
+                  }}
+                  className={`rounded-2xl border p-3 text-left transition ${customerMode === "walk_in" ? "border-primary bg-primary/5" : "border-gray-200 hover:bg-gray-50"}`}
+                >
+                  <div className="text-sm font-semibold text-gray-900">{locale === "ar" ? "Walk-in" : "Walk-in"}</div>
+                  <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "أدخل بيانات العميل" : "Enter customer details"}</div>
+                </button>
+              </div>
+
+              {mode === "product" ? (
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setRecipientType("self")}
+                    className={`rounded-2xl border p-3 text-left transition ${recipientType === "self" ? "border-primary bg-primary/5" : "border-gray-200 hover:bg-gray-50"}`}
+                  >
+                    <div className="text-sm font-semibold text-gray-900">{locale === "ar" ? "لنفسه" : "Self purchase"}</div>
+                    <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "فاتورة فقط" : "Invoice only"}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipientType("gift")}
+                    className={`rounded-2xl border p-3 text-left transition ${recipientType === "gift" ? "border-primary bg-primary/5" : "border-gray-200 hover:bg-gray-50"}`}
+                  >
+                    <div className="text-sm font-semibold text-gray-900">{locale === "ar" ? "هدية" : "Gift"}</div>
+                    <div className="mt-1 text-xs text-gray-500">{locale === "ar" ? "رسالة وإرسال" : "Add a message and send"}</div>
+                  </button>
+                </div>
+              ) : null}
+
               {customerMode === "existing" ? (
                 <>
-                  <div className="relative">
+                  <div className="mt-3 relative">
                     <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     <input
                       value={customerSearch}
@@ -824,8 +884,9 @@ export function AppointmentBoardCartDrawer({
                 />
               ) : null}
             </section>
+            ) : null}
 
-            <section className="rounded-3xl border border-gray-200 bg-white p-4">
+            <section className={`rounded-3xl border border-gray-200 bg-white p-4 ${step === 3 ? "" : "hidden"}`}>
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
@@ -890,6 +951,7 @@ export function AppointmentBoardCartDrawer({
               </div>
             </section>
 
+            {step === 3 ? (
             <section className="rounded-3xl border border-gray-200 bg-white p-4">
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>{locale === "ar" ? "المبلغ المستحق" : "Amount due"}</span>
@@ -911,6 +973,7 @@ export function AppointmentBoardCartDrawer({
                   : (locale === "ar" ? `يوجد فرق ${difference.toFixed(2)} ر.س` : `Difference ${difference.toFixed(2)} SAR`)}
               </div>
             </section>
+            ) : null}
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-4">
@@ -921,14 +984,38 @@ export function AppointmentBoardCartDrawer({
             >
               {locale === "ar" ? "إلغاء" : "Cancel"}
             </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting || !isBalanced || subtotal <= 0}
-              className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "تنفيذ" : "Apply")}
-            </button>
+
+            <div className="flex items-center gap-2">
+              {step > 1 ? (
+                <button
+                  type="button"
+                  onClick={goPrevious}
+                  className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  {locale === "ar" ? "السابق" : "Previous"}
+                </button>
+              ) : null}
+
+              {step < 3 ? (
+                <button
+                  type="button"
+                  onClick={goNext}
+                  disabled={(step === 1 && !hasSelectedItems) || (step === 2 && !customerReady)}
+                  className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {locale === "ar" ? "التالي" : "Next"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting || !paymentReady}
+                  className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submitting ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "تنفيذ" : "Apply")}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </aside>
