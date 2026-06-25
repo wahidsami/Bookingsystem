@@ -205,10 +205,6 @@ export function AppointmentBoardCartDrawer({
     if (!open || customerMode !== "existing") return;
 
     const query = customerSearch.trim();
-    if (!query) {
-      setCustomerResults([]);
-      return;
-    }
 
     const timer = window.setTimeout(async () => {
       try {
@@ -797,13 +793,13 @@ export function AppointmentBoardCartDrawer({
                     />
                   </div>
 
-                  {customerLoading ? (
-                    <div className="mt-3 text-sm text-gray-500">
-                      {locale === "ar" ? "جارٍ البحث..." : "Searching..."}
-                    </div>
-                  ) : (
-                    <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1">
-                      {customerResults.map((customer) => {
+                  <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                    {customerLoading ? (
+                      <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-4 text-sm text-gray-500">
+                        {locale === "ar" ? "جارٍ تحميل العملاء..." : "Loading customers..."}
+                      </div>
+                    ) : (
+                      customerResults.map((customer) => {
                         const active = selectedCustomer?.id === customer.id;
                         return (
                           <button
@@ -811,10 +807,6 @@ export function AppointmentBoardCartDrawer({
                             type="button"
                             onClick={() => {
                               setSelectedCustomer(customer);
-                              setWalkInFirstName(customer.firstName || "");
-                              setWalkInLastName(customer.lastName || "");
-                              setWalkInEmail(customer.email || "");
-                              setWalkInPhone(customer.phone || "");
                             }}
                             className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition ${
                               active ? "border-primary bg-primary/5" : "border-gray-200 hover:bg-gray-50"
@@ -827,52 +819,52 @@ export function AppointmentBoardCartDrawer({
                             {active ? <span className="text-xs font-semibold text-primary">{locale === "ar" ? "مختار" : "Selected"}</span> : null}
                           </button>
                         );
-                      })}
-                      {customerResults.length === 0 && customerSearch.trim() ? (
-                        <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-4 text-sm text-gray-500">
-                          {locale === "ar" ? "لا يوجد نتائج. أكمل كضيف." : "No matches. Continue as guest."}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
+                      })
+                    )}
+                    {!customerLoading && customerResults.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-4 text-sm text-gray-500">
+                        {locale === "ar" ? "لا توجد عملاء مطابقة." : "No customers found."}
+                      </div>
+                    ) : null}
+                  </div>
                 </>
-              ) : null}
-
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input
-                  value={walkInFirstName}
-                  onChange={(event) => setWalkInFirstName(event.target.value)}
-                  placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-                <input
-                  value={walkInLastName}
-                  onChange={(event) => setWalkInLastName(event.target.value)}
-                  placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-                <input
-                  value={walkInEmail}
-                  onChange={(event) => setWalkInEmail(event.target.value)}
-                  placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-                <input
-                  value={walkInPhone}
-                  onChange={(event) => setWalkInPhone(event.target.value)}
-                  placeholder={locale === "ar" ? "الجوال" : "Mobile"}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-                {mode === "gift_card" ? (
+              ) : (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input
-                    value={walkInBirthDate}
-                    onChange={(event) => setWalkInBirthDate(event.target.value)}
-                    type="date"
-                    placeholder={locale === "ar" ? "تاريخ الميلاد" : "Birth date"}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 sm:col-span-2"
+                    value={walkInFirstName}
+                    onChange={(event) => setWalkInFirstName(event.target.value)}
+                    placeholder={locale === "ar" ? "الاسم الأول" : "First name"}
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
                   />
-                ) : null}
-              </div>
+                  <input
+                    value={walkInLastName}
+                    onChange={(event) => setWalkInLastName(event.target.value)}
+                    placeholder={locale === "ar" ? "اسم العائلة" : "Last name"}
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                  <input
+                    value={walkInEmail}
+                    onChange={(event) => setWalkInEmail(event.target.value)}
+                    placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                  <input
+                    value={walkInPhone}
+                    onChange={(event) => setWalkInPhone(event.target.value)}
+                    placeholder={locale === "ar" ? "الجوال" : "Mobile"}
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                  {mode === "gift_card" ? (
+                    <input
+                      value={walkInBirthDate}
+                      onChange={(event) => setWalkInBirthDate(event.target.value)}
+                      type="date"
+                      placeholder={locale === "ar" ? "تاريخ الميلاد" : "Birth date"}
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 sm:col-span-2"
+                    />
+                  ) : null}
+                </div>
+              )}
 
               {mode === "product" && recipientType === "gift" ? (
                 <textarea
