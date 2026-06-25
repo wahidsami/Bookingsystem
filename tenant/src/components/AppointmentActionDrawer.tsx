@@ -1479,10 +1479,10 @@ export function AppointmentActionDrawer({
             ) : null}
 
             {mode === "appointment" ? (
-              <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="min-h-0">
+              <div className="flex h-full min-h-0 flex-col gap-5 xl:flex-row">
+                <div className="min-h-0 xl:sticky xl:top-0 xl:w-[320px] xl:shrink-0">
                   <div className="h-full overflow-y-auto pr-1">
-                    <div className={`rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm ${appointmentStep === 1 ? "hidden" : ""}`}>
+                    <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="rounded-[24px] border border-dashed border-gray-200 px-6 py-8 text-center">
                       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500">
                         <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -1691,7 +1691,7 @@ export function AppointmentActionDrawer({
                   </div>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto pr-1">
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                   <div className="space-y-5">
                   {!hasQueuedServices ? (
                     <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
