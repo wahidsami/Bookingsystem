@@ -104,6 +104,12 @@ interface PaymentCollectionRow {
   giftCardCode: string;
 }
 
+interface PaymentAllocationPayload {
+  paymentMethod: PaymentCollectionMethod | string;
+  amount: number;
+  giftCardCode?: string;
+}
+
 export interface AppointmentActionDrawerPrefill {
   customer?: PrefillCustomer | null;
   serviceId?: string;
@@ -1390,7 +1396,7 @@ export function AppointmentActionDrawer({
         throw new Error(locale === "ar" ? "الرجاء اختيار خدمة واحدة على الأقل." : "Please choose at least one service.");
       }
 
-      const normalizedPaymentAllocations = paymentCollectionMode === "customized"
+      const normalizedPaymentAllocations: PaymentAllocationPayload[] = paymentCollectionMode === "customized"
         ? paymentCollectionRows
             .map((row) => ({
               paymentMethod: row.paymentMethod,
@@ -1398,7 +1404,10 @@ export function AppointmentActionDrawer({
               giftCardCode: row.paymentMethod === "gift_card_code" ? row.giftCardCode.trim() : undefined
             }))
             .filter((row) => row.amount > 0)
-        : [];
+        : [{
+            paymentMethod: resolvedPaymentMethod,
+            amount: queuedServicesTotal
+          }];
 
       if (paymentCollectionMode === "customized") {
         if (normalizedPaymentAllocations.length === 0) {
