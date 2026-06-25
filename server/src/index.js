@@ -669,6 +669,59 @@ const ensurePlatformUserAuthSchema = async () => {
     }
 };
 
+const ensureTenantGiftCardSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'tenant_gift_card_packages'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS title VARCHAR(255) NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS description TEXT NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "discountPreset" VARCHAR(32) NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "discountPercent" NUMERIC(10, 2) NOT NULL DEFAULT 0;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "expirationPreset" VARCHAR(32) NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
+                UPDATE public.tenant_gift_card_packages
+                SET title = COALESCE(title, title_en, title_ar),
+                    description = COALESCE(description, description_en, description_ar),
+                    "discountPreset" = COALESCE("discountPreset", 'custom'),
+                    "expirationPreset" = COALESCE("expirationPreset", 'never')
+                WHERE title IS NULL
+                   OR description IS NULL
+                   OR "discountPreset" IS NULL
+                   OR "expirationPreset" IS NULL;
+            END $$;
+        `);
+
+        console.log('Tenant gift card schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure tenant gift card schema:', error);
+        throw error;
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -703,6 +756,7 @@ const startServer = async () => {
 
         await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
         await ensurePlatformUserAuthSchema();
+        await ensureTenantGiftCardSchema();
         await db.GiftCardCode.sync({ force: false }); // Gift card code registry
         await db.GiftCardCodeRedemption.sync({ force: false }); // Gift card redemption audit trail
         await db.GiftCardTransaction.sync({ force: false }); // Legacy gift card sales
