@@ -157,6 +157,19 @@ const normalizeGiftCardPackage = (item) => ({
   updatedAt: item.updatedAt || null
 });
 
+const getActiveGiftPackageWhere = (tenantId, extraWhere = {}) => {
+  const now = new Date();
+  return {
+    tenantId,
+    ...extraWhere,
+    isActive: true,
+    [Op.and]: [
+      { [Op.or]: [{ startsAt: null }, { startsAt: { [Op.lte]: now } }] },
+      { [Op.or]: [{ endsAt: null }, { endsAt: { [Op.gte]: now } }] }
+    ]
+  };
+};
+
 const uploadStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const tenantId = ensureTenantId(req);
@@ -197,7 +210,7 @@ exports.listPackages = async (req, res) => {
   try {
     const tenantId = ensureTenantId(req);
     const rows = await db.TenantGiftCardPackage.findAll({
-      where: { tenantId },
+      where: getActiveGiftPackageWhere(tenantId),
       order: [['displayOrder', 'ASC'], ['createdAt', 'DESC']]
     });
     return res.json({ success: true, packages: rows.map(normalizeGiftCardPackage) });
