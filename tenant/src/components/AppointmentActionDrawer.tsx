@@ -1685,57 +1685,13 @@ export function AppointmentActionDrawer({
                                   : (locale === "ar" ? "اختيار" : "Choose")}
                               </button>
                             </div>
-
-                            {selectedGuestServices.length > 0 ? (
-                              <div className="mt-4 grid gap-3">
-                                {selectedGuestServices.map((service) => {
-                                  const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
-                                  return (
-                                    <div
-                                      key={service.id}
-                                      className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3"
-                                    >
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <p className="truncate text-sm font-semibold text-fuchsia-950">{serviceName}</p>
-                                          <p className="mt-0.5 text-xs text-fuchsia-700">
-                                            {formatMinutesLabel(service.duration, locale)}
-                                          </p>
-                                        </div>
-                                        <div className="text-sm font-semibold text-fuchsia-800">
-                                          {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
-                                        </div>
-                                      </div>
-                                      <div className="mt-3 flex items-center justify-between gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => openGuestServicePicker()}
-                                          className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
-                                        >
-                                          {locale === "ar" ? "تعديل" : "Edit"}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => removeGuestService(service.id)}
-                                          className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
-                                        >
-                                          {locale === "ar" ? "حذف" : "Remove"}
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openGuestServicePicker()}
-                                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 transition hover:bg-purple-100"
-                              >
-                                <span className="text-lg leading-none">+</span>
-                                {locale === "ar" ? "إضافة خدمة للضيف" : "Add guest services"}
-                              </button>
-                            )}
+                            <p className="mt-3 text-sm text-fuchsia-700">
+                              {selectedGuestServices.length
+                                ? (locale === "ar"
+                                  ? `${selectedGuestServices.length} خدمة محددة`
+                                  : `${selectedGuestServices.length} services selected`)
+                                : (locale === "ar" ? "لم يتم اختيار خدمات بعد." : "No guest services selected yet.")}
+                            </p>
                           </div>
                         </div>
                       ) : null}
@@ -2269,6 +2225,75 @@ export function AppointmentActionDrawer({
                         </div>
                       )}
                     </div>
+
+                    {includeGroupGuest ? (
+                      <div className="rounded-3xl border border-fuchsia-200 bg-fuchsia-50 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fuchsia-700">
+                              {locale === "ar" ? "خدمات الضيف" : "Guest services"}
+                            </p>
+                            <p className="mt-1 text-sm text-fuchsia-800">
+                              {selectedGuestServices.length
+                                ? (locale === "ar"
+                                  ? `${selectedGuestServices.length} خدمة محددة`
+                                  : `${selectedGuestServices.length} services selected`)
+                                : (locale === "ar" ? "لم يتم اختيار خدمات بعد." : "No guest services selected yet.")}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openGuestServicePicker()}
+                            className="rounded-full border border-fuchsia-200 bg-white px-4 py-2 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                          >
+                            {selectedGuestServices.length
+                              ? (locale === "ar" ? "تعديل" : "Edit")
+                              : (locale === "ar" ? "اختيار" : "Choose")}
+                          </button>
+                        </div>
+                        {selectedGuestServices.length > 0 ? (
+                          <div className="mt-4 grid gap-3">
+                            {selectedGuestServices.map((service) => {
+                              const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                              return (
+                                <div
+                                  key={service.id}
+                                  className="rounded-2xl border border-fuchsia-200 bg-white px-4 py-3"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-semibold text-gray-900">{serviceName}</p>
+                                      <p className="mt-0.5 text-xs text-gray-500">
+                                        {formatMinutesLabel(service.duration, locale)}
+                                      </p>
+                                    </div>
+                                    <div className="text-sm font-semibold text-fuchsia-800">
+                                      {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex items-center justify-between gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => openGuestServicePicker()}
+                                      className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                    >
+                                      {locale === "ar" ? "تعديل" : "Edit"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeGuestService(service.id)}
+                                      className="rounded-full border border-fuchsia-200 bg-white px-3 py-1.5 text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100"
+                                    >
+                                      {locale === "ar" ? "حذف" : "Remove"}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     {hasQueuedServices && !showServicePicker ? (
                       <button
