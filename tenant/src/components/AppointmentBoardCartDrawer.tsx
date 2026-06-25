@@ -717,7 +717,7 @@ export function AppointmentBoardCartDrawer({
                   ) : null}
                 </div>
               </section>
-              )}
+              )
             ) : null}
 
             {step === 2 ? (
