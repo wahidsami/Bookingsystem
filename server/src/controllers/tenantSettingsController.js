@@ -118,6 +118,15 @@ exports.getSettings = async (req, res) => {
                 timezone: 'Asia/Riyadh',
                 autoApproveBookings: true,
                 bufferTime: 15,
+                bookingSettings: {
+                    minimumAdvanceBookingMinutes: 15,
+                    slotInterval: 15,
+                    defaultBufferBefore: 5,
+                    defaultBufferAfter: 5,
+                    allowAnyStaff: true,
+                    maxBookingsPerCustomerPerDay: null,
+                    allowWalkInBooking: true
+                },
                 maxAdvanceBookingDays: 30,
                 cancellationHours: 24,
                 acceptCash: true,
@@ -297,7 +306,8 @@ exports.updateBookingSettings = async (req, res) => {
             defaultBufferAfter,
             allowAnyStaff,
             maxBookingsPerCustomerPerDay,
-            allowWalkInBooking
+            allowWalkInBooking,
+            minimumAdvanceBookingMinutes
         } = req.body;
 
         let [settings] = await db.TenantSettings.findOrCreate({
@@ -343,6 +353,16 @@ exports.updateBookingSettings = async (req, res) => {
         }
         if (allowWalkInBooking !== undefined) {
             newBookingSettings.allowWalkInBooking = allowWalkInBooking;
+        }
+        if (minimumAdvanceBookingMinutes !== undefined) {
+            const parsedAdvance = Math.max(0, parseInt(minimumAdvanceBookingMinutes, 10));
+            if (!Number.isFinite(parsedAdvance)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'minimumAdvanceBookingMinutes must be a valid number'
+                });
+            }
+            newBookingSettings.minimumAdvanceBookingMinutes = parsedAdvance;
         }
 
         updateData.bookingSettings = newBookingSettings;

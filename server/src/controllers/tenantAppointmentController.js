@@ -842,7 +842,6 @@ exports.createAppointment = async (req, res) => {
             paymentMethod: dashboardOverridePaymentMethod,
             paymentAllocations,
             assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
-            skipAdvanceValidation: true,
             skipServicePaymentOptionValidation: true,
             bookingSessionId: existingSession?.id || null,
             bookingReference: resolvedBookingReference || undefined,

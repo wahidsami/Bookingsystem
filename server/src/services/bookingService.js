@@ -265,6 +265,10 @@ class BookingService {
         const bookingSettings = tenantSettings?.bookingSettings || {};
         const allowAnyStaff = bookingSettings.allowAnyStaff !== false; // Default true
         const maxBookingsPerCustomerPerDay = bookingSettings.maxBookingsPerCustomerPerDay || null;
+        const minimumAdvanceBookingMinutes = Math.max(
+            0,
+            normalizeNumber(bookingSettings.minimumAdvanceBookingMinutes, 15)
+        );
 
         // Handle "Any Staff" selection
         const normalizedRequestedStaffId = requestedStaffId || null;
@@ -315,13 +319,11 @@ class BookingService {
         const end = new Date(start.getTime() + resolvedDuration * 60000);
 
         // Validate start time is in the future for customer/self-service bookings.
-        // Tenant dashboard bookings can intentionally bypass this rule so admins can
-        // backfill or create immediate appointments from the board.
         if (!skipAdvanceValidation) {
             const now = new Date();
-            const oneHourFromNow = new Date(now.getTime() + 60 * 60000);
-            if (start < oneHourFromNow) {
-                throw new Error('Booking must be at least 1 hour in advance');
+            const minimumStartTime = new Date(now.getTime() + minimumAdvanceBookingMinutes * 60000);
+            if (start < minimumStartTime) {
+                throw new Error(`Booking must be at least ${minimumAdvanceBookingMinutes} minutes in advance`);
             }
         }
 
