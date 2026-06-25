@@ -1404,10 +1404,7 @@ export function AppointmentActionDrawer({
               giftCardCode: row.paymentMethod === "gift_card_code" ? row.giftCardCode.trim() : undefined
             }))
             .filter((row) => row.amount > 0)
-        : [{
-            paymentMethod: resolvedPaymentMethod,
-            amount: queuedServicesTotal
-          }];
+        : [];
 
       if (paymentCollectionMode === "customized") {
         if (normalizedPaymentAllocations.length === 0) {
@@ -1424,10 +1421,10 @@ export function AppointmentActionDrawer({
         }
       }
 
-    const payload = {
-      notes: notes.trim() || undefined,
-      paymentMethod: resolvedPaymentMethod,
-        paymentAllocations: normalizedPaymentAllocations.length > 0 ? normalizedPaymentAllocations : undefined,
+      const payload = {
+        notes: notes.trim() || undefined,
+        paymentMethod: resolvedPaymentMethod,
+        paymentAllocations: paymentCollectionMode === "customized" ? normalizedPaymentAllocations : undefined,
         bookingSessionId: prefill?.bookingSessionId || undefined,
         bookingReference: prefill?.bookingReference || undefined,
         items: bookingItems,
