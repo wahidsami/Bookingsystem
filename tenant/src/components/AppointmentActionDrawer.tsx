@@ -393,7 +393,16 @@ export function AppointmentActionDrawer({
   const [paymentCollectionRows, setPaymentCollectionRows] = useState<PaymentCollectionRow[]>([]);
   const [notes, setNotes] = useState("");
   const [includeGroupGuest, setIncludeGroupGuest] = useState(false);
-  const [groupGuest, setGroupGuest] = useState({ firstName: "", lastName: "", phone: "", serviceId: "", serviceIds: [] as string[], isFree: false });
+  const [groupGuest, setGroupGuest] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    birthDate: "",
+    serviceId: "",
+    serviceIds: [] as string[],
+    isFree: false
+  });
   const [showGuestServicePicker, setShowGuestServicePicker] = useState(false);
   const [guestServiceDraftIds, setGuestServiceDraftIds] = useState<string[]>([]);
   const [guestServiceSearch, setGuestServiceSearch] = useState("");
@@ -481,7 +490,7 @@ export function AppointmentActionDrawer({
       setPaymentCollectionRows([]);
       setNotes(prefill?.notes || "");
       setIncludeGroupGuest(false);
-      setGroupGuest({ firstName: "", lastName: "", phone: "", serviceId: "", serviceIds: [], isFree: false });
+      setGroupGuest({ firstName: "", lastName: "", email: "", phone: "", birthDate: "", serviceId: "", serviceIds: [], isFree: false });
       setShowGuestServicePicker(false);
       setGuestServiceDraftIds([]);
       setGuestServiceSearch("");
@@ -722,6 +731,18 @@ export function AppointmentActionDrawer({
       ),
     [selectedGuestServices, guestServiceDrafts, defaultStaffId, appointmentTime, groupGuest.isFree]
   );
+  const selectedGuestServicesDurationTotal = useMemo(
+    () =>
+      selectedGuestServices.reduce((sum, service) => {
+        const draft = guestServiceDrafts[service.id] || createGuestServiceDraft({
+          staffId: defaultStaffId || "",
+          startTime: appointmentTime,
+          duration: `${service.duration || 30}`
+        });
+        return sum + Math.max(5, Number(draft.duration || service.duration || 30));
+      }, 0),
+    [selectedGuestServices, guestServiceDrafts, defaultStaffId, appointmentTime]
+  );
   const guestServicePrice = includeGroupGuest
     ? (groupGuest.isFree ? 0 : selectedGuestServicesSubtotal)
     : 0;
@@ -767,9 +788,11 @@ export function AppointmentActionDrawer({
   const hasQueuedServices = queuedServices.length > 0;
   const queuedServicesDurationTotal = queuedServices.reduce((sum, item) => sum + getQueueItemDuration(item), 0);
   const queuedServiceCount = queuedServices.length;
+  const totalAppointmentServiceCount = queuedServiceCount + (includeGroupGuest ? selectedGuestServices.length : 0);
+  const totalAppointmentDurationTotal = queuedServicesDurationTotal + (includeGroupGuest ? selectedGuestServicesDurationTotal : 0);
   const appointmentWorkspaceDateLabel = formatAppointmentDateLabel(appointmentDate || defaultDate || getTodayDateKey(), locale);
   const appointmentWorkspaceTimeLabel = formatTime12Hour(appointmentTime || defaultTime || "10:00", locale);
-  const appointmentWorkspaceDurationLabel = formatMinutesLabel(queuedServicesDurationTotal || displayDuration || 30, locale);
+  const appointmentWorkspaceDurationLabel = formatMinutesLabel(totalAppointmentDurationTotal || displayDuration || 30, locale);
   const groupedServices = useMemo(() => {
     const groupMap = new Map<string, { heading: string | null; items: ServiceItem[] }>();
 
@@ -973,6 +996,10 @@ export function AppointmentActionDrawer({
     setEditingGuestServiceId(null);
   };
 
+  const closeGuestServicePicker = () => {
+    setShowGuestServicePicker(false);
+  };
+
   const openGuestServiceEditor = (serviceId: string) => {
     const trimmedServiceId = `${serviceId || ""}`.trim();
     if (!trimmedServiceId) {
@@ -1026,6 +1053,7 @@ export function AppointmentActionDrawer({
       .map((serviceId) => `${serviceId}`.trim())
       .filter(Boolean);
 
+    setIncludeGroupGuest(true);
     setGroupGuest((current) => ({
       ...current,
       serviceIds: nextIds,
@@ -1033,6 +1061,24 @@ export function AppointmentActionDrawer({
     }));
     setEditingGuestServiceId(null);
     setShowGuestServicePicker(false);
+  };
+
+  const resetGroupGuest = () => {
+    setGroupGuest({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      birthDate: "",
+      serviceId: "",
+      serviceIds: [],
+      isFree: false
+    });
+    setGuestServiceDraftIds([]);
+    setGuestServiceSearch("");
+    setSelectedGuestServiceCategory("all");
+    setEditingGuestServiceId(null);
+    setGuestServiceDrafts({});
   };
 
   const removeGuestService = (serviceId: string) => {
@@ -1379,7 +1425,9 @@ export function AppointmentActionDrawer({
         groupGuest: includeGroupGuest ? {
           ...splitFullName(groupGuest.firstName.trim()),
           lastName: splitFullName(groupGuest.firstName.trim()).lastName || groupGuest.lastName.trim(),
+          email: groupGuest.email.trim() || undefined,
           phone: groupGuest.phone.trim() || undefined,
+          birthDate: groupGuest.birthDate.trim() || undefined,
           serviceId: (groupGuest.serviceIds[0] || groupGuest.serviceId || "").trim() || undefined,
           serviceIds: (groupGuest.serviceIds.length > 0 ? groupGuest.serviceIds : groupGuest.serviceId ? [groupGuest.serviceId] : []).map((serviceId) => `${serviceId}`.trim()).filter(Boolean),
           isFree: Boolean(groupGuest.isFree),
@@ -1721,7 +1769,16 @@ export function AppointmentActionDrawer({
                         <input
                           type="checkbox"
                           checked={includeGroupGuest}
-                          onChange={(event) => setIncludeGroupGuest(event.target.checked)}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setIncludeGroupGuest(checked);
+                            if (checked) {
+                              openGuestServicePicker();
+                            } else {
+                              resetGroupGuest();
+                              setShowGuestServicePicker(false);
+                            }
+                          }}
                           className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                         />
                         <span>{locale === "ar" ? "إضافة ضيف" : "Include guest"}</span>
@@ -1959,7 +2016,9 @@ export function AppointmentActionDrawer({
                         </div>
                         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                           <p className="text-xs font-medium text-gray-500">{locale === "ar" ? "الخدمات" : "Services"}</p>
-                          <p className="mt-2 text-sm font-semibold text-gray-900">{queuedServiceCount} {locale === "ar" ? "خدمة" : queuedServiceCount === 1 ? "service" : "services"}</p>
+                          <p className="mt-2 text-sm font-semibold text-gray-900">
+                            {totalAppointmentServiceCount} {locale === "ar" ? "خدمة" : totalAppointmentServiceCount === 1 ? "service" : "services"}
+                          </p>
                           <p className="mt-1 text-xs text-gray-500">{appointmentWorkspaceDurationLabel}</p>
                         </div>
                         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -1979,7 +2038,7 @@ export function AppointmentActionDrawer({
                         </p>
                         <h4 className="mt-1 text-lg font-semibold text-gray-900">
                           {hasQueuedServices
-                            ? (locale === "ar" ? `${queuedServiceCount} خدمة` : `${queuedServiceCount} service${queuedServiceCount > 1 ? "s" : ""}`)
+                            ? (locale === "ar" ? `${totalAppointmentServiceCount} خدمة` : `${totalAppointmentServiceCount} service${totalAppointmentServiceCount > 1 ? "s" : ""}`)
                             : (locale === "ar" ? "اختر خدمة" : "Select a service")}
                         </h4>
                         <p className="mt-1 text-sm text-gray-500">
@@ -2970,81 +3029,150 @@ export function AppointmentActionDrawer({
                   </button>
                 </div>
 
-                <div className="space-y-5 px-6 py-5">
-                  <input
-                    type="text"
-                    value={guestServiceSearch}
-                    onChange={(e) => setGuestServiceSearch(e.target.value)}
-                    placeholder={locale === "ar" ? "ابحث عن خدمة..." : "Search a service..."}
-                    className="w-full rounded-[20px] border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
-                  />
+                <div className="grid gap-5 px-6 py-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                  <section className="rounded-[28px] border border-gray-200 bg-gray-50 p-4">
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-700">
+                        {locale === "ar" ? "بيانات الضيف" : "Guest details"}
+                      </p>
+                      <h5 className="mt-1 text-lg font-semibold text-gray-900">
+                        {locale === "ar" ? "أدخل بيانات الضيف" : "Enter guest details"}
+                      </h5>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {locale === "ar"
+                          ? "أضف الاسم والبريد الإلكتروني والهاتف عند الحاجة."
+                          : "Add the guest name, email, and phone when needed."}
+                      </p>
+                    </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {guestServiceCategoryTabs.map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setSelectedGuestServiceCategory(tab)}
-                        className={`rounded-[18px] border px-4 py-2 text-sm font-semibold transition ${
-                          selectedGuestServiceCategory === tab
-                            ? "border-primary bg-white text-gray-900 shadow-sm"
-                            : "border-transparent bg-white text-gray-500 hover:border-gray-200 hover:text-gray-900"
-                        }`}
-                      >
-                        {tab === "all" ? (locale === "ar" ? "الكل" : "All") : tab}
-                      </button>
-                    ))}
-                  </div>
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={`${groupGuest.firstName || ""} ${groupGuest.lastName || ""}`.trim()}
+                        onChange={(e) => {
+                          const next = splitFullName(e.target.value);
+                          setGroupGuest((current) => ({ ...current, firstName: next.firstName, lastName: next.lastName }));
+                        }}
+                        placeholder={locale === "ar" ? "اسم الضيف" : "Guest name"}
+                        className="w-full rounded-[20px] border border-gray-300 bg-white px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        type="email"
+                        value={groupGuest.email || ""}
+                        onChange={(e) => setGroupGuest((current) => ({ ...current, email: e.target.value }))}
+                        placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email"}
+                        className="w-full rounded-[20px] border border-gray-300 bg-white px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        type="tel"
+                        value={groupGuest.phone || ""}
+                        onChange={(e) => setGroupGuest((current) => ({ ...current, phone: e.target.value }))}
+                        placeholder={locale === "ar" ? "الهاتف" : "Phone"}
+                        className="w-full rounded-[20px] border border-gray-300 bg-white px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                      <input
+                        type="date"
+                        value={groupGuest.birthDate || ""}
+                        onChange={(e) => setGroupGuest((current) => ({ ...current, birthDate: e.target.value }))}
+                        className="w-full rounded-[20px] border border-gray-300 bg-white px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                      />
+                      <div className="rounded-[22px] border border-dashed border-gray-300 bg-white px-4 py-3 text-xs text-gray-500">
+                        {locale === "ar"
+                          ? "يمكن إضافة الضيف بخدمات متعددة في نفس الوقت."
+                          : "You can add the guest with multiple services at once."}
+                      </div>
+                    </div>
+                  </section>
 
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {guestFilteredServices.map((service) => {
-                      const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
-                      const isSelected = guestServiceDraftIds.includes(service.id);
-                      return (
+                  <section className="rounded-[28px] border border-gray-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                          {locale === "ar" ? "خدمات الضيف" : "Guest services"}
+                        </p>
+                        <h5 className="mt-1 text-lg font-semibold text-gray-900">
+                          {locale === "ar" ? "اختر خدمة أو أكثر" : "Pick one or more services"}
+                        </h5>
+                      </div>
+                      <div className="inline-flex rounded-full bg-fuchsia-50 px-3 py-1 text-xs font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200">
+                        {guestServiceDraftIds.length}
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={guestServiceSearch}
+                      onChange={(e) => setGuestServiceSearch(e.target.value)}
+                      placeholder={locale === "ar" ? "ابحث عن خدمة..." : "Search a service..."}
+                      className="w-full rounded-[20px] border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-primary"
+                    />
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {guestServiceCategoryTabs.map((tab) => (
                         <button
-                          key={service.id}
+                          key={tab}
                           type="button"
-                          onClick={() => {
-                            setGuestServiceDraftIds((current) =>
-                              current.includes(service.id)
-                                ? current.filter((item) => item !== service.id)
-                                : [...current, service.id]
-                            );
-                          }}
-                          className={`rounded-[24px] border p-5 text-left transition ${
-                            isSelected
-                              ? "border-fuchsia-500 bg-fuchsia-50 shadow-sm"
-                              : "border-gray-200 bg-white hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                          onClick={() => setSelectedGuestServiceCategory(tab)}
+                          className={`rounded-[18px] border px-4 py-2 text-sm font-semibold transition ${
+                            selectedGuestServiceCategory === tab
+                              ? "border-primary bg-white text-gray-900 shadow-sm"
+                              : "border-transparent bg-gray-50 text-gray-500 hover:border-gray-200 hover:text-gray-900"
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-base font-semibold text-gray-900">{serviceName}</p>
-                              <p className="mt-0.5 text-xs text-gray-500">
-                                {formatMinutesLabel(service.duration, locale)}
-                                {service.category || service.parentName || service.parentService ? ` • ${service.category || service.parentName || service.parentService}` : ""}
-                              </p>
-                            </div>
-                            <div className="text-sm font-semibold text-fuchsia-700">
-                              {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
-                            </div>
-                          </div>
-                          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-gray-500">
-                            <span className="rounded-full bg-gray-100 px-3 py-1 ring-1 ring-gray-200">
-                              {service.employees?.length ? (locale === "ar" ? "محدد" : "Available") : (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
-                            </span>
-                            <span className="text-gray-400">{isSelected ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "أضفها" : "Add")}</span>
-                          </div>
+                          {tab === "all" ? (locale === "ar" ? "الكل" : "All") : tab}
                         </button>
-                      );
-                    })}
-                  </div>
-
-                  {!guestFilteredServices.length ? (
-                    <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-                      <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "لا توجد خدمات مطابقة" : "No matching services"}</p>
+                      ))}
                     </div>
-                  ) : null}
+
+                    <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+                      {guestFilteredServices.map((service) => {
+                        const serviceName = locale === "ar" ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar);
+                        const isSelected = guestServiceDraftIds.includes(service.id);
+                        return (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => {
+                              setGuestServiceDraftIds((current) =>
+                                current.includes(service.id)
+                                  ? current.filter((item) => item !== service.id)
+                                  : [...current, service.id]
+                              );
+                            }}
+                            className={`w-full rounded-[24px] border p-4 text-left transition ${
+                              isSelected
+                                ? "border-fuchsia-500 bg-fuchsia-50 shadow-sm"
+                                : "border-gray-200 bg-white hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-base font-semibold text-gray-900">{serviceName}</p>
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  {formatMinutesLabel(service.duration, locale)}
+                                  {service.category || service.parentName || service.parentService ? ` • ${service.category || service.parentName || service.parentService}` : ""}
+                                </p>
+                              </div>
+                              <div className="text-sm font-semibold text-fuchsia-700">
+                                {groupGuest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={toSafeMoneyNumber(service.finalPrice || 0)} />}
+                              </div>
+                            </div>
+                            <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-gray-500">
+                              <span className="rounded-full bg-gray-100 px-3 py-1 ring-1 ring-gray-200">
+                                {service.employees?.length ? (locale === "ar" ? "محدد" : "Available") : (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
+                              </span>
+                              <span className="text-gray-400">{isSelected ? (locale === "ar" ? "مضافة" : "Added") : (locale === "ar" ? "أضفها" : "Add")}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {!guestFilteredServices.length ? (
+                        <div className="rounded-[24px] border border-dashed border-gray-300 bg-gray-50 px-5 py-8 text-center text-sm text-gray-500">
+                          {locale === "ar" ? "لا توجد خدمات مطابقة" : "No matching services"}
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-6 py-4">
@@ -3053,23 +3181,24 @@ export function AppointmentActionDrawer({
                       ? `${guestServiceDraftIds.length} خدمة محددة`
                       : `${guestServiceDraftIds.length} service${guestServiceDraftIds.length === 1 ? "" : "s"} selected`}
                   </p>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowGuestServicePicker(false)}
-                      className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                    >
-                      {locale === "ar" ? "إلغاء" : "Cancel"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={commitGuestServicePicker}
-                      className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-                    >
-                      {locale === "ar" ? "تطبيق" : "Apply"}
-                    </button>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeGuestServicePicker}
+                    className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إلغاء" : "Cancel"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={commitGuestServicePicker}
+                    disabled={!groupGuest.firstName.trim() || guestServiceDraftIds.length === 0}
+                    className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                      {locale === "ar" ? "إضافة الضيف" : "Add guest"}
+                  </button>
                 </div>
+              </div>
               </div>
             </div>
           ) : null}

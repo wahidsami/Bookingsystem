@@ -38,7 +38,9 @@ const appendGroupGuestToNotes = (notes, groupGuest) => {
 
     const firstName = `${groupGuest.firstName || ''}`.trim();
     const lastName = `${groupGuest.lastName || ''}`.trim();
+    const email = `${groupGuest.email || ''}`.trim();
     const phone = `${groupGuest.phone || ''}`.trim();
+    const birthDate = `${groupGuest.birthDate || ''}`.trim();
     const serviceId = `${groupGuest.serviceId || ''}`.trim();
     const serviceIds = Array.isArray(groupGuest.serviceIds)
         ? groupGuest.serviceIds.map((entry) => `${entry || ''}`.trim()).filter(Boolean)
@@ -55,7 +57,9 @@ const appendGroupGuestToNotes = (notes, groupGuest) => {
 
     const payload = {
         fullName,
+        email: email || null,
         phone: phone || null,
+        birthDate: birthDate || null,
         serviceId: serviceId || null,
         serviceIds: serviceIds.length > 0 ? serviceIds : null,
         serviceName: serviceName || null,
