@@ -1938,6 +1938,15 @@ class TenantApiClient {
     return this.get(`/tenant/reports/customer-analytics${query ? `?${query}` : ''}`);
   }
 
+  async getRebookingAnalytics(params?: { startDate?: string; endDate?: string; groupBy?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.groupBy) queryParams.append('groupBy', params.groupBy);
+    const query = queryParams.toString();
+    return this.get(`/tenant/reports/rebookings${query ? `?${query}` : ''}`);
+  }
+
   async getRefundsReport(params?: { startDate?: string; endDate?: string }): Promise<any> {
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
@@ -1946,10 +1955,11 @@ class TenantApiClient {
     return this.get(`/tenant/reports/refunds${query ? `?${query}` : ''}`);
   }
 
-  async getPaymentMethodsReport(params?: { startDate?: string; endDate?: string }): Promise<any> {
+  async getPaymentMethodsReport(params?: { startDate?: string; endDate?: string; groupBy?: string }): Promise<any> {
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.groupBy) queryParams.append('groupBy', params.groupBy);
     const query = queryParams.toString();
     return this.get(`/tenant/reports/payment-methods${query ? `?${query}` : ''}`);
   }

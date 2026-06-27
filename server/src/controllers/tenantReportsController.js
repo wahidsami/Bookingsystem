@@ -67,6 +67,217 @@ function getRefundModeLabel(amount, referenceAmount) {
     return numericAmount >= (numericReference - 0.01) ? 'Full' : 'Partial';
 }
 
+function getDateBucketKey(dateValue, groupBy = 'day') {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    const year = date.getUTCFullYear();
+    const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+    if (groupBy === 'month') {
+        return `${year}-${month}`;
+    }
+
+    const day = `${date.getUTCDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getTrendSeriesPointDateLabel(bucketKey, groupBy = 'day') {
+    if (!bucketKey) return bucketKey;
+    if (groupBy === 'month') {
+        return `${bucketKey}-01`;
+    }
+    return bucketKey;
+}
+
+function buildTimeSeriesBuckets(transactions, groupBy = 'day') {
+    const buckets = new Map();
+
+    transactions.forEach((transaction) => {
+        if (transaction.status !== 'completed' && transaction.status !== 'refunded') {
+            return;
+        }
+
+        const bucketKey = getDateBucketKey(transaction.processedAt || transaction.createdAt, groupBy);
+        if (!bucketKey) return;
+
+        const group = normalizePaymentMethodGroup(transaction.paymentMethod);
+        const paymentMethod = group === 'split' ? 'split' : group;
+        const amount = Number(transaction.amount || 0);
+        const signedAmount = transaction.status === 'refunded' || transaction.type === 'refund'
+            ? -Math.abs(amount)
+            : Math.abs(amount);
+
+        const mapKey = `${bucketKey}:${paymentMethod}`;
+        const existing = buckets.get(mapKey) || {
+            date: getTrendSeriesPointDateLabel(bucketKey, groupBy),
+            paymentMethod,
+            paymentMethodLabel: ({
+                cash: 'Cash',
+                card: 'Card',
+                wallet: 'Wallet',
+                gift_card: 'Gift Card',
+                split: 'Split Payments',
+                other: 'Other'
+            }[paymentMethod] || paymentMethod),
+            revenue: 0,
+            transactionCount: 0
+        };
+
+        existing.revenue += signedAmount;
+        existing.transactionCount += 1;
+        buckets.set(mapKey, existing);
+    });
+
+    return Array.from(buckets.values())
+        .map((row) => ({
+            ...row,
+            revenue: Number(row.revenue.toFixed(2))
+        }))
+        .sort((left, right) => {
+            if (left.date === right.date) {
+                return left.paymentMethod.localeCompare(right.paymentMethod);
+            }
+            return left.date.localeCompare(right.date);
+        });
+}
+
+async function buildRebookingAnalytics(req, startDate, endDate, groupBy = 'day') {
+    const tenantId = req.tenantId;
+    const where = {
+        [Op.or]: [
+            { tenantId },
+            { '$service.tenantId$': tenantId },
+            { '$staff.tenantId$': tenantId }
+        ],
+        status: 'completed'
+    };
+
+    const dateRange = buildDateRangeWhere('startTime', startDate, endDate);
+    if (dateRange.startTime) {
+        where.startTime = dateRange.startTime;
+    }
+
+    const appointments = await db.Appointment.findAll({
+        where,
+        include: [
+            ...getTenantAppointmentIncludes(),
+            {
+                model: db.PlatformUser,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            }
+        ],
+        attributes: ['id', 'startTime', 'status', 'price', 'platformUserId', 'customerId', 'staffId', 'bookingReference', 'bookingNumber'],
+        order: [['startTime', 'ASC']],
+        subQuery: false
+    });
+
+    const customerHistory = new Map();
+    const rebookedRows = [];
+    const trendBuckets = new Map();
+    const employeeBuckets = new Map();
+
+    appointments.forEach((appointment) => {
+        const customerKey = appointment.platformUserId || appointment.customerId || null;
+        if (!customerKey) {
+            return;
+        }
+
+        const history = customerHistory.get(customerKey) || [];
+        const amount = Number(appointment.price || 0);
+        const isRebooked = history.length > 0;
+
+        if (isRebooked) {
+            rebookedRows.push({
+                id: appointment.id,
+                date: appointment.startTime,
+                customer: getCustomerName(appointment.user),
+                reference: appointment.bookingReference || appointment.bookingNumber || appointment.id,
+                service: getServiceName(appointment.service),
+                employee: appointment.staff?.name || null,
+                amount: Number(amount.toFixed(2)),
+                staffId: appointment.staffId || null,
+                customerId: customerKey
+            });
+
+            const bucketKey = getDateBucketKey(appointment.startTime, groupBy);
+            if (bucketKey) {
+                const trend = trendBuckets.get(bucketKey) || {
+                    date: getTrendSeriesPointDateLabel(bucketKey, groupBy),
+                    rebookedAppointments: 0,
+                    repeatCustomers: new Set(),
+                    revenue: 0
+                };
+                trend.rebookedAppointments += 1;
+                trend.repeatCustomers.add(customerKey);
+                trend.revenue += amount;
+                trendBuckets.set(bucketKey, trend);
+            }
+
+            const employeeKey = appointment.staffId || 'unassigned';
+            const employee = employeeBuckets.get(employeeKey) || {
+                id: employeeKey,
+                name: appointment.staff?.name || 'Unassigned',
+                totalRebookings: 0,
+                rebookedRevenue: 0,
+                repeatCustomers: new Set()
+            };
+            employee.totalRebookings += 1;
+            employee.rebookedRevenue += amount;
+            employee.repeatCustomers.add(customerKey);
+            employeeBuckets.set(employeeKey, employee);
+        }
+
+        history.push({
+            id: appointment.id,
+            startTime: appointment.startTime,
+            amount
+        });
+        customerHistory.set(customerKey, history);
+    });
+
+    const totalCompletedAppointments = appointments.length;
+    const repeatCustomers = Array.from(customerHistory.values()).filter((history) => history.length > 1).length;
+    const rebookedAppointments = rebookedRows.length;
+    const rebookedRevenue = rebookedRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const rebookingRate = totalCompletedAppointments > 0
+        ? Number(((rebookedAppointments / totalCompletedAppointments) * 100).toFixed(1))
+        : 0;
+
+    const trend = Array.from(trendBuckets.values())
+        .map((item) => ({
+            ...item,
+            repeatCustomers: item.repeatCustomers.size,
+            revenue: Number(item.revenue.toFixed(2))
+        }))
+        .sort((left, right) => left.date.localeCompare(right.date));
+
+    const topRebookingEmployees = Array.from(employeeBuckets.values())
+        .map((item) => ({
+            ...item,
+            repeatCustomers: item.repeatCustomers.size,
+            rebookedRevenue: Number(item.rebookedRevenue.toFixed(2))
+        }))
+        .sort((left, right) => right.totalRebookings - left.totalRebookings)
+        .slice(0, 10);
+
+    return {
+        rows: rebookedRows,
+        totals: {
+            totalCompletedAppointments,
+            rebookedAppointments,
+            repeatCustomers,
+            rebookedRevenue: Number(rebookedRevenue.toFixed(2)),
+            rebookingRate
+        },
+        trend,
+        topRebookingEmployees
+    };
+}
+
 function buildPaymentTransactionIncludes() {
     return [
         {
@@ -785,7 +996,7 @@ async function buildRefundsReport(req, startDate, endDate) {
     };
 }
 
-async function buildPaymentMethodsReport(req, startDate, endDate) {
+async function buildPaymentMethodsReport(req, startDate, endDate, groupBy = 'day') {
     const transactions = await getPaymentTransactions(req, { startDate, endDate, limit: 400 });
     const buckets = new Map();
 
@@ -828,9 +1039,11 @@ async function buildPaymentMethodsReport(req, startDate, endDate) {
 
     const totalRevenue = rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
     const totalTransactions = rows.reduce((sum, row) => sum + Number(row.transactionCount || 0), 0);
+    const trend = buildTimeSeriesBuckets(transactions, groupBy);
 
     return {
         rows,
+        trend,
         totals: {
             revenue: Number(totalRevenue.toFixed(2)),
             transactionCount: totalTransactions
@@ -841,6 +1054,7 @@ async function buildPaymentMethodsReport(req, startDate, endDate) {
 async function buildFullReportData(req, sections, startDate, endDate) {
     const result = {};
     const queryWithRange = { ...req.query, startDate, endDate };
+    const groupBy = typeof req.query?.groupBy === 'string' ? req.query.groupBy : 'day';
     const transactions = (sections.includes('refunds') || sections.includes('paymentMethods') || sections.includes('customerSales'))
         ? await getPaymentTransactions(req, { startDate, endDate, limit: 400 })
         : [];
@@ -926,6 +1140,21 @@ async function buildFullReportData(req, sections, startDate, endDate) {
         }
     }
 
+    if (sections.includes('rebookings')) {
+        const response = await runHandler(exports.getRebookingAnalytics, {
+            ...req,
+            query: { ...queryWithRange, groupBy }
+        });
+        if (response?.success) {
+            result.rebookings = {
+                rows: response.data || [],
+                totals: response.totals || null,
+                trend: response.trend || [],
+                topRebookingEmployees: response.topRebookingEmployees || []
+            };
+        }
+    }
+
     if (sections.includes('refunds')) {
         const refunds = transactions
             .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
@@ -943,40 +1172,11 @@ async function buildFullReportData(req, sections, startDate, endDate) {
     }
 
     if (sections.includes('paymentMethods')) {
-        const buckets = new Map();
-        transactions.forEach((transaction) => {
-            if (transaction.status !== 'completed' && transaction.status !== 'refunded') return;
-            const group = normalizePaymentMethodGroup(transaction.paymentMethod);
-            const key = group === 'split' ? 'split' : group;
-            const amount = Number(transaction.amount || 0);
-            const signedAmount = transaction.status === 'refunded' || transaction.type === 'refund'
-                ? -Math.abs(amount)
-                : Math.abs(amount);
-
-            const existing = buckets.get(key) || {
-                paymentMethod: key,
-                paymentMethodLabel: ({
-                    cash: 'Cash',
-                    card: 'Card',
-                    wallet: 'Wallet',
-                    gift_card: 'Gift Card',
-                    split: 'Split Payments',
-                    other: 'Other'
-                }[key] || key),
-                revenue: 0,
-                transactionCount: 0
-            };
-
-            existing.revenue += signedAmount;
-            existing.transactionCount += 1;
-            buckets.set(key, existing);
-        });
-
+        const paymentMethodsReport = await buildPaymentMethodsReport(req, startDate, endDate, groupBy);
         result.paymentMethods = {
-            rows: Array.from(buckets.values()).map((row) => ({
-                ...row,
-                revenue: Number(row.revenue.toFixed(2))
-            })).sort((left, right) => right.revenue - left.revenue)
+            rows: paymentMethodsReport.rows,
+            trend: paymentMethodsReport.trend,
+            totals: paymentMethodsReport.totals
         };
     }
 
@@ -1039,15 +1239,38 @@ exports.getRefundsReport = async (req, res) => {
     }
 };
 
-exports.getPaymentMethodsReport = async (req, res) => {
+exports.getRebookingAnalytics = async (req, res) => {
     try {
-        const { startDate, endDate } = req.query;
-        const report = await buildPaymentMethodsReport(req, startDate, endDate);
+        const { startDate, endDate, groupBy } = req.query;
+        const report = await buildRebookingAnalytics(req, startDate, endDate, groupBy);
 
         res.json({
             success: true,
             data: report.rows,
-            totals: report.totals
+            totals: report.totals,
+            trend: report.trend,
+            topRebookingEmployees: report.topRebookingEmployees
+        });
+    } catch (error) {
+        console.error('Get rebooking analytics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate rebooking analytics',
+            error: error.message
+        });
+    }
+};
+
+exports.getPaymentMethodsReport = async (req, res) => {
+    try {
+        const { startDate, endDate, groupBy } = req.query;
+        const report = await buildPaymentMethodsReport(req, startDate, endDate, groupBy);
+
+        res.json({
+            success: true,
+            data: report.rows,
+            totals: report.totals,
+            trend: report.trend
         });
     } catch (error) {
         console.error('Get payment methods report error:', error);

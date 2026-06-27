@@ -610,12 +610,75 @@ export default function ReportPreviewPage() {
               )
             )}
 
+            {sections.includes('rebookings') && (
+              data.rebookings ? (
+                <section className="break-inside-avoid">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'تحليلات إعادة الحجز' : 'Rebooking analytics'}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'معدل إعادة الحجز:' : 'Rebooking rate:'}</span> {data.rebookings?.totals?.rebookingRate ?? 0}%</div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'العملاء المتكررون:' : 'Repeat customers:'}</span> {data.rebookings?.totals?.repeatCustomers ?? 0}</div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'إيراد معاد حجزه:' : 'Rebooked revenue:'}</span> <Currency amount={data.rebookings?.totals?.rebookedRevenue ?? 0} /></div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'الحجوزات المعادة:' : 'Rebooked appointments:'}</span> {data.rebookings?.totals?.rebookedAppointments ?? 0}</div>
+                  </div>
+                  <table className="w-full border border-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الموظف' : 'Employee'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'إعادة الحجز' : 'Rebooked'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.rebookings?.topRebookingEmployees || []).map((item: any) => (
+                        <tr key={item.id || item.name} className="border-b border-gray-100">
+                          <td className="px-3 py-2">{item.name}</td>
+                          <td className="px-3 py-2 text-right">{item.rebookedAppointments ?? item.rebookingCount ?? 0}</td>
+                          <td className="px-3 py-2 text-right"><Currency amount={item.rebookedRevenue ?? item.revenue ?? 0} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : (
+                <EmptyReportSection
+                  title={locale === 'ar' ? 'تحليلات إعادة الحجز' : 'Rebooking analytics'}
+                  description={locale === 'ar' ? 'لم يتم العثور على بيانات إعادة الحجز ضمن هذا النطاق.' : 'No rebooking analytics were found for this range.'}
+                />
+              )
+            )}
+
             {sections.includes('paymentMethods') && (
               data.paymentMethods ? (
                 <section className="break-inside-avoid">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}
                   </h3>
+                  {Array.isArray(data.paymentMethods?.trend) && data.paymentMethods.trend.length > 0 && (
+                    <div className="mb-4">
+                      <table className="w-full border border-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
+                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'طريقة الدفع' : 'Payment method'}</th>
+                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
+                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'العمليات' : 'Transactions'}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.paymentMethods.trend.slice(0, 10).map((item: any, index: number) => (
+                            <tr key={`${item.date || item.label || index}`} className="border-b border-gray-100">
+                              <td className="px-3 py-2">{item.date || item.label || '-'}</td>
+                              <td className="px-3 py-2">{item.paymentMethodLabel || item.paymentMethod || '-'}</td>
+                              <td className="px-3 py-2 text-right"><Currency amount={item.revenue ?? item.totalRevenue ?? item.collected ?? 0} /></td>
+                              <td className="px-3 py-2 text-right">{item.transactionCount ?? 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   <table className="w-full border border-gray-200 text-sm">
                     <thead className="bg-gray-50">
                       <tr>

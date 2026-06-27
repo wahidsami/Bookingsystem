@@ -254,6 +254,7 @@ router.get('/reports/service-performance', checkTenantFeature('reports'), tenant
 router.get('/reports/employee-performance', checkTenantFeature('reports'), tenantReportsController.getEmployeePerformance);
 router.get('/reports/peak-hours', checkTenantFeature('reports'), tenantReportsController.getPeakHoursAnalysis);
 router.get('/reports/customer-analytics', checkTenantFeature('reports'), tenantReportsController.getCustomerAnalytics);
+router.get('/reports/rebookings', checkTenantFeature('reports'), tenantReportsController.getRebookingAnalytics);
 router.get('/reports/refunds', checkTenantFeature('reports'), tenantReportsController.getRefundsReport);
 router.get('/reports/payment-methods', checkTenantFeature('reports'), tenantReportsController.getPaymentMethodsReport);
 

@@ -20,6 +20,7 @@ type ReportSectionId =
   | "sales"
   | "financial"
   | "appointments"
+  | "rebookings"
   | "employees"
   | "services"
   | "products"
@@ -178,6 +179,7 @@ export default function ReportsPage() {
   const [productRevenue, setProductRevenue] = useState<any>(null);
   const [peakHours, setPeakHours] = useState<any>(null);
   const [customerAnalytics, setCustomerAnalytics] = useState<any>(null);
+  const [rebookingAnalytics, setRebookingAnalytics] = useState<any>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<any>(null);
   const [refundsReport, setRefundsReport] = useState<any>(null);
   const [paymentMethodsReport, setPaymentMethodsReport] = useState<any>(null);
@@ -190,6 +192,7 @@ export default function ReportsPage() {
         { id: "sales", label: locale === "ar" ? "المبيعات" : "Sales reports" },
         { id: "financial", label: locale === "ar" ? "المالية" : "Financial reports" },
         { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointment reports" },
+        { id: "rebookings", label: locale === "ar" ? "إعادة الحجز" : "Rebooking analytics" },
         { id: "employees", label: locale === "ar" ? "الموظفون" : "Employee reports" },
         { id: "services", label: locale === "ar" ? "الخدمات" : "Service reports" },
         { id: "products", label: locale === "ar" ? "المنتجات" : "Product reports" },
@@ -206,7 +209,7 @@ export default function ReportsPage() {
     setError("");
     try {
       const params = { startDate, endDate };
-      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, refundsRes, paymentMethodsRes, posRes] = await Promise.allSettled([
+      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, rebookingRes, refundsRes, paymentMethodsRes, posRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
         tenantApi.getFinancialOverview(params),
         tenantApi.getBookingTrends({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
@@ -215,8 +218,9 @@ export default function ReportsPage() {
         tenantApi.getProductRevenue(params),
         tenantApi.getPeakHoursAnalysis(params),
         tenantApi.getCustomerAnalytics(params),
+        tenantApi.getRebookingAnalytics({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
         tenantApi.getRefundsReport(params),
-        tenantApi.getPaymentMethodsReport(params),
+        tenantApi.getPaymentMethodsReport({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
         tenantApi.getPosClosingSummary({ date: endDate })
       ]);
 
@@ -281,6 +285,18 @@ export default function ReportsPage() {
         failedSections.push(locale === "ar" ? "تحليلات العملاء" : "customer analytics");
       }
 
+      if (rebookingRes.status === "fulfilled" && rebookingRes.value.success) {
+        setRebookingAnalytics({
+          rows: rebookingRes.value.rows || [],
+          totals: rebookingRes.value.totals || null,
+          trend: rebookingRes.value.trend || [],
+          topRebookingEmployees: rebookingRes.value.topRebookingEmployees || []
+        });
+      } else {
+        setRebookingAnalytics(null);
+        failedSections.push(locale === "ar" ? "تحليلات إعادة الحجز" : "rebooking analytics");
+      }
+
       if (refundsRes.status === "fulfilled" && refundsRes.value.success) {
         setRefundsReport({
           rows: refundsRes.value.data || [],
@@ -294,7 +310,8 @@ export default function ReportsPage() {
       if (paymentMethodsRes.status === "fulfilled" && paymentMethodsRes.value.success) {
         setPaymentMethodsReport({
           rows: paymentMethodsRes.value.data || [],
-          totals: paymentMethodsRes.value.totals || null
+          totals: paymentMethodsRes.value.totals || null,
+          trend: paymentMethodsRes.value.trend || []
         });
       } else {
         setPaymentMethodsReport(null);
@@ -357,6 +374,18 @@ export default function ReportsPage() {
 
   const bookingTrendValues = useMemo(() => bookingTrends.map((item) => safeNumber(item.bookings)), [bookingTrends]);
   const revenueTrendValues = useMemo(() => bookingTrends.map((item) => safeNumber(item.revenue)), [bookingTrends]);
+  const paymentMethodTrendValues = useMemo(
+    () => (paymentMethodsReport?.trend || []).map((item: any) =>
+      safeNumber(item.revenue ?? item.totalRevenue ?? item.collected ?? item.value)
+    ),
+    [paymentMethodsReport]
+  );
+  const rebookingTrendValues = useMemo(
+    () => (rebookingAnalytics?.trend || []).map((item: any) =>
+      safeNumber(item.rebookedRevenue ?? item.revenue ?? item.totalRevenue ?? item.value)
+    ),
+    [rebookingAnalytics]
+  );
 
   const totalBookings = safeNumber(summary?.totalBookings ?? financialOverview?.totalBookings);
   const totalRevenue = safeNumber(summary?.totalRevenue ?? financialOverview?.totalRevenue);
@@ -597,6 +626,88 @@ export default function ReportsPage() {
               </FinanceSectionCard>
             ) : null}
 
+            {activeSection === "rebookings" ? (
+              <FinanceSectionCard
+                title={locale === "ar" ? "تحليلات إعادة الحجز" : "Rebooking analytics"}
+                subtitle={locale === "ar" ? "معدل إعادة الحجز، العملاء المتكررين، والإيراد المعاد حجزه." : "Rebooking rate, repeat customers, rebooked revenue, and trend."}
+              >
+                {rebookingAnalytics ? (
+                  <div className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "معدل إعادة الحجز" : "Rebooking rate"}
+                        value={formatPercent(rebookingAnalytics.totals?.rebookingRate)}
+                        tone="purple"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "عملاء متكررون" : "Repeat customers"}
+                        value={safeNumber(rebookingAnalytics.totals?.repeatCustomers)}
+                        tone="blue"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "إيراد معاد حجزه" : "Rebooked revenue"}
+                        value={formatMoney(rebookingAnalytics.totals?.rebookedRevenue)}
+                        tone="green"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "الحجوزات المعادة" : "Rebooked appointments"}
+                        value={safeNumber(rebookingAnalytics.totals?.rebookedAppointments)}
+                        tone="amber"
+                      />
+                    </div>
+
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,1fr)]">
+                      <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                        <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "اتجاه إعادة الحجز" : "Rebooking trend"}</p>
+                        <div className="mt-3">
+                          <TrendSparkline values={rebookingTrendValues.length ? rebookingTrendValues : [0]} color="#8b5cf6" height={110} />
+                        </div>
+                      </div>
+
+                      <FinanceSectionCard title={locale === "ar" ? "أعلى الموظفين" : "Top rebooking employees"}>
+                        <SectionTable
+                          rtl={isRTL}
+                          headers={[
+                            locale === "ar" ? "الموظف" : "Employee",
+                            locale === "ar" ? "إعادة الحجز" : "Rebooked",
+                            locale === "ar" ? "الإيراد" : "Revenue"
+                          ]}
+                          rows={(rebookingAnalytics.topRebookingEmployees || []).map((employee: any) => [
+                            employee.name,
+                            safeNumber(employee.rebookedAppointments ?? employee.rebookingCount),
+                            formatMoney(employee.rebookedRevenue ?? employee.revenue)
+                          ])}
+                        />
+                      </FinanceSectionCard>
+                    </div>
+
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "التاريخ" : "Date",
+                        locale === "ar" ? "العميل" : "Customer",
+                        locale === "ar" ? "الحجز المرجعي" : "Reference booking",
+                        locale === "ar" ? "إعادة الحجز" : "Rebooked",
+                        locale === "ar" ? "الإيراد" : "Revenue"
+                      ]}
+                      rows={(rebookingAnalytics.rows || []).map((row: any) => [
+                        row.date ? new Date(row.date).toLocaleDateString() : "-",
+                        row.customerName || row.customer || "-",
+                        row.reference || row.bookingNumber || "-",
+                        row.rebooked ? (locale === "ar" ? "نعم" : "Yes") : (locale === "ar" ? "لا" : "No"),
+                        formatMoney(row.rebookedRevenue ?? row.revenue ?? row.amount)
+                      ])}
+                    />
+                  </div>
+                ) : (
+                  <FinanceEmptyState
+                    title={locale === "ar" ? "لا توجد تحليلات إعادة الحجز" : "No rebooking analytics"}
+                    description={locale === "ar" ? "لم يتم العثور على بيانات إعادة حجز في هذا النطاق." : "No rebooking analytics are available for the selected range."}
+                  />
+                )}
+              </FinanceSectionCard>
+            ) : null}
+
             {activeSection === "employees" ? (
               <FinanceSectionCard title={locale === "ar" ? "أداء الموظفين" : "Employee performance"}>
                 <SectionTable
@@ -760,21 +871,55 @@ export default function ReportsPage() {
                 subtitle={locale === "ar" ? "توزيع الإيراد والمعاملات حسب طريقة الدفع." : "Revenue and transaction distribution by payment method."}
               >
                 {paymentMethodsReport?.rows?.length ? (
-                  <SectionTable
-                    rtl={isRTL}
-                    headers={[
-                      locale === "ar" ? "الطريقة" : "Method",
-                      locale === "ar" ? "الإيراد" : "Revenue",
-                      locale === "ar" ? "العمليات" : "Transactions",
-                      locale === "ar" ? "النسبة" : "Share"
-                    ]}
-                    rows={paymentMethodsReport.rows.map((method: any) => [
-                      method.paymentMethodLabel,
-                      formatMoney(method.revenue),
-                      method.transactionCount,
-                      `${paymentMethodsReport.totals?.revenue ? ((safeNumber(method.revenue) / safeNumber(paymentMethodsReport.totals.revenue)) * 100).toFixed(1) : "0.0"}%`
-                    ])}
-                  />
+                  <div className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "إجمالي الإيراد" : "Total revenue"}
+                        value={formatMoney(paymentMethodsReport.totals?.revenue)}
+                        tone="green"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "عدد العمليات" : "Transactions"}
+                        value={safeNumber(paymentMethodsReport.totals?.transactionCount)}
+                        tone="blue"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "أكبر حصة" : "Largest share"}
+                        value={paymentMethodsReport.rows?.length ? `${Math.max(...paymentMethodsReport.rows.map((row: any) => safeNumber(row.revenue))).toFixed(0)}` : "0"}
+                        tone="purple"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "اتجاه زمني" : "Trend points"}
+                        value={safeNumber(paymentMethodsReport.trend?.length)}
+                        tone="amber"
+                      />
+                    </div>
+
+                    <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {locale === "ar" ? "الاتجاه الزمني لطرق الدفع" : "Payment method trend"}
+                      </p>
+                      <div className="mt-3">
+                        <TrendSparkline values={paymentMethodTrendValues.length ? paymentMethodTrendValues : [0]} color="#0ea5e9" height={110} />
+                      </div>
+                    </div>
+
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "الطريقة" : "Method",
+                        locale === "ar" ? "الإيراد" : "Revenue",
+                        locale === "ar" ? "العمليات" : "Transactions",
+                        locale === "ar" ? "النسبة" : "Share"
+                      ]}
+                      rows={paymentMethodsReport.rows.map((method: any) => [
+                        method.paymentMethodLabel,
+                        formatMoney(method.revenue),
+                        method.transactionCount,
+                        `${paymentMethodsReport.totals?.revenue ? ((safeNumber(method.revenue) / safeNumber(paymentMethodsReport.totals.revenue)) * 100).toFixed(1) : "0.0"}%`
+                      ])}
+                    />
+                  </div>
                 ) : (
                   <FinanceEmptyState
                     title={locale === "ar" ? "لا توجد طرق دفع" : "No payment methods"}

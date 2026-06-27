@@ -15,6 +15,7 @@ const SECTION_OPTIONS = [
   { id: 'employeePerformance', labelAr: 'أداء الموظفين', labelEn: 'Employee performance' },
   { id: 'peakHours', labelAr: 'ساعات الذروة', labelEn: 'Peak hours' },
   { id: 'customerAnalytics', labelAr: 'تحليلات العملاء', labelEn: 'Customer analytics' },
+  { id: 'rebookings', labelAr: 'تحليلات إعادة الحجز', labelEn: 'Rebooking analytics' },
   { id: 'discounts', labelAr: 'تقرير الخصومات', labelEn: 'Discounts report' },
   { id: 'refunds', labelAr: 'تقرير الاستردادات', labelEn: 'Refunds report' },
   { id: 'paymentMethods', labelAr: 'طرق الدفع', labelEn: 'Payment methods' },

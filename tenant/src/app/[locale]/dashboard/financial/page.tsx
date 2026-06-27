@@ -14,6 +14,12 @@ import {
 } from "@/components/FinanceWorkspaceShell";
 import { Currency } from "@/components/Currency";
 import { tenantApi } from "@/lib/api";
+import {
+  buildRuleBasedAlerts,
+  formatTrendLabel,
+  getPreviousDateRange,
+  percentChange
+} from "@/lib/analyticsHelpers";
 
 interface Overview {
   totalRevenue: number;
@@ -187,6 +193,35 @@ function formatDateInput(daysOffset = 0) {
   return date.toISOString().split("T")[0];
 }
 
+function ComparisonNote({
+  current,
+  previous,
+  label,
+  locale
+}: {
+  current: unknown;
+  previous: unknown;
+  label: string;
+  locale: string;
+}) {
+  const delta = percentChange(current, previous);
+  const hasPrevious = safeNumber(previous) !== 0;
+  const tone = delta >= 0 ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-rose-600 bg-rose-50 border-rose-100";
+
+  return (
+    <div className="space-y-1">
+      <div className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>
+        <span>{formatTrendLabel(delta, locale)}</span>
+      </div>
+      <p className="text-xs text-gray-500">
+        {locale === "ar"
+          ? `الفترة السابقة ${label}: ${hasPrevious ? safeNumber(previous).toLocaleString() : "0"}`
+          : `Previous ${label}: ${hasPrevious ? safeNumber(previous).toLocaleString() : "0"}`}
+      </p>
+    </div>
+  );
+}
+
 function TrendSparkline({
   values,
   color = "#7c3aed",
@@ -320,14 +355,18 @@ export default function FinancialPage() {
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<FinancialSectionId>("executive");
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [previousOverview, setPreviousOverview] = useState<Overview | null>(null);
   const [reportSummary, setReportSummary] = useState<any>(null);
+  const [previousReportSummary, setPreviousReportSummary] = useState<any>(null);
   const [landingSummary, setLandingSummary] = useState<any>(null);
   const [employees, setEmployees] = useState<EmployeeRevenue[]>([]);
   const [services, setServices] = useState<ServiceRevenue[]>([]);
   const [products, setProducts] = useState<ProductRevenue[]>([]);
   const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
   const [customerAnalytics, setCustomerAnalytics] = useState<CustomerAnalytics | null>(null);
+  const [previousCustomerAnalytics, setPreviousCustomerAnalytics] = useState<CustomerAnalytics | null>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<PosClosingSummary | null>(null);
+  const [previousPosClosingSummary, setPreviousPosClosingSummary] = useState<PosClosingSummary | null>(null);
 
   const [startDate, setStartDate] = useState(() => formatDateInput(-29));
   const [endDate, setEndDate] = useState(() => formatDateInput(0));
@@ -380,20 +419,50 @@ export default function FinancialPage() {
   const revenueSeries = useMemo(() => dailyRevenue.map((day) => safeNumber(day.revenue)), [dailyRevenue]);
   const tenantRevenueSeries = useMemo(() => dailyRevenue.map((day) => safeNumber(day.tenantRevenue)), [dailyRevenue]);
   const bookingSeries = useMemo(() => dailyRevenue.map((day) => safeNumber(day.bookings)), [dailyRevenue]);
+  const operationalAlerts = useMemo(
+    () =>
+      buildRuleBasedAlerts({
+        currentRevenue: overview?.totalRevenue,
+        previousRevenue: previousOverview?.totalRevenue,
+        currentCompletionRate: completionRate,
+        previousCompletionRate: previousReportSummary?.completionRate ?? previousOverview?.completionRate,
+        currentCancellationRate: cancellationRate,
+        currentNoShowRate: noShowRate,
+        currentRetentionRate: retentionRate,
+        previousRetentionRate: previousCustomerAnalytics?.retentionRate,
+        locale
+      }),
+    [
+      cancellationRate,
+      completionRate,
+      locale,
+      noShowRate,
+      overview?.totalRevenue,
+      previousCustomerAnalytics?.retentionRate,
+      previousOverview?.completionRate,
+      previousOverview?.totalRevenue,
+      previousReportSummary?.completionRate,
+      retentionRate
+    ]
+  );
 
   const loadData = async () => {
     setLoading(true);
     setError("");
     try {
       const params = { startDate, endDate };
-      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes] = await Promise.allSettled([
+      const previousParams = getPreviousDateRange(startDate, endDate);
+      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes, previousOverviewRes, previousLandingRes, previousCustomerRes] = await Promise.allSettled([
         tenantApi.getFinancialOverview(params),
         tenantApi.getFinancialLandingSummary(params),
         tenantApi.getEmployeeRevenue(params),
         tenantApi.getServiceRevenue(params),
         tenantApi.getProductRevenue(params),
         tenantApi.getDailyRevenue(params),
-        tenantApi.getCustomerAnalytics(params)
+        tenantApi.getCustomerAnalytics(params),
+        tenantApi.getFinancialOverview(previousParams),
+        tenantApi.getFinancialLandingSummary(previousParams),
+        tenantApi.getCustomerAnalytics(previousParams)
       ]);
 
       const failedSections: string[] = [];
@@ -405,6 +474,12 @@ export default function FinancialPage() {
         failedSections.push(locale === "ar" ? "الملخص المالي" : "financial overview");
       }
 
+      if (previousOverviewRes.status === "fulfilled" && previousOverviewRes.value.success) {
+        setPreviousOverview(previousOverviewRes.value.overview || null);
+      } else {
+        setPreviousOverview(null);
+      }
+
       if (landingRes.status === "fulfilled" && landingRes.value.success) {
         setLandingSummary(landingRes.value.data || null);
         setReportSummary(landingRes.value.data?.overview || null);
@@ -414,6 +489,14 @@ export default function FinancialPage() {
         setReportSummary(null);
         setPosClosingSummary(null);
         failedSections.push(locale === "ar" ? "ملخص التقارير" : "report summary");
+      }
+
+      if (previousLandingRes.status === "fulfilled" && previousLandingRes.value.success) {
+        setPreviousReportSummary(previousLandingRes.value.data?.overview || null);
+        setPreviousPosClosingSummary(previousLandingRes.value.data?.collections?.closingSummary || null);
+      } else {
+        setPreviousReportSummary(null);
+        setPreviousPosClosingSummary(null);
       }
 
       if (employeesRes.status === "fulfilled" && employeesRes.value.success) {
@@ -449,6 +532,12 @@ export default function FinancialPage() {
       } else {
         setCustomerAnalytics(null);
         failedSections.push(locale === "ar" ? "مبيعات العملاء" : "customer sales");
+      }
+
+      if (previousCustomerRes.status === "fulfilled" && previousCustomerRes.value.success) {
+        setPreviousCustomerAnalytics(previousCustomerRes.value.data || null);
+      } else {
+        setPreviousCustomerAnalytics(null);
       }
 
       if (failedSections.length > 0) {
@@ -573,25 +662,25 @@ export default function FinancialPage() {
               <FinanceMetricCard
                 label={locale === "ar" ? "إجمالي الإيرادات" : "Total revenue"}
                 value={formatMoney(overview?.totalRevenue)}
-                note={`${totalBookings} ${locale === "ar" ? "حجز" : "bookings"}`}
+                note={<ComparisonNote current={overview?.totalRevenue} previous={previousOverview?.totalRevenue} label={locale === "ar" ? "الإيرادات" : "revenue"} locale={locale} />}
                 tone="green"
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "إيراد المركز" : "Tenant revenue"}
                 value={formatMoney(overview?.totalTenantRevenue)}
-                note={locale === "ar" ? "بعد الرسوم" : "After platform fees"}
+                note={<ComparisonNote current={overview?.totalTenantRevenue} previous={previousOverview?.totalTenantRevenue} label={locale === "ar" ? "إيراد المركز" : "tenant revenue"} locale={locale} />}
                 tone="blue"
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "صافي الإيرادات" : "Net revenue"}
                 value={formatMoney(overview?.netRevenue)}
-                note={locale === "ar" ? "بعد العمولات" : "After commissions"}
+                note={<ComparisonNote current={overview?.netRevenue} previous={previousOverview?.netRevenue} label={locale === "ar" ? "صافي الإيرادات" : "net revenue"} locale={locale} />}
                 tone="purple"
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "المدفوعات المعلقة" : "Pending payments"}
                 value={formatMoney(overview?.pendingPayments)}
-                note={locale === "ar" ? "يحتاج متابعة" : "Requires follow-up"}
+                note={<ComparisonNote current={overview?.pendingPayments} previous={previousOverview?.pendingPayments} label={locale === "ar" ? "المدفوعات المعلقة" : "pending payments"} locale={locale} />}
                 tone="amber"
               />
             </section>
@@ -600,23 +689,23 @@ export default function FinancialPage() {
               <FinanceMetricCard
                 label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"}
                 value={totalBookings}
-                note={`${completedBookings} ${locale === "ar" ? "مكتمل" : "completed"}`}
+                note={<ComparisonNote current={totalBookings} previous={safeNumber(previousOverview?.totalBookings)} label={locale === "ar" ? "الحجوزات" : "bookings"} locale={locale} />}
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "الحجوزات المدفوعة" : "Paid bookings"}
                 value={paidBookings}
-                note={`${unpaidBookings} ${locale === "ar" ? "غير مدفوعة" : "unpaid"}`}
+                note={<ComparisonNote current={paidBookings} previous={safeNumber(previousOverview?.paidBookings)} label={locale === "ar" ? "الحجوزات المدفوعة" : "paid bookings"} locale={locale} />}
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "الحجوزات المكتملة" : "Completed bookings"}
                 value={completedBookings}
-                note={`${formatPercent(completionRate)} ${locale === "ar" ? "معدل الإكمال" : "completion rate"}`}
+                note={<ComparisonNote current={completedBookings} previous={safeNumber(previousOverview?.completedBookings)} label={locale === "ar" ? "الحجوزات المكتملة" : "completed bookings"} locale={locale} />}
                 tone="green"
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "العملاء الفريدون" : "Unique customers"}
                 value={safeNumber(overview?.uniqueCustomers ?? customerAnalytics?.totalCustomers)}
-                note={`${safeNumber(customerAnalytics?.returningCustomers)} ${locale === "ar" ? "عملاء عائدون" : "returning"}`}
+                note={<ComparisonNote current={safeNumber(overview?.uniqueCustomers ?? customerAnalytics?.totalCustomers)} previous={safeNumber(previousOverview?.uniqueCustomers ?? previousCustomerAnalytics?.totalCustomers)} label={locale === "ar" ? "العملاء" : "customers"} locale={locale} />}
                 tone="blue"
               />
             </section>
@@ -625,24 +714,24 @@ export default function FinancialPage() {
               <FinanceMetricCard
                 label={locale === "ar" ? "متوسط قيمة الحجز" : "Average booking value"}
                 value={formatMoney(overview?.avgBookingValue)}
-                note={locale === "ar" ? "قيم الذروة والوسط" : "Average per completed booking"}
+                note={<ComparisonNote current={overview?.avgBookingValue} previous={previousOverview?.avgBookingValue} label={locale === "ar" ? "متوسط قيمة الحجز" : "average booking value"} locale={locale} />}
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "معدل الإلغاء" : "Cancellation rate"}
                 value={formatPercent(cancellationRate)}
-                note={`${safeNumber(overview?.cancelledBookings)} ${locale === "ar" ? "إلغاء" : "cancellations"}`}
+                note={<ComparisonNote current={cancellationRate} previous={safeNumber(previousOverview?.cancelledBookings) > 0 ? (safeNumber(previousOverview?.cancelledBookings) / Math.max(safeNumber(previousOverview?.totalBookings), 1)) * 100 : 0} label={locale === "ar" ? "معدل الإلغاء" : "cancellation rate"} locale={locale} />}
                 tone="rose"
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "معدل عدم الحضور" : "No-show rate"}
                 value={formatPercent(noShowRate)}
-                note={`${safeNumber(overview?.noShowBookings)} ${locale === "ar" ? "حالة" : "cases"}`}
+                note={<ComparisonNote current={noShowRate} previous={safeNumber(previousOverview?.noShowBookings) > 0 ? (safeNumber(previousOverview?.noShowBookings) / Math.max(safeNumber(previousOverview?.totalBookings), 1)) * 100 : 0} label={locale === "ar" ? "معدل عدم الحضور" : "no-show rate"} locale={locale} />}
                 tone="amber"
               />
               <FinanceMetricCard
                 label={locale === "ar" ? "معدل الاحتفاظ" : "Retention rate"}
                 value={formatPercent(retentionRate)}
-                note={locale === "ar" ? "من تقرير العملاء" : "From customer analytics"}
+                note={<ComparisonNote current={retentionRate} previous={previousCustomerAnalytics?.retentionRate} label={locale === "ar" ? "الاحتفاظ" : "retention"} locale={locale} />}
                 tone="purple"
               />
             </section>
@@ -810,10 +899,30 @@ export default function FinancialPage() {
                 {posClosingSummary ? (
                   <div className="space-y-5">
                     <div className="grid gap-4 md:grid-cols-4">
-                      <FinanceMetricCard label={locale === "ar" ? "إجمالي التحصيل" : "Gross collected"} value={formatMoney(posClosingSummary.grossCollected)} tone="green" />
-                      <FinanceMetricCard label={locale === "ar" ? "الاستردادات" : "Refunds"} value={formatMoney(posClosingSummary.refundsTotal)} tone="rose" />
-                      <FinanceMetricCard label={locale === "ar" ? "الصافي" : "Net collected"} value={formatMoney(posClosingSummary.netCollected)} tone="blue" />
-                      <FinanceMetricCard label={locale === "ar" ? "عدد العمليات" : "Transactions"} value={safeNumber(posClosingSummary.transactionCount)} tone="purple" />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "إجمالي التحصيل" : "Gross collected"}
+                        value={formatMoney(posClosingSummary.grossCollected)}
+                        note={<ComparisonNote current={posClosingSummary.grossCollected} previous={previousPosClosingSummary?.grossCollected} label={locale === "ar" ? "إجمالي التحصيل" : "gross collected"} locale={locale} />}
+                        tone="green"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "الاستردادات" : "Refunds"}
+                        value={formatMoney(posClosingSummary.refundsTotal)}
+                        note={<ComparisonNote current={posClosingSummary.refundsTotal} previous={previousPosClosingSummary?.refundsTotal} label={locale === "ar" ? "الاستردادات" : "refunds"} locale={locale} />}
+                        tone="rose"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "الصافي" : "Net collected"}
+                        value={formatMoney(posClosingSummary.netCollected)}
+                        note={<ComparisonNote current={posClosingSummary.netCollected} previous={previousPosClosingSummary?.netCollected} label={locale === "ar" ? "الصافي" : "net collected"} locale={locale} />}
+                        tone="blue"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "عدد العمليات" : "Transactions"}
+                        value={safeNumber(posClosingSummary.transactionCount)}
+                        note={<ComparisonNote current={posClosingSummary.transactionCount} previous={previousPosClosingSummary?.transactionCount} label={locale === "ar" ? "العمليات" : "transactions"} locale={locale} />}
+                        tone="purple"
+                      />
                     </div>
                     <SectionTable
                       rtl={isRTL}
@@ -1115,10 +1224,30 @@ export default function FinancialPage() {
                 {customerAnalytics ? (
                   <div className="space-y-5">
                     <div className="grid gap-4 md:grid-cols-4">
-                      <FinanceMetricCard label={locale === "ar" ? "إجمالي العملاء" : "Total customers"} value={customerAnalytics.totalCustomers} tone="blue" />
-                      <FinanceMetricCard label={locale === "ar" ? "عملاء جدد" : "New customers"} value={customerAnalytics.newCustomers} tone="green" />
-                      <FinanceMetricCard label={locale === "ar" ? "عملاء عائدون" : "Returning customers"} value={customerAnalytics.returningCustomers} tone="purple" />
-                      <FinanceMetricCard label={locale === "ar" ? "الاحتفاظ" : "Retention"} value={formatPercent(customerAnalytics.retentionRate)} tone="amber" />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "إجمالي العملاء" : "Total customers"}
+                        value={customerAnalytics.totalCustomers}
+                        note={<ComparisonNote current={customerAnalytics.totalCustomers} previous={previousCustomerAnalytics?.totalCustomers} label={locale === "ar" ? "العملاء" : "customers"} locale={locale} />}
+                        tone="blue"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "عملاء جدد" : "New customers"}
+                        value={customerAnalytics.newCustomers}
+                        note={<ComparisonNote current={customerAnalytics.newCustomers} previous={previousCustomerAnalytics?.newCustomers} label={locale === "ar" ? "العملاء الجدد" : "new customers"} locale={locale} />}
+                        tone="green"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "عملاء عائدون" : "Returning customers"}
+                        value={customerAnalytics.returningCustomers}
+                        note={<ComparisonNote current={customerAnalytics.returningCustomers} previous={previousCustomerAnalytics?.returningCustomers} label={locale === "ar" ? "العملاء العائدون" : "returning customers"} locale={locale} />}
+                        tone="purple"
+                      />
+                      <FinanceMetricCard
+                        label={locale === "ar" ? "الاحتفاظ" : "Retention"}
+                        value={formatPercent(customerAnalytics.retentionRate)}
+                        note={<ComparisonNote current={customerAnalytics.retentionRate} previous={previousCustomerAnalytics?.retentionRate} label={locale === "ar" ? "الاحتفاظ" : "retention"} locale={locale} />}
+                        tone="amber"
+                      />
                     </div>
                     <SectionTable
                       rtl={isRTL}
@@ -1173,6 +1302,37 @@ export default function FinancialPage() {
             ) : null}
 
             {activeSection === "executive" ? (
+              <div className="space-y-5">
+                <FinanceSectionCard
+                  title={locale === "ar" ? "التنبيهات التشغيلية" : "Operational alerts"}
+                  subtitle={locale === "ar" ? "تنبيهات قائمة على القواعد للفترات التي تحتاج متابعة." : "Rule-based alerts for periods that need attention."}
+                >
+                  {operationalAlerts.length ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {operationalAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className={`rounded-2xl border p-4 ${
+                            alert.tone === "rose"
+                              ? "border-rose-200 bg-rose-50"
+                              : alert.tone === "amber"
+                                ? "border-amber-200 bg-amber-50"
+                                : "border-sky-200 bg-sky-50"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                          <p className="mt-2 text-sm text-gray-600">{alert.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <FinanceEmptyState
+                      title={locale === "ar" ? "لا توجد تنبيهات" : "No alerts"}
+                      description={locale === "ar" ? "لا توجد مؤشرات تستدعي التنبيه في هذا النطاق." : "No rule-based alerts were triggered in this range."}
+                    />
+                  )}
+                </FinanceSectionCard>
+
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
                 <FinanceSectionCard
                   title={locale === "ar" ? "خط الإيراد" : "Revenue line"}
@@ -1204,6 +1364,7 @@ export default function FinancialPage() {
                     ))}
                   </div>
                 </FinanceSectionCard>
+              </div>
               </div>
             ) : null}
 
