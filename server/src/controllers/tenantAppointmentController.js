@@ -487,6 +487,63 @@ async function sendAppointmentRescheduleEmail({
     });
 }
 
+async function sendAppointmentStatusEmail({
+    to,
+    customerName,
+    tenantName,
+    serviceName,
+    appointmentDate,
+    previousStatus,
+    currentStatus,
+    bookingReference,
+    locale = 'en'
+}) {
+    if (!to) {
+        return;
+    }
+
+    if (`${to}`.toLowerCase().endsWith('@guest.refah.local')) {
+        return;
+    }
+
+    const statusLabels = locale === 'ar'
+        ? {
+            checked_in: 'تم الوصول',
+            in_service: 'قيد التنفيذ',
+            completed: 'مكتمل',
+            cancelled: 'ملغي',
+            no_show: 'لم يحضر',
+            confirmed: 'مؤكد',
+            pending: 'قيد الانتظار'
+        }
+        : {
+            checked_in: 'Checked in',
+            in_service: 'In service',
+            completed: 'Completed',
+            cancelled: 'Cancelled',
+            no_show: 'No-show',
+            confirmed: 'Confirmed',
+            pending: 'Pending'
+        };
+
+    await sendEmail({
+        to,
+        subject: locale === 'ar'
+            ? 'تم تحديث حالة موعدك في رفاه'
+            : 'Your Refah appointment status has been updated',
+        template: 'customer_appointment_status_updated',
+        data: {
+            customerName: customerName || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer'),
+            tenantName: tenantName || 'Refah',
+            serviceName: serviceName || (locale === 'ar' ? 'الخدمة' : 'Service'),
+            appointmentDate: appointmentDate || '',
+            previousStatus: statusLabels[previousStatus] || previousStatus || '-',
+            currentStatus: statusLabels[currentStatus] || currentStatus || '-',
+            bookingReference: bookingReference || ''
+        }
+    });
+}
+
 function appendGroupGuestToNotes(notes, groupGuest) {
     if (!groupGuest || typeof groupGuest !== 'object') {
         return notes;
@@ -2025,7 +2082,10 @@ exports.updateAppointmentStatus = async (req, res) => {
                         status: normalizedStatus
                     }
                 );
-            } else {
+            }
+
+            const handledStatusNotifications = ['checked_in', 'in_service', 'completed', 'cancelled', 'no_show'].includes(normalizedStatus);
+            if (!handledStatusNotifications) {
                 await pushNotificationService.sendToUser(appointment.platformUserId, {
                     title: 'Booking updated',
                     body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
@@ -2035,6 +2095,24 @@ exports.updateAppointmentStatus = async (req, res) => {
                         status: normalizedStatus
                     }
                 });
+            }
+
+            if (appointment.user?.email) {
+                try {
+                    await sendAppointmentStatusEmail({
+                        to: appointment.user.email,
+                        customerName,
+                        tenantName: appointment.tenant?.name || appointment.tenant?.name_en || appointment.tenant?.name_ar || 'Refah',
+                        serviceName,
+                        appointmentDate,
+                        previousStatus,
+                        currentStatus: normalizedStatus,
+                        bookingReference: appointment.bookingNumber || appointment.bookingReference || '',
+                        locale: appointment.user?.preferredLanguage === 'ar' ? 'ar' : 'en'
+                    });
+                } catch (emailError) {
+                    console.warn('Tenant booking status email warning:', emailError.message);
+                }
             }
         } catch (notificationError) {
             console.warn('Tenant booking status notification warning:', notificationError.message);
