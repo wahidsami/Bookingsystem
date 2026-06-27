@@ -175,6 +175,7 @@ export default function ReportsPage() {
   const [bookingTrends, setBookingTrends] = useState<any[]>([]);
   const [servicePerformance, setServicePerformance] = useState<any[]>([]);
   const [employeePerformance, setEmployeePerformance] = useState<any[]>([]);
+  const [productRevenue, setProductRevenue] = useState<any>(null);
   const [peakHours, setPeakHours] = useState<any>(null);
   const [customerAnalytics, setCustomerAnalytics] = useState<any>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<any>(null);
@@ -205,12 +206,13 @@ export default function ReportsPage() {
     setError("");
     try {
       const params = { startDate, endDate };
-      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes, refundsRes, paymentMethodsRes, posRes] = await Promise.allSettled([
+      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, refundsRes, paymentMethodsRes, posRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
         tenantApi.getFinancialOverview(params),
         tenantApi.getBookingTrends({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
         tenantApi.getServicePerformance(params),
         tenantApi.getEmployeePerformance(params),
+        tenantApi.getProductRevenue(params),
         tenantApi.getPeakHoursAnalysis(params),
         tenantApi.getCustomerAnalytics(params),
         tenantApi.getRefundsReport(params),
@@ -253,6 +255,16 @@ export default function ReportsPage() {
       } else {
         setEmployeePerformance([]);
         failedSections.push(locale === "ar" ? "أداء الموظفين" : "employee performance");
+      }
+
+      if (productsRes.status === "fulfilled" && productsRes.value.success) {
+        setProductRevenue({
+          rows: productsRes.value.products || [],
+          totals: productsRes.value.totals || null
+        });
+      } else {
+        setProductRevenue(null);
+        failedSections.push(locale === "ar" ? "تقرير المنتجات" : "product report");
       }
 
       if (peakRes.status === "fulfilled" && peakRes.value.success) {
@@ -353,6 +365,7 @@ export default function ReportsPage() {
   const completionRate = safeNumber(summary?.completionRate ?? financialOverview?.completionRate);
   const retentionRate = safeNumber(customerAnalytics?.retentionRate);
   const discountTotals = financialOverview?.discountTotals || null;
+  const overviewVisible = activeSection === "overview";
 
   return (
     <TenantLayout>
@@ -407,110 +420,112 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FinanceMetricCard label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={totalBookings} tone="blue" />
-              <FinanceMetricCard label={locale === "ar" ? "الإيراد" : "Total revenue"} value={formatMoney(totalRevenue)} tone="green" />
-              <FinanceMetricCard label={locale === "ar" ? "إيراد المركز" : "Tenant revenue"} value={formatMoney(tenantRevenue)} tone="purple" />
-              <FinanceMetricCard label={locale === "ar" ? "العملاء الفريدون" : "Unique customers"} value={safeNumber(summary?.uniqueCustomers)} tone="amber" />
-            </section>
+            {overviewVisible ? (
+              <>
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <FinanceMetricCard label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={totalBookings} tone="blue" />
+                  <FinanceMetricCard label={locale === "ar" ? "الإيراد" : "Total revenue"} value={formatMoney(totalRevenue)} tone="green" />
+                  <FinanceMetricCard label={locale === "ar" ? "إيراد المركز" : "Tenant revenue"} value={formatMoney(tenantRevenue)} tone="purple" />
+                  <FinanceMetricCard label={locale === "ar" ? "العملاء الفريدون" : "Unique customers"} value={safeNumber(summary?.uniqueCustomers)} tone="amber" />
+                </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FinanceMetricCard label={locale === "ar" ? "متوسط قيمة الحجز" : "Average booking value"} value={formatMoney(avgBookingValue)} />
-              <FinanceMetricCard label={locale === "ar" ? "معدل الإكمال" : "Completion rate"} value={formatPercent(completionRate)} tone="green" />
-              <FinanceMetricCard label={locale === "ar" ? "معدل الاحتفاظ" : "Retention rate"} value={formatPercent(retentionRate)} tone="purple" />
-              <FinanceMetricCard label={locale === "ar" ? "المدفوعات المعلقة" : "Pending revenue"} value={formatMoney(summary?.pendingRevenue ?? financialOverview?.pendingPayments)} tone="rose" />
-            </section>
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <FinanceMetricCard label={locale === "ar" ? "متوسط قيمة الحجز" : "Average booking value"} value={formatMoney(avgBookingValue)} />
+                  <FinanceMetricCard label={locale === "ar" ? "معدل الإكمال" : "Completion rate"} value={formatPercent(completionRate)} tone="green" />
+                  <FinanceMetricCard label={locale === "ar" ? "معدل الاحتفاظ" : "Retention rate"} value={formatPercent(retentionRate)} tone="purple" />
+                  <FinanceMetricCard label={locale === "ar" ? "المدفوعات المعلقة" : "Pending revenue"} value={formatMoney(summary?.pendingRevenue ?? financialOverview?.pendingPayments)} tone="rose" />
+                </section>
 
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
-              <FinanceSectionCard
-                title={locale === "ar" ? "اتجاهات الحجز" : "Booking trends"}
-                subtitle={locale === "ar" ? "الاتجاه اليومي أو الشهري بحسب النطاق المحدد." : "Daily or monthly booking trend based on the selected range."}
-              >
-                <div className="space-y-4">
-                  <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#0ea5e9" />
-                  <SectionTable
-                    rtl={isRTL}
-                    headers={[
-                      locale === "ar" ? "التاريخ" : "Date",
-                      locale === "ar" ? "الحجوزات" : "Bookings",
-                      locale === "ar" ? "المكتملة" : "Completed",
-                      locale === "ar" ? "الإيراد" : "Revenue"
-                    ]}
-                    rows={bookingTrends.slice(0, 8).map((trend) => [
-                      trend.date,
-                      safeNumber(trend.bookings),
-                      safeNumber(trend.completed),
-                      formatMoney(trend.revenue)
-                    ])}
-                  />
-                </div>
-              </FinanceSectionCard>
-
-              <FinanceSectionCard
-                title={locale === "ar" ? "ملخص التشغيل" : "Operational summary"}
-                subtitle={locale === "ar" ? "مؤشرات سريعة من الملخص المالي والتقارير." : "Quick KPIs from the financial and report summaries."}
-              >
-                <div className="space-y-3">
-                  {[
-                    { label: locale === "ar" ? "الحجوزات المكتملة" : "Completed bookings", value: safeNumber(summary?.completedBookings ?? financialOverview?.completedBookings), tone: "bg-emerald-500" },
-                    { label: locale === "ar" ? "الحجوزات الملغاة" : "Cancelled bookings", value: safeNumber(summary?.cancelledBookings ?? financialOverview?.cancelledBookings), tone: "bg-rose-500" },
-                    { label: locale === "ar" ? "حالات عدم الحضور" : "No-show cases", value: safeNumber(summary?.noShowBookings ?? financialOverview?.noShowBookings), tone: "bg-amber-500" },
-                    { label: locale === "ar" ? "العملاء العائدون" : "Returning customers", value: safeNumber(customerAnalytics?.returningCustomers), tone: "bg-violet-500" }
-                  ].map((item) => (
-                    <div key={item.label} className="rounded-2xl border border-gray-200 p-4">
-                      <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-                        <span className="text-sm font-medium text-gray-600">{item.label}</span>
-                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
-                      </div>
-                      <div className="mt-3 h-2 rounded-full bg-gray-100">
-                        <div className={`h-2 rounded-full ${item.tone}`} style={{ width: "100%" }} />
-                      </div>
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
+                  <FinanceSectionCard
+                    title={locale === "ar" ? "اتجاهات الحجز" : "Booking trends"}
+                    subtitle={locale === "ar" ? "الاتجاه اليومي أو الشهري بحسب النطاق المحدد." : "Daily or monthly booking trend based on the selected range."}
+                  >
+                    <div className="space-y-4">
+                      <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#0ea5e9" />
+                      <SectionTable
+                        rtl={isRTL}
+                        headers={[
+                          locale === "ar" ? "التاريخ" : "Date",
+                          locale === "ar" ? "الحجوزات" : "Bookings",
+                          locale === "ar" ? "المكتملة" : "Completed",
+                          locale === "ar" ? "الإيراد" : "Revenue"
+                        ]}
+                        rows={bookingTrends.slice(0, 8).map((trend) => [
+                          trend.date,
+                          safeNumber(trend.bookings),
+                          safeNumber(trend.completed),
+                          formatMoney(trend.revenue)
+                        ])}
+                      />
                     </div>
-                  ))}
+                  </FinanceSectionCard>
+
+                  <FinanceSectionCard
+                    title={locale === "ar" ? "ملخص التشغيل" : "Operational summary"}
+                    subtitle={locale === "ar" ? "مؤشرات سريعة من الملخص المالي والتقارير." : "Quick KPIs from the financial and report summaries."}
+                  >
+                    <div className="space-y-3">
+                      {[
+                        { label: locale === "ar" ? "الحجوزات المكتملة" : "Completed bookings", value: safeNumber(summary?.completedBookings ?? financialOverview?.completedBookings), tone: "bg-emerald-500" },
+                        { label: locale === "ar" ? "الحجوزات الملغاة" : "Cancelled bookings", value: safeNumber(summary?.cancelledBookings ?? financialOverview?.cancelledBookings), tone: "bg-rose-500" },
+                        { label: locale === "ar" ? "حالات عدم الحضور" : "No-show cases", value: safeNumber(summary?.noShowBookings ?? financialOverview?.noShowBookings), tone: "bg-amber-500" },
+                        { label: locale === "ar" ? "العملاء العائدون" : "Returning customers", value: safeNumber(customerAnalytics?.returningCustomers), tone: "bg-violet-500" }
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-2xl border border-gray-200 p-4">
+                          <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                            <span className="text-sm font-medium text-gray-600">{item.label}</span>
+                            <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                          </div>
+                          <div className="mt-3 h-2 rounded-full bg-gray-100">
+                            <div className={`h-2 rounded-full ${item.tone}`} style={{ width: "100%" }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </FinanceSectionCard>
                 </div>
-              </FinanceSectionCard>
-            </div>
 
-            {activeSection === "overview" ? (
-              <div className="grid gap-5 xl:grid-cols-2">
-                <FinanceSectionCard
-                  title={locale === "ar" ? "الخدمات الأعلى أداء" : "Top services"}
-                  subtitle={locale === "ar" ? "الخدمات الأكثر توليدا للإيراد." : "Highest revenue-generating services."}
-                >
-                  <SectionTable
-                    rtl={isRTL}
-                    headers={[
-                      locale === "ar" ? "الخدمة" : "Service",
-                      locale === "ar" ? "الحجوزات" : "Bookings",
-                      locale === "ar" ? "الإيراد" : "Revenue"
-                    ]}
-                    rows={servicePerformance.slice(0, 6).map((service) => [
-                      locale === "ar" ? service.name_ar : service.name_en,
-                      safeNumber(service.totalBookings),
-                      formatMoney(service.revenue ?? service.totalRevenue)
-                    ])}
-                  />
-                </FinanceSectionCard>
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <FinanceSectionCard
+                    title={locale === "ar" ? "الخدمات الأعلى أداء" : "Top services"}
+                    subtitle={locale === "ar" ? "الخدمات الأكثر توليدا للإيراد." : "Highest revenue-generating services."}
+                  >
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "الخدمة" : "Service",
+                        locale === "ar" ? "الحجوزات" : "Bookings",
+                        locale === "ar" ? "الإيراد" : "Revenue"
+                      ]}
+                      rows={servicePerformance.slice(0, 6).map((service) => [
+                        locale === "ar" ? service.name_ar : service.name_en,
+                        safeNumber(service.totalBookings),
+                        formatMoney(service.revenue ?? service.totalRevenue)
+                      ])}
+                    />
+                  </FinanceSectionCard>
 
-                <FinanceSectionCard
-                  title={locale === "ar" ? "أكبر العملاء" : "Top customers"}
-                  subtitle={locale === "ar" ? "العملاء الأكثر إنفاقا." : "Customers with the highest revenue contribution."}
-                >
-                  <SectionTable
-                    rtl={isRTL}
-                    headers={[
-                      locale === "ar" ? "العميل" : "Customer",
-                      locale === "ar" ? "الحجوزات" : "Bookings",
-                      locale === "ar" ? "الإيراد" : "Revenue"
-                    ]}
-                    rows={(customerAnalytics?.topCustomers || []).slice(0, 6).map((customer: any) => [
-                      customer.id,
-                      safeNumber(customer.bookings),
-                      formatMoney(customer.revenue)
-                    ])}
-                  />
-                </FinanceSectionCard>
-              </div>
+                  <FinanceSectionCard
+                    title={locale === "ar" ? "أكبر العملاء" : "Top customers"}
+                    subtitle={locale === "ar" ? "العملاء الأكثر إنفاقا." : "Customers with the highest revenue contribution."}
+                  >
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "العميل" : "Customer",
+                        locale === "ar" ? "الحجوزات" : "Bookings",
+                        locale === "ar" ? "الإيراد" : "Revenue"
+                      ]}
+                      rows={(customerAnalytics?.topCustomers || []).slice(0, 6).map((customer: any) => [
+                        customer.id,
+                        safeNumber(customer.bookings),
+                        formatMoney(customer.revenue)
+                      ])}
+                    />
+                  </FinanceSectionCard>
+                </div>
+              </>
             ) : null}
 
             {activeSection === "sales" ? (
@@ -624,10 +639,38 @@ export default function ReportsPage() {
 
             {activeSection === "products" ? (
               <FinanceSectionCard title={locale === "ar" ? "تقرير المنتجات" : "Product report"}>
-                <FinanceEmptyState
-                  title={locale === "ar" ? "لا يوجد تقرير منتجات" : "No product report"}
-                  description={locale === "ar" ? "التقارير الحالية لا تعرض بعد تقرير منتجات منفصل." : "The current report API does not yet expose a dedicated product report."}
-                />
+                {productRevenue?.rows?.length ? (
+                  <div className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <FinanceMetricCard label={locale === "ar" ? "المنتجات النشطة" : "Active products"} value={safeNumber(productRevenue.totals?.totalProducts)} tone="blue" />
+                      <FinanceMetricCard label={locale === "ar" ? "الطلبات" : "Orders"} value={safeNumber(productRevenue.totals?.totalOrders)} tone="green" />
+                      <FinanceMetricCard label={locale === "ar" ? "الكمية" : "Quantity"} value={safeNumber(productRevenue.totals?.totalQuantity)} tone="purple" />
+                      <FinanceMetricCard label={locale === "ar" ? "الإيراد" : "Revenue"} value={formatMoney(productRevenue.totals?.totalRevenue)} tone="amber" />
+                    </div>
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "المنتج" : "Product",
+                        locale === "ar" ? "الطلبات" : "Orders",
+                        locale === "ar" ? "الكمية" : "Quantity",
+                        locale === "ar" ? "الإيراد" : "Revenue",
+                        locale === "ar" ? "إيراد المركز" : "Tenant revenue"
+                      ]}
+                      rows={productRevenue.rows.map((product: any) => [
+                        locale === "ar" ? product.name_ar : product.name_en,
+                        safeNumber(product.totalOrders),
+                        safeNumber(product.totalQuantity),
+                        formatMoney(product.totalRevenue),
+                        formatMoney(product.totalTenantRevenue)
+                      ])}
+                    />
+                  </div>
+                ) : (
+                  <FinanceEmptyState
+                    title={locale === "ar" ? "لا يوجد تقرير منتجات" : "No product report"}
+                    description={locale === "ar" ? "التقرير لا يحتوي على بيانات منتجات ضمن هذا النطاق." : "No product revenue data is available for this range."}
+                  />
+                )}
               </FinanceSectionCard>
             ) : null}
 
