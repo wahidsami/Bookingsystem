@@ -64,7 +64,7 @@ function getTenantAppointmentIncludes() {
         {
             model: db.Service,
             as: 'service',
-            attributes: ['id', 'tenantId'],
+            attributes: ['id', 'tenantId', 'name_en', 'name_ar', 'category', 'rawPrice', 'finalPrice'],
             required: false
         },
         {
@@ -74,6 +74,23 @@ function getTenantAppointmentIncludes() {
             required: false
         }
     ];
+}
+
+function getAppointmentDiscountAmount(appointment) {
+    const serviceRawPrice = parseFloat(appointment?.service?.rawPrice || 0);
+    const discountedRawPrice = parseFloat(appointment?.rawPrice || 0);
+    const discountAmount = serviceRawPrice - discountedRawPrice;
+    return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
+}
+
+function getOrderDiscountAmount(order) {
+    const subtotal = parseFloat(order?.subtotal || 0);
+    const taxAmount = parseFloat(order?.taxAmount || 0);
+    const shippingFee = parseFloat(order?.shippingFee || 0);
+    const totalAmount = parseFloat(order?.totalAmount || 0);
+    const baseAmount = subtotal + taxAmount + shippingFee;
+    const discountAmount = baseAmount - totalAmount;
+    return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
 }
 
 /**
@@ -131,7 +148,7 @@ exports.getFinancialOverview = async (req, res) => {
         const orders = await db.Order.findAll({
             where: orderWhere,
             attributes: [
-                'id', 'totalAmount', 'platformFee', 
+                'id', 'orderNumber', 'subtotal', 'taxAmount', 'shippingFee', 'totalAmount', 'platformFee',
                 'paymentStatus', 'status', 'createdAt'
             ]
         });
@@ -168,11 +185,15 @@ exports.getFinancialOverview = async (req, res) => {
             totalPlatformFees: 0,
             totalTenantRevenue: 0,
             totalEmployeeCommissions: 0,
+            totalDiscountAmount: 0,
             totalBookings: allAppointments.length,
             paidBookings: 0,
             pendingPayments: 0,
-            completedBookings: 0
+            completedBookings: 0,
+            discountedBookings: 0
         };
+
+        const discountedServiceTotals = new Map();
 
         appointments.forEach(appt => {
             appointmentTotals.totalRevenue += parseFloat(appt.price || 0);
@@ -181,6 +202,27 @@ exports.getFinancialOverview = async (req, res) => {
             appointmentTotals.totalPlatformFees += parseFloat(appt.platformFee || 0);
             appointmentTotals.totalTenantRevenue += parseFloat(appt.tenantRevenue || 0);
             appointmentTotals.totalEmployeeCommissions += parseFloat(appt.employeeCommission || 0);
+
+            const discountAmount = getAppointmentDiscountAmount(appt);
+            if (discountAmount > 0) {
+                appointmentTotals.totalDiscountAmount += discountAmount;
+                appointmentTotals.discountedBookings += 1;
+
+                const serviceKey = appt.service?.id || appt.serviceId || 'unknown';
+                const serviceName = appt.service?.name_en || appt.service?.name_ar || 'Service';
+                const existingService = discountedServiceTotals.get(serviceKey) || {
+                    id: serviceKey,
+                    name_en: appt.service?.name_en || serviceName,
+                    name_ar: appt.service?.name_ar || serviceName,
+                    category: appt.service?.category || null,
+                    discountAmount: 0,
+                    bookingCount: 0
+                };
+
+                existingService.discountAmount += discountAmount;
+                existingService.bookingCount += 1;
+                discountedServiceTotals.set(serviceKey, existingService);
+            }
 
             if (isAppointmentFullyPaid(appt.paymentStatus)) {
                 appointmentTotals.paidBookings++;
@@ -198,20 +240,37 @@ exports.getFinancialOverview = async (req, res) => {
             totalRevenue: 0,
             totalPlatformFees: 0,
             totalTenantRevenue: 0,
+            totalDiscountAmount: 0,
             totalOrders: orders.length,
             paidOrders: 0,
             pendingPayments: 0,
-            completedOrders: 0
+            completedOrders: 0,
+            discountedOrders: 0
         };
+
+        const discountedOrderTotals = [];
 
         orders.forEach(order => {
             const totalAmount = parseFloat(order.totalAmount || 0);
             const platformFee = parseFloat(order.platformFee || 0);
             const tenantRevenue = totalAmount - platformFee;
+            const discountAmount = getOrderDiscountAmount(order);
             
             orderTotals.totalRevenue += totalAmount;
             orderTotals.totalPlatformFees += platformFee;
             orderTotals.totalTenantRevenue += tenantRevenue;
+
+            if (discountAmount > 0) {
+                orderTotals.totalDiscountAmount += discountAmount;
+                orderTotals.discountedOrders += 1;
+                discountedOrderTotals.push({
+                    id: order.id,
+                    orderNumber: order.orderNumber || order.id,
+                    discountAmount,
+                    totalAmount,
+                    baseAmount: parseFloat((parseFloat(order.subtotal || 0) + parseFloat(order.taxAmount || 0) + parseFloat(order.shippingFee || 0)).toFixed(2))
+                });
+            }
 
             if (order.paymentStatus === 'paid') {
                 orderTotals.paidOrders++;
@@ -251,6 +310,11 @@ exports.getFinancialOverview = async (req, res) => {
             avgBookingValue: allAppointments.filter((appt) => appt.status === 'completed').length > 0
                 ? parseFloat((appointmentTotals.totalRevenue / allAppointments.filter((appt) => appt.status === 'completed').length).toFixed(2))
                 : 0,
+            totalDiscountAmount: parseFloat((appointmentTotals.totalDiscountAmount + orderTotals.totalDiscountAmount).toFixed(2)),
+            appointmentDiscountAmount: parseFloat(appointmentTotals.totalDiscountAmount.toFixed(2)),
+            orderDiscountAmount: parseFloat(orderTotals.totalDiscountAmount.toFixed(2)),
+            discountedBookings: appointmentTotals.discountedBookings,
+            discountedOrders: orderTotals.discountedOrders,
             // Separate breakdowns
             appointmentRevenue: appointmentTotals.totalRevenue,
             orderRevenue: orderTotals.totalRevenue,
@@ -258,7 +322,30 @@ exports.getFinancialOverview = async (req, res) => {
             giftCardTransactions: giftCardTotals.totalTransactions,
             appointmentTenantRevenue: appointmentTotals.totalTenantRevenue,
             orderTenantRevenue: orderTotals.totalTenantRevenue,
-            giftCardTenantRevenue: giftCardTotals.totalRevenue
+            giftCardTenantRevenue: giftCardTotals.totalRevenue,
+            discountTotals: {
+                totalDiscountAmount: parseFloat((appointmentTotals.totalDiscountAmount + orderTotals.totalDiscountAmount).toFixed(2)),
+                appointmentDiscountAmount: parseFloat(appointmentTotals.totalDiscountAmount.toFixed(2)),
+                orderDiscountAmount: parseFloat(orderTotals.totalDiscountAmount.toFixed(2)),
+                discountedBookings: appointmentTotals.discountedBookings,
+                discountedOrders: orderTotals.discountedOrders,
+                averageDiscountAmount: parseFloat(((appointmentTotals.totalDiscountAmount + orderTotals.totalDiscountAmount) / Math.max(appointmentTotals.discountedBookings + orderTotals.discountedOrders, 1)).toFixed(2)),
+                topDiscountedServices: Array.from(discountedServiceTotals.values())
+                    .sort((left, right) => right.discountAmount - left.discountAmount)
+                    .slice(0, 10)
+                    .map((entry) => ({
+                        ...entry,
+                        discountAmount: parseFloat(entry.discountAmount.toFixed(2))
+                    })),
+                topDiscountedOrders: discountedOrderTotals
+                    .sort((left, right) => right.discountAmount - left.discountAmount)
+                    .slice(0, 10)
+                    .map((entry) => ({
+                        ...entry,
+                        discountAmount: parseFloat(entry.discountAmount.toFixed(2)),
+                        baseAmount: parseFloat(entry.baseAmount.toFixed(2))
+                    }))
+            }
         };
 
         // Round all values

@@ -80,7 +80,8 @@ function TrendSparkline({
       return `${x},${y}`;
     });
 
-    return `M ${coords[0]} ${coords.slice(1).map((point) => `L ${point}`).join(" ")} L 100 ${height} L 0 ${height} Z`;
+    const linePath = coords.map((point, index) => `${index === 0 ? "M" : "L"} ${point}`).join(" ");
+    return `${linePath} L 100 ${height} L 0 ${height} Z`;
   }, [height, values]);
 
   if (!values.length) {
@@ -327,6 +328,7 @@ export default function ReportsPage() {
   const avgBookingValue = safeNumber(summary?.avgBookingValue ?? financialOverview?.avgBookingValue);
   const completionRate = safeNumber(summary?.completionRate ?? financialOverview?.completionRate);
   const retentionRate = safeNumber(customerAnalytics?.retentionRate);
+  const discountTotals = financialOverview?.discountTotals || null;
 
   return (
     <TenantLayout>
@@ -607,10 +609,34 @@ export default function ReportsPage() {
 
             {activeSection === "discounts" ? (
               <FinanceSectionCard title={locale === "ar" ? "الخصومات" : "Discounts"}>
-                <FinanceEmptyState
-                  title={locale === "ar" ? "لا يوجد تجميع خصومات مخصص" : "No dedicated discount aggregate"}
-                  description={locale === "ar" ? "يمكن إضافة هذا القسم لاحقا كتوسعة إضافية." : "This section can be added later as an additive extension."}
-                />
+                {discountTotals ? (
+                  <div className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <FinanceMetricCard label={locale === "ar" ? "إجمالي الخصومات" : "Total discounts"} value={formatMoney(discountTotals.totalDiscountAmount)} tone="rose" />
+                      <FinanceMetricCard label={locale === "ar" ? "خصومات الحجوزات" : "Booking discounts"} value={formatMoney(discountTotals.appointmentDiscountAmount)} tone="purple" />
+                      <FinanceMetricCard label={locale === "ar" ? "خصومات الطلبات" : "Order discounts"} value={formatMoney(discountTotals.orderDiscountAmount)} tone="blue" />
+                      <FinanceMetricCard label={locale === "ar" ? "متوسط الخصم" : "Average discount"} value={formatMoney(discountTotals.averageDiscountAmount)} tone="amber" />
+                    </div>
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "الخدمة" : "Service",
+                        locale === "ar" ? "الحجوزات" : "Bookings",
+                        locale === "ar" ? "الخصم" : "Discount"
+                      ]}
+                      rows={(discountTotals.topDiscountedServices || []).map((service: any) => [
+                        locale === "ar" ? service.name_ar : service.name_en,
+                        safeNumber(service.bookingCount),
+                        formatMoney(service.discountAmount)
+                      ])}
+                    />
+                  </div>
+                ) : (
+                  <FinanceEmptyState
+                    title={locale === "ar" ? "لا توجد خصومات مسجلة" : "No recorded discounts"}
+                    description={locale === "ar" ? "لم يتم العثور على حجوزات أو طلبات تحتوي على خصم ضمن هذا النطاق." : "No appointments or orders with discounts were found in the selected range."}
+                  />
+                )}
               </FinanceSectionCard>
             ) : null}
 

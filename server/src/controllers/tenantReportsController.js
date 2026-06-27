@@ -523,10 +523,15 @@ async function buildFullReportData(req, sections, startDate, endDate) {
     const result = {};
     const queryWithRange = { ...req.query, startDate, endDate };
 
-    if (sections.includes('overview')) {
+    if (sections.includes('overview') || sections.includes('discounts')) {
         const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
         if (response?.success && response?.overview) {
-            result.overview = response.overview;
+            if (sections.includes('overview')) {
+                result.overview = response.overview;
+            }
+            if (sections.includes('discounts') && response.overview.discountTotals) {
+                result.discounts = response.overview.discountTotals;
+            }
         }
     }
 

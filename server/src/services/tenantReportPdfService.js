@@ -132,6 +132,43 @@ function generateReportPdfBuffer(payload) {
             ]);
         }
 
+        if (payload.data?.discounts) {
+            const discounts = payload.data.discounts;
+            drawSectionTitle(doc, 'Discounts');
+            drawKeyValueGrid(doc, [
+                ['Total Discounts', formatMoney(discounts.totalDiscountAmount)],
+                ['Booking Discounts', formatMoney(discounts.appointmentDiscountAmount)],
+                ['Order Discounts', formatMoney(discounts.orderDiscountAmount)],
+                ['Average Discount', formatMoney(discounts.averageDiscountAmount)],
+            ]);
+
+            if (Array.isArray(discounts.topDiscountedServices) && discounts.topDiscountedServices.length > 0) {
+                drawSimpleTable(
+                    doc,
+                    'Top Discounted Services',
+                    ['Service', 'Bookings', 'Discount'],
+                    discounts.topDiscountedServices.map((service) => [
+                        service.name_en || service.name_ar || '-',
+                        service.bookingCount ?? 0,
+                        formatMoney(service.discountAmount),
+                    ])
+                );
+            }
+
+            if (Array.isArray(discounts.topDiscountedOrders) && discounts.topDiscountedOrders.length > 0) {
+                drawSimpleTable(
+                    doc,
+                    'Top Discounted Orders',
+                    ['Order', 'Base Amount', 'Discount'],
+                    discounts.topDiscountedOrders.map((order) => [
+                        order.orderNumber || order.id || '-',
+                        formatMoney(order.baseAmount),
+                        formatMoney(order.discountAmount),
+                    ])
+                );
+            }
+        }
+
         if (Array.isArray(payload.data?.employees)) {
             drawSimpleTable(
                 doc,
@@ -183,4 +220,3 @@ module.exports = {
     resolveUploadPath,
     sanitizeFileNamePart,
 };
-

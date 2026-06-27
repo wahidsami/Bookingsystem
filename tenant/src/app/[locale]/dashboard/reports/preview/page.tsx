@@ -497,12 +497,70 @@ export default function ReportPreviewPage() {
             )}
 
             {sections.includes('discounts') && (
-              <EmptyReportSection
-                title={locale === 'ar' ? 'تقرير الخصومات' : 'Discounts report'}
-                description={locale === 'ar'
-                  ? 'لا يوجد حتى الآن مصدر تجميعي مخصص للخصومات، لكن يمكن إضافة هذا القسم لاحقاً بدون تغيير نموذج المحاسبة.'
-                  : 'There is no dedicated discount aggregate yet, but this section can be added later without changing the accounting model.'}
-              />
+              data.discounts ? (
+                <section className="break-inside-avoid">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'تقرير الخصومات' : 'Discounts report'}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'إجمالي الخصومات:' : 'Total discounts:'}</span> <Currency amount={data.discounts.totalDiscountAmount ?? 0} /></div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'خصومات الحجوزات:' : 'Booking discounts:'}</span> <Currency amount={data.discounts.appointmentDiscountAmount ?? 0} /></div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'خصومات الطلبات:' : 'Order discounts:'}</span> <Currency amount={data.discounts.orderDiscountAmount ?? 0} /></div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'متوسط الخصم:' : 'Average discount:'}</span> <Currency amount={data.discounts.averageDiscountAmount ?? 0} /></div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 mb-2">{locale === 'ar' ? 'أكبر الخدمات المخفضة' : 'Top discounted services'}</p>
+                      <table className="w-full border border-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
+                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
+                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الخصم' : 'Discount'}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(data.discounts.topDiscountedServices || []).map((item: any) => (
+                            <tr key={item.id} className="border-b border-gray-100">
+                              <td className="px-3 py-2">{locale === 'ar' ? item.name_ar : item.name_en}</td>
+                              <td className="px-3 py-2 text-right">{item.bookingCount ?? 0}</td>
+                              <td className="px-3 py-2 text-right"><Currency amount={item.discountAmount ?? 0} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 mb-2">{locale === 'ar' ? 'أكبر الطلبات المخفضة' : 'Top discounted orders'}</p>
+                      <table className="w-full border border-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الطلب' : 'Order'}</th>
+                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'القيمة الأساسية' : 'Base amount'}</th>
+                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الخصم' : 'Discount'}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(data.discounts.topDiscountedOrders || []).map((item: any) => (
+                            <tr key={item.id} className="border-b border-gray-100">
+                              <td className="px-3 py-2">{item.orderNumber}</td>
+                              <td className="px-3 py-2 text-right"><Currency amount={item.baseAmount ?? 0} /></td>
+                              <td className="px-3 py-2 text-right"><Currency amount={item.discountAmount ?? 0} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+              ) : (
+                <EmptyReportSection
+                  title={locale === 'ar' ? 'تقرير الخصومات' : 'Discounts report'}
+                  description={locale === 'ar'
+                    ? 'لا توجد خصومات مسجلة ضمن هذا النطاق.'
+                    : 'No recorded discounts were found for this range.'}
+                />
+              )
             )}
 
             {sections.includes('refunds') && (
