@@ -3170,8 +3170,32 @@ export function AppointmentDetailsDrawer({
             </div>
             <div className="border-t border-gray-200 pt-4">
             {customerWorkspaceLoading ? (
-              <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
-                <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+              <div className="grid gap-4 xl:grid-cols-[340px_260px_minmax(0,1fr)]">
+                <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="mx-auto h-20 w-20 animate-pulse rounded-full bg-gray-200" />
+                  <div className="mx-auto h-5 w-40 animate-pulse rounded-full bg-gray-200" />
+                  <div className="mx-auto h-4 w-28 animate-pulse rounded-full bg-gray-200" />
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    {[...Array(4)].map((_, index) => (
+                      <div key={index} className="h-14 animate-pulse rounded-2xl bg-gray-100" />
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="h-4 w-24 animate-pulse rounded-full bg-gray-200" />
+                  {[...Array(6)].map((_, index) => (
+                    <div key={index} className="h-10 animate-pulse rounded-2xl bg-gray-100" />
+                  ))}
+                </div>
+                <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="h-4 w-32 animate-pulse rounded-full bg-gray-200" />
+                  <div className="grid grid-cols-2 gap-3">
+                    {[...Array(4)].map((_, index) => (
+                      <div key={index} className="h-20 animate-pulse rounded-2xl bg-gray-100" />
+                    ))}
+                  </div>
+                  <div className="h-32 animate-pulse rounded-3xl bg-gray-100" />
+                </div>
               </div>
             ) : customerProfile ? (
               renderCustomerTabContent()
@@ -3554,7 +3578,17 @@ export function AppointmentDetailsDrawer({
             </article>
           )) : (
             <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-              {locale === "ar" ? "لا توجد مراجعات لهذا العميل." : "No reviews from this customer yet."}
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-400 ring-1 ring-gray-200">
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M9.049 2.927c.3-.921 1.602-.921 1.902 0l1.058 3.25a1 1 0 00.95.69h3.416c.969 0 1.371 1.24.588 1.81l-2.765 2.009a1 1 0 00-.364 1.118l1.058 3.25c.3.921-.755 1.688-1.54 1.118l-2.765-2.01a1 1 0 00-1.175 0l-2.765 2.01c-.785.57-1.84-.197-1.54-1.118l1.058-3.25a1 1 0 00-.364-1.118L2.497 8.677c-.783-.57-.38-1.81.588-1.81H6.5a1 1 0 00.95-.69l1.058-3.25z" />
+                </svg>
+              </div>
+              <p className="mt-3 font-medium text-gray-700">{locale === "ar" ? "لا توجد مراجعات لهذا العميل." : "No reviews from this customer yet."}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {locale === "ar"
+                  ? "ستظهر المراجعات هنا بعد أن يرسل العميل تقييمًا."
+                  : "Reviews will appear here once the customer leaves feedback."}
+              </p>
             </div>
           )}
         </div>
@@ -3602,7 +3636,17 @@ export function AppointmentDetailsDrawer({
         </div>
       )) : (
         <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-          {locale === "ar" ? "لا توجد مواعيد متاحة." : "No appointments available."}
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-400 ring-1 ring-gray-200">
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M5 4a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V8.5L13.5 4H5zm0 2h7v3h3v5H5V6z" />
+            </svg>
+          </div>
+          <p className="mt-3 font-medium text-gray-700">{locale === "ar" ? "لا توجد مواعيد متاحة." : "No appointments available."}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {locale === "ar"
+              ? "ستظهر هنا المواعيد السابقة واللاحقة للعميل."
+              : "Past and upcoming appointments for this customer will appear here."}
+          </p>
         </div>
       )}
     </div>
@@ -3611,8 +3655,39 @@ export function AppointmentDetailsDrawer({
   const renderTransactions = () => (
     <div className="space-y-3">
       {customerTransactionsLoading ? (
-        <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
-          <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+        <div className="space-y-3">
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2">
+                <div className="h-3 w-40 animate-pulse rounded-full bg-gray-200" />
+                <div className="h-4 w-56 animate-pulse rounded-full bg-gray-200" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="h-9 w-20 animate-pulse rounded-full bg-gray-100" />
+                ))}
+              </div>
+            </div>
+          </div>
+          {[...Array(3)].map((_, index) => (
+            <div key={index} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="h-6 w-24 animate-pulse rounded-full bg-gray-200" />
+                    <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
+                    <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
+                  </div>
+                  <div className="h-4 w-48 animate-pulse rounded-full bg-gray-200" />
+                  <div className="h-4 w-32 animate-pulse rounded-full bg-gray-100" />
+                </div>
+                <div className="space-y-2 text-right">
+                  <div className="h-5 w-24 animate-pulse rounded-full bg-gray-200" />
+                  <div className="h-3 w-20 animate-pulse rounded-full bg-gray-100" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <>
@@ -3795,7 +3870,17 @@ export function AppointmentDetailsDrawer({
             </div>
           ) : (
             <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-              {locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-400 ring-1 ring-gray-200">
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M4 4.5A2.5 2.5 0 016.5 2h7A2.5 2.5 0 0116 4.5V16a1 1 0 01-1.447.894L10 14.118l-4.553 2.776A1 1 0 014 16V4.5zm2.5-.5a.5.5 0 00-.5.5v9.717l3.553-2.166a1 1 0 011.042 0L14.5 14.217V4.5a.5.5 0 00-.5-.5h-7z" />
+                </svg>
+              </div>
+              <p className="mt-3 font-medium text-gray-700">{locale === "ar" ? "لا توجد معاملات مطابقة للفلتر." : "No transactions match the selected filters."}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {locale === "ar"
+                  ? "جرّب تغيير نوع المعاملة أو حالتها لعرض نتائج أكثر."
+                  : "Try changing the transaction type or status to see more results."}
+              </p>
             </div>
           )}
         </>
@@ -3832,8 +3917,35 @@ export function AppointmentDetailsDrawer({
             )}
 
             {loading ? (
-              <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
-                <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+              <div className="space-y-4 rounded-3xl border border-dashed border-gray-200 bg-gray-50 p-4">
+                <div className="grid gap-4 xl:grid-cols-[340px_260px_minmax(0,1fr)]">
+                  <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="mx-auto h-20 w-20 animate-pulse rounded-full bg-gray-200" />
+                    <div className="mx-auto h-5 w-40 animate-pulse rounded-full bg-gray-200" />
+                    <div className="mx-auto h-4 w-28 animate-pulse rounded-full bg-gray-200" />
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      {[...Array(4)].map((_, index) => (
+                        <div key={index} className="h-14 animate-pulse rounded-2xl bg-gray-100" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="h-4 w-24 animate-pulse rounded-full bg-gray-200" />
+                    <div className="space-y-2">
+                      {[...Array(6)].map((_, index) => (
+                        <div key={index} className="h-10 animate-pulse rounded-2xl bg-gray-100" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="h-4 w-32 animate-pulse rounded-full bg-gray-200" />
+                    <div className="space-y-3">
+                      <div className="h-24 animate-pulse rounded-3xl bg-gray-100" />
+                      <div className="h-24 animate-pulse rounded-3xl bg-gray-100" />
+                      <div className="h-24 animate-pulse rounded-3xl bg-gray-100" />
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : appointment ? (
               <div className="h-full">
