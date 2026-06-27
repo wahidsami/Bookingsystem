@@ -448,6 +448,52 @@ class AdminApi {
     }>(`/admin/financial/invoices${suffix}`);
   }
 
+  async getAnalyticsDrilldown(params: {
+    entity: 'transactions' | 'appointments' | 'payments' | 'customers' | 'employees' | 'services' | 'products' | 'invoices' | 'bills';
+    page?: number;
+    limit?: number;
+    search?: string;
+    tenantId?: string;
+    status?: string;
+    type?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    active?: string;
+  }) {
+    const search = new URLSearchParams();
+    search.append('entity', params.entity);
+    if (params.page != null) search.append('page', params.page.toString());
+    if (params.limit != null) search.append('limit', params.limit.toString());
+    if (params.search) search.append('search', params.search);
+    if (params.tenantId) search.append('tenantId', params.tenantId);
+    if (params.status) search.append('status', params.status);
+    if (params.type) search.append('type', params.type);
+    if (params.paymentStatus) search.append('paymentStatus', params.paymentStatus);
+    if (params.paymentMethod) search.append('paymentMethod', params.paymentMethod);
+    if (params.category) search.append('category', params.category);
+    if (params.startDate) search.append('startDate', params.startDate);
+    if (params.endDate) search.append('endDate', params.endDate);
+    if (params.active) search.append('active', params.active);
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+
+    return this.request<{
+      success: boolean;
+      data: {
+        entity: string;
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+        rows: any[];
+        summary?: Record<string, any>;
+        filters?: Record<string, any>;
+      };
+    }>(`/admin/financial/drilldown${suffix}`);
+  }
+
   async getPlatformTransactions(params: { startDate?: string; endDate?: string; tenantId?: string; type?: string; limit?: number; offset?: number } = {}) {
     const search = new URLSearchParams();
     if (params.startDate) search.append('startDate', params.startDate);

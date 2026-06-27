@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '@/lib/api';
 import { format, subDays } from 'date-fns';
+import { AnalyticsDetailsDrawer, AnalyticsDrilldownEntity } from '@/components/AnalyticsDetailsDrawer';
+
+type DrilldownConfig = {
+  entity: AnalyticsDrilldownEntity;
+  title: string;
+  description?: string;
+  defaultFilters?: Record<string, string>;
+};
 
 const exportToCSV = (data: any[], filename: string) => {
   if (data.length === 0) {
@@ -35,6 +43,7 @@ export default function GeneralReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState('30');
+  const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
 
   useEffect(() => {
     fetchReport();
@@ -106,6 +115,9 @@ export default function GeneralReportPage() {
   const leaderboard = data.leaderboard || [];
   const topEmployees = data.topEmployees || [];
   const revenueByType = data.revenueByType || {};
+  const currentStartDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
+  const currentEndDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
+  const openDrilldown = (config: DrilldownConfig) => setDrilldown(config);
 
   return (
     <div className="space-y-6">
@@ -136,22 +148,58 @@ export default function GeneralReportPage() {
 
       {/* Summary cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg border border-dark-600 bg-dark-800 p-4">
+        <button
+          type="button"
+          onClick={() => openDrilldown({
+            entity: 'transactions',
+            title: 'Revenue Transactions',
+            description: 'Transactions behind the total revenue summary.',
+            defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+          })}
+          className="rounded-lg border border-dark-600 bg-dark-800 p-4 text-left transition hover:border-primary-500 hover:bg-dark-750"
+        >
           <p className="text-sm text-dark-400">Total Revenue</p>
           <p className="text-xl font-bold text-white">SAR {rev.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-4">
+        </button>
+        <button
+          type="button"
+          onClick={() => openDrilldown({
+            entity: 'transactions',
+            title: 'Commission Transactions',
+            description: 'Transactions that contributed to your commission.',
+            defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+          })}
+          className="rounded-lg border border-green-600/50 bg-green-900/20 p-4 text-left transition hover:border-green-400 hover:bg-green-900/30"
+        >
           <p className="text-sm text-green-300">Your Commission</p>
           <p className="text-xl font-bold text-green-400">SAR {yourEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="rounded-lg border border-blue-600/50 bg-blue-900/20 p-4">
+        </button>
+        <button
+          type="button"
+          onClick={() => openDrilldown({
+            entity: 'transactions',
+            title: 'Tenant Revenue Transactions',
+            description: 'Transactions that contributed to tenant revenue.',
+            defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+          })}
+          className="rounded-lg border border-blue-600/50 bg-blue-900/20 p-4 text-left transition hover:border-blue-400 hover:bg-blue-900/30"
+        >
           <p className="text-sm text-blue-300">Tenant Revenue</p>
           <p className="text-xl font-bold text-blue-400">SAR {tenantEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="rounded-lg border border-dark-600 bg-dark-800 p-4">
+        </button>
+        <button
+          type="button"
+          onClick={() => openDrilldown({
+            entity: 'transactions',
+            title: 'All Transactions',
+            description: 'Full transaction ledger for the selected period.',
+            defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+          })}
+          className="rounded-lg border border-dark-600 bg-dark-800 p-4 text-left transition hover:border-dark-500 hover:bg-dark-750"
+        >
           <p className="text-sm text-dark-400">Transactions</p>
           <p className="text-xl font-bold text-white">{totalTx}</p>
-        </div>
+        </button>
       </div>
 
       {/* Revenue by type */}
@@ -175,7 +223,18 @@ export default function GeneralReportPage() {
                   if (!row) return null;
                   const labels: Record<string, string> = { booking: 'Bookings', product_purchase: 'Products', subscription: 'Subscriptions' };
                   return (
-                    <tr key={key} className="border-b border-dark-700">
+                    <tr
+                      key={key}
+                      className="cursor-pointer border-b border-dark-700 transition hover:bg-dark-700/50"
+                      onClick={() => openDrilldown({
+                        entity: key === 'subscription' ? 'invoices' : 'transactions',
+                        title: `${labels[key]} Drill-down`,
+                        description: `Detailed records behind ${labels[key].toLowerCase()} revenue.`,
+                        defaultFilters: key === 'subscription'
+                          ? { status: 'PAID', startDate: currentStartDate, endDate: currentEndDate }
+                          : { type: key, startDate: currentStartDate, endDate: currentEndDate }
+                      })}
+                    >
                       <td className="py-2 text-white">{labels[key]}</td>
                       <td className="py-2 text-right text-white">{row.count}</td>
                       <td className="py-2 text-right text-white">SAR {(row.amount || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</td>
@@ -207,7 +266,21 @@ export default function GeneralReportPage() {
               </thead>
               <tbody>
                 {monthly.map((m: any, idx: number) => (
-                  <tr key={idx} className="border-b border-dark-700">
+                  <tr
+                    key={idx}
+                    className="cursor-pointer border-b border-dark-700 transition hover:bg-dark-700/50"
+                    onClick={() => {
+                      const monthDate = new Date(m.month);
+                      const monthStart = format(monthDate, "yyyy-MM-dd'T'00:00:00'Z'");
+                      const monthEnd = format(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0), "yyyy-MM-dd'T'23:59:59'Z'");
+                      openDrilldown({
+                        entity: 'transactions',
+                        title: `${format(monthDate, 'MMMM yyyy')} Transactions`,
+                        description: 'Transactions within this month.',
+                        defaultFilters: { startDate: monthStart, endDate: monthEnd }
+                      });
+                    }}
+                  >
                     <td className="py-2 text-white">{format(new Date(m.month), 'MMMM yyyy')}</td>
                     <td className="py-2 text-right text-white">SAR {(Number(m.total_revenue) || 0).toLocaleString('en-SA', { maximumFractionDigits: 0 })}</td>
                     <td className="py-2 text-right text-green-400">SAR {(Number(m.your_earnings) || 0).toLocaleString('en-SA', { maximumFractionDigits: 0 })}</td>
@@ -267,7 +340,16 @@ export default function GeneralReportPage() {
               </thead>
               <tbody>
                 {leaderboard.map((row: any) => (
-                  <tr key={row.id} className="border-b border-dark-700">
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer border-b border-dark-700 transition hover:bg-dark-700/50"
+                    onClick={() => openDrilldown({
+                      entity: 'transactions',
+                      title: `${row.name} Transactions`,
+                      description: `Transactions for tenant ${row.name}.`,
+                      defaultFilters: { tenantId: row.id, startDate: currentStartDate, endDate: currentEndDate }
+                    })}
+                  >
                     <td className="py-2 text-white">{row.rank}</td>
                     <td className="py-2 text-white">{row.name}</td>
                     <td className="py-2 text-right text-white">SAR {(Number(row.gross_revenue) || 0).toLocaleString('en-SA', { maximumFractionDigits: 0 })}</td>
@@ -298,7 +380,16 @@ export default function GeneralReportPage() {
               </thead>
               <tbody>
                 {topEmployees.map((row: any) => (
-                  <tr key={`${row.tenant}-${row.employee}`} className="border-b border-dark-700">
+                  <tr
+                    key={`${row.tenant}-${row.employee}`}
+                    className="cursor-pointer border-b border-dark-700 transition hover:bg-dark-700/50"
+                    onClick={() => openDrilldown({
+                      entity: 'employees',
+                      title: `${row.employee} Drill-down`,
+                      description: `Employee activity for ${row.employee} at ${row.tenant}.`,
+                      defaultFilters: { search: row.employee, startDate: currentStartDate, endDate: currentEndDate }
+                    })}
+                  >
                     <td className="py-2 text-white">{row.rank}</td>
                     <td className="py-2 text-white">{row.tenant}</td>
                     <td className="py-2 text-white">{row.employee}</td>
@@ -311,6 +402,17 @@ export default function GeneralReportPage() {
           </div>
         </div>
       )}
+
+      <AnalyticsDetailsDrawer
+        open={Boolean(drilldown)}
+        entity={drilldown?.entity || null}
+        title={drilldown?.title || ''}
+        description={drilldown?.description}
+        defaultFilters={drilldown?.defaultFilters}
+        startDate={currentStartDate}
+        endDate={currentEndDate}
+        onClose={() => setDrilldown(null)}
+      />
     </div>
   );
 }

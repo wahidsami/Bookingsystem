@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { adminApi } from '@/lib/api';
 import { format, subDays } from 'date-fns';
+import { AnalyticsDetailsDrawer, AnalyticsDrilldownEntity } from '@/components/AnalyticsDetailsDrawer';
 
 type Summary = {
   total_revenue: number;
@@ -71,6 +72,13 @@ type InvoicePagination = {
   totalPages: number;
 };
 
+type DrilldownConfig = {
+  entity: AnalyticsDrilldownEntity;
+  title: string;
+  description?: string;
+  defaultFilters?: Record<string, string>;
+};
+
 const formatMoney = (amount: number) =>
   `SAR ${(Number(amount) || 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}`;
 
@@ -129,6 +137,7 @@ export default function FinancialOverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('30');
+  const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -308,6 +317,11 @@ export default function FinancialOverviewPage() {
     subscription: 'Subscriptions',
   };
 
+  const currentStartDate = format(subDays(new Date(), parseInt(period)), 'yyyy-MM-dd');
+  const currentEndDate = format(new Date(), 'yyyy-MM-dd');
+
+  const openDrilldown = (config: DrilldownConfig) => setDrilldown(config);
+
   return (
     <div className="space-y-6">
       {notice && (
@@ -337,15 +351,33 @@ export default function FinancialOverviewPage() {
       {/* Key Metrics - 4 Cards */}
       {summary && (
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border border-gray-600 bg-gray-800 p-6">
+          <button
+            type="button"
+            onClick={() => openDrilldown({
+              entity: 'transactions',
+              title: 'Revenue Transactions',
+              description: 'Completed, refunded, and failed transaction records behind the revenue summary.',
+              defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+            })}
+            className="rounded-lg border border-gray-600 bg-gray-800 p-6 text-left transition hover:border-primary-500 hover:bg-gray-750"
+          >
             <p className="text-sm font-medium text-gray-300">Total Revenue</p>
             <p className="mt-2 text-2xl font-bold text-white">
               SAR {rev.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-xs text-gray-400">from all customers</p>
-          </div>
+          </button>
 
-          <div className="rounded-lg border border-green-600 bg-green-900 p-6">
+          <button
+            type="button"
+            onClick={() => openDrilldown({
+              entity: 'transactions',
+              title: 'Your Commission Records',
+              description: 'Transaction records that produced the platform commission.',
+              defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+            })}
+            className="rounded-lg border border-green-600 bg-green-900 p-6 text-left transition hover:border-green-400 hover:bg-green-950"
+          >
             <p className="text-sm font-medium text-green-200">Your Commission</p>
             <p className="mt-2 text-2xl font-bold text-green-400">
               SAR {yourEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
@@ -356,9 +388,18 @@ export default function FinancialOverviewPage() {
                 : '0'}
               % of total
             </p>
-          </div>
+          </button>
 
-          <div className="rounded-lg border border-blue-600 bg-blue-900 p-6">
+          <button
+            type="button"
+            onClick={() => openDrilldown({
+              entity: 'transactions',
+              title: 'Tenant Revenue Records',
+              description: 'Transactions that contributed to tenant earnings.',
+              defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+            })}
+            className="rounded-lg border border-blue-600 bg-blue-900 p-6 text-left transition hover:border-blue-400 hover:bg-blue-950"
+          >
             <p className="text-sm font-medium text-blue-200">Tenant Revenue</p>
             <p className="mt-2 text-2xl font-bold text-blue-400">
               SAR {tenantEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
@@ -369,9 +410,18 @@ export default function FinancialOverviewPage() {
                 : '0'}
               % of total
             </p>
-          </div>
+          </button>
 
-          <div className="rounded-lg border border-purple-600 bg-purple-900 p-6">
+          <button
+            type="button"
+            onClick={() => openDrilldown({
+              entity: 'transactions',
+              title: 'Transaction Ledger',
+              description: 'All transaction records for the selected period.',
+              defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+            })}
+            className="rounded-lg border border-purple-600 bg-purple-900 p-6 text-left transition hover:border-purple-400 hover:bg-purple-950"
+          >
             <p className="text-sm font-medium text-purple-200">Transactions</p>
             <p className="mt-2 text-2xl font-bold text-purple-400">
               {totalTx.toLocaleString()}
@@ -384,36 +434,81 @@ export default function FinancialOverviewPage() {
                   })
                 : '0'}
             </p>
-          </div>
+          </button>
         </div>
       )}
 
       {/* Bills summary */}
-      {billsSummary && (
-        <div className="card p-6">
-          <h2 className="mb-4 text-lg font-semibold text-white">Bills Summary</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-amber-600/50 bg-amber-900/20 p-4">
+        {billsSummary && (
+          <div className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold text-white">Bills Summary</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => openDrilldown({
+                entity: 'invoices',
+                title: 'Unpaid Invoices',
+                description: 'Invoices waiting for payment.',
+                defaultFilters: { status: 'UNPAID', startDate: currentStartDate, endDate: currentEndDate }
+              })}
+              className="rounded-lg border border-amber-600/50 bg-amber-900/20 p-4 text-left transition hover:border-amber-400 hover:bg-amber-900/30"
+            >
               <p className="text-sm font-medium text-amber-200">Unpaid</p>
               <p className="mt-1 text-xl font-bold text-amber-400">{billsSummary.UNPAID?.count ?? 0} bills</p>
               <p className="text-xs text-amber-300">SAR {(billsSummary.UNPAID?.totalAmount ?? 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-4">
+            </button>
+            <button
+              type="button"
+              onClick={() => openDrilldown({
+                entity: 'invoices',
+                title: 'Paid Invoices',
+                description: 'Invoices that were fully settled.',
+                defaultFilters: { status: 'PAID', startDate: currentStartDate, endDate: currentEndDate }
+              })}
+              className="rounded-lg border border-green-600/50 bg-green-900/20 p-4 text-left transition hover:border-green-400 hover:bg-green-900/30"
+            >
               <p className="text-sm font-medium text-green-200">Paid</p>
               <p className="mt-1 text-xl font-bold text-green-400">{billsSummary.PAID?.count ?? 0} bills</p>
               <p className="text-xs text-green-300">SAR {(billsSummary.PAID?.totalAmount ?? 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="rounded-lg border border-gray-600 bg-gray-800 p-4">
+            </button>
+            <button
+              type="button"
+              onClick={() => openDrilldown({
+                entity: 'invoices',
+                title: 'Expired Invoices',
+                description: 'Invoices that passed their due date.',
+                defaultFilters: { status: 'EXPIRED', startDate: currentStartDate, endDate: currentEndDate }
+              })}
+              className="rounded-lg border border-gray-600 bg-gray-800 p-4 text-left transition hover:border-gray-500 hover:bg-gray-750"
+            >
               <p className="text-sm font-medium text-gray-300">Expired</p>
               <p className="mt-1 text-xl font-bold text-gray-400">{billsSummary.EXPIRED?.count ?? 0} bills</p>
               <p className="text-xs text-gray-400">SAR {(billsSummary.EXPIRED?.totalAmount ?? 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="rounded-lg border border-rose-600/50 bg-rose-900/20 p-4">
+            </button>
+            <button
+              type="button"
+              onClick={() => openDrilldown({
+                entity: 'invoices',
+                title: 'Failed Invoices',
+                description: 'Invoices that failed payment collection.',
+                defaultFilters: { status: 'FAILED', startDate: currentStartDate, endDate: currentEndDate }
+              })}
+              className="rounded-lg border border-rose-600/50 bg-rose-900/20 p-4 text-left transition hover:border-rose-400 hover:bg-rose-900/30"
+            >
               <p className="text-sm font-medium text-rose-200">Failed</p>
               <p className="mt-1 text-xl font-bold text-rose-400">{billsSummary.FAILED?.count ?? 0} bills</p>
               <p className="text-xs text-rose-300">SAR {(billsSummary.FAILED?.totalAmount ?? 0).toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="rounded-lg border border-slate-600 bg-slate-800/60 p-4">
+            </button>
+            <button
+              type="button"
+              onClick={() => openDrilldown({
+                entity: 'invoices',
+                title: 'Draft and Void Invoices',
+                description: 'Draft or voided invoices for the selected period.',
+                defaultFilters: { startDate: currentStartDate, endDate: currentEndDate }
+              })}
+              className="rounded-lg border border-slate-600 bg-slate-800/60 p-4 text-left transition hover:border-slate-500 hover:bg-slate-800"
+            >
               <p className="text-sm font-medium text-slate-200">Draft / Void</p>
               <p className="mt-1 text-xl font-bold text-slate-300">
                 {(billsSummary.DRAFT?.count ?? 0) + (billsSummary.VOID?.count ?? 0)} bills
@@ -421,7 +516,7 @@ export default function FinancialOverviewPage() {
               <p className="text-xs text-slate-400">
                 {formatMoney((billsSummary.DRAFT?.totalAmount ?? 0) + (billsSummary.VOID?.totalAmount ?? 0))}
               </p>
-            </div>
+            </button>
           </div>
         </div>
       )}
@@ -651,7 +746,18 @@ export default function FinancialOverviewPage() {
                   const row = revenueByType[key];
                   if (!row) return null;
                   return (
-                    <tr key={key}>
+                    <tr
+                      key={key}
+                      className="cursor-pointer transition hover:bg-dark-800/70"
+                      onClick={() => openDrilldown({
+                        entity: key === 'subscription' ? 'invoices' : 'transactions',
+                        title: `${typeLabels[key] || key} Drill-down`,
+                        description: `Detailed records behind ${typeLabels[key] || key.toLowerCase()} revenue.`,
+                        defaultFilters: key === 'subscription'
+                          ? { status: 'PAID', startDate: currentStartDate, endDate: currentEndDate }
+                          : { type: key, startDate: currentStartDate, endDate: currentEndDate }
+                      })}
+                    >
                       <td>{typeLabels[key] || key}</td>
                       <td className="text-right">{row.count}</td>
                       <td className="text-right">
@@ -885,6 +991,17 @@ export default function FinancialOverviewPage() {
           </div>
         </div>
       )}
+
+      <AnalyticsDetailsDrawer
+        open={Boolean(drilldown)}
+        entity={drilldown?.entity || null}
+        title={drilldown?.title || ''}
+        description={drilldown?.description}
+        defaultFilters={drilldown?.defaultFilters}
+        startDate={currentStartDate}
+        endDate={currentEndDate}
+        onClose={() => setDrilldown(null)}
+      />
     </div>
   );
 }

@@ -3,8 +3,16 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '@/lib/api';
 import { format, subDays } from 'date-fns';
+import { AnalyticsDetailsDrawer, AnalyticsDrilldownEntity } from '@/components/AnalyticsDetailsDrawer';
 
 const PAGE_SIZE = 25;
+
+type DrilldownConfig = {
+  entity: AnalyticsDrilldownEntity;
+  title: string;
+  description?: string;
+  defaultFilters?: Record<string, string>;
+};
 
 const exportToCSV = (data: any[], filename: string) => {
   if (data.length === 0) {
@@ -41,6 +49,7 @@ export default function DetailedReportPage() {
   const [tenantId, setTenantId] = useState<string>('');
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
   const [page, setPage] = useState(0);
+  const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
 
   useEffect(() => {
     fetchReport();
@@ -67,6 +76,8 @@ export default function DetailedReportPage() {
       setLoading(false);
     }
   };
+
+  const openDrilldown = (config: DrilldownConfig) => setDrilldown(config);
 
   useEffect(() => {
     const loadTenants = async () => {
@@ -112,6 +123,8 @@ export default function DetailedReportPage() {
   const total = report?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const summary = report?.summary ?? {};
+  const currentStartDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
+  const currentEndDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
 
   return (
     <div className="space-y-6">
@@ -201,7 +214,20 @@ export default function DetailedReportPage() {
                   </tr>
                 ) : (
                   transactions.map((t: any) => (
-                    <tr key={t.id} className="border-b border-dark-700">
+                    <tr
+                      key={t.id}
+                      className="cursor-pointer border-b border-dark-700 transition hover:bg-dark-700/50"
+                      onClick={() => openDrilldown({
+                        entity: 'transactions',
+                        title: `Transaction ${t.item_name}`,
+                        description: 'Drill-down view of the selected transaction record.',
+                        defaultFilters: {
+                          search: `${t.item_name || ''}`,
+                          startDate: currentStartDate,
+                          endDate: currentEndDate
+                        }
+                      })}
+                    >
                       <td className="py-2 pl-4 text-white">
                         {t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd HH:mm') : '—'}
                       </td>
@@ -250,6 +276,17 @@ export default function DetailedReportPage() {
           )}
         </>
       )}
+
+      <AnalyticsDetailsDrawer
+        open={Boolean(drilldown)}
+        entity={drilldown?.entity || null}
+        title={drilldown?.title || ''}
+        description={drilldown?.description}
+        defaultFilters={drilldown?.defaultFilters}
+        startDate={currentStartDate}
+        endDate={currentEndDate}
+        onClose={() => setDrilldown(null)}
+      />
     </div>
   );
 }

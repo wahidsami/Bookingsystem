@@ -41,6 +41,7 @@ router.get('/financial/customer-invoices/:id/receipt-pdf', requirePermission('fi
 router.get('/financial/top-employees', adminFinancialController.getTopEmployees);
 router.get('/financial/transactions/:tenantId', adminFinancialController.getTransactionDetails);
 router.get('/financial/employee-metrics/:tenantId', adminFinancialController.getTenantEmployeeMetrics);
+router.get('/financial/drilldown', requirePermission('financial', 'view'), adminFinancialController.getAnalyticsDrilldown);
 
 // ===== DASHBOARD STATS =====
 router.get('/stats/dashboard', adminStatsController.getDashboardStats);
