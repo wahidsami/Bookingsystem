@@ -31,7 +31,8 @@ class UserService {
      * @param {Object} userData - { email, phone, firstName, lastName }
      * @returns {Promise<PlatformUser>}
      */
-    async findOrCreatePlatformUser({ email, phone, firstName, lastName }) {
+    async findOrCreatePlatformUser({ email, phone, firstName, lastName }, options = {}) {
+        const transaction = options.transaction || null;
         if (!phone && !email) {
             throw new Error('Phone or email is required');
         }
@@ -52,7 +53,8 @@ class UserService {
         });
 
         if (!user) {
-            // Create soft account (no password, can claim later)
+            // Create a soft account with a generated password so DB constraints are satisfied.
+            const generatedPassword = `guest_${crypto.randomBytes(24).toString('hex')}`;
             const userData = {
                 email: email ? email.toLowerCase().trim() : null,
                 phone: phone ? phone.trim() : null,
@@ -60,8 +62,9 @@ class UserService {
                 lastName: lastName || 'User',
                 emailVerified: false,
                 phoneVerified: false,
+                password: generatedPassword,
                 isActive: true,
-                // No password set - user can claim account later via email/SMS
+                // Password can be reset or claimed later by support flows.
             };
 
             // PlatformUser model requires phone, so generate a valid placeholder if missing
@@ -71,7 +74,7 @@ class UserService {
                 throw new Error('Phone number is required');
             }
 
-            user = await db.PlatformUser.create(userData);
+            user = await db.PlatformUser.create(userData, transaction ? { transaction } : undefined);
 
             // Link any pending gifts that were sent to this email/phone before the account existed.
             await linkPendingGiftRecipients({
@@ -93,7 +96,7 @@ class UserService {
             if (phone && !user.phone) updates.phone = phone.trim();
 
             if (Object.keys(updates).length > 0) {
-                await user.update(updates);
+                await user.update(updates, transaction ? { transaction } : undefined);
             }
         }
 

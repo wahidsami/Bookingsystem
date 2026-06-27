@@ -2,6 +2,7 @@
 
 const db = require('../models');
 const pushNotificationService = require('./pushNotificationService');
+const { sendCustomerNotificationEmail } = require('./customerNotificationEmailService');
 
 const toSafeText = (value, fallback = '') => {
     const candidate = `${value || ''}`.trim();
@@ -126,6 +127,18 @@ const notifyCustomer = async ({
 
     let inboxResult = { success: false, skipped: true, reason: 'not_attempted' };
     let pushResult = { success: false, skipped: true, reason: 'not_attempted' };
+    let emailResult = { success: false, skipped: true, reason: 'not_attempted' };
+
+    const [customer, tenant] = await Promise.all([
+        db.PlatformUser.findByPk(platformUserId, {
+            attributes: ['id', 'firstName', 'lastName', 'email', 'preferredLanguage']
+        }),
+        tenantId
+            ? db.Tenant.findByPk(tenantId, {
+                attributes: ['id', 'name', 'name_en', 'name_ar']
+            })
+            : Promise.resolve(null)
+    ]);
 
     try {
         inboxResult = await createCustomerInboxRecord({
@@ -154,6 +167,46 @@ const notifyCustomer = async ({
             recipientId: platformUserId,
             tenantId,
             channel: 'inbox',
+            status: 'failed',
+            reason: error.message,
+            payload: effectiveData
+        });
+    }
+
+    try {
+        if (customer?.email && !`${customer.email}`.toLowerCase().endsWith('@guest.refah.local')) {
+            emailResult = await sendCustomerNotificationEmail({
+                tenant: tenant || {},
+                customer,
+                title: effectiveTitle,
+                body: effectiveBody,
+                actionUrl: data.actionUrl || data.linkUrl || data.url || '',
+                actionText: data.actionText || '',
+                locale: customer?.preferredLanguage === 'ar' ? 'ar' : 'en'
+            });
+        } else {
+            emailResult = { success: false, skipped: true, reason: 'customer_email_missing' };
+        }
+
+        await logDelivery({
+            eventType: effectiveEventType,
+            recipientType: 'customer',
+            recipientId: platformUserId,
+            tenantId,
+            channel: 'email',
+            status: emailResult.success ? 'sent' : (emailResult.skipped ? 'skipped' : 'failed'),
+            reason: emailResult.reason || emailResult.error || null,
+            payload: effectiveData,
+            response: emailResult
+        });
+    } catch (error) {
+        emailResult = { success: false, skipped: false, reason: error.message };
+        await logDelivery({
+            eventType: effectiveEventType,
+            recipientType: 'customer',
+            recipientId: platformUserId,
+            tenantId,
+            channel: 'email',
             status: 'failed',
             reason: error.message,
             payload: effectiveData
@@ -192,9 +245,10 @@ const notifyCustomer = async ({
     }
 
     return {
-        success: Boolean(inboxResult.success || pushResult.success),
+        success: Boolean(inboxResult.success || pushResult.success || emailResult.success),
         eventType: effectiveEventType,
         inbox: inboxResult,
+        email: emailResult,
         push: pushResult
     };
 };
@@ -290,4 +344,3 @@ module.exports = {
     notifyCustomer,
     notifyStaff
 };
-
