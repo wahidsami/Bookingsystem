@@ -1544,6 +1544,19 @@ export function AppointmentDetailsDrawer({
         ? remainingAmount
         : outstandingAmount
     );
+    const checkoutFlowStage = appointment.status === "completed"
+      ? "confirmed"
+      : paymentDueAmount > 0
+        ? "payment"
+        : "review";
+    const checkoutFlowStageLabel = checkoutFlowStage === "review"
+      ? (locale === "ar" ? "مراجعة" : "Review")
+      : checkoutFlowStage === "payment"
+        ? (locale === "ar" ? "الدفع" : "Payment")
+        : (locale === "ar" ? "تأكيد" : "Confirmation");
+    const primaryCheckoutActionLabel = paymentDueAmount > 0
+      ? (locale === "ar" ? "ادفع الآن" : "Pay now")
+      : (locale === "ar" ? "إنهاء" : "Checkout");
     const serviceCards = (() => {
       if (!sessionAppointments.length) {
         return [appointment];
@@ -2311,6 +2324,38 @@ export function AppointmentDetailsDrawer({
                     </div>
                   </div>
 
+                  <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-3.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { key: "review", label: locale === "ar" ? "مراجعة" : "Review" },
+                        { key: "payment", label: locale === "ar" ? "الدفع" : "Payment" },
+                        { key: "confirmed", label: locale === "ar" ? "تأكيد" : "Confirmation" }
+                      ].map((step, index) => {
+                        const active = checkoutFlowStage === step.key;
+                        return (
+                          <div key={step.key} className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                                active
+                                  ? "bg-primary text-white ring-primary"
+                                  : "bg-gray-100 text-gray-600 ring-gray-200"
+                              }`}
+                            >
+                              {step.label}
+                            </span>
+                            {index < 2 ? <span className="h-px w-6 bg-gray-200" /> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-500">
+                      <span>
+                        {locale === "ar" ? "المرحلة الحالية" : "Current stage"}
+                      </span>
+                      <span className="font-semibold text-gray-700">{checkoutFlowStageLabel}</span>
+                    </div>
+                  </div>
+
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-2xl border border-gray-200 bg-white p-3.5">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
@@ -2632,21 +2677,35 @@ export function AppointmentDetailsDrawer({
               ) : null}
 
               <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 pt-3 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-gray-200 bg-white px-3.5 py-3 shadow-sm">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "الإجراء الأساسي" : "Primary action"}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">
+                      {primaryCheckoutActionLabel}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => void handlePayNow()}
-                      className="rounded-2xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                      className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                        paymentDueAmount > 0
+                          ? "bg-violet-600 text-white shadow-sm hover:bg-violet-500"
+                          : "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+                      }`}
                     >
                       {locale === "ar" ? "ادفع الآن" : "Pay now"}
                     </button>
-                  </div>
-                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => void handleCheckout()}
-                      className="rounded-2xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                      className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                        paymentDueAmount <= 0
+                          ? "bg-gray-900 text-white shadow-sm hover:bg-gray-800"
+                          : "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+                      }`}
                     >
                       {locale === "ar" ? "إنهاء" : "Checkout"}
                     </button>
@@ -2659,7 +2718,7 @@ export function AppointmentDetailsDrawer({
                           message: locale === "ar" ? "تم حفظ التغييرات." : "Changes saved."
                         });
                       }}
-                      className="rounded-2xl bg-gray-900 px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
                     >
                       {locale === "ar" ? "حفظ التغييرات" : "Save changes"}
                     </button>
