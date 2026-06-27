@@ -2607,10 +2607,11 @@ export function AppointmentDetailsDrawer({
 
               {paymentCollectionOpen ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-2xl">
-                    <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+                  <div className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-2xl">
+                    <div className="border-b border-gray-200 bg-gradient-to-br from-violet-50 via-white to-rose-50 px-5 py-4">
+                      <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">
+                        <p className="inline-flex rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-500 ring-1 ring-violet-100">
                           {locale === "ar" ? "تحصيل الدفع" : "Collect payment"}
                         </p>
                         <h3 className="mt-1 text-lg font-bold text-gray-900">
@@ -2632,6 +2633,7 @@ export function AppointmentDetailsDrawer({
                           <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
                         </svg>
                       </button>
+                    </div>
                     </div>
 
                     <div className="space-y-4 px-5 py-4">
@@ -2662,7 +2664,7 @@ export function AppointmentDetailsDrawer({
                           />
                         </div>
                         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
+                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                               {locale === "ar" ? "المبلغ المستحق" : "Amount due"}
                             </p>
@@ -2670,7 +2672,7 @@ export function AppointmentDetailsDrawer({
                               <Currency amount={paymentDueAmount} />
                             </p>
                           </div>
-                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
+                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                               {locale === "ar" ? "المجموع الحالي" : "Current total"}
                             </p>
@@ -2678,7 +2680,7 @@ export function AppointmentDetailsDrawer({
                               <Currency amount={paymentCollectionTotal} />
                             </p>
                           </div>
-                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
+                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                               {locale === "ar" ? "المتبقي" : "Remaining"}
                             </p>
@@ -2710,8 +2712,11 @@ export function AppointmentDetailsDrawer({
 
                       <div className="space-y-3">
                         {paymentCollectionRows.map((row, index) => (
-                          <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                          <div key={row.id} className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm transition hover:border-primary/20">
                             <div className="flex items-start justify-between gap-3">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xs font-bold text-primary ring-1 ring-primary/20">
+                                {index + 1}
+                              </div>
                               <div className="grid flex-1 gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
                                 <label className="block">
                                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -2746,7 +2751,7 @@ export function AppointmentDetailsDrawer({
                                   <button
                                     type="button"
                                     onClick={() => removePaymentCollectionRow(row.id)}
-                                    className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                                    className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
                                   >
                                     {locale === "ar" ? "حذف" : "Remove"}
                                   </button>
@@ -2802,7 +2807,7 @@ export function AppointmentDetailsDrawer({
                       </div>
 
                       {paymentCollectionMismatch ? (
-                        <p className="text-sm font-medium text-amber-700">
+                        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
                           {locale === "ar"
                             ? "لا يمكن تطبيق الدفع قبل أن يساوي الإجمالي المبلغ المستحق."
                             : "You cannot apply payment until the total matches the amount due."}
