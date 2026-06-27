@@ -1726,8 +1726,17 @@ export function AppointmentDetailsDrawer({
 
     const paymentCollectionTotal = paymentCollectionRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
     const paymentCollectionDifference = paymentCollectionTotal - paymentDueAmount;
+    const paymentCollectionRemaining = Math.max(0, paymentDueAmount - paymentCollectionTotal);
+    const paymentCollectionProgress = paymentDueAmount > 0 ? Math.min(1, paymentCollectionTotal / paymentDueAmount) : 0;
     const paymentCollectionMismatch = Math.abs(paymentCollectionDifference) > 0.01;
     const paymentCollectionDifferenceLabel = `${paymentCollectionDifference > 0 ? "+" : ""}${paymentCollectionDifference.toFixed(2)}`;
+    const paymentCollectionStatus = paymentCollectionMismatch
+      ? (paymentCollectionDifference > 0
+        ? (locale === "ar" ? "فائض" : "Overpaid")
+        : (locale === "ar" ? "جزئي" : "Partial"))
+      : (paymentCollectionTotal > 0
+        ? (locale === "ar" ? "مدفوع" : "Paid")
+        : (locale === "ar" ? "غير مدفوع" : "Unpaid"));
 
     const submitPaymentCollection = async () => {
       if (!appointment || paymentCollectionSubmitting) return;
@@ -2345,13 +2354,56 @@ export function AppointmentDetailsDrawer({
 
                     <div className="space-y-4 px-5 py-4">
                       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="text-gray-600">{locale === "ar" ? "المبلغ المستحق" : "Amount due"}</span>
-                          <Currency amount={paymentDueAmount} className="text-base font-bold text-gray-900" />
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                              {locale === "ar" ? "حالة التوزيع" : "Allocation status"}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{paymentCollectionStatus}</p>
+                          </div>
+                          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            paymentCollectionMismatch
+                              ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                              : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                          }`}>
+                            {paymentCollectionMismatch
+                              ? (locale === "ar" ? "بحاجة لضبط" : "Needs adjustment")
+                              : (locale === "ar" ? "جاهز" : "Ready")}
+                          </div>
                         </div>
-                        <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                          <span className="text-gray-600">{locale === "ar" ? "المجموع الحالي" : "Current split total"}</span>
-                          <Currency amount={paymentCollectionTotal} className="font-semibold text-gray-900" />
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              paymentCollectionMismatch ? "bg-amber-400" : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${Math.max(0, Math.min(100, paymentCollectionProgress * 100))}%` }}
+                          />
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                              {locale === "ar" ? "المبلغ المستحق" : "Amount due"}
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-gray-900">
+                              <Currency amount={paymentDueAmount} />
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                              {locale === "ar" ? "المجموع الحالي" : "Current total"}
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-gray-900">
+                              <Currency amount={paymentCollectionTotal} />
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                              {locale === "ar" ? "المتبقي" : "Remaining"}
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-gray-900">
+                              <Currency amount={paymentCollectionRemaining} />
+                            </p>
+                          </div>
                         </div>
                         <div
                           className={`mt-3 rounded-2xl border px-3 py-2 text-xs font-semibold ${
