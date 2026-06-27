@@ -364,6 +364,13 @@ class AdminApi {
     return this.request<{ success: boolean; data: any }>(`/admin/financial/comparison?${params.toString()}`);
   }
 
+  async getOperationalInsights(startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/insights?${params.toString()}`);
+  }
+
   async getPlatformFinancialSummary(startDate?: string, endDate?: string) {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);

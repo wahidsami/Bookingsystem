@@ -251,6 +251,24 @@ exports.getGeneralReport = async (req, res) => {
   }
 };
 
+exports.getOperationalInsights = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const defaultEnd = new Date();
+    const defaultStart = new Date(defaultEnd);
+    defaultStart.setDate(defaultStart.getDate() - 29);
+
+    const start = startDate || defaultStart.toISOString();
+    const end = endDate || defaultEnd.toISOString();
+    const insights = await FinancialService.getOperationalInsights(start, end);
+
+    res.json(successResponse('Operational insights retrieved', insights));
+  } catch (error) {
+    console.error('Error fetching operational insights:', error);
+    res.status(500).json(errorResponse('Failed to fetch operational insights', error.message));
+  }
+};
+
 exports.getDetailedReport = async (req, res) => {
   try {
     const query = parseAnalyticsQuery(req.query);

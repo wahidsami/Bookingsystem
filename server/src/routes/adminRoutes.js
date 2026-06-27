@@ -28,6 +28,7 @@ router.post('/bills/:id/void', requirePermission('financial', 'refund'), adminBi
 router.get('/financial/dashboard', adminFinancialController.getDashboardOverview);
 router.get('/financial/summary', adminFinancialController.getPlatformSummary);
 router.get('/financial/comparison', requirePermission('financial', 'view'), adminFinancialController.getFinancialComparison);
+router.get('/financial/insights', requirePermission('financial', 'view'), adminFinancialController.getOperationalInsights);
 router.get('/financial/tenants', adminFinancialController.getTenantFinancials);
 router.get('/financial/leaderboard', adminFinancialController.getTenantLeaderboard);
 router.get('/financial/monthly-comparison', adminFinancialController.getMonthlyComparison);

@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 
 const tabs = [
   { name: 'Overview', href: '/dashboard/financial' },
+  { name: 'Insights & Alerts', href: '/dashboard/financial/insights' },
   { name: 'Tenants', href: '/dashboard/financial/tenants' },
   { name: 'Reports', href: '/dashboard/financial/reports' },
 ];
