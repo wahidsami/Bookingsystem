@@ -2533,34 +2533,51 @@ export function AppointmentDetailsDrawer({
               <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <WorkspacePanel title={locale === "ar" ? "سجل النشاط" : "Activity timeline"}>
                   <div className="space-y-2.5">
-                  {timelineAuditEntries.length > 0 ? (
-                    timelineAuditEntries.map((entry, index) => (
-                      <div key={`${entry.label}-${entry.timestamp}-${index}`} className="flex gap-3">
-                        <div className="flex flex-col items-center">
-                          <span className="mt-1 h-3 w-3 rounded-full bg-gray-900" />
-                          {index !== timelineAuditEntries.length - 1 ? <span className="h-full w-px bg-gray-200" /> : null}
+                    {timelineAuditEntries.length > 0 ? (
+                      timelineAuditEntries.map((entry, index) => (
+                        <div key={`${entry.label}-${entry.timestamp}-${index}`} className="flex gap-3">
+                          <div className="flex flex-col items-center pt-0.5">
+                            <span className={`h-3 w-3 rounded-full ring-4 ring-white ${entry.tone.includes("blue") ? "bg-blue-500" : entry.tone.includes("emerald") ? "bg-emerald-500" : entry.tone.includes("sky") ? "bg-sky-500" : entry.tone.includes("rose") ? "bg-rose-500" : "bg-gray-800"}`} />
+                            {index !== timelineAuditEntries.length - 1 ? <span className="h-full w-px bg-gray-200" /> : null}
+                          </div>
+                          <div className={`flex-1 rounded-2xl border px-3 py-3 shadow-sm ${entry.tone}`}>
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold">{entry.label}</p>
+                                <p className="mt-1 text-xs opacity-80">{entry.value}</p>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-600 ring-1 ring-white/80">
+                                {formatDateTime(entry.timestamp, locale)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className={`flex-1 rounded-2xl border px-3 py-2 ${entry.tone}`}>
-                          <p className="text-sm font-semibold">{entry.label}</p>
-                          <p className="mt-0.5 text-xs opacity-80">{entry.value}</p>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-sm text-gray-500">
+                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-400 ring-1 ring-gray-200">
+                          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path d="M5 4a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V8.5L13.5 4H5zm0 2h7v3h3v5H5V6z" />
+                          </svg>
                         </div>
+                        <p className="mt-3 font-medium text-gray-700">{locale === "ar" ? "لا يوجد نشاط بعد." : "No activity yet."}</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {locale === "ar"
+                            ? "ستظهر هنا عمليات تغيير الحالة، إعادة الجدولة، والدفع فور حدوثها."
+                            : "Status changes, reschedules, and payments will appear here as they happen."}
+                        </p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                      {locale === "ar" ? "لا يوجد نشاط بعد." : "No activity yet."}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
                   <div className="mt-3 flex justify-end">
-                  <Link
-                    href={`/${locale}/dashboard/appointments/${appointment.id}`}
-                    onClick={onClose}
-                    className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    {locale === "ar" ? "عرض كل النشاط" : "View all activity"}
-                  </Link>
-                </div>
+                    <Link
+                      href={`/${locale}/dashboard/appointments/${appointment.id}`}
+                      onClick={onClose}
+                      className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "عرض كل النشاط" : "View all activity"}
+                    </Link>
+                  </div>
                 </WorkspacePanel>
 
                 <WorkspacePanel
