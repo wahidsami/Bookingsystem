@@ -1075,130 +1075,166 @@ async function buildFullReportData(req, sections, startDate, endDate) {
     const transactions = (sections.includes('refunds') || sections.includes('paymentMethods') || sections.includes('customerSales'))
         ? await getPaymentTransactions(req, { startDate, endDate, limit: 400 })
         : [];
+    const collectSection = async (sectionName, loader) => {
+        try {
+            await loader();
+        } catch (error) {
+            console.error(`Report section "${sectionName}" failed:`, error);
+        }
+    };
 
     if (sections.includes('overview') || sections.includes('discounts')) {
-        const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
-        if (response?.success && response?.overview) {
-            if (sections.includes('overview')) {
-                result.overview = response.overview;
+        await collectSection('overview', async () => {
+            const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
+            const overview = response?.overview || response?.data?.overview || response?.data || null;
+            if (overview) {
+                if (sections.includes('overview')) {
+                    result.overview = overview;
+                }
+                if (sections.includes('discounts') && overview.discountTotals) {
+                    result.discounts = overview.discountTotals;
+                }
             }
-            if (sections.includes('discounts') && response.overview.discountTotals) {
-                result.discounts = response.overview.discountTotals;
-            }
-        }
+        });
     }
 
     if (sections.includes('employees')) {
-        const response = await runHandler(tenantFinancialController.getEmployeeRevenue, req);
-        if (response?.success) {
-            result.employees = response.employees;
-            result.employeeTotals = response.totals;
-        }
+        await collectSection('employees', async () => {
+            const response = await runHandler(tenantFinancialController.getEmployeeRevenue, req);
+            if (response?.success) {
+                result.employees = response.employees;
+                result.employeeTotals = response.totals;
+            }
+        });
     }
 
     if (sections.includes('services')) {
-        const response = await runHandler(tenantFinancialController.getServiceRevenue, req);
-        if (response?.success) {
-            result.services = response.services;
-            result.serviceTotals = response.totals;
-        }
+        await collectSection('services', async () => {
+            const response = await runHandler(tenantFinancialController.getServiceRevenue, req);
+            if (response?.success) {
+                result.services = response.services;
+                result.serviceTotals = response.totals;
+            }
+        });
     }
 
     if (sections.includes('products')) {
-        const response = await runHandler(tenantFinancialController.getProductRevenue, req);
-        if (response?.success) {
-            result.products = response.products;
-            result.productTotals = response.totals;
-        }
+        await collectSection('products', async () => {
+            const response = await runHandler(tenantFinancialController.getProductRevenue, req);
+            if (response?.success) {
+                result.products = response.products;
+                result.productTotals = response.totals;
+            }
+        });
     }
 
     if (sections.includes('daily')) {
-        const response = await runHandler(tenantFinancialController.getDailyRevenue, req);
-        if (response?.success && response?.dailyRevenue) {
-            result.dailyRevenue = response.dailyRevenue;
-        }
+        await collectSection('daily', async () => {
+            const response = await runHandler(tenantFinancialController.getDailyRevenue, req);
+            if (response?.success && response?.dailyRevenue) {
+                result.dailyRevenue = response.dailyRevenue;
+            }
+        });
     }
 
     if (sections.includes('bookingTrends')) {
-        const response = await runHandler(exports.getBookingTrends, {
-            ...req,
-            query: { ...queryWithRange, groupBy: 'day' }
+        await collectSection('bookingTrends', async () => {
+            const response = await runHandler(exports.getBookingTrends, {
+                ...req,
+                query: { ...queryWithRange, groupBy: 'day' }
+            });
+            if (response?.success && response?.data) {
+                result.bookingTrends = response.data;
+            }
         });
-        if (response?.success && response?.data) {
-            result.bookingTrends = response.data;
-        }
     }
 
     if (sections.includes('servicePerformance')) {
-        const response = await runHandler(exports.getServicePerformance, req);
-        if (response?.success && response?.data) {
-            result.servicePerformance = response.data;
-        }
+        await collectSection('servicePerformance', async () => {
+            const response = await runHandler(exports.getServicePerformance, req);
+            if (response?.success && response?.data) {
+                result.servicePerformance = response.data;
+            }
+        });
     }
 
     if (sections.includes('employeePerformance')) {
-        const response = await runHandler(exports.getEmployeePerformance, req);
-        if (response?.success && response?.data) {
-            result.employeePerformance = response.data;
-        }
+        await collectSection('employeePerformance', async () => {
+            const response = await runHandler(exports.getEmployeePerformance, req);
+            if (response?.success && response?.data) {
+                result.employeePerformance = response.data;
+            }
+        });
     }
 
     if (sections.includes('peakHours')) {
-        const response = await runHandler(exports.getPeakHoursAnalysis, req);
-        if (response?.success && response?.data) {
-            result.peakHours = response.data;
-        }
+        await collectSection('peakHours', async () => {
+            const response = await runHandler(exports.getPeakHoursAnalysis, req);
+            if (response?.success && response?.data) {
+                result.peakHours = response.data;
+            }
+        });
     }
 
     if (sections.includes('customerAnalytics')) {
-        const response = await runHandler(exports.getCustomerAnalytics, req);
-        if (response?.success && response?.data) {
-            result.customerAnalytics = response.data;
-        }
+        await collectSection('customerAnalytics', async () => {
+            const response = await runHandler(exports.getCustomerAnalytics, req);
+            if (response?.success && response?.data) {
+                result.customerAnalytics = response.data;
+            }
+        });
     }
 
     if (sections.includes('rebookings')) {
-        const response = await runHandler(exports.getRebookingAnalytics, {
-            ...req,
-            query: { ...queryWithRange, groupBy }
+        await collectSection('rebookings', async () => {
+            const response = await runHandler(exports.getRebookingAnalytics, {
+                ...req,
+                query: { ...queryWithRange, groupBy }
+            });
+            if (response?.success) {
+                result.rebookings = {
+                    rows: response.data || [],
+                    totals: response.totals || null,
+                    trend: response.trend || [],
+                    topRebookingEmployees: response.topRebookingEmployees || []
+                };
+            }
         });
-        if (response?.success) {
-            result.rebookings = {
-                rows: response.data || [],
-                totals: response.totals || null,
-                trend: response.trend || [],
-                topRebookingEmployees: response.topRebookingEmployees || []
-            };
-        }
     }
 
     if (sections.includes('refunds')) {
-        const refunds = transactions
-            .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
-            .map(mapRefundRow);
+        await collectSection('refunds', async () => {
+            const refunds = transactions
+                .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
+                .map(mapRefundRow);
 
-        result.refunds = {
-            rows: refunds,
-            totals: {
-                totalRefunds: Number(refunds.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)),
-                refundCount: refunds.length,
-                fullRefundCount: refunds.filter((row) => row.refundMode === 'Full').length,
-                partialRefundCount: refunds.filter((row) => row.refundMode === 'Partial').length
-            }
-        };
+            result.refunds = {
+                rows: refunds,
+                totals: {
+                    totalRefunds: Number(refunds.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)),
+                    refundCount: refunds.length,
+                    fullRefundCount: refunds.filter((row) => row.refundMode === 'Full').length,
+                    partialRefundCount: refunds.filter((row) => row.refundMode === 'Partial').length
+                }
+            };
+        });
     }
 
     if (sections.includes('paymentMethods')) {
-        const paymentMethodsReport = await buildPaymentMethodsReport(req, startDate, endDate, groupBy);
-        result.paymentMethods = {
-            rows: paymentMethodsReport.rows,
-            trend: paymentMethodsReport.trend,
-            totals: paymentMethodsReport.totals
-        };
+        await collectSection('paymentMethods', async () => {
+            const paymentMethodsReport = await buildPaymentMethodsReport(req, startDate, endDate, groupBy);
+            result.paymentMethods = {
+                rows: paymentMethodsReport.rows,
+                trend: paymentMethodsReport.trend,
+                totals: paymentMethodsReport.totals
+            };
+        });
     }
 
     if (sections.includes('customerSales')) {
-        result.customerSales = buildCustomerSalesRows(transactions);
+        await collectSection('customerSales', async () => {
+            result.customerSales = buildCustomerSalesRows(transactions);
+        });
     }
 
     return result;
