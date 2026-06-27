@@ -178,7 +178,7 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
     phone,
     firstName,
     lastName
-  }, { transaction });
+  }, transaction ? { transaction } : {});
 
   if (birthDate && !guest.dateOfBirth) {
     await guest.update({ dateOfBirth: birthDate }, { transaction });
