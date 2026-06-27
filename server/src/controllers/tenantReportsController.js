@@ -432,6 +432,11 @@ function buildCustomerSalesRows(transactions) {
         .sort((left, right) => right.totalSpent - left.totalSpent)
         .map((item) => ({
             ...item,
+            customerName: item.name,
+            customer: item.name,
+            bookings: item.visits,
+            completed: item.visits,
+            revenue: item.totalSpent,
             totalSpent: Number(item.totalSpent.toFixed(2)),
             averageSpend: Number(item.averageSpend.toFixed(2))
         }));

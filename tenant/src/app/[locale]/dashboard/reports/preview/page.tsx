@@ -799,9 +799,9 @@ export default function ReportPreviewPage() {
                     <tbody>
                       {(data.customerSales || []).map((item: any) => (
                         <tr key={item.id} className="border-b border-gray-100">
-                          <td className="px-3 py-2">{item.name}</td>
-                          <td className="px-3 py-2 text-right">{item.visits ?? 0}</td>
-                          <td className="px-3 py-2 text-right"><Currency amount={item.totalSpent ?? 0} /></td>
+                          <td className="px-3 py-2">{item.customerName || item.customer || item.name || item.id}</td>
+                          <td className="px-3 py-2 text-right">{item.bookings ?? item.visits ?? 0}</td>
+                          <td className="px-3 py-2 text-right"><Currency amount={item.revenue ?? item.totalSpent ?? 0} /></td>
                           <td className="px-3 py-2 text-right"><Currency amount={item.averageSpend ?? 0} /></td>
                           <td className="px-3 py-2">{item.lastVisit ? new Date(item.lastVisit).toLocaleDateString() : '-'}</td>
                         </tr>

@@ -466,7 +466,17 @@ export function buildReportExportTables(params: {
     }
   }
 
-  if (includeAny(['customerSales', 'customerAnalytics']) && data.customerAnalytics?.topCustomers?.length) {
+  const customerSalesRows = Array.isArray(data.customerSales)
+    ? data.customerSales
+    : Array.isArray(data.customerSales?.rows)
+      ? data.customerSales.rows
+      : [];
+  const customerAnalyticsRows = Array.isArray(data.customerAnalytics?.topCustomers)
+    ? data.customerAnalytics.topCustomers
+    : [];
+
+  if (include('customerSales') && (customerSalesRows.length || customerAnalyticsRows.length)) {
+    const sourceRows = customerSalesRows.length ? customerSalesRows : customerAnalyticsRows;
     tables.push({
       title: localizedLabel(locale, 'Customer sales', 'مبيعات العملاء'),
       columns: [
@@ -476,7 +486,27 @@ export function buildReportExportTables(params: {
         localizedLabel(locale, 'Revenue', 'الإيراد'),
         localizedLabel(locale, 'Last visit', 'آخر زيارة')
       ],
-      rows: data.customerAnalytics.topCustomers.map((item: any) => [
+      rows: sourceRows.map((item: any) => [
+        item.customerName ?? item.customer ?? item.name ?? item.id ?? '',
+        numberRow(item.bookings ?? item.visits),
+        numberRow(item.completed ?? item.visits),
+        numberRow(item.revenue ?? item.totalSpent),
+        item.lastVisit ?? ''
+      ])
+    });
+  }
+
+  if (include('customerAnalytics') && customerAnalyticsRows.length) {
+    tables.push({
+      title: localizedLabel(locale, 'Customer analytics', 'تحليلات العملاء'),
+      columns: [
+        localizedLabel(locale, 'Customer', 'العميل'),
+        localizedLabel(locale, 'Bookings', 'الحجوزات'),
+        localizedLabel(locale, 'Completed', 'المكتملة'),
+        localizedLabel(locale, 'Revenue', 'الإيراد'),
+        localizedLabel(locale, 'Last visit', 'آخر زيارة')
+      ],
+      rows: customerAnalyticsRows.map((item: any) => [
         item.name ?? item.customerName ?? item.id ?? '',
         numberRow(item.bookings),
         numberRow(item.completed),
