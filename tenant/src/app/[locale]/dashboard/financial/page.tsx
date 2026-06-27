@@ -658,6 +658,8 @@ export default function FinancialPage() {
           </div>
         ) : (
           <div className="space-y-5">
+            {activeSection === "executive" ? (
+              <>
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <FinanceMetricCard
                 label={locale === "ar" ? "إجمالي الإيرادات" : "Total revenue"}
@@ -820,6 +822,8 @@ export default function FinancialPage() {
                 </div>
               </FinanceSectionCard>
             </div>
+              </>
+            ) : null}
 
             {activeSection === "executive" ? (
               <FinanceSectionCard
