@@ -3050,7 +3050,7 @@ exports.reassignRescheduleAppointment = async (req, res) => {
 
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { staffId, startTime, notifyCustomer = false } = req.body || {};
+        const { staffId, startTime, notifyCustomer = true } = req.body || {};
 
         if (!staffId || !startTime) {
             await transaction.rollback();
