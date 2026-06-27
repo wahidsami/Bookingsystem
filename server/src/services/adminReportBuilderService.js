@@ -41,7 +41,8 @@ const DEFAULT_CONFIG = {
   outputType: 'table',
   chartType: 'bar',
   filters: {},
-  scheduleConfig: {}
+  scheduleConfig: {},
+  comparisonMode: 'off'
 };
 
 const toNumber = (value) => {
@@ -164,7 +165,10 @@ const normalizeReportConfig = (input = {}) => {
       dayOfWeek: Number.isInteger(scheduleConfig.dayOfWeek) ? scheduleConfig.dayOfWeek : null,
       dayOfMonth: Number.isInteger(scheduleConfig.dayOfMonth) ? scheduleConfig.dayOfMonth : null,
       recipients: Array.isArray(scheduleConfig.recipients) ? scheduleConfig.recipients.filter(Boolean) : []
-    }
+    },
+    comparisonMode: `${input.comparisonMode || 'off'}`.trim() || 'off',
+    compareStartDate: input.compareStartDate || null,
+    compareEndDate: input.compareEndDate || null
   };
 };
 
@@ -172,6 +176,60 @@ const buildSummarySeed = (metrics) => metrics.reduce((accumulator, metric) => {
   accumulator[metric] = 0;
   return accumulator;
 }, {});
+
+const cloneDate = (date) => new Date(date.getTime());
+
+const shiftDateRange = (startDate, endDate, mode) => {
+  if (!startDate || !endDate) return null;
+
+  const start = cloneDate(startDate);
+  const end = cloneDate(endDate);
+  const spanMs = Math.max(end.getTime() - start.getTime(), 0);
+  const days = Math.max(Math.round(spanMs / 86400000) + 1, 1);
+
+  const shiftedStart = cloneDate(start);
+  const shiftedEnd = cloneDate(end);
+
+  if (mode === 'year_over_year') {
+    shiftedStart.setFullYear(shiftedStart.getFullYear() - 1);
+    shiftedEnd.setFullYear(shiftedEnd.getFullYear() - 1);
+  } else if (mode === 'month_over_month') {
+    shiftedStart.setMonth(shiftedStart.getMonth() - 1);
+    shiftedEnd.setMonth(shiftedEnd.getMonth() - 1);
+  } else {
+    shiftedStart.setDate(shiftedStart.getDate() - days);
+    shiftedEnd.setDate(shiftedEnd.getDate() - days);
+  }
+
+  return { startDate: shiftedStart, endDate: shiftedEnd };
+};
+
+const comparisonLabelMap = {
+  current_previous: 'Previous Period',
+  month_over_month: 'Previous Month',
+  year_over_year: 'Previous Year',
+  custom_vs_custom: 'Comparison Period'
+};
+
+const buildComparisonRange = (config = {}) => {
+  const comparisonMode = `${config.comparisonMode || 'off'}`.toLowerCase();
+  if (comparisonMode === 'off') return null;
+
+  if (comparisonMode === 'custom_vs_custom') {
+    const compareStartDate = parseDate(config.compareStartDate || config.filters?.compareStartDate, false);
+    const compareEndDate = parseDate(config.compareEndDate || config.filters?.compareEndDate, true);
+    if (!compareStartDate || !compareEndDate) return null;
+    return { startDate: compareStartDate, endDate: compareEndDate };
+  }
+
+  const currentStart = parseDate(config.filters?.startDate, false) || (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  })();
+  const currentEnd = parseDate(config.filters?.endDate, true) || new Date();
+  return shiftDateRange(currentStart, currentEnd, comparisonMode);
+};
 
 const metricFieldMap = {
   revenue: 'revenue',
@@ -450,6 +508,30 @@ async function previewReport(config = {}) {
   const facts = await fetchTransactionFacts(normalized, { productMode });
   const filteredFacts = applyBuilderFilters(facts, normalized.filters);
   const result = aggregateFacts(filteredFacts, normalized);
+  const comparisonRange = buildComparisonRange(normalized);
+  let comparison = null;
+
+  if (comparisonRange) {
+    const comparisonConfig = {
+      ...normalized,
+      filters: {
+        ...normalized.filters,
+        startDate: comparisonRange.startDate.toISOString(),
+        endDate: comparisonRange.endDate.toISOString()
+      },
+      comparisonMode: 'off'
+    };
+    const comparisonFacts = await fetchTransactionFacts(comparisonConfig, { productMode });
+    const comparisonFilteredFacts = applyBuilderFilters(comparisonFacts, comparisonConfig.filters);
+    const comparisonResult = aggregateFacts(comparisonFilteredFacts, comparisonConfig);
+    comparison = {
+      label: comparisonLabelMap[normalized.comparisonMode] || 'Comparison Period',
+      summary: comparisonResult.summary,
+      totals: comparisonResult.totals,
+      rows: comparisonResult.rows,
+      chart: buildChartPayload(comparisonResult.rows, normalized.metrics, normalized.outputType)
+    };
+  }
 
   return {
     config: normalized,
@@ -461,7 +543,8 @@ async function previewReport(config = {}) {
     summary: result.summary,
     totals: result.totals,
     chart: buildChartPayload(result.rows, normalized.metrics, normalized.outputType),
-    kpis: buildKpiPayload(result.summary, normalized.metrics)
+    kpis: buildKpiPayload(result.summary, normalized.metrics),
+    comparison
   };
 }
 
@@ -532,6 +615,7 @@ function serializeSavedReport(report) {
     lastRunAt: report.lastRunAt || null,
     nextRunAt: report.nextRunAt || null,
     lastRunResult: report.lastRunResult || {},
+    runHistory: Array.isArray(report.runHistory) ? report.runHistory : [],
     duplicatedFromId: report.duplicatedFromId || null,
     createdAt: report.createdAt,
     updatedAt: report.updatedAt

@@ -48,6 +48,21 @@ function buildSavedReportPayload(body = {}, fallback = {}) {
     };
 }
 
+function appendRunHistory(report, preview, runType = 'manual') {
+    const history = Array.isArray(report.runHistory) ? report.runHistory : [];
+    const entry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        runType,
+        ranAt: new Date().toISOString(),
+        rows: preview?.totals?.rows || 0,
+        recordCount: preview?.totals?.recordCount || 0,
+        summary: preview?.summary || {},
+        comparison: preview?.comparison?.label || null
+    };
+    history.unshift(entry);
+    report.runHistory = history.slice(0, 20);
+}
+
 async function findAdminSavedReport(reportId) {
     return db.AdminSavedReport.findByPk(reportId, {
         include: [
@@ -293,6 +308,7 @@ exports.runSavedReport = async (req, res) => {
 
         savedReport.lastRunAt = new Date();
         savedReport.lastRunResult = preview;
+        appendRunHistory(savedReport, preview, 'manual');
         if (savedReport.scheduleConfig?.enabled) {
             savedReport.nextRunAt = calcNextRunAt(savedReport.scheduleConfig, new Date());
         }
@@ -323,6 +339,20 @@ exports.previewSavedReport = async (req, res) => {
     }
 };
 
+exports.getSavedReportHistory = async (req, res) => {
+    try {
+        const savedReport = await findAdminSavedReport(req.params.id);
+        if (!savedReport) {
+            return res.status(404).json(errorResponse('Saved report not found'));
+        }
+
+        res.json(successResponse('Saved report history retrieved', Array.isArray(savedReport.runHistory) ? savedReport.runHistory : []));
+    } catch (error) {
+        console.error('Get saved report history error:', error);
+        res.status(500).json(errorResponse('Failed to load saved report history', error.message));
+    }
+};
+
 exports.runScheduledReports = async () => {
     const dueReports = await db.AdminSavedReport.findAll({
         where: {
@@ -336,6 +366,7 @@ exports.runScheduledReports = async () => {
             const preview = await previewReport(report.reportConfig || {});
             report.lastRunAt = new Date();
             report.lastRunResult = preview;
+            appendRunHistory(report, preview, 'scheduled');
             report.nextRunAt = calcNextRunAt(report.scheduleConfig, new Date());
             await report.save();
         } catch (error) {

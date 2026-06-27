@@ -84,6 +84,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: {}
         },
+        runHistory: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: []
+        },
         duplicatedFromId: {
             type: DataTypes.UUID,
             allowNull: true,

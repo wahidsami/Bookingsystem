@@ -9,8 +9,14 @@ type PreviewResponse = {
   rows: any[];
   summary: Record<string, number>;
   totals: { rows: number; recordCount: number };
-  chart: { labels: string[]; series: number[]; metric?: string };
+  chart: { labels: string[]; series: number[]; comparisonSeries?: number[]; metric?: string };
   kpis: Array<{ key: string; label: string; value: number }>;
+  comparison?: {
+    label: string;
+    summary: Record<string, number>;
+    totals: { rows: number; recordCount: number };
+    chart: { labels: string[]; series: number[]; metric?: string };
+  } | null;
 };
 
 const outputTypes = [
@@ -63,6 +69,38 @@ function Sparkline({ values, stroke = '#38bdf8' }: { values: number[]; stroke?: 
   );
 }
 
+function ComparisonSparkline({
+  currentValues,
+  comparisonValues,
+}: {
+  currentValues: number[];
+  comparisonValues: number[];
+}) {
+  if (!currentValues.length && !comparisonValues.length) {
+    return <div className="h-16 rounded-xl bg-white/5" />;
+  }
+
+  const width = 220;
+  const height = 72;
+  const allValues = [...currentValues, ...comparisonValues];
+  const max = Math.max(...allValues, 1);
+  const min = Math.min(...allValues, 0);
+  const range = max - min || 1;
+
+  const toPoints = (values: number[]) => values.map((value, index) => {
+    const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
+    const y = height - ((value - min) / range) * (height - 10) - 5;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-16 w-full">
+      <polyline fill="none" stroke="#38bdf8" strokeWidth="2.5" points={toPoints(currentValues)} strokeLinejoin="round" strokeLinecap="round" />
+      <polyline fill="none" stroke="#f59e0b" strokeWidth="2.5" points={toPoints(comparisonValues)} strokeLinejoin="round" strokeLinecap="round" strokeDasharray="5 4" />
+    </svg>
+  );
+}
+
 export default function CustomReportBuilderPage() {
   const [options, setOptions] = useState<any>(null);
   const [savedReports, setSavedReports] = useState<any[]>([]);
@@ -83,14 +121,24 @@ export default function CustomReportBuilderPage() {
   const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState('1');
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState('1');
   const [scheduleRecipients, setScheduleRecipients] = useState('');
+  const [comparisonMode, setComparisonMode] = useState('off');
+  const [compareStartDate, setCompareStartDate] = useState('');
+  const [compareEndDate, setCompareEndDate] = useState('');
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragState, setDragState] = useState<{ type: 'dimension' | 'metric'; key: string } | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [selectedReportHistory, setSelectedReportHistory] = useState<any[]>([]);
+  const [tablePage, setTablePage] = useState(1);
+  const rowsPerPage = 10;
 
   useEffect(() => {
     loadBootstrap();
   }, []);
+
+  useEffect(() => {
+    setTablePage(1);
+  }, [preview?.totals?.rows, preview?.comparison?.totals?.rows, outputType, grouping, dimensions.join(','), metrics.join(',')]);
 
   const loadBootstrap = async () => {
     try {
@@ -127,8 +175,11 @@ export default function CustomReportBuilderPage() {
     outputType,
     chartType,
     filters,
-    scheduleConfig: selectedScheduleConfig
-  }), [title, description, dimensions, metrics, grouping, outputType, chartType, filters, selectedScheduleConfig]);
+    scheduleConfig: selectedScheduleConfig,
+    comparisonMode,
+    compareStartDate: compareStartDate || null,
+    compareEndDate: compareEndDate || null
+  }), [title, description, dimensions, metrics, grouping, outputType, chartType, filters, selectedScheduleConfig, comparisonMode, compareStartDate, compareEndDate]);
 
   const applyPreview = async () => {
     try {
@@ -159,6 +210,7 @@ export default function CustomReportBuilderPage() {
       if (response.success) {
         await loadBootstrap();
         setSelectedReportId(response.data.id);
+        await loadSavedReportHistory(response.data.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save report');
@@ -174,6 +226,7 @@ export default function CustomReportBuilderPage() {
       if (response.success) {
         setPreview(response.data.preview || null);
         setSelectedReportId(report.id);
+        await loadSavedReportHistory(report.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run saved report');
@@ -205,11 +258,26 @@ export default function CustomReportBuilderPage() {
         setScheduleDayOfWeek(`${schedule.dayOfWeek ?? 1}`);
         setScheduleDayOfMonth(`${schedule.dayOfMonth ?? 1}`);
         setScheduleRecipients(Array.isArray(schedule.recipients) ? schedule.recipients.join(', ') : '');
+        setComparisonMode(report.reportConfig?.comparisonMode || 'off');
+        setCompareStartDate(report.reportConfig?.compareStartDate || '');
+        setCompareEndDate(report.reportConfig?.compareEndDate || '');
+        await loadSavedReportHistory(report.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load saved report');
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const loadSavedReportHistory = async (reportId: string) => {
+    try {
+      const response = await adminApi.getSavedCustomReportHistory(reportId);
+      if (response.success) {
+        setSelectedReportHistory(response.data || []);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load report history');
     }
   };
 
@@ -227,6 +295,12 @@ export default function CustomReportBuilderPage() {
   const dimensionOptions = options?.dimensions || [];
   const metricOptions = options?.metrics || [];
   const groupingOptions = options?.groupings || [];
+  const paginatedRows = useMemo(() => {
+    if (!preview?.rows?.length) return [];
+    const start = (tablePage - 1) * rowsPerPage;
+    return preview.rows.slice(start, start + rowsPerPage);
+  }, [preview?.rows, tablePage]);
+  const totalPages = Math.max(Math.ceil((preview?.rows?.length || 0) / rowsPerPage), 1);
 
   if (loading) {
     return <div className="h-64 animate-pulse rounded-3xl bg-white/5" />;
@@ -414,7 +488,7 @@ export default function CustomReportBuilderPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <label className="text-xs uppercase tracking-[0.2em] text-white/45">Grouping</label>
               <select value={grouping} onChange={(e) => setGrouping(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white">
@@ -439,6 +513,24 @@ export default function CustomReportBuilderPage() {
                 <input type="date" value={filters.startDate || ''} onChange={(e) => setFilters((current) => ({ ...current, startDate: e.target.value }))} className="rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" />
                 <input type="date" value={filters.endDate || ''} onChange={(e) => setFilters((current) => ({ ...current, endDate: e.target.value }))} className="rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" />
               </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <label className="text-xs uppercase tracking-[0.2em] text-white/45">Comparison</label>
+              <select value={comparisonMode} onChange={(e) => setComparisonMode(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white">
+                <option value="off">Off</option>
+                <option value="current_previous">Current vs Previous Period</option>
+                <option value="month_over_month">Month over Month</option>
+                <option value="year_over_year">Year over Year</option>
+                <option value="custom_vs_custom">Custom vs Custom</option>
+              </select>
+              {comparisonMode === 'custom_vs_custom' ? (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input type="date" value={compareStartDate} onChange={(e) => setCompareStartDate(e.target.value)} className="rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" />
+                  <input type="date" value={compareEndDate} onChange={(e) => setCompareEndDate(e.target.value)} className="rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" />
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-white/45">Charts will overlay a comparison series when previewed.</p>
+              )}
             </div>
           </div>
 
@@ -497,16 +589,27 @@ export default function CustomReportBuilderPage() {
 
                 {outputType === 'chart' && (
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm text-white/55">Chart metric: {preview.chart.metric || metrics[0]}</p>
-                      <p className="text-sm text-white/55">{chartType}</p>
+                      <div className="flex items-center gap-2 text-xs text-white/55">
+                        <span>{chartType}</span>
+                        {preview.comparison ? <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-1 text-amber-200">{preview.comparison.label}</span> : null}
+                      </div>
                     </div>
-                    <Sparkline values={preview.chart.series || []} />
+                    <ComparisonSparkline
+                      currentValues={preview.chart.series || []}
+                      comparisonValues={preview.chart.comparisonSeries || preview.comparison?.chart?.series || []}
+                    />
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/50">
                       {preview.chart.labels.map((label, index) => (
                         <span key={`${label}-${index}`} className="rounded-full border border-white/10 bg-white/5 px-2 py-1">{label}</span>
                       ))}
                     </div>
+                    {preview.comparison ? (
+                      <p className="mt-3 text-xs text-white/45">
+                        Current series overlays the selected comparison mode. Previous values are shown as the dashed line.
+                      </p>
+                    ) : null}
                   </div>
                 )}
 
@@ -524,7 +627,7 @@ export default function CustomReportBuilderPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.rows.map((row, index) => (
+                      {paginatedRows.map((row, index) => (
                         <tr key={index} className="border-b border-white/5">
                           {dimensions.map((dimension) => (
                             <td key={dimension} className="px-4 py-3 text-white">{row[dimension] || 'N/A'}</td>
@@ -541,6 +644,16 @@ export default function CustomReportBuilderPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm text-white/55">
+                  <span>
+                    Showing {Math.min((tablePage - 1) * rowsPerPage + 1, preview.rows.length)}-{Math.min(tablePage * rowsPerPage, preview.rows.length)} of {preview.rows.length} rows
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setTablePage((current) => Math.max(current - 1, 1))} disabled={tablePage === 1} className="rounded-lg border border-white/10 bg-dark-900 px-3 py-1 disabled:opacity-40">Prev</button>
+                    <span className="text-xs text-white/40">Page {tablePage} of {totalPages}</span>
+                    <button type="button" onClick={() => setTablePage((current) => Math.min(current + 1, totalPages))} disabled={tablePage >= totalPages} className="rounded-lg border border-white/10 bg-dark-900 px-3 py-1 disabled:opacity-40">Next</button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -594,6 +707,29 @@ export default function CustomReportBuilderPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Run History</h2>
+              <span className="text-xs text-white/35">{selectedReportHistory.length} entries</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {selectedReportHistory.length ? selectedReportHistory.map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-white">{entry.runType === 'scheduled' ? 'Scheduled run' : 'Manual run'}</p>
+                    <span className="text-[11px] text-white/35">{format(new Date(entry.ranAt), 'dd MMM, HH:mm')}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/45">
+                    {entry.rows} groups, {entry.recordCount} records
+                    {entry.comparison ? `, ${entry.comparison}` : ''}
+                  </p>
+                </div>
+              )) : (
+                <p className="text-sm text-white/45">No run history yet for the selected report.</p>
+              )}
             </div>
           </div>
         </aside>

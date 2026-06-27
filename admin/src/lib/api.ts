@@ -396,6 +396,10 @@ class AdminApi {
     return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}/run`, 'POST');
   }
 
+  async getSavedCustomReportHistory(id: string) {
+    return this.request<{ success: boolean; data: any[] }>(`/admin/financial/reports/builder/saved/${id}/history`);
+  }
+
   async getOperationalInsights(startDate?: string, endDate?: string) {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
