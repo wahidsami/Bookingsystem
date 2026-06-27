@@ -123,6 +123,7 @@ export default function DetailedReportPage() {
   const total = report?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const summary = report?.summary ?? {};
+  const comparison = report?.comparison ?? null;
   const currentStartDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
   const currentEndDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
 
@@ -185,6 +186,12 @@ export default function DetailedReportPage() {
         <span className="text-dark-300">
           Showing {transactions.length} of {total} transactions
         </span>
+        {comparison?.summary?.delta && (
+          <span className="text-dark-400">
+            Trend: {comparison.summary.delta.total_revenue?.percentage > 0 ? '+' : ''}
+            {Number(comparison.summary.delta.total_revenue?.percentage || 0).toFixed(1)}%
+          </span>
+        )}
       </div>
 
       {loading ? (

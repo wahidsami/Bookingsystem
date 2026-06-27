@@ -12,6 +12,11 @@ type DrilldownConfig = {
   defaultFilters?: Record<string, string>;
 };
 
+type TrendDelta = {
+  percentage: number;
+  direction: 'up' | 'down' | 'flat';
+};
+
 const exportToCSV = (data: any[], filename: string) => {
   if (data.length === 0) {
     alert('No data to export');
@@ -38,16 +43,31 @@ const exportToCSV = (data: any[], filename: string) => {
   URL.revokeObjectURL(link.href);
 };
 
+const comparisonModes: Record<string, string> = {
+  current_previous: 'Current vs Previous',
+  month_over_month: 'Month over Month',
+  year_over_year: 'Year over Year',
+  custom_vs_custom: 'Custom vs Custom'
+};
+
+const trendPill = (delta?: TrendDelta) => {
+  if (!delta) return 'No comparison';
+  const prefix = delta.direction === 'up' ? '↑' : delta.direction === 'down' ? '↓' : '•';
+  const sign = delta.percentage > 0 ? '+' : '';
+  return `${prefix} ${sign}${delta.percentage.toFixed(1)}%`;
+};
+
 export default function GeneralReportPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState('30');
+  const [comparisonMode, setComparisonMode] = useState<'current_previous' | 'month_over_month' | 'year_over_year' | 'custom_vs_custom'>('current_previous');
   const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
 
   useEffect(() => {
     fetchReport();
-  }, [period]);
+  }, [period, comparisonMode]);
 
   const fetchReport = async () => {
     try {
@@ -55,7 +75,7 @@ export default function GeneralReportPage() {
       setError(null);
       const startDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
       const endDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
-      const res = await adminApi.getGeneralReport(startDate, endDate);
+      const res = await adminApi.getGeneralReport(startDate, endDate, { comparisonMode });
       if (res.success) setData(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load report');
@@ -115,6 +135,7 @@ export default function GeneralReportPage() {
   const leaderboard = data.leaderboard || [];
   const topEmployees = data.topEmployees || [];
   const revenueByType = data.revenueByType || {};
+  const comparison = data.comparison || null;
   const currentStartDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
   const currentEndDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
   const openDrilldown = (config: DrilldownConfig) => setDrilldown(config);
@@ -143,6 +164,15 @@ export default function GeneralReportPage() {
             <option value="90">Last 90 days</option>
             <option value="365">Last year</option>
           </select>
+          <select
+            value={comparisonMode}
+            onChange={(e) => setComparisonMode(e.target.value as typeof comparisonMode)}
+            className="rounded border border-dark-600 bg-dark-800 px-3 py-2 text-white"
+          >
+            {Object.entries(comparisonModes).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -160,6 +190,7 @@ export default function GeneralReportPage() {
         >
           <p className="text-sm text-dark-400">Total Revenue</p>
           <p className="text-xl font-bold text-white">SAR {rev.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+          <p className="mt-2 text-xs text-dark-400">{trendPill(comparison?.summary?.delta?.total_revenue)}</p>
         </button>
         <button
           type="button"
@@ -173,6 +204,7 @@ export default function GeneralReportPage() {
         >
           <p className="text-sm text-green-300">Your Commission</p>
           <p className="text-xl font-bold text-green-400">SAR {yourEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+          <p className="mt-2 text-xs text-green-300">{trendPill(comparison?.summary?.delta?.your_earnings)}</p>
         </button>
         <button
           type="button"
@@ -186,6 +218,7 @@ export default function GeneralReportPage() {
         >
           <p className="text-sm text-blue-300">Tenant Revenue</p>
           <p className="text-xl font-bold text-blue-400">SAR {tenantEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+          <p className="mt-2 text-xs text-blue-300">{trendPill(comparison?.summary?.delta?.tenant_earnings)}</p>
         </button>
         <button
           type="button"
@@ -199,8 +232,42 @@ export default function GeneralReportPage() {
         >
           <p className="text-sm text-dark-400">Transactions</p>
           <p className="text-xl font-bold text-white">{totalTx}</p>
+          <p className="mt-2 text-xs text-dark-400">{trendPill(comparison?.summary?.delta?.total_transactions)}</p>
         </button>
       </div>
+
+      {comparison?.timeline?.length ? (
+        <div className="rounded-lg border border-dark-600 bg-dark-800 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Comparison Overlay</h2>
+            <span className="text-xs uppercase tracking-[0.2em] text-dark-400">
+              {comparisonModes[comparison.mode] || comparison.mode}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <svg viewBox="0 0 640 220" className="h-56 w-full">
+              {(() => {
+                const current = comparison.timeline.map((point: any) => Number(point.current.total_revenue) || 0);
+                const previous = comparison.timeline.map((point: any) => Number(point.previous.total_revenue) || 0);
+                const max = Math.max(...current, ...previous, 1);
+                const buildPoints = (values: number[]) => values
+                  .map((value, index) => {
+                    const x = values.length === 1 ? 320 : (index / (values.length - 1)) * 640;
+                    const y = 200 - ((value / max) * 176);
+                    return `${x},${y}`;
+                  })
+                  .join(' ');
+                return (
+                  <>
+                    <polyline fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 6" points={buildPoints(previous)} />
+                    <polyline fill="none" stroke="#38bdf8" strokeWidth="2.5" points={buildPoints(current)} />
+                  </>
+                );
+              })()}
+            </svg>
+          </div>
+        </div>
+      ) : null}
 
       {/* Revenue by type */}
       {revenueByType && Object.keys(revenueByType).length > 0 && (

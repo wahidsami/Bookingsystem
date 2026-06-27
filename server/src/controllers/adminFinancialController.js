@@ -186,6 +186,105 @@ exports.getDashboardOverview = async (req, res) => {
   }
 };
 
+function resolveComparisonOptions(query = {}) {
+  const mode = `${query.mode || query.comparisonMode || 'current_previous'}`.trim().toLowerCase();
+
+  return {
+    mode,
+    compareStartDate: `${query.compareStartDate || ''}`.trim() || undefined,
+    compareEndDate: `${query.compareEndDate || ''}`.trim() || undefined,
+  };
+}
+
+exports.getFinancialComparison = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json(errorResponse('startDate and endDate are required'));
+    }
+
+    const comparison = await FinancialService.getComparisonAnalytics(
+      startDate,
+      endDate,
+      resolveComparisonOptions(req.query)
+    );
+
+    res.json(successResponse('Financial comparison retrieved', comparison));
+  } catch (error) {
+    console.error('Error fetching financial comparison:', error);
+    res.status(500).json(errorResponse('Failed to fetch financial comparison', error.message));
+  }
+};
+
+exports.getGeneralReport = async (req, res) => {
+  try {
+    const { startDate, endDate, leaderboardLimit = 5, monthlyLimit = 6, employeesLimit = 5 } = req.query;
+
+    const [summary, leaderboard, monthlyComparison, commissionBreakdown, topEmployees, revenueByType, billsSummary, comparison] =
+      await Promise.all([
+        FinancialService.getPlatformSummary(startDate, endDate),
+        FinancialService.getTenantLeaderboard(parseInt(leaderboardLimit, 10), startDate, endDate),
+        FinancialService.getMonthlyComparison(parseInt(monthlyLimit, 10)),
+        FinancialService.getCommissionByPackage(startDate, endDate),
+        FinancialService.getTopEmployees(parseInt(employeesLimit, 10), startDate, endDate),
+        FinancialService.getRevenueByType(startDate, endDate),
+        FinancialService.getBillsSummary(),
+        startDate && endDate
+          ? FinancialService.getComparisonAnalytics(startDate, endDate, resolveComparisonOptions(req.query))
+          : Promise.resolve(null),
+      ]);
+
+    res.json(successResponse('General report retrieved', {
+      summary,
+      leaderboard,
+      monthlyComparison,
+      commissionBreakdown,
+      topEmployees,
+      revenueByType,
+      billsSummary,
+      comparison,
+    }));
+  } catch (error) {
+    console.error('Error fetching general report:', error);
+    res.status(500).json(errorResponse('Failed to fetch general report', error.message));
+  }
+};
+
+exports.getDetailedReport = async (req, res) => {
+  try {
+    const query = parseAnalyticsQuery(req.query);
+    query.entity = 'transactions';
+
+    const data = await getAnalyticsTransactions(query);
+    const comparison = query.startDate && query.endDate
+      ? await FinancialService.getComparisonAnalytics(query.startDate, query.endDate, resolveComparisonOptions(req.query))
+      : null;
+
+    res.json(successResponse('Detailed report retrieved', {
+      transactions: data.rows,
+      total: data.total,
+      summary: data.summary,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        totalPages: Math.max(Math.ceil(data.total / query.limit), 1),
+      },
+      filters: {
+        search: query.search,
+        tenantId: query.tenantId,
+        type: query.type,
+        startDate: query.startDate,
+        endDate: query.endDate,
+      },
+      comparison,
+    }));
+  } catch (error) {
+    console.error('Error fetching detailed report:', error);
+    res.status(500).json(errorResponse('Failed to fetch detailed report', error.message));
+  }
+};
+
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 200;
 

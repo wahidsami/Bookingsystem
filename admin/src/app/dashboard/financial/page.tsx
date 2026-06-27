@@ -14,6 +14,32 @@ type Summary = {
   avg_commission: number;
 };
 
+type TrendDelta = {
+  current: number;
+  previous: number;
+  absolute: number;
+  percentage: number;
+  direction: 'up' | 'down' | 'flat';
+};
+
+type ComparisonPoint = {
+  date: string;
+  current: Summary;
+  previous: Summary;
+};
+
+type ComparisonData = {
+  mode: string;
+  currentPeriod: { startDate: string; endDate: string };
+  previousPeriod: { startDate: string; endDate: string };
+  summary: {
+    current: Summary;
+    previous: Summary;
+    delta: Record<keyof Summary, TrendDelta>;
+  };
+  timeline: ComparisonPoint[];
+};
+
 type MonthlyData = {
   month: string;
   total_revenue: number;
@@ -112,11 +138,151 @@ const INVOICE_STATUS_META: Record<InvoiceRow['status'], { label: string; badgeCl
   VOID: { label: 'Void', badgeClass: 'bg-zinc-700 text-zinc-300' }
 };
 
+const COMPARE_MODE_LABELS: Record<string, string> = {
+  current_previous: 'Current vs Previous',
+  month_over_month: 'Month over Month',
+  year_over_year: 'Year over Year',
+  custom_vs_custom: 'Custom vs Custom'
+};
+
+function formatSignedPercent(value: number) {
+  if (!Number.isFinite(value)) return '0.0%';
+  const prefix = value > 0 ? '+' : '';
+  return `${prefix}${value.toFixed(1)}%`;
+}
+
+function TrendBadge({ delta }: { delta?: TrendDelta }) {
+  if (!delta) {
+    return <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white/70">No comparison</span>;
+  }
+
+  const classes = delta.direction === 'up'
+    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+    : delta.direction === 'down'
+      ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+      : 'bg-white/10 text-white/70 border-white/10';
+
+  const arrow = delta.direction === 'up' ? '↑' : delta.direction === 'down' ? '↓' : '•';
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium ${classes}`}>
+      <span>{arrow}</span>
+      <span>{formatSignedPercent(delta.percentage)}</span>
+    </span>
+  );
+}
+
+function Sparkline({ values, stroke = '#60a5fa' }: { values: number[]; stroke?: string }) {
+  if (!values.length) {
+    return <div className="h-10 rounded bg-white/5" />;
+  }
+
+  const width = 120;
+  const height = 36;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const points = values
+    .map((value, index) => {
+      const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
+      const y = height - ((value - min) / range) * height;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-10 w-full">
+      <polyline
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
+  );
+}
+
+function ComparativeOverlayChart({
+  current,
+  previous,
+  currentLabel,
+  previousLabel,
+}: {
+  current: number[];
+  previous: number[];
+  currentLabel: string;
+  previousLabel: string;
+}) {
+  const pointsLength = Math.max(current.length, previous.length);
+
+  if (!pointsLength) {
+    return <div className="h-64 rounded-xl bg-white/5" />;
+  }
+
+  const width = 640;
+  const height = 240;
+  const max = Math.max(...current, ...previous, 1);
+  const scaleX = pointsLength === 1 ? 0 : width / (pointsLength - 1);
+  const buildPoints = (series: number[]) => series
+    .map((value, index) => {
+      const x = pointsLength === 1 ? width / 2 : index * scaleX;
+      const y = height - ((value || 0) / max) * (height - 24) - 12;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  const currentPoints = buildPoints(current);
+  const previousPoints = buildPoints(previous);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-4 text-xs text-white/70">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
+          {currentLabel}
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+          {previousLabel}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full overflow-visible">
+        <defs>
+          <linearGradient id="comparisonFillCurrent" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="comparisonFillPrevious" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#94a3b8" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polyline
+          fill="none"
+          stroke="#94a3b8"
+          strokeWidth="2"
+          strokeDasharray="6 6"
+          points={previousPoints}
+        />
+        <polyline
+          fill="none"
+          stroke="#38bdf8"
+          strokeWidth="2.5"
+          points={currentPoints}
+        />
+      </svg>
+    </div>
+  );
+}
+
 export default function FinancialOverviewPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [monthly, setMonthly] = useState<MonthlyData[]>([]);
   const [commissionBreakdown, setCommissionBreakdown] = useState<CommissionByPackageItem[]>([]);
   const [revenueByType, setRevenueByType] = useState<RevenueByType | null>(null);
+  const [comparison, setComparison] = useState<ComparisonData | null>(null);
   const [billsSummary, setBillsSummary] = useState<Record<string, { count: number; totalAmount: number }> | null>(null);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [invoiceSummary, setInvoiceSummary] = useState<Record<string, { count: number; totalAmount: number }> | null>(null);
@@ -137,11 +303,13 @@ export default function FinancialOverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('30');
+  const [comparisonMode, setComparisonMode] = useState<'current_previous' | 'month_over_month' | 'year_over_year' | 'custom_vs_custom'>('current_previous');
+  const [overlayComparison, setOverlayComparison] = useState(true);
   const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
 
   useEffect(() => {
     fetchData();
-  }, [period]);
+  }, [period, comparisonMode]);
 
   useEffect(() => {
     fetchInvoices();
@@ -156,12 +324,13 @@ export default function FinancialOverviewPage() {
       const startDate = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd'T'00:00:00'Z'");
       const endDate = format(new Date(), "yyyy-MM-dd'T'23:59:59'Z'");
 
-      const [summaryRes, monthlyRes, commissionRes, revenueByTypeRes, billsRes] = await Promise.allSettled([
+      const [summaryRes, monthlyRes, commissionRes, revenueByTypeRes, billsRes, comparisonRes] = await Promise.allSettled([
         adminApi.getPlatformFinancialSummary(startDate, endDate),
         adminApi.getMonthlyComparison(12),
         adminApi.getCommissionByPackage(startDate, endDate),
         adminApi.getRevenueByType(startDate, endDate),
         adminApi.getBillsSummary(),
+        adminApi.getFinancialComparison(startDate, endDate, { mode: comparisonMode }),
       ]);
       const failedSections: string[] = [];
 
@@ -198,6 +367,13 @@ export default function FinancialOverviewPage() {
       } else {
         setBillsSummary(null);
         failedSections.push('bills summary');
+      }
+
+      if (comparisonRes.status === 'fulfilled' && comparisonRes.value.success) {
+        setComparison(comparisonRes.value.data || null);
+      } else {
+        setComparison(null);
+        failedSections.push('comparison');
       }
 
       if (failedSections.length === 5) {
@@ -319,6 +495,14 @@ export default function FinancialOverviewPage() {
 
   const currentStartDate = format(subDays(new Date(), parseInt(period)), 'yyyy-MM-dd');
   const currentEndDate = format(new Date(), 'yyyy-MM-dd');
+  const comparisonDelta = comparison?.summary.delta || null;
+  const trendSeries = {
+    total_revenue: comparison?.timeline?.map((point) => Number(point.current.total_revenue) || 0) || [],
+    your_earnings: comparison?.timeline?.map((point) => Number(point.current.your_earnings) || 0) || [],
+    tenant_earnings: comparison?.timeline?.map((point) => Number(point.current.tenant_earnings) || 0) || [],
+    total_transactions: comparison?.timeline?.map((point) => Number(point.current.total_transactions) || 0) || [],
+  };
+  const comparisonLabel = COMPARE_MODE_LABELS[comparison?.mode || comparisonMode] || 'Current vs Previous';
 
   const openDrilldown = (config: DrilldownConfig) => setDrilldown(config);
 
@@ -348,6 +532,23 @@ export default function FinancialOverviewPage() {
         </select>
       </div>
 
+      {/* Comparison Controls */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+        <span className="font-medium text-white">Comparison:</span>
+        <select
+          value={comparisonMode}
+          onChange={(e) => setComparisonMode(e.target.value as typeof comparisonMode)}
+          className="rounded-lg border border-white/10 bg-dark-800 px-3 py-2 text-white"
+        >
+          {Object.entries(COMPARE_MODE_LABELS).map(([value, label]) => (
+            <option key={value} value={value} className="bg-dark-900 text-white">
+              {label}
+            </option>
+          ))}
+        </select>
+        <span className="text-white/60">{comparisonLabel}</span>
+      </div>
+
       {/* Key Metrics - 4 Cards */}
       {summary && (
         <div className="grid gap-4 md:grid-cols-4">
@@ -365,7 +566,13 @@ export default function FinancialOverviewPage() {
             <p className="mt-2 text-2xl font-bold text-white">
               SAR {rev.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-xs text-gray-400">from all customers</p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <TrendBadge delta={comparisonDelta?.total_revenue} />
+              <span className="text-xs text-gray-400">from all customers</span>
+            </div>
+            <div className="mt-3">
+              <Sparkline values={trendSeries.total_revenue} stroke="#60a5fa" />
+            </div>
           </button>
 
           <button
@@ -382,12 +589,15 @@ export default function FinancialOverviewPage() {
             <p className="mt-2 text-2xl font-bold text-green-400">
               SAR {yourEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-xs text-green-300">
-              {rev > 0
-                ? ((yourEarnings / rev) * 100).toFixed(1)
-                : '0'}
-              % of total
-            </p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <TrendBadge delta={comparisonDelta?.your_earnings} />
+              <p className="text-xs text-green-300">
+                {rev > 0 ? ((yourEarnings / rev) * 100).toFixed(1) : '0'}% of total
+              </p>
+            </div>
+            <div className="mt-3">
+              <Sparkline values={trendSeries.your_earnings} stroke="#34d399" />
+            </div>
           </button>
 
           <button
@@ -404,12 +614,15 @@ export default function FinancialOverviewPage() {
             <p className="mt-2 text-2xl font-bold text-blue-400">
               SAR {tenantEarnings.toLocaleString('en-SA', { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-xs text-blue-300">
-              {rev > 0
-                ? ((tenantEarnings / rev) * 100).toFixed(1)
-                : '0'}
-              % of total
-            </p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <TrendBadge delta={comparisonDelta?.tenant_earnings} />
+              <p className="text-xs text-blue-300">
+                {rev > 0 ? ((tenantEarnings / rev) * 100).toFixed(1) : '0'}% of total
+              </p>
+            </div>
+            <div className="mt-3">
+              <Sparkline values={trendSeries.tenant_earnings} stroke="#60a5fa" />
+            </div>
           </button>
 
           <button
@@ -426,17 +639,62 @@ export default function FinancialOverviewPage() {
             <p className="mt-2 text-2xl font-bold text-purple-400">
               {totalTx.toLocaleString()}
             </p>
-            <p className="text-xs text-purple-300">
-              avg: SAR{' '}
-              {totalTx > 0
-                ? (rev / totalTx).toLocaleString('en-SA', {
-                    maximumFractionDigits: 0,
-                  })
-                : '0'}
-            </p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <TrendBadge delta={comparisonDelta?.total_transactions} />
+              <p className="text-xs text-purple-300">
+                avg: SAR{' '}
+                {totalTx > 0
+                  ? (rev / totalTx).toLocaleString('en-SA', {
+                      maximumFractionDigits: 0,
+                    })
+                  : '0'}
+              </p>
+            </div>
+            <div className="mt-3">
+              <Sparkline values={trendSeries.total_transactions} stroke="#c084fc" />
+            </div>
           </button>
         </div>
       )}
+
+      {comparison?.timeline?.length ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Comparison Trend</h2>
+              <p className="text-sm text-white/60">
+                {comparisonLabel} overlay for the selected period.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOverlayComparison((value) => !value)}
+              className="rounded-full border border-white/10 bg-dark-800 px-3 py-2 text-xs font-medium text-white/80 transition hover:border-white/20 hover:text-white"
+            >
+              {overlayComparison ? 'Hide overlay' : 'Show overlay'}
+            </button>
+          </div>
+          {overlayComparison ? (
+            <ComparativeOverlayChart
+              current={comparison.timeline.map((point) => Number(point.current.total_revenue) || 0)}
+              previous={comparison.timeline.map((point) => Number(point.previous.total_revenue) || 0)}
+              currentLabel="Current period"
+              previousLabel="Previous period"
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-dark-800/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">Current period</p>
+                <Sparkline values={comparison.timeline.map((point) => Number(point.current.total_revenue) || 0)} stroke="#38bdf8" />
+              </div>
+              <div className="rounded-xl border border-white/10 bg-dark-800/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">Previous period</p>
+                <Sparkline values={comparison.timeline.map((point) => Number(point.previous.total_revenue) || 0)} stroke="#94a3b8" />
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Bills summary */}
         {billsSummary && (

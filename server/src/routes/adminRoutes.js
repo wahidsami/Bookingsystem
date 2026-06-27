@@ -27,6 +27,7 @@ router.post('/bills/:id/reconcile-payment', requirePermission('financial', 'refu
 router.post('/bills/:id/void', requirePermission('financial', 'refund'), adminBillsController.voidBill);
 router.get('/financial/dashboard', adminFinancialController.getDashboardOverview);
 router.get('/financial/summary', adminFinancialController.getPlatformSummary);
+router.get('/financial/comparison', requirePermission('financial', 'view'), adminFinancialController.getFinancialComparison);
 router.get('/financial/tenants', adminFinancialController.getTenantFinancials);
 router.get('/financial/leaderboard', adminFinancialController.getTenantLeaderboard);
 router.get('/financial/monthly-comparison', adminFinancialController.getMonthlyComparison);
@@ -34,6 +35,8 @@ router.get('/financial/commission-breakdown', adminFinancialController.getCommis
 router.get('/financial/commission-by-package', adminFinancialController.getCommissionByPackage);
 router.get('/financial/revenue-by-type', adminFinancialController.getRevenueByType);
 router.get('/financial/bills-summary', adminFinancialController.getBillsSummary);
+router.get('/financial/reports/general', requirePermission('financial', 'view'), adminFinancialController.getGeneralReport);
+router.get('/financial/reports/detailed', requirePermission('financial', 'view'), adminFinancialController.getDetailedReport);
 router.get('/financial/customer-invoices', requirePermission('financial', 'view'), customerInvoiceController.listAdminInvoices);
 router.get('/financial/customer-invoices/:id', requirePermission('financial', 'view'), customerInvoiceController.getAdminInvoiceById);
 router.get('/financial/customer-invoices/:id/invoice-pdf', requirePermission('financial', 'view'), customerInvoiceController.getAdminInvoicePdf);

@@ -345,8 +345,23 @@ class AdminApi {
         monthlyComparison: any[];
         commissionBreakdown: any[];
         topEmployees: any[];
+        comparison?: any;
       };
     }>(`/admin/financial/dashboard?${params.toString()}`);
+  }
+
+  async getFinancialComparison(
+    startDate: string,
+    endDate: string,
+    options?: { mode?: 'current_previous' | 'month_over_month' | 'year_over_year' | 'custom_vs_custom'; compareStartDate?: string; compareEndDate?: string }
+  ) {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate);
+    params.append('endDate', endDate);
+    if (options?.mode) params.append('mode', options.mode);
+    if (options?.compareStartDate) params.append('compareStartDate', options.compareStartDate);
+    if (options?.compareEndDate) params.append('compareEndDate', options.compareEndDate);
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/comparison?${params.toString()}`);
   }
 
   async getPlatformFinancialSummary(startDate?: string, endDate?: string) {
@@ -512,13 +527,27 @@ class AdminApi {
     return this.request<{ success: boolean; data: any[] }>(`/admin/financial/commission-by-package?${params.toString()}`);
   }
 
-  async getGeneralReport(startDate?: string, endDate?: string, options?: { leaderboardLimit?: number; monthlyLimit?: number; employeesLimit?: number }) {
+  async getGeneralReport(
+    startDate?: string,
+    endDate?: string,
+    options?: {
+      leaderboardLimit?: number;
+      monthlyLimit?: number;
+      employeesLimit?: number;
+      comparisonMode?: 'current_previous' | 'month_over_month' | 'year_over_year' | 'custom_vs_custom';
+      compareStartDate?: string;
+      compareEndDate?: string;
+    }
+  ) {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     if (options?.leaderboardLimit != null) params.append('leaderboardLimit', options.leaderboardLimit.toString());
     if (options?.monthlyLimit != null) params.append('monthlyLimit', options.monthlyLimit.toString());
     if (options?.employeesLimit != null) params.append('employeesLimit', options.employeesLimit.toString());
+    if (options?.comparisonMode) params.append('mode', options.comparisonMode);
+    if (options?.compareStartDate) params.append('compareStartDate', options.compareStartDate);
+    if (options?.compareEndDate) params.append('compareEndDate', options.compareEndDate);
     return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/general?${params.toString()}`);
   }
 

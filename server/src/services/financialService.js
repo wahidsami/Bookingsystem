@@ -11,6 +11,152 @@ const buildDateClause = (column, startDate, endDate) => `
   ${endDate ? `AND ${column} <= :endDate` : ''}
 `;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const parseDate = (value) => (value ? new Date(value) : null);
+
+const startOfUtcDay = (date) => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth(),
+  date.getUTCDate()
+));
+
+const endOfUtcDay = (date) => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth(),
+  date.getUTCDate(),
+  23,
+  59,
+  59,
+  999
+));
+
+const addUtcDays = (date, days) => {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+};
+
+const addUtcMonths = (date, months) => {
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  return next;
+};
+
+const addUtcYears = (date, years) => {
+  const next = new Date(date);
+  next.setUTCFullYear(next.getUTCFullYear() + years);
+  return next;
+};
+
+const formatUtcDateKey = (date) => date.toISOString().slice(0, 10);
+
+const getPeriodLengthDays = (startDate, endDate) => {
+  const start = startOfUtcDay(parseDate(startDate));
+  const end = startOfUtcDay(parseDate(endDate));
+  return Math.max(Math.round((end - start) / DAY_MS), 0) + 1;
+};
+
+const buildComparisonWindow = (startDate, endDate, mode = 'current_previous', compareStartDate, compareEndDate) => {
+  const currentStart = startOfUtcDay(parseDate(startDate));
+  const currentEnd = endOfUtcDay(parseDate(endDate));
+  const currentDays = getPeriodLengthDays(startDate, endDate);
+
+  let previousStart;
+  let previousEnd;
+
+  if (compareStartDate && compareEndDate) {
+    previousStart = startOfUtcDay(parseDate(compareStartDate));
+    previousEnd = endOfUtcDay(parseDate(compareEndDate));
+  } else if (mode === 'year_over_year') {
+    previousStart = startOfUtcDay(addUtcYears(currentStart, -1));
+    previousEnd = endOfUtcDay(addUtcYears(currentEnd, -1));
+  } else if (mode === 'month_over_month') {
+    previousStart = startOfUtcDay(addUtcMonths(currentStart, -1));
+    previousEnd = endOfUtcDay(addUtcMonths(currentEnd, -1));
+  } else {
+    const priorEnd = endOfUtcDay(addUtcDays(currentStart, -1));
+    previousEnd = priorEnd;
+    previousStart = startOfUtcDay(addUtcDays(priorEnd, -(currentDays - 1)));
+  }
+
+  return {
+    mode,
+    current: {
+      startDate: currentStart.toISOString(),
+      endDate: currentEnd.toISOString(),
+    },
+    previous: {
+      startDate: previousStart.toISOString(),
+      endDate: previousEnd.toISOString(),
+    },
+  };
+};
+
+const buildTrendDelta = (currentValue, previousValue) => {
+  const current = toNumber(currentValue);
+  const previous = toNumber(previousValue);
+  const absolute = current - previous;
+  const percentage = previous !== 0 ? Number(((absolute / Math.abs(previous)) * 100).toFixed(1)) : (current !== 0 ? 100 : 0);
+
+  return {
+    current,
+    previous,
+    absolute: Number(absolute.toFixed(2)),
+    percentage,
+    direction: absolute > 0 ? 'up' : absolute < 0 ? 'down' : 'flat',
+  };
+};
+
+const buildSeriesRows = (startDate, endDate, rows = []) => {
+  const start = startOfUtcDay(parseDate(startDate));
+  const end = startOfUtcDay(parseDate(endDate));
+  const totalDays = Math.max(Math.round((end - start) / DAY_MS), 0) + 1;
+  const map = new Map();
+
+  for (const row of rows || []) {
+    const key = formatUtcDateKey(new Date(row.day));
+    map.set(key, {
+      total_revenue: toNumber(row.total_revenue),
+      your_earnings: toNumber(row.your_earnings),
+      tenant_earnings: toNumber(row.tenant_earnings),
+      total_transactions: toNumber(row.total_transactions),
+      failed_transactions: toNumber(row.failed_transactions),
+    });
+  }
+
+  return Array.from({ length: totalDays }, (_, index) => {
+    const date = addUtcDays(start, index);
+    const key = formatUtcDateKey(date);
+    const value = map.get(key) || {
+      total_revenue: 0,
+      your_earnings: 0,
+      tenant_earnings: 0,
+      total_transactions: 0,
+      failed_transactions: 0,
+    };
+
+    return {
+      date: key,
+      ...value,
+    };
+  });
+};
+
+const aggregateSeriesTotals = (rows = []) => rows.reduce((acc, row) => ({
+  total_revenue: acc.total_revenue + toNumber(row.total_revenue),
+  your_earnings: acc.your_earnings + toNumber(row.your_earnings),
+  tenant_earnings: acc.tenant_earnings + toNumber(row.tenant_earnings),
+  total_transactions: acc.total_transactions + toNumber(row.total_transactions),
+  failed_transactions: acc.failed_transactions + toNumber(row.failed_transactions),
+}), {
+  total_revenue: 0,
+  your_earnings: 0,
+  tenant_earnings: 0,
+  total_transactions: 0,
+  failed_transactions: 0,
+});
+
 class FinancialService {
   static async getPlatformSummary(startDate, endDate) {
     try {
@@ -86,6 +232,201 @@ class FinancialService {
         failed_transactions: 0,
         avg_commission: 0,
       };
+    }
+  }
+
+  static async getComparisonAnalytics(startDate, endDate, options = {}) {
+    try {
+      const window = buildComparisonWindow(
+        startDate,
+        endDate,
+        options.mode,
+        options.compareStartDate,
+        options.compareEndDate
+      );
+
+      const [currentSummary, previousSummary, currentSeriesRows, previousSeriesRows] = await Promise.all([
+        FinancialService.getPlatformSummary(window.current.startDate, window.current.endDate),
+        FinancialService.getPlatformSummary(window.previous.startDate, window.previous.endDate),
+        FinancialService.getDailyFinancialSeries(window.current.startDate, window.current.endDate),
+        FinancialService.getDailyFinancialSeries(window.previous.startDate, window.previous.endDate),
+      ]);
+
+      const currentSeries = buildSeriesRows(window.current.startDate, window.current.endDate, currentSeriesRows);
+      const previousSeries = buildSeriesRows(window.previous.startDate, window.previous.endDate, previousSeriesRows);
+      const currentTotals = aggregateSeriesTotals(currentSeries);
+      const previousTotals = aggregateSeriesTotals(previousSeries);
+
+      return {
+        mode: window.mode,
+        currentPeriod: window.current,
+        previousPeriod: window.previous,
+        summary: {
+          current: currentSummary,
+          previous: previousSummary,
+          delta: {
+            total_revenue: buildTrendDelta(currentSummary.total_revenue, previousSummary.total_revenue),
+            your_earnings: buildTrendDelta(currentSummary.your_earnings, previousSummary.your_earnings),
+            tenant_earnings: buildTrendDelta(currentSummary.tenant_earnings, previousSummary.tenant_earnings),
+            total_transactions: buildTrendDelta(currentSummary.total_transactions, previousSummary.total_transactions),
+            failed_transactions: buildTrendDelta(currentSummary.failed_transactions, previousSummary.failed_transactions),
+            avg_commission: buildTrendDelta(currentSummary.avg_commission, previousSummary.avg_commission),
+          }
+        },
+        timeline: currentSeries.map((row, index) => ({
+          date: row.date,
+          current: row,
+          previous: previousSeries[index] || {
+            date: previousSeries[index]?.date || null,
+            total_revenue: 0,
+            your_earnings: 0,
+            tenant_earnings: 0,
+            total_transactions: 0,
+            failed_transactions: 0,
+          }
+        })),
+        totals: {
+          current: currentTotals,
+          previous: previousTotals,
+        }
+      };
+    } catch (error) {
+      console.error('Error in getComparisonAnalytics:', error);
+      return {
+        mode: options.mode || 'current_previous',
+        currentPeriod: { startDate, endDate },
+        previousPeriod: { startDate, endDate },
+        summary: {
+          current: await FinancialService.getPlatformSummary(startDate, endDate),
+          previous: await FinancialService.getPlatformSummary(startDate, endDate),
+          delta: {
+            total_revenue: buildTrendDelta(0, 0),
+            your_earnings: buildTrendDelta(0, 0),
+            tenant_earnings: buildTrendDelta(0, 0),
+            total_transactions: buildTrendDelta(0, 0),
+            failed_transactions: buildTrendDelta(0, 0),
+            avg_commission: buildTrendDelta(0, 0),
+          }
+        },
+        timeline: [],
+        totals: {
+          current: {
+            total_revenue: 0,
+            your_earnings: 0,
+            tenant_earnings: 0,
+            total_transactions: 0,
+            failed_transactions: 0,
+          },
+          previous: {
+            total_revenue: 0,
+            your_earnings: 0,
+            tenant_earnings: 0,
+            total_transactions: 0,
+            failed_transactions: 0,
+          }
+        }
+      };
+    }
+  }
+
+  static async getDailyFinancialSeries(startDate, endDate) {
+    try {
+      const transactionQuery = `
+        SELECT
+          DATE_TRUNC('day', "createdAt")::date as day,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST(amount as NUMERIC))
+              ELSE ABS(CAST(amount as NUMERIC))
+            END
+          ), 2) as total_revenue,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("platformFee" as NUMERIC))
+              ELSE ABS(CAST("platformFee" as NUMERIC))
+            END
+          ), 2) as your_earnings,
+          ROUND(SUM(
+            CASE
+              WHEN type = 'refund' THEN -ABS(CAST("tenantRevenue" as NUMERIC))
+              ELSE ABS(CAST("tenantRevenue" as NUMERIC))
+            END
+          ), 2) as tenant_earnings,
+          COUNT(*) as total_transactions,
+          COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_transactions
+        FROM transactions
+        WHERE status IN ('completed', 'refunded')
+          AND type IN ('booking', 'product_purchase', 'refund')
+          ${buildDateClause('"createdAt"', startDate, endDate)}
+        GROUP BY DATE_TRUNC('day', "createdAt")
+      `;
+
+      const billQuery = `
+        SELECT
+          DATE_TRUNC('day', "paidAt")::date as day,
+          ROUND(SUM(CAST(amount as NUMERIC)), 2) as total_revenue,
+          COUNT(*) as total_transactions
+        FROM bills
+        WHERE status = 'PAID'
+          AND "paidAt" IS NOT NULL
+          ${buildDateClause('"paidAt"', startDate, endDate)}
+        GROUP BY DATE_TRUNC('day', "paidAt")
+      `;
+
+      const [transactionRows, billRows] = await Promise.all([
+        sequelize.query(transactionQuery, {
+          replacements: { startDate, endDate },
+          type: sequelize.QueryTypes.SELECT,
+        }),
+        sequelize.query(billQuery, {
+          replacements: { startDate, endDate },
+          type: sequelize.QueryTypes.SELECT,
+        }),
+      ]);
+
+      const daily = new Map();
+
+      for (const row of transactionRows || []) {
+        const key = formatUtcDateKey(new Date(row.day));
+        const current = daily.get(key) || {
+          day: key,
+          total_revenue: 0,
+          your_earnings: 0,
+          tenant_earnings: 0,
+          total_transactions: 0,
+          failed_transactions: 0,
+        };
+
+        current.total_revenue += toNumber(row.total_revenue);
+        current.your_earnings += toNumber(row.your_earnings);
+        current.tenant_earnings += toNumber(row.tenant_earnings);
+        current.total_transactions += toNumber(row.total_transactions);
+        current.failed_transactions += toNumber(row.failed_transactions);
+        daily.set(key, current);
+      }
+
+      for (const row of billRows || []) {
+        const key = formatUtcDateKey(new Date(row.day));
+        const current = daily.get(key) || {
+          day: key,
+          total_revenue: 0,
+          your_earnings: 0,
+          tenant_earnings: 0,
+          total_transactions: 0,
+          failed_transactions: 0,
+        };
+
+        current.total_revenue += toNumber(row.total_revenue);
+        current.your_earnings += toNumber(row.total_revenue);
+        current.total_transactions += toNumber(row.total_transactions);
+        daily.set(key, current);
+      }
+
+      return Array.from(daily.values())
+        .sort((a, b) => new Date(a.day) - new Date(b.day));
+    } catch (error) {
+      console.error('Error in getDailyFinancialSeries:', error);
+      return [];
     }
   }
 
