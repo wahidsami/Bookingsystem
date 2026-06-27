@@ -2670,8 +2670,8 @@ export function AppointmentDetailsDrawer({
 
     return (
       <div className="h-full p-3 lg:p-4">
-        <div className="grid h-full gap-4 xl:grid-cols-[360px_240px_minmax(0,1fr)]">
-          <div className="space-y-4">
+        <div className="grid h-full gap-4 xl:grid-cols-[340px_260px_minmax(0,1fr)]">
+          <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
             <WorkspacePanel
               title={locale === "ar" ? "الملف الشخصي" : "Customer profile"}
               subtitle={customerFullName}
@@ -2877,26 +2877,55 @@ export function AppointmentDetailsDrawer({
             </WorkspacePanel>
           </div>
 
-          <div className="sticky top-4 z-10 rounded-3xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
-            <div className="grid gap-2">
-              {customerTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setCustomerTab(tab.key)}
-                  className={`w-full rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition ${
-                    customerTab === tab.key
-                      ? "bg-primary text-white"
-                      : "bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          <div className="xl:sticky xl:top-4 xl:self-start">
+            <div className="rounded-3xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
+              <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                    {locale === "ar" ? "التنقل" : "Navigation"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {locale === "ar" ? "مساحات CRM" : "CRM workspace"}
+                  </p>
+                </div>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200">
+                  {locale === "ar" ? "ثابت" : "Sticky"}
+                </span>
+              </div>
+              <div className="grid gap-2">
+                {customerTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setCustomerTab(tab.key)}
+                    className={`w-full rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                      customerTab === tab.key
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 rounded-3xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  {locale === "ar" ? "المحتوى" : "Content"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {customerTabs.find((tab) => tab.key === customerTab)?.label || ""}
+                </p>
+              </div>
+              <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                CRM
+              </div>
+            </div>
+            <div className="border-t border-gray-200 pt-4">
             {customerWorkspaceLoading ? (
               <div className="flex items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 py-16">
                 <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
@@ -2908,6 +2937,7 @@ export function AppointmentDetailsDrawer({
                 {locale === "ar" ? "لا توجد بيانات إضافية متاحة." : "No extra customer data is available yet."}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>
