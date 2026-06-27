@@ -2294,32 +2294,74 @@ export function AppointmentDetailsDrawer({
               </WorkspacePanel>
 
               <WorkspacePanel title={locale === "ar" ? "ملخص الدفع" : "Payment summary"}>
-                <div className="space-y-1.5 text-sm">
-                {[
-                  { label: locale === "ar" ? "المجموع الفرعي" : "Subtotal", value: subtotalAmount },
-                  { label: locale === "ar" ? "الخصم" : "Discount", value: discountAmount },
-                  { label: locale === "ar" ? "الضريبة" : "Tax", value: taxAmount },
-                  { label: locale === "ar" ? "العربون" : "Deposit", value: depositAmount }
-                ].map((row) => (
-                  <div key={row.label} className="flex items-center justify-between gap-3">
-                    <span className="text-gray-600">{row.label}</span>
-                    <Currency amount={row.value} />
+                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                        {locale === "ar" ? "الحالة المالية" : "Financial state"}
+                      </p>
+                      <h4 className="mt-1 text-lg font-semibold text-gray-900">
+                        {getPaymentStatusLabel(currentPaymentStatus, locale)}
+                      </h4>
+                    </div>
+                    <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                      {locale === "ar"
+                        ? `${Math.max(0, Math.round((paidAmount / Math.max(totalAmount, 1)) * 100))}% مدفوع`
+                        : `${Math.max(0, Math.round((paidAmount / Math.max(totalAmount, 1)) * 100))}% paid`}
+                    </div>
                   </div>
-                ))}
-                <div className="border-t border-gray-200 pt-1.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الإجمالي" : "Total"}</span>
-                    <Currency amount={totalAmount} className="text-sm font-bold" />
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                        {locale === "ar" ? "الخدمات" : "Services"}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-gray-900">
+                        <Currency amount={subtotalAmount} />
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                        {locale === "ar" ? "الخصومات" : "Discounts"}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-gray-900">
+                        <Currency amount={discountAmount} />
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                        {locale === "ar" ? "المدفوع" : "Paid"}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-gray-900">
+                        <Currency amount={paidAmount} />
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                        {locale === "ar" ? "المتبقي" : "Remaining"}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-gray-900">
+                        <Currency amount={remainingAmount} />
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-0.5 flex items-center justify-between gap-3 text-xs">
-                    <span className="text-gray-600">{locale === "ar" ? "المدفوع" : "Paid"}</span>
-                    <Currency amount={paidAmount} />
+
+                  <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3.5">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-gray-600">{locale === "ar" ? "الضريبة" : "Tax"}</span>
+                      <Currency amount={taxAmount} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                      <span className="text-gray-600">{locale === "ar" ? "العربون" : "Deposit"}</span>
+                      <Currency amount={depositAmount} />
+                    </div>
+                    <div className="mt-2 border-t border-gray-200 pt-2">
+                      <div className="flex items-center justify-between gap-3 text-base">
+                        <span className="font-semibold text-gray-900">{locale === "ar" ? "الإجمالي النهائي" : "Final total"}</span>
+                        <Currency amount={totalAmount} className="text-sm font-bold" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-0.5 flex items-center justify-between gap-3 text-xs">
-                    <span className="text-gray-600">{locale === "ar" ? "المتبقي" : "Remaining"}</span>
-                    <Currency amount={remainingAmount} className="font-semibold text-gray-900" />
-                  </div>
-                </div>
                 </div>
               </WorkspacePanel>
 
