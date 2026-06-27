@@ -134,6 +134,7 @@ interface CustomerAnalytics {
   };
   topCustomers?: Array<{
     id: string;
+    name?: string;
     bookings: number;
     completed: number;
     revenue: number;
@@ -1262,7 +1263,7 @@ export default function FinancialPage() {
                         locale === "ar" ? "الإيراد" : "Revenue"
                       ]}
                       rows={(customerAnalytics.topCustomers || []).map((customer, index) => [
-                        `${index + 1}. ${customer.id}`,
+                        `${index + 1}. ${customer.name || customer.id}`,
                         customer.bookings,
                         customer.completed,
                         formatMoney(customer.revenue)

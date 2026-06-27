@@ -864,7 +864,7 @@ export default function ReportsPage() {
                     locale === "ar" ? "الإيراد" : "Revenue"
                   ]}
                   rows={(customerAnalytics?.topCustomers || []).slice(0, 6).map((customer: any) => [
-                    customer.id,
+                    customer.name || customer.id,
                     safeNumber(customer.bookings),
                     formatMoney(customer.revenue)
                   ])}

@@ -857,14 +857,19 @@ exports.getCustomerAnalytics = async (req, res) => {
         const customerStats = {};
         appointments.forEach(appointment => {
             const customerId = appointment.platformUserId;
+            const customerName = getCustomerName(appointment.user);
             if (!customerStats[customerId]) {
                 customerStats[customerId] = {
+                    id: customerId,
+                    name: customerName,
                     bookings: 0,
                     completed: 0,
                     revenue: 0,
                     firstVisit: appointment.startTime,
                     lastVisit: appointment.startTime
                 };
+            } else if (customerName && (!customerStats[customerId].name || customerStats[customerId].name === customerId)) {
+                customerStats[customerId].name = customerName;
             }
             
             customerStats[customerId].bookings++;
@@ -904,7 +909,11 @@ exports.getCustomerAnalytics = async (req, res) => {
 
         // Top customers by revenue
         const topCustomers = Object.entries(customerStats)
-            .map(([id, stats]) => ({ id, ...stats }))
+            .map(([id, stats]) => ({
+                id,
+                name: stats.name || id,
+                ...stats
+            }))
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 10);
 

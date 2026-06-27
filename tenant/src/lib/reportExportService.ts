@@ -79,63 +79,62 @@ function buildDelimitedLines(payload: ReportExportPayload): string[] {
 }
 
 function buildExcelHtml(payload: ReportExportPayload): string {
-  const htmlRows: string[] = [];
-  htmlRows.push('<!doctype html>');
-  htmlRows.push('<html><head><meta charset="utf-8" />');
-  htmlRows.push('<style>');
-  htmlRows.push('body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111827;margin:24px;}');
-  htmlRows.push('h1{font-size:18px;margin:0 0 8px;}');
-  htmlRows.push('h2{font-size:14px;margin:20px 0 8px;}');
-  htmlRows.push('table{border-collapse:collapse;width:100%;margin-bottom:16px;}');
-  htmlRows.push('th,td{border:1px solid #d1d5db;padding:8px 10px;vertical-align:top;text-align:left;}');
-  htmlRows.push('th{background:#f9fafb;font-weight:700;}');
-  htmlRows.push('.meta{margin-bottom:12px;color:#374151;}');
-  htmlRows.push('.meta p{margin:0 0 4px;}');
-  htmlRows.push('</style></head><body>');
+  const rows: string[] = [];
+
+  const escapeXml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  const rowXml = (cells: ReportExportCell[]) => (
+    `<Row>${
+      cells.map((cell) => {
+        const isNumber = typeof cell === 'number' && Number.isFinite(cell);
+        const isBoolean = typeof cell === 'boolean';
+        const text = escapeXml(safeText(cell));
+        return `<Cell><Data ss:Type="${isNumber ? 'Number' : isBoolean ? 'Boolean' : 'String'}">${isBoolean ? (cell ? '1' : '0') : text}</Data></Cell>`;
+      }).join('')
+    }</Row>`
+  );
+
+  rows.push('<?xml version="1.0" encoding="UTF-8"?>');
+  rows.push('<?mso-application progid="Excel.Sheet"?>');
+  rows.push('<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">');
+  rows.push('<Worksheet ss:Name="Report"><Table>');
 
   if (payload.reportTitle) {
-    htmlRows.push(`<h1>${escapeHtml(payload.reportTitle)}</h1>`);
+    rows.push(rowXml(['Report', payload.reportTitle]));
   }
 
-  htmlRows.push('<div class="meta">');
-  htmlRows.push(`<p><strong>Period:</strong> ${escapeHtml(`${payload.startDate} - ${payload.endDate}`)}</p>`);
-  htmlRows.push(`<p><strong>Sections:</strong> ${escapeHtml(payload.sections.join(' | ') || '')}</p>`);
+  rows.push(rowXml(['Period', `${payload.startDate} - ${payload.endDate}`]));
+  rows.push(rowXml(['Sections', payload.sections.join(' | ') || '']));
+
   if (payload.notes) {
-    htmlRows.push(`<p><strong>Notes:</strong> ${escapeHtml(payload.notes)}</p>`);
+    rows.push(rowXml(['Notes', payload.notes]));
   }
-  htmlRows.push('</div>');
 
   payload.tables.forEach((table) => {
-    htmlRows.push(`<h2>${escapeHtml(table.title)}</h2>`);
+    rows.push(rowXml([table.title]));
+
     if (table.metadataRows?.length) {
-      htmlRows.push('<table>');
       table.metadataRows.forEach(([label, value]) => {
-        htmlRows.push(`<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(safeText(value))}</td></tr>`);
+        rows.push(rowXml([label, value]));
       });
-      htmlRows.push('</table>');
     }
-    htmlRows.push('<table>');
-    htmlRows.push('<thead><tr>');
-    table.columns.forEach((column) => {
-      htmlRows.push(`<th>${escapeHtml(column)}</th>`);
-    });
-    htmlRows.push('</tr></thead><tbody>');
+
+    rows.push(rowXml(table.columns));
     if (table.rows.length > 0) {
-      table.rows.forEach((row) => {
-        htmlRows.push('<tr>');
-        row.forEach((cell) => {
-          htmlRows.push(`<td>${escapeHtml(safeText(cell))}</td>`);
-        });
-        htmlRows.push('</tr>');
-      });
+      table.rows.forEach((row) => rows.push(rowXml(row)));
     } else {
-      htmlRows.push(`<tr><td colspan="${Math.max(table.columns.length, 1)}">No rows found.</td></tr>`);
+      rows.push(rowXml(['No rows found.']));
     }
-    htmlRows.push('</tbody></table>');
+    rows.push(rowXml(['']));
   });
 
-  htmlRows.push('</body></html>');
-  return htmlRows.join('');
+  rows.push('</Table></Worksheet></Workbook>');
+  return rows.join('');
 }
 
 function escapeHtml(value: string): string {
@@ -478,7 +477,7 @@ export function buildReportExportTables(params: {
         localizedLabel(locale, 'Last visit', 'آخر زيارة')
       ],
       rows: data.customerAnalytics.topCustomers.map((item: any) => [
-        item.id ?? item.customerName ?? '',
+        item.name ?? item.customerName ?? item.id ?? '',
         numberRow(item.bookings),
         numberRow(item.completed),
         numberRow(item.revenue),
