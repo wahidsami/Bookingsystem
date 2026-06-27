@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { TenantLayout } from "@/components/TenantLayout";
+import { ReportExportToolbar } from "@/components/ReportExportToolbar";
 import {
   FinanceEmptyState,
   FinanceMetricCard,
@@ -14,6 +15,13 @@ import {
 } from "@/components/FinanceWorkspaceShell";
 import { Currency } from "@/components/Currency";
 import { tenantApi } from "@/lib/api";
+import {
+  buildReportExportTables,
+  exportCsv,
+  exportExcel,
+  exportPdf,
+  printReport
+} from "@/lib/reportExportService";
 
 type ReportSectionId =
   | "overview"
@@ -158,6 +166,36 @@ function SectionTable({
       </table>
     </div>
   );
+}
+
+function getPreviewSectionsForReportSection(sectionId: ReportSectionId) {
+  switch (sectionId) {
+    case "sales":
+      return ["daily", "bookingTrends"];
+    case "financial":
+      return ["financial", "discounts", "refunds", "paymentMethods"];
+    case "appointments":
+      return ["appointments", "bookingTrends"];
+    case "rebookings":
+      return ["rebookings"];
+    case "employees":
+      return ["employees", "employeePerformance"];
+    case "services":
+      return ["services", "servicePerformance"];
+    case "products":
+      return ["products"];
+    case "discounts":
+      return ["discounts"];
+    case "refunds":
+      return ["refunds"];
+    case "paymentMethods":
+      return ["paymentMethods"];
+    case "customerSales":
+      return ["customerSales"];
+    case "overview":
+    default:
+      return ["overview"];
+  }
 }
 
 export default function ReportsPage() {
@@ -386,6 +424,107 @@ export default function ReportsPage() {
     ),
     [rebookingAnalytics]
   );
+
+  const exportSections = useMemo(() => getPreviewSectionsForReportSection(activeSection), [activeSection]);
+  const reportTitle = useMemo(() => {
+    switch (activeSection) {
+      case "sales":
+        return locale === "ar" ? "تقرير المبيعات" : "Sales report";
+      case "financial":
+        return locale === "ar" ? "التقرير المالي" : "Financial report";
+      case "appointments":
+        return locale === "ar" ? "تقرير المواعيد" : "Appointment report";
+      case "rebookings":
+        return locale === "ar" ? "تحليلات إعادة الحجز" : "Rebooking analytics";
+      case "employees":
+        return locale === "ar" ? "تقرير الموظفين" : "Employee report";
+      case "services":
+        return locale === "ar" ? "تقرير الخدمات" : "Service report";
+      case "products":
+        return locale === "ar" ? "تقرير المنتجات" : "Product report";
+      case "discounts":
+        return locale === "ar" ? "تقرير الخصومات" : "Discounts report";
+      case "refunds":
+        return locale === "ar" ? "تقرير الاستردادات" : "Refunds report";
+      case "paymentMethods":
+        return locale === "ar" ? "طرق الدفع" : "Payment methods";
+      case "customerSales":
+        return locale === "ar" ? "مبيعات العملاء" : "Customer sales";
+      case "overview":
+      default:
+        return locale === "ar" ? "النظرة العامة" : "Overview";
+    }
+  }, [activeSection, locale]);
+
+  const exportData = useMemo(() => ({
+    overview: summary || financialOverview,
+    summary,
+    financialOverview,
+    bookingTrends,
+    dailyRevenue: bookingTrends,
+    servicePerformance,
+    employeePerformance,
+    employees: employeePerformance,
+    products: productRevenue?.rows || [],
+    discounts: financialOverview?.discountTotals,
+    refunds: refundsReport,
+    paymentMethods: paymentMethodsReport,
+    customerAnalytics,
+    rebookings: rebookingAnalytics,
+    posClosingSummary
+  }), [
+    bookingTrends,
+    customerAnalytics,
+    employeePerformance,
+    financialOverview,
+    paymentMethodsReport,
+    productRevenue?.rows,
+    rebookingAnalytics,
+    refundsReport,
+    servicePerformance,
+    summary
+  ]);
+
+  const exportTables = useMemo(
+    () =>
+      buildReportExportTables({
+        locale,
+        sections: exportSections,
+        data: exportData
+      }),
+    [exportData, exportSections, locale]
+  );
+
+  const handleExportPdf = async () => {
+    await exportPdf({
+      startDate,
+      endDate,
+      sections: exportSections,
+      title: reportTitle
+    });
+  };
+
+  const handleExportCsv = () => {
+    exportCsv({
+      fileName: reportTitle,
+      reportTitle,
+      startDate,
+      endDate,
+      sections: exportSections,
+      tables: exportTables
+    });
+  };
+
+  const handleExportExcel = () => {
+    exportExcel({
+      fileName: reportTitle,
+      reportTitle,
+      startDate,
+      endDate,
+      sections: exportSections,
+      tables: exportTables
+    });
+  };
 
   const totalBookings = safeNumber(summary?.totalBookings ?? financialOverview?.totalBookings);
   const totalRevenue = safeNumber(summary?.totalRevenue ?? financialOverview?.totalRevenue);
@@ -900,6 +1039,22 @@ export default function ReportsPage() {
           { id: "quarter", label: locale === "ar" ? "ربع سنة" : "Quarter", onClick: () => setQuickRange("quarter") },
           { id: "year", label: locale === "ar" ? "هذا العام" : "This year", onClick: () => setQuickRange("year") }
         ]}
+        toolbarExtras={
+          <ReportExportToolbar
+            locale={locale}
+            previewHref={`/${locale}/dashboard/reports/preview?${new URLSearchParams({
+              startDate,
+              endDate,
+              sections: exportSections.join(","),
+              title: reportTitle
+            }).toString()}`}
+            onExportPdf={handleExportPdf}
+            onExportCsv={handleExportCsv}
+            onExportExcel={handleExportExcel}
+            onPrint={printReport}
+            disabled={loading}
+          />
+        }
         actions={
           <>
             <Link href={`/${locale}/dashboard/reports/generate`} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">

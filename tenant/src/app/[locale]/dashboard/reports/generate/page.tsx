@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { TenantLayout } from '@/components/TenantLayout';
 
 const SECTION_OPTIONS = [
@@ -27,23 +27,40 @@ export type ReportSectionId = (typeof SECTION_OPTIONS)[number]['id'];
 export default function GenerateReportPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as string) || 'ar';
   const isRTL = locale === 'ar';
 
   const [startDate, setStartDate] = useState(() => {
+    const prefill = searchParams.get('startDate');
+    if (prefill) return prefillsDateToIso(prefill);
     const d = new Date();
     d.setDate(1);
     return d.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(() => {
+    const prefill = searchParams.get('endDate');
+    if (prefill) return prefillsDateToIso(prefill);
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
     d.setDate(0);
     return d.toISOString().split('T')[0];
   });
-  const [sections, setSections] = useState<ReportSectionId[]>(['overview', 'employees', 'services', 'products']);
-  const [reportTitle, setReportTitle] = useState('');
-  const [notes, setNotes] = useState('');
+  const [sections, setSections] = useState<ReportSectionId[]>(() => {
+    const prefills = searchParams.get('sections');
+    const parsed = prefills
+      ? prefills.split(',').map((section) => section.trim()).filter(Boolean) as ReportSectionId[]
+      : [];
+    return parsed.length ? parsed : ['overview', 'employees', 'services', 'products'];
+  });
+  const [reportTitle, setReportTitle] = useState(() => searchParams.get('title') || '');
+  const [notes, setNotes] = useState(() => searchParams.get('notes') || '');
+
+  function prefillsDateToIso(value: string) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toISOString().split('T')[0];
+  }
 
   const toggleSection = (id: ReportSectionId) => {
     setSections((prev) =>

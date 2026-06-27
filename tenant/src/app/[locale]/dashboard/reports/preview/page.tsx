@@ -5,6 +5,7 @@ import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantAuth } from '@/contexts/TenantAuthContext';
 import { ReportHeader } from '@/components/ReportHeader';
+import { ReportExportToolbar } from '@/components/ReportExportToolbar';
 import { tenantApi } from '@/lib/api';
 import { Currency } from '@/components/Currency';
 import {
@@ -16,6 +17,13 @@ import {
   exportServicePerformanceToCsv,
   exportEmployeePerformanceToCsv,
 } from '@/utils/csvExport';
+import {
+  buildReportExportTables,
+  exportCsv,
+  exportExcel,
+  exportPdf,
+  printReport
+} from '@/lib/reportExportService';
 import type { ReportSectionId } from '../generate/page';
 
 function EmptyReportSection({
@@ -31,6 +39,31 @@ function EmptyReportSection({
       <p className="text-sm text-gray-600">{description}</p>
     </section>
   );
+}
+
+function getGenerateHref({
+  locale,
+  startDate,
+  endDate,
+  sections,
+  reportTitle,
+  notes,
+}: {
+  locale: string;
+  startDate: string;
+  endDate: string;
+  sections: ReportSectionId[];
+  reportTitle?: string;
+  notes?: string;
+}) {
+  const query = new URLSearchParams({
+    startDate,
+    endDate,
+    sections: sections.join(','),
+  });
+  if (reportTitle?.trim()) query.set('title', reportTitle.trim());
+  if (notes?.trim()) query.set('notes', notes.trim());
+  return `/${locale}/dashboard/reports/generate?${query.toString()}`;
 }
 
 export default function ReportPreviewPage() {
@@ -52,7 +85,6 @@ export default function ReportPreviewPage() {
   const notes = searchParams.get('notes') || '';
 
   const [loading, setLoading] = useState(true);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadError, setDownloadError] = useState<string>('');
   const [data, setData] = useState<Record<string, any>>({});
 
@@ -87,40 +119,85 @@ export default function ReportPreviewPage() {
     };
   }, [endDate, sections, startDate]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const tenantName = user?.businessName || (locale === 'ar' ? 'النشاط' : 'Business');
+  const previewExportData = useMemo(() => ({
+    overview: data.overview,
+    summary: data.overview,
+    financialOverview: data.overview,
+    bookingTrends: data.bookingTrends,
+    dailyRevenue: data.dailyRevenue,
+    servicePerformance: data.servicePerformance,
+    employeePerformance: data.employeePerformance || data.employees,
+    employees: data.employees || data.employeePerformance,
+    services: data.services,
+    products: data.products,
+    discounts: data.discounts,
+    refunds: data.refunds,
+    paymentMethods: data.paymentMethods,
+    customerAnalytics: data.customerAnalytics,
+    rebookings: data.rebookings,
+    posClosingSummary: data.posClosingSummary
+  }), [data]);
+  const previewExportTables = useMemo(
+    () =>
+      buildReportExportTables({
+        locale,
+        sections,
+        data: previewExportData
+      }),
+    [locale, previewExportData, sections]
+  );
+  const previewReportTitle = reportTitle || (locale === 'ar' ? 'تقرير مخصص' : 'Custom report');
+  const previewEditHref = getGenerateHref({
+    locale,
+    startDate,
+    endDate,
+    sections,
+    reportTitle,
+    notes
+  });
 
-  const handleDownloadPdf = async () => {
+  const handleExportPdf = async () => {
     try {
       setDownloadError('');
-      setDownloadingPdf(true);
-      const file = await tenantApi.downloadReportPdf({
+      await exportPdf({
         startDate,
         endDate,
         sections,
-        title: reportTitle || undefined,
+        title: previewReportTitle
       });
-      const url = URL.createObjectURL(file.blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.filename || 'report.pdf';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error('Failed to download report PDF:', err);
       setDownloadError(
         err?.message
           || (locale === 'ar' ? 'تعذر تنزيل ملف PDF. حاول مرة أخرى.' : 'Failed to download PDF. Please try again.')
       );
-    } finally {
-      setDownloadingPdf(false);
     }
   };
 
-  const tenantName = user?.businessName || (locale === 'ar' ? 'النشاط' : 'Business');
+  const handleExportCsv = () => {
+    setDownloadError('');
+    exportCsv({
+      fileName: previewReportTitle,
+      reportTitle: previewReportTitle,
+      startDate,
+      endDate,
+      sections,
+      tables: previewExportTables,
+    });
+  };
+
+  const handleExportExcel = () => {
+    setDownloadError('');
+    exportExcel({
+      fileName: previewReportTitle,
+      reportTitle: previewReportTitle,
+      startDate,
+      endDate,
+      sections,
+      tables: previewExportTables,
+    });
+  };
 
   if (!startDate || !endDate) {
     return (
@@ -135,36 +212,31 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-white p-6" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      <div className="no-print flex gap-4 mb-6">
-        <button
-          type="button"
-          onClick={handleDownloadPdf}
-          disabled={downloadingPdf}
-          className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:opacity-90 disabled:opacity-60"
-        >
-          {downloadingPdf
-            ? (locale === 'ar' ? 'جاري إنشاء PDF...' : 'Generating PDF...')
-            : (locale === 'ar' ? 'تنزيل PDF' : 'Download PDF')}
-        </button>
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:opacity-90"
-        >
-          {locale === 'ar' ? 'طباعة / حفظ كـ PDF' : 'Print / Save as PDF'}
-        </button>
-        <Link
-          href={`/${locale}/dashboard/reports/generate`}
-          className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300"
-        >
-          {locale === 'ar' ? 'تعديل التقرير' : 'Edit report'}
-        </Link>
-        <Link
-          href={`/${locale}/dashboard/reports`}
-          className="px-4 py-2 text-gray-600 hover:underline"
-        >
-          {locale === 'ar' ? 'العودة إلى التقارير' : 'Back to Reports'}
-        </Link>
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href={`/${locale}/dashboard/reports`}
+            className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            {locale === 'ar' ? 'العودة إلى التقارير' : 'Back to Reports'}
+          </Link>
+          <Link
+            href={previewEditHref}
+            className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            {locale === 'ar' ? 'تعديل التقرير' : 'Edit report'}
+          </Link>
+        </div>
+        <ReportExportToolbar
+          locale={locale}
+          previewHref={previewEditHref}
+          previewLabel={locale === 'ar' ? 'تعديل' : 'Edit'}
+          onExportPdf={handleExportPdf}
+          onExportCsv={handleExportCsv}
+          onExportExcel={handleExportExcel}
+          onPrint={printReport}
+          disabled={loading}
+        />
       </div>
       {downloadError ? (
         <div className="no-print mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
