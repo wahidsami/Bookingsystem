@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const db = require('../models');
+const { deliverScheduledReport } = require('../services/adminReportDeliveryService');
 const {
     DIMENSIONS,
     METRICS,
@@ -20,7 +21,12 @@ function normalizeScheduleConfig(scheduleConfig = {}) {
         timeOfDay: `${scheduleConfig.timeOfDay || '09:00'}`.trim(),
         dayOfWeek: Number.isInteger(scheduleConfig.dayOfWeek) ? scheduleConfig.dayOfWeek : null,
         dayOfMonth: Number.isInteger(scheduleConfig.dayOfMonth) ? scheduleConfig.dayOfMonth : null,
-        recipients: Array.isArray(scheduleConfig.recipients) ? scheduleConfig.recipients.filter(Boolean) : []
+        recipients: Array.isArray(scheduleConfig.recipients) ? scheduleConfig.recipients.filter(Boolean) : [],
+        deliveryChannels: Array.isArray(scheduleConfig.deliveryChannels) ? scheduleConfig.deliveryChannels.map((item) => `${item}`.trim()).filter(Boolean) : [],
+        exportFormats: Array.isArray(scheduleConfig.exportFormats) ? scheduleConfig.exportFormats.map((item) => `${item}`.trim()).filter(Boolean) : [],
+        customIntervalMinutes: Number.isFinite(Number.parseInt(scheduleConfig.customIntervalMinutes, 10))
+            ? Number.parseInt(scheduleConfig.customIntervalMinutes, 10)
+            : null
     };
 }
 
@@ -57,10 +63,67 @@ function appendRunHistory(report, preview, runType = 'manual') {
         rows: preview?.totals?.rows || 0,
         recordCount: preview?.totals?.recordCount || 0,
         summary: preview?.summary || {},
-        comparison: preview?.comparison?.label || null
+        comparison: preview?.comparison?.label || null,
+        delivery: preview?.delivery || null
     };
     history.unshift(entry);
     report.runHistory = history.slice(0, 20);
+}
+
+async function runReportWithDelivery(savedReport, runType = 'manual') {
+    const preview = await previewReport(savedReport.reportConfig || {
+        title: savedReport.title,
+        description: savedReport.description,
+        dimensions: savedReport.dimensions,
+        metrics: savedReport.metrics,
+        grouping: savedReport.grouping,
+        filters: savedReport.filters,
+        outputType: savedReport.outputType,
+        chartType: savedReport.chartType,
+        scheduleConfig: savedReport.scheduleConfig,
+        reportType: savedReport.reportType
+    });
+
+    const delivery = await deliverScheduledReport(savedReport, preview);
+    const finalPreview = {
+        ...preview,
+        delivery
+    };
+
+    savedReport.lastRunAt = new Date();
+    savedReport.lastRunResult = finalPreview;
+    appendRunHistory(savedReport, finalPreview, runType);
+    if (savedReport.scheduleConfig?.enabled) {
+        savedReport.nextRunAt = calcNextRunAt(savedReport.scheduleConfig, new Date());
+    }
+    await savedReport.save();
+
+    return { preview: finalPreview, delivery };
+}
+
+async function runReportPreviewOnly(savedReport, runType = 'manual') {
+    const preview = await previewReport(savedReport.reportConfig || {
+        title: savedReport.title,
+        description: savedReport.description,
+        dimensions: savedReport.dimensions,
+        metrics: savedReport.metrics,
+        grouping: savedReport.grouping,
+        filters: savedReport.filters,
+        outputType: savedReport.outputType,
+        chartType: savedReport.chartType,
+        scheduleConfig: savedReport.scheduleConfig,
+        reportType: savedReport.reportType
+    });
+
+    savedReport.lastRunAt = new Date();
+    savedReport.lastRunResult = preview;
+    appendRunHistory(savedReport, preview, runType);
+    if (savedReport.scheduleConfig?.enabled) {
+        savedReport.nextRunAt = calcNextRunAt(savedReport.scheduleConfig, new Date());
+    }
+    await savedReport.save();
+
+    return preview;
 }
 
 async function findAdminSavedReport(reportId) {
@@ -292,27 +355,7 @@ exports.runSavedReport = async (req, res) => {
         if (!savedReport) {
             return res.status(404).json(errorResponse('Saved report not found'));
         }
-
-        const preview = await previewReport(savedReport.reportConfig || {
-            title: savedReport.title,
-            description: savedReport.description,
-            dimensions: savedReport.dimensions,
-            metrics: savedReport.metrics,
-            grouping: savedReport.grouping,
-            filters: savedReport.filters,
-            outputType: savedReport.outputType,
-            chartType: savedReport.chartType,
-            scheduleConfig: savedReport.scheduleConfig,
-            reportType: savedReport.reportType
-        });
-
-        savedReport.lastRunAt = new Date();
-        savedReport.lastRunResult = preview;
-        appendRunHistory(savedReport, preview, 'manual');
-        if (savedReport.scheduleConfig?.enabled) {
-            savedReport.nextRunAt = calcNextRunAt(savedReport.scheduleConfig, new Date());
-        }
-        await savedReport.save();
+        const preview = await runReportPreviewOnly(savedReport, 'manual');
 
         res.json(successResponse('Saved report run completed', {
             report: serializeSavedReport(savedReport),
@@ -336,6 +379,25 @@ exports.previewSavedReport = async (req, res) => {
     } catch (error) {
         console.error('Preview saved report error:', error);
         res.status(500).json(errorResponse('Failed to preview saved report', error.message));
+    }
+};
+
+exports.deliverSavedReport = async (req, res) => {
+    try {
+        const savedReport = await findAdminSavedReport(req.params.id);
+        if (!savedReport) {
+            return res.status(404).json(errorResponse('Saved report not found'));
+        }
+
+        const { preview, delivery } = await runReportWithDelivery(savedReport, 'manual_delivery');
+        res.json(successResponse('Saved report delivered', {
+            report: serializeSavedReport(savedReport),
+            preview,
+            delivery
+        }));
+    } catch (error) {
+        console.error('Deliver saved report error:', error);
+        res.status(500).json(errorResponse('Failed to deliver saved report', error.message));
     }
 };
 
@@ -363,12 +425,7 @@ exports.runScheduledReports = async () => {
     for (const report of dueReports || []) {
         if (!report.scheduleConfig?.enabled) continue;
         try {
-            const preview = await previewReport(report.reportConfig || {});
-            report.lastRunAt = new Date();
-            report.lastRunResult = preview;
-            appendRunHistory(report, preview, 'scheduled');
-            report.nextRunAt = calcNextRunAt(report.scheduleConfig, new Date());
-            await report.save();
+            const { preview } = await runReportWithDelivery(report, 'scheduled');
         } catch (error) {
             console.error(`Scheduled report run failed for ${report.id}:`, error);
         }

@@ -121,6 +121,9 @@ export default function CustomReportBuilderPage() {
   const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState('1');
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState('1');
   const [scheduleRecipients, setScheduleRecipients] = useState('');
+  const [scheduleDeliveryChannels, setScheduleDeliveryChannels] = useState<string[]>(['email', 'dashboard_inbox']);
+  const [scheduleExportFormats, setScheduleExportFormats] = useState<string[]>(['pdf', 'excel']);
+  const [customIntervalMinutes, setCustomIntervalMinutes] = useState('1440');
   const [comparisonMode, setComparisonMode] = useState('off');
   const [compareStartDate, setCompareStartDate] = useState('');
   const [compareEndDate, setCompareEndDate] = useState('');
@@ -163,8 +166,11 @@ export default function CustomReportBuilderPage() {
     timeOfDay: scheduleTimeOfDay,
     dayOfWeek: Number(scheduleDayOfWeek),
     dayOfMonth: Number(scheduleDayOfMonth),
-    recipients: scheduleRecipients.split(',').map((item) => item.trim()).filter(Boolean)
-  }), [scheduleEnabled, scheduleCadence, scheduleTimeOfDay, scheduleDayOfWeek, scheduleDayOfMonth, scheduleRecipients]);
+    recipients: scheduleRecipients.split(',').map((item) => item.trim()).filter(Boolean),
+    deliveryChannels: scheduleDeliveryChannels,
+    exportFormats: scheduleExportFormats,
+    customIntervalMinutes: Number(customIntervalMinutes)
+  }), [scheduleEnabled, scheduleCadence, scheduleTimeOfDay, scheduleDayOfWeek, scheduleDayOfMonth, scheduleRecipients, scheduleDeliveryChannels, scheduleExportFormats, customIntervalMinutes]);
 
   const builderPayload = useMemo(() => ({
     title,
@@ -258,6 +264,9 @@ export default function CustomReportBuilderPage() {
         setScheduleDayOfWeek(`${schedule.dayOfWeek ?? 1}`);
         setScheduleDayOfMonth(`${schedule.dayOfMonth ?? 1}`);
         setScheduleRecipients(Array.isArray(schedule.recipients) ? schedule.recipients.join(', ') : '');
+        setScheduleDeliveryChannels(Array.isArray(schedule.deliveryChannels) && schedule.deliveryChannels.length ? schedule.deliveryChannels : ['email', 'dashboard_inbox']);
+        setScheduleExportFormats(Array.isArray(schedule.exportFormats) && schedule.exportFormats.length ? schedule.exportFormats : ['pdf', 'excel']);
+        setCustomIntervalMinutes(`${schedule.customIntervalMinutes ?? 1440}`);
         setComparisonMode(report.reportConfig?.comparisonMode || 'off');
         setCompareStartDate(report.reportConfig?.compareStartDate || '');
         setCompareEndDate(report.reportConfig?.compareEndDate || '');
@@ -265,6 +274,22 @@ export default function CustomReportBuilderPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load saved report');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const deliverSavedReport = async (report: any) => {
+    try {
+      setPreviewLoading(true);
+      const response = await adminApi.deliverSavedCustomReport(report.id);
+      if (response.success) {
+        setPreview(response.data.preview || null);
+        setSelectedReportId(report.id);
+        await loadSavedReportHistory(report.id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to deliver report');
     } finally {
       setPreviewLoading(false);
     }
@@ -301,6 +326,7 @@ export default function CustomReportBuilderPage() {
     return preview.rows.slice(start, start + rowsPerPage);
   }, [preview?.rows, tablePage]);
   const totalPages = Math.max(Math.ceil((preview?.rows?.length || 0) / rowsPerPage), 1);
+  const activeReport = savedReports.find((report) => report.id === selectedReportId) || null;
 
   if (loading) {
     return <div className="h-64 animate-pulse rounded-3xl bg-white/5" />;
@@ -324,6 +350,11 @@ export default function CustomReportBuilderPage() {
             <button type="button" onClick={saveReport} disabled={saveLoading} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 disabled:opacity-60">
               {saveLoading ? 'Saving...' : selectedReportId ? 'Update Report' : 'Save Report'}
             </button>
+            {activeReport ? (
+              <button type="button" onClick={() => deliverSavedReport(activeReport)} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200">
+                Deliver Now
+              </button>
+            ) : null}
             <button type="button" onClick={exportCsv} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80">
               Export CSV
             </button>
@@ -676,11 +707,58 @@ export default function CustomReportBuilderPage() {
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
+                <option value="custom">Custom</option>
               </select>
+              {scheduleCadence === 'custom' ? (
+                <input
+                  type="number"
+                  min="1"
+                  value={customIntervalMinutes}
+                  onChange={(e) => setCustomIntervalMinutes(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white"
+                  placeholder="Interval minutes"
+                />
+              ) : null}
               <input type="time" value={scheduleTimeOfDay} onChange={(e) => setScheduleTimeOfDay(e.target.value)} className="w-full rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" />
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" min="0" max="6" value={scheduleDayOfWeek} onChange={(e) => setScheduleDayOfWeek(e.target.value)} className="rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" placeholder="Day of week" />
                 <input type="number" min="1" max="28" value={scheduleDayOfMonth} onChange={(e) => setScheduleDayOfMonth(e.target.value)} className="rounded-xl border border-white/10 bg-dark-900 px-3 py-2 text-white" placeholder="Day of month" />
+              </div>
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/45">Delivery Channels</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    { key: 'email', label: 'Email' },
+                    { key: 'dashboard_inbox', label: 'Dashboard Inbox' }
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setScheduleDeliveryChannels((current) => current.includes(item.key) ? current.filter((channel) => channel !== item.key) : [...current, item.key])}
+                      className={`rounded-full border px-3 py-1 text-xs transition ${scheduleDeliveryChannels.includes(item.key) ? 'border-sky-400/30 bg-sky-500/10 text-sky-100' : 'border-white/10 bg-white/5 text-white/70'}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/45">Export Formats</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    { key: 'pdf', label: 'PDF' },
+                    { key: 'excel', label: 'Excel' }
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setScheduleExportFormats((current) => current.includes(item.key) ? current.filter((format) => format !== item.key) : [...current, item.key])}
+                      className={`rounded-full border px-3 py-1 text-xs transition ${scheduleExportFormats.includes(item.key) ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100' : 'border-white/10 bg-white/5 text-white/70'}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <textarea
                 value={scheduleRecipients}
@@ -700,6 +778,11 @@ export default function CustomReportBuilderPage() {
                     <div>
                       <p className="text-sm font-medium text-white">{report.title}</p>
                       <p className="text-xs text-white/45">{report.lastRunAt ? `Last run ${format(new Date(report.lastRunAt), 'dd MMM, HH:mm')}` : 'Never run'}</p>
+                      <p className="text-xs text-white/45">
+                        {report.scheduleConfig?.enabled
+                          ? `${report.scheduleConfig.cadence || 'daily'} · ${(report.scheduleConfig.deliveryChannels || []).join(', ') || 'email'}`
+                          : 'Scheduling disabled'}
+                      </p>
                     </div>
                     <button type="button" onClick={() => runSavedReport(report)} className="rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200">
                       Run
@@ -719,12 +802,19 @@ export default function CustomReportBuilderPage() {
               {selectedReportHistory.length ? selectedReportHistory.map((entry) => (
                 <div key={entry.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-white">{entry.runType === 'scheduled' ? 'Scheduled run' : 'Manual run'}</p>
+                    <p className="text-sm font-medium text-white">
+                      {entry.runType === 'scheduled'
+                        ? 'Scheduled run'
+                        : entry.runType === 'manual_delivery'
+                          ? 'Delivered manually'
+                          : 'Manual run'}
+                    </p>
                     <span className="text-[11px] text-white/35">{format(new Date(entry.ranAt), 'dd MMM, HH:mm')}</span>
                   </div>
                   <p className="mt-1 text-xs text-white/45">
                     {entry.rows} groups, {entry.recordCount} records
                     {entry.comparison ? `, ${entry.comparison}` : ''}
+                    {entry.delivery?.deliverySummary?.channels?.length ? `, ${entry.delivery.deliverySummary.channels.join(' + ')}` : ''}
                   </p>
                 </div>
               )) : (

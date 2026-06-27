@@ -396,6 +396,10 @@ class AdminApi {
     return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}/run`, 'POST');
   }
 
+  async deliverSavedCustomReport(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}/deliver`, 'POST');
+  }
+
   async getSavedCustomReportHistory(id: string) {
     return this.request<{ success: boolean; data: any[] }>(`/admin/financial/reports/builder/saved/${id}/history`);
   }

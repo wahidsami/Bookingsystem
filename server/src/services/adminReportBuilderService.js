@@ -107,6 +107,9 @@ const calcNextRunAt = (scheduleConfig = {}, fromDate = new Date()) => {
       next.setDate(next.getDate() + 7);
     } else if (cadence === 'monthly') {
       next.setMonth(next.getMonth() + 1);
+    } else if (cadence === 'custom') {
+      const intervalMinutes = Number.parseInt(scheduleConfig.customIntervalMinutes, 10);
+      next.setTime(next.getTime() + (Number.isFinite(intervalMinutes) && intervalMinutes > 0 ? intervalMinutes : 1440) * 60000);
     } else {
       next.setDate(next.getDate() + 1);
     }
@@ -124,6 +127,14 @@ const calcNextRunAt = (scheduleConfig = {}, fromDate = new Date()) => {
     if (next <= fromDate) {
       next.setMonth(next.getMonth() + 1);
       next.setDate(safeDay);
+    }
+  }
+
+  if (cadence === 'custom') {
+    const intervalMinutes = Number.parseInt(scheduleConfig.customIntervalMinutes, 10);
+    if (Number.isFinite(intervalMinutes) && intervalMinutes > 0) {
+      const nextCustom = new Date(fromDate.getTime() + intervalMinutes * 60000);
+      return nextCustom;
     }
   }
 
@@ -147,6 +158,8 @@ const normalizeReportConfig = (input = {}) => {
   const scheduleConfig = input.scheduleConfig && typeof input.scheduleConfig === 'object' && !Array.isArray(input.scheduleConfig)
     ? input.scheduleConfig
     : {};
+  const deliveryChannels = Array.isArray(scheduleConfig.deliveryChannels) ? scheduleConfig.deliveryChannels : [];
+  const exportFormats = Array.isArray(scheduleConfig.exportFormats) ? scheduleConfig.exportFormats : [];
 
   return {
     reportType: `${input.reportType || 'custom'}`.trim() || 'custom',
@@ -164,7 +177,12 @@ const normalizeReportConfig = (input = {}) => {
       timeOfDay: `${scheduleConfig.timeOfDay || '09:00'}`.trim(),
       dayOfWeek: Number.isInteger(scheduleConfig.dayOfWeek) ? scheduleConfig.dayOfWeek : null,
       dayOfMonth: Number.isInteger(scheduleConfig.dayOfMonth) ? scheduleConfig.dayOfMonth : null,
-      recipients: Array.isArray(scheduleConfig.recipients) ? scheduleConfig.recipients.filter(Boolean) : []
+      recipients: Array.isArray(scheduleConfig.recipients) ? scheduleConfig.recipients.filter(Boolean) : [],
+      deliveryChannels: deliveryChannels.map((item) => `${item}`.trim()).filter(Boolean),
+      exportFormats: exportFormats.map((item) => `${item}`.trim()).filter(Boolean),
+      customIntervalMinutes: Number.isFinite(Number.parseInt(scheduleConfig.customIntervalMinutes, 10))
+        ? Number.parseInt(scheduleConfig.customIntervalMinutes, 10)
+        : null
     },
     comparisonMode: `${input.comparisonMode || 'off'}`.trim() || 'off',
     compareStartDate: input.compareStartDate || null,

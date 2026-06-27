@@ -47,6 +47,7 @@ router.post('/financial/reports/builder/saved', requirePermission('financial', '
 router.put('/financial/reports/builder/saved/:id', requirePermission('financial', 'edit'), adminReportBuilderController.updateSavedReport);
 router.delete('/financial/reports/builder/saved/:id', requirePermission('financial', 'delete'), adminReportBuilderController.deleteSavedReport);
 router.post('/financial/reports/builder/saved/:id/run', requirePermission('financial', 'view'), adminReportBuilderController.runSavedReport);
+router.post('/financial/reports/builder/saved/:id/deliver', requirePermission('financial', 'view'), adminReportBuilderController.deliverSavedReport);
 router.get('/financial/reports/builder/saved/:id/preview', requirePermission('financial', 'view'), adminReportBuilderController.previewSavedReport);
 router.get('/financial/reports/builder/saved/:id/history', requirePermission('financial', 'view'), adminReportBuilderController.getSavedReportHistory);
 router.get('/financial/customer-invoices', requirePermission('financial', 'view'), customerInvoiceController.listAdminInvoices);
