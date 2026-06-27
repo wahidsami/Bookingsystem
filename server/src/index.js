@@ -19,6 +19,7 @@ const trustProxyValue = Number.isNaN(parsedTrustProxy) ? process.env.TRUST_PROXY
 let server = null;
 let expiryInterval = null;
 let appointmentAutomationInterval = null;
+let reportScheduleInterval = null;
 
 app.disable('x-powered-by');
 app.set('trust proxy', trustProxyValue);
@@ -806,6 +807,7 @@ const startServer = async () => {
         await db.CustomerInvoice.sync({ force: false }); // Customer commerce invoices
         await db.CustomerInvoiceItem.sync({ force: false }); // Customer invoice line items
         await db.CustomerInvoiceEvent.sync({ force: false }); // Customer invoice audit trail
+        await db.AdminSavedReport.sync({ force: false }); // Admin custom reports
         await db.PublicPageData.sync({ force: false }); // Public page data
 
         console.log('✅ Database synced successfully.');
@@ -835,6 +837,11 @@ const startServer = async () => {
                 () => processAppointmentAutomation().catch((error) => console.error('Appointment automation job failed:', error)),
                 60 * 1000
             );
+            const { runScheduledReports } = require('./controllers/adminReportBuilderController');
+            reportScheduleInterval = setInterval(
+                () => runScheduledReports().catch((error) => console.error('Scheduled report job failed:', error)),
+                10 * 60 * 1000
+            );
         });
     } catch (error) {
         console.error('Unable to connect to the database:', error);
@@ -852,6 +859,10 @@ const shutdown = async (signal) => {
     if (appointmentAutomationInterval) {
         clearInterval(appointmentAutomationInterval);
         appointmentAutomationInterval = null;
+    }
+    if (reportScheduleInterval) {
+        clearInterval(reportScheduleInterval);
+        reportScheduleInterval = null;
     }
 
     try {

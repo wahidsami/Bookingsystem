@@ -12,6 +12,17 @@ export default function ReportsLandingPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Link
+          href="/dashboard/financial/reports/builder"
+          className="flex flex-col rounded-lg border border-sky-500/30 bg-gradient-to-br from-sky-950/80 to-dark-800 p-6 transition hover:border-sky-400/60"
+        >
+          <h2 className="text-lg font-semibold text-white">Custom Report Builder</h2>
+          <p className="mt-2 text-sm text-dark-300">
+            Drag-and-drop dimensions, metrics, and filters to compose live reports, then save, export, or schedule them.
+          </p>
+          <span className="mt-4 text-sm font-medium text-sky-300">Open builder →</span>
+        </Link>
+
+        <Link
           href="/dashboard/financial/reports/general"
           className="flex flex-col rounded-lg border border-dark-600 bg-dark-800 p-6 transition hover:border-dark-500"
         >

@@ -9,6 +9,7 @@ const tabs = [
   { name: 'Insights & Alerts', href: '/dashboard/financial/insights' },
   { name: 'Tenants', href: '/dashboard/financial/tenants' },
   { name: 'Reports', href: '/dashboard/financial/reports' },
+  { name: 'Report Builder', href: '/dashboard/financial/reports/builder' },
 ];
 
 export default function FinancialLayout({

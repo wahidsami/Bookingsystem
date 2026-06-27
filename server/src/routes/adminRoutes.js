@@ -10,6 +10,7 @@ const adminSettingsController = require('../controllers/adminSettingsController'
 const adminBillsController = require('../controllers/adminBillsController');
 const adminNotificationsController = require('../controllers/adminNotificationsController');
 const adminFinancialController = require('../controllers/adminFinancialController');
+const adminReportBuilderController = require('../controllers/adminReportBuilderController');
 const adminCategoryController = require('../controllers/adminCategoryController');
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
 const adminGiftCardPackageController = require('../controllers/adminGiftCardPackageController');
@@ -38,6 +39,15 @@ router.get('/financial/revenue-by-type', adminFinancialController.getRevenueByTy
 router.get('/financial/bills-summary', adminFinancialController.getBillsSummary);
 router.get('/financial/reports/general', requirePermission('financial', 'view'), adminFinancialController.getGeneralReport);
 router.get('/financial/reports/detailed', requirePermission('financial', 'view'), adminFinancialController.getDetailedReport);
+router.get('/financial/reports/builder/options', requirePermission('financial', 'view'), adminReportBuilderController.getReportBuilderOptions);
+router.post('/financial/reports/builder/preview', requirePermission('financial', 'view'), adminReportBuilderController.previewReport);
+router.get('/financial/reports/builder/saved', requirePermission('financial', 'view'), adminReportBuilderController.getSavedReports);
+router.get('/financial/reports/builder/saved/:id', requirePermission('financial', 'view'), adminReportBuilderController.getSavedReport);
+router.post('/financial/reports/builder/saved', requirePermission('financial', 'edit'), adminReportBuilderController.createSavedReport);
+router.put('/financial/reports/builder/saved/:id', requirePermission('financial', 'edit'), adminReportBuilderController.updateSavedReport);
+router.delete('/financial/reports/builder/saved/:id', requirePermission('financial', 'delete'), adminReportBuilderController.deleteSavedReport);
+router.post('/financial/reports/builder/saved/:id/run', requirePermission('financial', 'view'), adminReportBuilderController.runSavedReport);
+router.get('/financial/reports/builder/saved/:id/preview', requirePermission('financial', 'view'), adminReportBuilderController.previewSavedReport);
 router.get('/financial/customer-invoices', requirePermission('financial', 'view'), customerInvoiceController.listAdminInvoices);
 router.get('/financial/customer-invoices/:id', requirePermission('financial', 'view'), customerInvoiceController.getAdminInvoiceById);
 router.get('/financial/customer-invoices/:id/invoice-pdf', requirePermission('financial', 'view'), customerInvoiceController.getAdminInvoicePdf);

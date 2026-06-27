@@ -364,6 +364,38 @@ class AdminApi {
     return this.request<{ success: boolean; data: any }>(`/admin/financial/comparison?${params.toString()}`);
   }
 
+  async getReportBuilderOptions() {
+    return this.request<{ success: boolean; data: any }>('/admin/financial/reports/builder/options');
+  }
+
+  async previewCustomReport(payload: Record<string, any>) {
+    return this.request<{ success: boolean; data: any }>('/admin/financial/reports/builder/preview', 'POST', { body: payload });
+  }
+
+  async getSavedCustomReports() {
+    return this.request<{ success: boolean; data: any[] }>('/admin/financial/reports/builder/saved');
+  }
+
+  async getSavedCustomReport(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}`);
+  }
+
+  async createSavedCustomReport(payload: Record<string, any>) {
+    return this.request<{ success: boolean; data: any }>('/admin/financial/reports/builder/saved', 'POST', { body: payload });
+  }
+
+  async updateSavedCustomReport(id: string, payload: Record<string, any>) {
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}`, 'PUT', { body: payload });
+  }
+
+  async deleteSavedCustomReport(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}`, 'DELETE');
+  }
+
+  async runSavedCustomReport(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/admin/financial/reports/builder/saved/${id}/run`, 'POST');
+  }
+
   async getOperationalInsights(startDate?: string, endDate?: string) {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
