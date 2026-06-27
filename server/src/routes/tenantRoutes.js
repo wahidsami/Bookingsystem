@@ -147,6 +147,7 @@ router.patch('/appointments/:id/reassign-reschedule', tenantAppointmentControlle
 
 // Financial management
 router.get('/financial/overview', tenantFinancialController.getFinancialOverview);
+router.get('/financial/landing-summary', tenantFinancialController.getLandingSummary);
 router.get('/financial/employees', tenantFinancialController.getEmployeeRevenue);
 router.get('/financial/employees/:id', tenantFinancialController.getEmployeeFinancialDetails);
 router.get('/financial/services', tenantFinancialController.getServiceRevenue);
@@ -253,6 +254,8 @@ router.get('/reports/service-performance', checkTenantFeature('reports'), tenant
 router.get('/reports/employee-performance', checkTenantFeature('reports'), tenantReportsController.getEmployeePerformance);
 router.get('/reports/peak-hours', checkTenantFeature('reports'), tenantReportsController.getPeakHoursAnalysis);
 router.get('/reports/customer-analytics', checkTenantFeature('reports'), tenantReportsController.getCustomerAnalytics);
+router.get('/reports/refunds', checkTenantFeature('reports'), tenantReportsController.getRefundsReport);
+router.get('/reports/payment-methods', checkTenantFeature('reports'), tenantReportsController.getPaymentMethodsReport);
 
 // Public Page Data
 router.get('/public-page', checkTenantFeature('publicPageCustomization'), tenantPublicPageController.getPublicPageData);

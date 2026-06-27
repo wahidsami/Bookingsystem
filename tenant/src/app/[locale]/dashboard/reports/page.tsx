@@ -178,6 +178,8 @@ export default function ReportsPage() {
   const [peakHours, setPeakHours] = useState<any>(null);
   const [customerAnalytics, setCustomerAnalytics] = useState<any>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<any>(null);
+  const [refundsReport, setRefundsReport] = useState<any>(null);
+  const [paymentMethodsReport, setPaymentMethodsReport] = useState<any>(null);
 
   const sidebarGroups: FinanceSidebarGroup[] = [
     {
@@ -203,7 +205,7 @@ export default function ReportsPage() {
     setError("");
     try {
       const params = { startDate, endDate };
-      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes, posRes] = await Promise.allSettled([
+      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes, refundsRes, paymentMethodsRes, posRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
         tenantApi.getFinancialOverview(params),
         tenantApi.getBookingTrends({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
@@ -211,6 +213,8 @@ export default function ReportsPage() {
         tenantApi.getEmployeePerformance(params),
         tenantApi.getPeakHoursAnalysis(params),
         tenantApi.getCustomerAnalytics(params),
+        tenantApi.getRefundsReport(params),
+        tenantApi.getPaymentMethodsReport(params),
         tenantApi.getPosClosingSummary({ date: endDate })
       ]);
 
@@ -263,6 +267,26 @@ export default function ReportsPage() {
       } else {
         setCustomerAnalytics(null);
         failedSections.push(locale === "ar" ? "تحليلات العملاء" : "customer analytics");
+      }
+
+      if (refundsRes.status === "fulfilled" && refundsRes.value.success) {
+        setRefundsReport({
+          rows: refundsRes.value.data || [],
+          totals: refundsRes.value.totals || null
+        });
+      } else {
+        setRefundsReport(null);
+        failedSections.push(locale === "ar" ? "تقرير الاستردادات" : "refunds report");
+      }
+
+      if (paymentMethodsRes.status === "fulfilled" && paymentMethodsRes.value.success) {
+        setPaymentMethodsReport({
+          rows: paymentMethodsRes.value.data || [],
+          totals: paymentMethodsRes.value.totals || null
+        });
+      } else {
+        setPaymentMethodsReport(null);
+        failedSections.push(locale === "ar" ? "تقرير طرق الدفع" : "payment methods report");
       }
 
       if (posRes.status === "fulfilled" && posRes.value.success) {
@@ -641,44 +665,77 @@ export default function ReportsPage() {
             ) : null}
 
             {activeSection === "refunds" ? (
-              <FinanceSectionCard title={locale === "ar" ? "الاستردادات" : "Refunds"}>
-                {posClosingSummary ? (
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <FinanceMetricCard label={locale === "ar" ? "إجمالي الاسترداد" : "Refunds total"} value={formatMoney(posClosingSummary.refundsTotal)} tone="rose" />
-                    <FinanceMetricCard label={locale === "ar" ? "الصافي" : "Net collected"} value={formatMoney(posClosingSummary.netCollected)} tone="green" />
-                    <FinanceMetricCard label={locale === "ar" ? "العمليات" : "Transactions"} value={safeNumber(posClosingSummary.transactionCount)} tone="blue" />
+              <FinanceSectionCard
+                title={locale === "ar" ? "الاستردادات" : "Refunds"}
+                subtitle={locale === "ar" ? "سجل الاستردادات الموحّد مع تفاصيل العملية والسبب." : "Unified refunds ledger with transaction and reason details."}
+              >
+                {refundsReport?.rows?.length ? (
+                  <div className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <FinanceMetricCard label={locale === "ar" ? "إجمالي الاسترداد" : "Refunds total"} value={formatMoney(refundsReport.totals?.totalRefunds)} tone="rose" />
+                      <FinanceMetricCard label={locale === "ar" ? "عدد الاستردادات" : "Refund count"} value={safeNumber(refundsReport.totals?.refundCount)} tone="blue" />
+                      <FinanceMetricCard label={locale === "ar" ? "كامل" : "Full"} value={safeNumber(refundsReport.totals?.fullRefundCount)} tone="green" />
+                      <FinanceMetricCard label={locale === "ar" ? "جزئي" : "Partial"} value={safeNumber(refundsReport.totals?.partialRefundCount)} tone="amber" />
+                    </div>
+
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "التاريخ" : "Date",
+                        locale === "ar" ? "العميل" : "Customer",
+                        locale === "ar" ? "المرجع" : "Reference",
+                        locale === "ar" ? "المبلغ" : "Amount",
+                        locale === "ar" ? "طريقة الدفع" : "Payment method",
+                        locale === "ar" ? "السبب" : "Reason",
+                        locale === "ar" ? "الموظف" : "Employee",
+                        locale === "ar" ? "النوع" : "Type"
+                      ]}
+                      rows={(refundsReport.rows || []).map((row: any) => [
+                        row.date ? new Date(row.date).toLocaleDateString() : "-",
+                        row.customer,
+                        row.reference,
+                        formatMoney(row.amount),
+                        row.paymentMethodLabel,
+                        row.refundReason || "-",
+                        row.employee || "-",
+                        row.refundMode
+                      ])}
+                    />
                   </div>
                 ) : (
                   <FinanceEmptyState
                     title={locale === "ar" ? "لا توجد بيانات استرداد" : "No refund data"}
-                    description={locale === "ar" ? "ملخص الإقفال اليومي غير متوفر لهذا النطاق." : "The daily closing snapshot is not available for this range."}
+                    description={locale === "ar" ? "لم نعثر على استردادات ضمن النطاق المحدد." : "No refund transactions were found in the selected range."}
                   />
                 )}
               </FinanceSectionCard>
             ) : null}
 
             {activeSection === "paymentMethods" ? (
-              <FinanceSectionCard title={locale === "ar" ? "طرق الدفع" : "Payment methods"}>
-                {posClosingSummary?.totalsByMethod?.length ? (
+              <FinanceSectionCard
+                title={locale === "ar" ? "طرق الدفع" : "Payment methods"}
+                subtitle={locale === "ar" ? "توزيع الإيراد والمعاملات حسب طريقة الدفع." : "Revenue and transaction distribution by payment method."}
+              >
+                {paymentMethodsReport?.rows?.length ? (
                   <SectionTable
                     rtl={isRTL}
                     headers={[
                       locale === "ar" ? "الطريقة" : "Method",
-                      locale === "ar" ? "المحصّل" : "Collected",
-                      locale === "ar" ? "الاسترداد" : "Refunded",
-                      locale === "ar" ? "العمليات" : "Transactions"
+                      locale === "ar" ? "الإيراد" : "Revenue",
+                      locale === "ar" ? "العمليات" : "Transactions",
+                      locale === "ar" ? "النسبة" : "Share"
                     ]}
-                    rows={posClosingSummary.totalsByMethod.map((method: any) => [
+                    rows={paymentMethodsReport.rows.map((method: any) => [
                       method.paymentMethodLabel,
-                      formatMoney(method.collected),
-                      formatMoney(method.refunded),
-                      method.transactionCount
+                      formatMoney(method.revenue),
+                      method.transactionCount,
+                      `${paymentMethodsReport.totals?.revenue ? ((safeNumber(method.revenue) / safeNumber(paymentMethodsReport.totals.revenue)) * 100).toFixed(1) : "0.0"}%`
                     ])}
                   />
                 ) : (
                   <FinanceEmptyState
                     title={locale === "ar" ? "لا توجد طرق دفع" : "No payment methods"}
-                    description={locale === "ar" ? "اختر نطاق تاريخ فيه تحصيل POS." : "Pick a range with POS closing activity."}
+                    description={locale === "ar" ? "اختر نطاق تاريخ فيه معاملات مسجلة." : "Pick a range with recorded transactions."}
                   />
                 )}
               </FinanceSectionCard>

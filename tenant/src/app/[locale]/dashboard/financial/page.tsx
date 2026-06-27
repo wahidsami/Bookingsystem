@@ -321,6 +321,7 @@ export default function FinancialPage() {
   const [activeSection, setActiveSection] = useState<FinancialSectionId>("executive");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [reportSummary, setReportSummary] = useState<any>(null);
+  const [landingSummary, setLandingSummary] = useState<any>(null);
   const [employees, setEmployees] = useState<EmployeeRevenue[]>([]);
   const [services, setServices] = useState<ServiceRevenue[]>([]);
   const [products, setProducts] = useState<ProductRevenue[]>([]);
@@ -385,15 +386,14 @@ export default function FinancialPage() {
     setError("");
     try {
       const params = { startDate, endDate };
-      const [overviewRes, summaryRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes, posRes] = await Promise.allSettled([
+      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes] = await Promise.allSettled([
         tenantApi.getFinancialOverview(params),
-        tenantApi.getReportsSummary(params),
+        tenantApi.getFinancialLandingSummary(params),
         tenantApi.getEmployeeRevenue(params),
         tenantApi.getServiceRevenue(params),
         tenantApi.getProductRevenue(params),
         tenantApi.getDailyRevenue(params),
-        tenantApi.getCustomerAnalytics(params),
-        tenantApi.getPosClosingSummary({ date: endDate })
+        tenantApi.getCustomerAnalytics(params)
       ]);
 
       const failedSections: string[] = [];
@@ -405,10 +405,14 @@ export default function FinancialPage() {
         failedSections.push(locale === "ar" ? "الملخص المالي" : "financial overview");
       }
 
-      if (summaryRes.status === "fulfilled" && summaryRes.value.success) {
-        setReportSummary(summaryRes.value.data || null);
+      if (landingRes.status === "fulfilled" && landingRes.value.success) {
+        setLandingSummary(landingRes.value.data || null);
+        setReportSummary(landingRes.value.data?.overview || null);
+        setPosClosingSummary(landingRes.value.data?.collections?.closingSummary || null);
       } else {
+        setLandingSummary(null);
         setReportSummary(null);
+        setPosClosingSummary(null);
         failedSections.push(locale === "ar" ? "ملخص التقارير" : "report summary");
       }
 
@@ -445,13 +449,6 @@ export default function FinancialPage() {
       } else {
         setCustomerAnalytics(null);
         failedSections.push(locale === "ar" ? "مبيعات العملاء" : "customer sales");
-      }
-
-      if (posRes.status === "fulfilled" && posRes.value.success) {
-        setPosClosingSummary(posRes.value.summary || null);
-      } else {
-        setPosClosingSummary(null);
-        failedSections.push(locale === "ar" ? "التحصيل POS" : "POS collections");
       }
 
       if (failedSections.length > 0) {
@@ -764,9 +761,21 @@ export default function FinancialPage() {
                 action={<Link href={`/${locale}/dashboard/bills`} className="text-sm font-semibold text-primary hover:underline">{locale === "ar" ? "فتح الفواتير" : "Open bills"}</Link>}
               >
                 <div className="grid gap-4 md:grid-cols-3">
-                  <FinanceMetricCard label={locale === "ar" ? "فواتير مفتوحة" : "Open bills"} value={"--"} note={locale === "ar" ? "مصدر البيانات الحالي" : "Current source of truth"} />
-                  <FinanceMetricCard label={locale === "ar" ? "آخر اشتراك" : "Latest subscription"} value={"--"} note={locale === "ar" ? "المستوى والحصص" : "Plan and quotas"} />
-                  <FinanceMetricCard label={locale === "ar" ? "عرض الحزم" : "Entitlements"} value={"--"} note={locale === "ar" ? "الميزات المسموح بها" : "Allowed features"} />
+                  <FinanceMetricCard
+                    label={locale === "ar" ? "فواتير مفتوحة" : "Open bills"}
+                    value={safeNumber(landingSummary?.billing?.unpaidBillCount)}
+                    note={landingSummary?.billing?.currentUnpaidBill?.billNumber || (locale === "ar" ? "أحدث فاتورة مستحقة" : "Latest payable bill")}
+                  />
+                  <FinanceMetricCard
+                    label={locale === "ar" ? "آخر اشتراك" : "Latest subscription"}
+                    value={landingSummary?.subscription?.currentSubscription?.status || "--"}
+                    note={landingSummary?.subscription?.currentSubscription?.package?.name || (locale === "ar" ? "المستوى والحصص" : "Plan and quotas")}
+                  />
+                    <FinanceMetricCard
+                      label={locale === "ar" ? "عرض الحزم" : "Entitlements"}
+                      value={safeNumber(landingSummary?.subscription?.consumption?.rows?.length)}
+                      note={landingSummary?.subscription?.consumption?.alerts?.length ? `${safeNumber(landingSummary?.subscription?.consumption?.alerts?.length)} alerts` : (locale === "ar" ? "الميزات المسموح بها" : "Allowed features")}
+                    />
                 </div>
               </FinanceSectionCard>
             ) : null}
@@ -777,9 +786,18 @@ export default function FinancialPage() {
                 subtitle={locale === "ar" ? "واجهة الاشتراك الحالية تصبح جزءا من مساحة التمويل الموحدة." : "The current subscription surface now sits inside the unified finance workspace."}
               >
                 <div className="grid gap-4 md:grid-cols-3">
-                  <FinanceMetricCard label={locale === "ar" ? "الخطة" : "Plan"} value={"--"} />
-                  <FinanceMetricCard label={locale === "ar" ? "الحصص" : "Quotas"} value={"--"} />
-                  <FinanceMetricCard label={locale === "ar" ? "الترقية" : "Upgrade"} value={"--"} />
+                  <FinanceMetricCard
+                    label={locale === "ar" ? "الخطة" : "Plan"}
+                    value={landingSummary?.subscription?.currentSubscription?.package?.name || "--"}
+                  />
+                  <FinanceMetricCard
+                    label={locale === "ar" ? "الحصص" : "Quotas"}
+                    value={safeNumber(landingSummary?.subscription?.consumption?.rows?.length)}
+                  />
+                  <FinanceMetricCard
+                    label={locale === "ar" ? "الترقية" : "Upgrade"}
+                    value={landingSummary?.billing?.currentUnpaidBill?.status || (locale === "ar" ? "لا حاجة" : "None")}
+                  />
                 </div>
               </FinanceSectionCard>
             ) : null}

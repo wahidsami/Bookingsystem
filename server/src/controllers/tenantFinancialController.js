@@ -6,6 +6,10 @@
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
+const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { buildSubscriptionConsumption } = require('../services/subscriptionConsumptionService');
+const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
+const tenantPosController = require('./tenantPosController');
 
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
@@ -91,6 +95,31 @@ function getOrderDiscountAmount(order) {
     const baseAmount = subtotal + taxAmount + shippingFee;
     const discountAmount = baseAmount - totalAmount;
     return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
+}
+
+function runHandler(handler, req) {
+    return new Promise((resolve, reject) => {
+        const res = {
+            json(body) { resolve(body); },
+            status() { return this; },
+            send(body) { resolve(body); }
+        };
+
+        Promise.resolve(handler(req, res)).catch(reject);
+    });
+}
+
+async function getLandingCollectionsSummary(req, endDate) {
+    const closingResponse = await runHandler(tenantPosController.getClosingSummary, {
+        ...req,
+        query: { date: endDate }
+    });
+
+    if (closingResponse?.success && closingResponse?.summary) {
+        return closingResponse.summary;
+    }
+
+    return null;
 }
 
 /**
@@ -369,6 +398,83 @@ exports.getFinancialOverview = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch financial overview',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get unified financial landing summary
+ * GET /api/v1/tenant/financial/landing-summary
+ */
+exports.getLandingSummary = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { startDate, endDate } = req.query;
+
+        const [overviewResponse, subscriptionResult, subscriptionConsumption, landingCollections] = await Promise.all([
+            runHandler(exports.getFinancialOverview, req),
+            getActiveSubscriptionForTenant(tenantId, {
+                statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+            }),
+            buildSubscriptionConsumption(tenantId),
+            getLandingCollectionsSummary(req, endDate)
+        ]);
+
+        const unpaidBills = await db.Bill.findAll({
+            where: {
+                tenantId,
+                status: { [Op.in]: PAYABLE_BILL_STATUSES }
+            },
+            include: [{
+                model: db.TenantSubscription,
+                as: 'subscription',
+                include: [{
+                    model: db.SubscriptionPackage,
+                    as: 'package'
+                }]
+            }],
+            order: [['createdAt', 'DESC']],
+            limit: 5
+        });
+
+        const activeAlerts = subscriptionConsumption?.alerts || [];
+        const subscription = subscriptionResult?.subscription
+            ? {
+                ...subscriptionResult.subscription.toJSON(),
+                package: subscriptionResult.package?.toJSON ? subscriptionResult.package.toJSON() : subscriptionResult.package
+            }
+            : null;
+
+        res.json({
+            success: true,
+            data: {
+                overview: overviewResponse?.overview || null,
+                billing: {
+                    currentUnpaidBill: unpaidBills[0] ? unpaidBills[0].toJSON() : null,
+                    unpaidBillCount: unpaidBills.length
+                },
+                subscription: {
+                    currentSubscription: subscription,
+                    consumption: subscriptionConsumption
+                },
+                collections: {
+                    closingSummary: landingCollections
+                },
+                alerts: activeAlerts,
+                alertsCount: activeAlerts.length,
+                updatedAt: new Date().toISOString(),
+                dateRange: {
+                    startDate: startDate || null,
+                    endDate: endDate || null
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get landing summary error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch landing summary',
             error: error.message
         });
     }

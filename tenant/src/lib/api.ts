@@ -1578,6 +1578,17 @@ class TenantApiClient {
     return this.get(`/tenant/financial/daily${query ? `?${query}` : ''}`);
   }
 
+  async getFinancialLandingSummary(params?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    const query = queryParams.toString();
+    return this.get(`/tenant/financial/landing-summary${query ? `?${query}` : ''}`);
+  }
+
   /**
    * Customer Management
    */
@@ -1925,6 +1936,22 @@ class TenantApiClient {
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     const query = queryParams.toString();
     return this.get(`/tenant/reports/customer-analytics${query ? `?${query}` : ''}`);
+  }
+
+  async getRefundsReport(params?: { startDate?: string; endDate?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    const query = queryParams.toString();
+    return this.get(`/tenant/reports/refunds${query ? `?${query}` : ''}`);
+  }
+
+  async getPaymentMethodsReport(params?: { startDate?: string; endDate?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    const query = queryParams.toString();
+    return this.get(`/tenant/reports/payment-methods${query ? `?${query}` : ''}`);
   }
 
   /**

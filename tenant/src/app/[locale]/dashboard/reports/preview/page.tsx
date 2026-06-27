@@ -564,30 +564,124 @@ export default function ReportPreviewPage() {
             )}
 
             {sections.includes('refunds') && (
-              <EmptyReportSection
-                title={locale === 'ar' ? 'تقرير الاستردادات' : 'Refunds report'}
-                description={locale === 'ar'
-                  ? 'الاستردادات تظهر حالياً في ملخص الإقفال اليومي POS ويمكن ربطها هنا لاحقاً.'
-                  : 'Refunds currently surface in the POS closing summary and can be linked here later.'}
-              />
+              data.refunds ? (
+                <section className="break-inside-avoid">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'تقرير الاستردادات' : 'Refunds report'}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'إجمالي الاسترداد:' : 'Refunds total:'}</span> <Currency amount={data.refunds?.totals?.totalRefunds ?? 0} /></div>
+                    <div><span className="text-gray-600">{locale === 'ar' ? 'عدد الاستردادات:' : 'Refund count:'}</span> {data.refunds?.totals?.refundCount ?? 0}</div>
+                  </div>
+                  <table className="w-full border border-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'العميل' : 'Customer'}</th>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'المرجع' : 'Reference'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'المبلغ' : 'Amount'}</th>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'طريقة الدفع' : 'Payment method'}</th>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'السبب' : 'Reason'}</th>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'النوع' : 'Type'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.refunds?.rows || []).map((item: any) => (
+                        <tr key={item.id} className="border-b border-gray-100">
+                          <td className="px-3 py-2">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                          <td className="px-3 py-2">{item.customer}</td>
+                          <td className="px-3 py-2">{item.reference}</td>
+                          <td className="px-3 py-2 text-right"><Currency amount={item.amount ?? 0} /></td>
+                          <td className="px-3 py-2">{item.paymentMethodLabel}</td>
+                          <td className="px-3 py-2">{item.refundReason || '-'}</td>
+                          <td className="px-3 py-2">{item.refundMode}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : (
+                <EmptyReportSection
+                  title={locale === 'ar' ? 'تقرير الاستردادات' : 'Refunds report'}
+                  description={locale === 'ar'
+                    ? 'لم يتم العثور على استردادات ضمن هذا النطاق.'
+                    : 'No refund transactions were found in this range.'}
+                />
+              )
             )}
 
             {sections.includes('paymentMethods') && (
-              <EmptyReportSection
-                title={locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}
-                description={locale === 'ar'
-                  ? 'تفصيل طرق الدفع موجود حالياً ضمن التحصيل اليومي POS.'
-                  : 'The payment method breakdown currently lives in the POS closing summary.'}
-              />
+              data.paymentMethods ? (
+                <section className="break-inside-avoid">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}
+                  </h3>
+                  <table className="w-full border border-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الطريقة' : 'Method'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'العمليات' : 'Transactions'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.paymentMethods?.rows || []).map((item: any) => (
+                        <tr key={item.paymentMethod} className="border-b border-gray-100">
+                          <td className="px-3 py-2">{item.paymentMethodLabel}</td>
+                          <td className="px-3 py-2 text-right"><Currency amount={item.revenue ?? 0} /></td>
+                          <td className="px-3 py-2 text-right">{item.transactionCount ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : (
+                <EmptyReportSection
+                  title={locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}
+                  description={locale === 'ar'
+                    ? 'تفصيل طرق الدفع غير متوفر لهذا النطاق.'
+                    : 'No payment method breakdown is available for this range.'}
+                />
+              )
             )}
 
             {sections.includes('customerSales') && (
-              <EmptyReportSection
-                title={locale === 'ar' ? 'مبيعات العملاء' : 'Customer sales'}
-                description={locale === 'ar'
-                  ? 'يمكن توسيع تحليلات العملاء الحالية إلى تقرير مستقل لاحقاً.'
-                  : 'Current customer analytics can be expanded into a dedicated report later.'}
-              />
+              data.customerSales ? (
+                <section className="break-inside-avoid">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                    {locale === 'ar' ? 'مبيعات العملاء' : 'Customer sales'}
+                  </h3>
+                  <table className="w-full border border-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'العميل' : 'Customer'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الزيارات' : 'Visits'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإجمالي' : 'Total spent'}</th>
+                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'المتوسط' : 'Average spend'}</th>
+                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'آخر زيارة' : 'Last visit'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.customerSales || []).map((item: any) => (
+                        <tr key={item.id} className="border-b border-gray-100">
+                          <td className="px-3 py-2">{item.name}</td>
+                          <td className="px-3 py-2 text-right">{item.visits ?? 0}</td>
+                          <td className="px-3 py-2 text-right"><Currency amount={item.totalSpent ?? 0} /></td>
+                          <td className="px-3 py-2 text-right"><Currency amount={item.averageSpend ?? 0} /></td>
+                          <td className="px-3 py-2">{item.lastVisit ? new Date(item.lastVisit).toLocaleDateString() : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : (
+                <EmptyReportSection
+                  title={locale === 'ar' ? 'مبيعات العملاء' : 'Customer sales'}
+                  description={locale === 'ar'
+                    ? 'تقرير مبيعات العملاء غير متوفر لهذا النطاق.'
+                    : 'No customer sales data is available for this range.'}
+                />
+              )
             )}
           </div>
         )}

@@ -11,6 +11,220 @@ const {
     sanitizeFileNamePart
 } = require('../services/tenantReportPdfService');
 
+function getCustomerName(user) {
+    const firstName = user?.firstName || '';
+    const lastName = user?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || user?.email || user?.phone || 'Guest Customer';
+}
+
+function getServiceName(service) {
+    return service?.name_en || service?.name_ar || 'Service';
+}
+
+function getOrderLabel(order) {
+    const itemNames = Array.isArray(order?.items)
+        ? order.items
+            .map((item) => item?.product?.name_en || item?.product?.name_ar)
+            .filter(Boolean)
+        : [];
+
+    return itemNames.length
+        ? itemNames.slice(0, 2).join(', ')
+        : 'Product order';
+}
+
+function formatPaymentMethodLabel(paymentMethod) {
+    return ({
+        online: 'Online',
+        cash: 'Cash',
+        card_pos: 'Card',
+        wallet: 'Wallet',
+        bank_transfer: 'Bank transfer',
+        gift_card_code: 'Gift card',
+        pay_on_visit: 'Pay on visit',
+        cash_on_delivery: 'Cash on delivery',
+        split: 'Split payments'
+    }[paymentMethod] || paymentMethod || 'Not set');
+}
+
+function normalizePaymentMethodGroup(paymentMethod) {
+    const method = `${paymentMethod || ''}`.trim().toLowerCase();
+
+    if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
+    if (['card_pos', 'online', 'online-full', 'mock_online', 'bank_transfer'].includes(method)) return 'card';
+    if (['wallet'].includes(method)) return 'wallet';
+    if (['gift_card_code'].includes(method)) return 'gift_card';
+    if (method === 'split') return 'split';
+    return 'other';
+}
+
+function getRefundModeLabel(amount, referenceAmount) {
+    const numericAmount = Number(amount || 0);
+    const numericReference = Number(referenceAmount || 0);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return 'Partial';
+    if (!Number.isFinite(numericReference) || numericReference <= 0) return 'Partial';
+    return numericAmount >= (numericReference - 0.01) ? 'Full' : 'Partial';
+}
+
+function buildPaymentTransactionIncludes() {
+    return [
+        {
+            model: db.Appointment,
+            as: 'appointment',
+            attributes: ['id', 'bookingNumber', 'tenantId', 'startTime', 'paymentStatus', 'status', 'price'],
+            required: false,
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ]
+        },
+        {
+            model: db.Order,
+            as: 'order',
+            attributes: ['id', 'tenantId', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'subtotal', 'taxAmount', 'shippingFee'],
+            required: false,
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                },
+                {
+                    model: db.OrderItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: db.Product,
+                            as: 'product',
+                            attributes: ['id', 'name_en', 'name_ar'],
+                            required: false
+                        }
+                    ],
+                    required: false
+                }
+            ]
+        },
+        {
+            model: db.Staff,
+            as: 'processor',
+            attributes: ['id', 'name'],
+            required: false
+        }
+    ];
+}
+
+function buildTransactionReference(transaction) {
+    const appointment = transaction?.appointment;
+    const order = transaction?.order;
+    return appointment?.bookingNumber
+        || appointment?.id
+        || order?.orderNumber
+        || transaction?.transactionRef
+        || transaction?.id;
+}
+
+function buildTransactionReferenceAmount(transaction) {
+    if (transaction?.appointment) {
+        return Number(transaction.appointment.price || 0);
+    }
+    if (transaction?.order) {
+        const subtotal = Number(transaction.order.subtotal || 0);
+        const taxAmount = Number(transaction.order.taxAmount || 0);
+        const shippingFee = Number(transaction.order.shippingFee || 0);
+        return subtotal + taxAmount + shippingFee;
+    }
+    return Number(transaction?.amount || 0);
+}
+
+function mapRefundRow(transaction) {
+    const appointment = transaction.appointment;
+    const order = transaction.order;
+    const user = appointment?.user || order?.user;
+    const reference = buildTransactionReference(transaction);
+    const amount = Number(transaction.amount || 0);
+    const referenceAmount = buildTransactionReferenceAmount(transaction);
+    const refundMode = getRefundModeLabel(amount, referenceAmount);
+    const refundReason = `${transaction.notes || transaction.metadata?.reason || transaction.metadata?.refundReason || transaction.gatewayResponse?.reason || ''}`.trim() || null;
+
+    return {
+        id: transaction.id,
+        date: transaction.processedAt || transaction.createdAt,
+        customer: getCustomerName(user),
+        reference,
+        entityType: appointment ? 'appointment' : 'order',
+        entityLabel: appointment ? getServiceName(appointment.service) : getOrderLabel(order),
+        amount: Number(amount.toFixed(2)),
+        refundReason,
+        employee: transaction.processor?.name || null,
+        paymentMethod: transaction.paymentMethod,
+        paymentMethodLabel: formatPaymentMethodLabel(transaction.paymentMethod),
+        refundMode,
+        status: transaction.status,
+        detailPath: appointment?.id
+            ? `/dashboard/appointments/${appointment.id}`
+            : order?.id
+                ? `/dashboard/orders/${order.id}`
+                : null
+    };
+}
+
+function buildCustomerSalesRows(transactions) {
+    const customers = new Map();
+
+    transactions.forEach((transaction) => {
+        const appointment = transaction.appointment;
+        const order = transaction.order;
+        const user = appointment?.user || order?.user;
+        if (!user) return;
+
+        const customerId = user.id || user.email || user.phone;
+        const current = customers.get(customerId) || {
+            id: customerId,
+            name: getCustomerName(user),
+            totalSpent: 0,
+            visits: 0,
+            averageSpend: 0,
+            lastVisit: null,
+            firstVisit: null
+        };
+
+        const amount = Number(transaction.amount || 0);
+        const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
+        const delta = isRefund ? -Math.abs(amount) : Math.abs(amount);
+        const visitedAt = transaction.processedAt || appointment?.startTime || order?.createdAt || transaction.createdAt;
+
+        current.totalSpent += delta;
+        if (!isRefund) {
+            current.visits += 1;
+            current.lastVisit = !current.lastVisit || new Date(visitedAt) > new Date(current.lastVisit) ? visitedAt : current.lastVisit;
+            current.firstVisit = !current.firstVisit || new Date(visitedAt) < new Date(current.firstVisit) ? visitedAt : current.firstVisit;
+        }
+        current.averageSpend = current.visits > 0 ? current.totalSpent / current.visits : 0;
+
+        customers.set(customerId, current);
+    });
+
+    return Array.from(customers.values())
+        .sort((left, right) => right.totalSpent - left.totalSpent)
+        .map((item) => ({
+            ...item,
+            totalSpent: Number(item.totalSpent.toFixed(2)),
+            averageSpend: Number(item.averageSpend.toFixed(2))
+        }));
+}
+
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
         return null;
@@ -519,9 +733,117 @@ function runHandler(handler, req) {
     });
 }
 
+async function getPaymentTransactions(req, { startDate, endDate, limit = 200 } = {}) {
+    const tenantId = req.tenantId;
+    const where = {
+        [Op.or]: [
+            { '$appointment.tenantId$': tenantId },
+            { '$order.tenantId$': tenantId }
+        ],
+        status: { [Op.in]: ['completed', 'refunded'] },
+        type: { [Op.in]: ['booking', 'product_purchase', 'refund'] }
+    };
+
+    if (startDate || endDate) {
+        const range = {};
+        const start = parseDateValue(startDate, false);
+        const end = parseDateValue(endDate, true);
+        if (start) range[Op.gte] = start;
+        if (end) range[Op.lte] = end;
+        if (Object.keys(range).length) {
+            where.processedAt = range;
+        }
+    }
+
+    return db.PaymentTransaction.findAll({
+        where,
+        include: buildPaymentTransactionIncludes(),
+        order: [['processedAt', 'DESC']],
+        limit,
+        subQuery: false
+    });
+}
+
+async function buildRefundsReport(req, startDate, endDate) {
+    const transactions = await getPaymentTransactions(req, { startDate, endDate, limit: 300 });
+    const refunds = transactions
+        .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
+        .map(mapRefundRow);
+
+    const totalRefunds = refunds.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const fullRefunds = refunds.filter((row) => row.refundMode === 'Full').length;
+    const partialRefunds = refunds.filter((row) => row.refundMode === 'Partial').length;
+
+    return {
+        refunds,
+        totals: {
+            totalRefunds: Number(totalRefunds.toFixed(2)),
+            refundCount: refunds.length,
+            fullRefundCount: fullRefunds,
+            partialRefundCount: partialRefunds
+        }
+    };
+}
+
+async function buildPaymentMethodsReport(req, startDate, endDate) {
+    const transactions = await getPaymentTransactions(req, { startDate, endDate, limit: 400 });
+    const buckets = new Map();
+
+    transactions.forEach((transaction) => {
+        if (transaction.status !== 'completed' && transaction.status !== 'refunded') {
+            return;
+        }
+
+        const group = normalizePaymentMethodGroup(transaction.paymentMethod);
+        const key = group === 'split' ? 'split' : group;
+        const amount = Number(transaction.amount || 0);
+        const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
+        const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
+
+        const existing = buckets.get(key) || {
+            paymentMethod: key,
+            paymentMethodLabel: ({
+                cash: 'Cash',
+                card: 'Card',
+                wallet: 'Wallet',
+                gift_card: 'Gift Card',
+                split: 'Split Payments',
+                other: 'Other'
+            }[key] || key),
+            revenue: 0,
+            transactionCount: 0
+        };
+
+        existing.revenue += signedAmount;
+        existing.transactionCount += 1;
+        buckets.set(key, existing);
+    });
+
+    const rows = Array.from(buckets.values())
+        .map((row) => ({
+            ...row,
+            revenue: Number(row.revenue.toFixed(2))
+        }))
+        .sort((left, right) => right.revenue - left.revenue);
+
+    const totalRevenue = rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
+    const totalTransactions = rows.reduce((sum, row) => sum + Number(row.transactionCount || 0), 0);
+
+    return {
+        rows,
+        totals: {
+            revenue: Number(totalRevenue.toFixed(2)),
+            transactionCount: totalTransactions
+        }
+    };
+}
+
 async function buildFullReportData(req, sections, startDate, endDate) {
     const result = {};
     const queryWithRange = { ...req.query, startDate, endDate };
+    const transactions = (sections.includes('refunds') || sections.includes('paymentMethods') || sections.includes('customerSales'))
+        ? await getPaymentTransactions(req, { startDate, endDate, limit: 400 })
+        : [];
 
     if (sections.includes('overview') || sections.includes('discounts')) {
         const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
@@ -604,6 +926,64 @@ async function buildFullReportData(req, sections, startDate, endDate) {
         }
     }
 
+    if (sections.includes('refunds')) {
+        const refunds = transactions
+            .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
+            .map(mapRefundRow);
+
+        result.refunds = {
+            rows: refunds,
+            totals: {
+                totalRefunds: Number(refunds.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)),
+                refundCount: refunds.length,
+                fullRefundCount: refunds.filter((row) => row.refundMode === 'Full').length,
+                partialRefundCount: refunds.filter((row) => row.refundMode === 'Partial').length
+            }
+        };
+    }
+
+    if (sections.includes('paymentMethods')) {
+        const buckets = new Map();
+        transactions.forEach((transaction) => {
+            if (transaction.status !== 'completed' && transaction.status !== 'refunded') return;
+            const group = normalizePaymentMethodGroup(transaction.paymentMethod);
+            const key = group === 'split' ? 'split' : group;
+            const amount = Number(transaction.amount || 0);
+            const signedAmount = transaction.status === 'refunded' || transaction.type === 'refund'
+                ? -Math.abs(amount)
+                : Math.abs(amount);
+
+            const existing = buckets.get(key) || {
+                paymentMethod: key,
+                paymentMethodLabel: ({
+                    cash: 'Cash',
+                    card: 'Card',
+                    wallet: 'Wallet',
+                    gift_card: 'Gift Card',
+                    split: 'Split Payments',
+                    other: 'Other'
+                }[key] || key),
+                revenue: 0,
+                transactionCount: 0
+            };
+
+            existing.revenue += signedAmount;
+            existing.transactionCount += 1;
+            buckets.set(key, existing);
+        });
+
+        result.paymentMethods = {
+            rows: Array.from(buckets.values()).map((row) => ({
+                ...row,
+                revenue: Number(row.revenue.toFixed(2))
+            })).sort((left, right) => right.revenue - left.revenue)
+        };
+    }
+
+    if (sections.includes('customerSales')) {
+        result.customerSales = buildCustomerSalesRows(transactions);
+    }
+
     return result;
 }
 
@@ -634,6 +1014,46 @@ exports.getFullReport = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate full report',
+            error: error.message
+        });
+    }
+};
+
+exports.getRefundsReport = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const report = await buildRefundsReport(req, startDate, endDate);
+
+        res.json({
+            success: true,
+            data: report.refunds,
+            totals: report.totals
+        });
+    } catch (error) {
+        console.error('Get refunds report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate refunds report',
+            error: error.message
+        });
+    }
+};
+
+exports.getPaymentMethodsReport = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const report = await buildPaymentMethodsReport(req, startDate, endDate);
+
+        res.json({
+            success: true,
+            data: report.rows,
+            totals: report.totals
+        });
+    } catch (error) {
+        console.error('Get payment methods report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate payment methods report',
             error: error.message
         });
     }
