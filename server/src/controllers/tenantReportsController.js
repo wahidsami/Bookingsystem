@@ -1187,6 +1187,114 @@ async function buildFullReportData(req, sections, startDate, endDate) {
     return result;
 }
 
+const SAVED_REPORT_SECTION_IDS = new Set([
+    'overview',
+    'sales',
+    'financial',
+    'appointments',
+    'rebookings',
+    'employees',
+    'services',
+    'products',
+    'discounts',
+    'refunds',
+    'paymentMethods',
+    'customerSales'
+]);
+
+function normalizeSavedReportSections(sections, fallback = ['overview']) {
+    const normalized = Array.isArray(sections)
+        ? sections.map((section) => `${section}`.trim()).filter((section) => SAVED_REPORT_SECTION_IDS.has(section))
+        : [];
+
+    return normalized.length ? normalized : fallback;
+}
+
+function buildSavedReportConfigFromBody(body = {}, fallback = {}) {
+    const reportType = `${body.reportType || fallback.reportType || 'overview'}`.trim();
+    const sections = normalizeSavedReportSections(body.sections || fallback.sections || []);
+    const filters = body.filters && typeof body.filters === 'object' && !Array.isArray(body.filters)
+        ? body.filters
+        : fallback.filters || {};
+    const selectedMetrics = Array.isArray(body.selectedMetrics)
+        ? body.selectedMetrics.map((metric) => `${metric}`.trim()).filter(Boolean)
+        : Array.isArray(fallback.selectedMetrics)
+            ? fallback.selectedMetrics
+            : [];
+    const sorting = body.sorting && typeof body.sorting === 'object' && !Array.isArray(body.sorting)
+        ? body.sorting
+        : fallback.sorting || {};
+    const grouping = `${body.grouping || fallback.grouping || ''}`.trim() || null;
+    const reportConfig = body.reportConfig && typeof body.reportConfig === 'object' && !Array.isArray(body.reportConfig)
+        ? body.reportConfig
+        : fallback.reportConfig || {};
+
+    return {
+        reportType,
+        sections,
+        filters,
+        selectedMetrics,
+        sorting,
+        grouping,
+        reportConfig: {
+            ...reportConfig,
+            reportType,
+            sections,
+            filters,
+            selectedMetrics,
+            sorting,
+            grouping
+        }
+    };
+}
+
+function serializeSavedReport(savedReport) {
+    if (!savedReport) return null;
+
+    return {
+        id: savedReport.id,
+        tenantId: savedReport.tenantId,
+        createdByUserId: savedReport.createdByUserId,
+        creator: savedReport.creator ? {
+            id: savedReport.creator.id,
+            name: [savedReport.creator.firstName, savedReport.creator.lastName].filter(Boolean).join(' ').trim() || savedReport.creator.email || null,
+            email: savedReport.creator.email || null,
+            phone: savedReport.creator.phone || null
+        } : null,
+        reportType: savedReport.reportType,
+        title: savedReport.title,
+        description: savedReport.description,
+        sections: Array.isArray(savedReport.sections) ? savedReport.sections : [],
+        filters: savedReport.filters || {},
+        selectedMetrics: Array.isArray(savedReport.selectedMetrics) ? savedReport.selectedMetrics : [],
+        grouping: savedReport.grouping || null,
+        sorting: savedReport.sorting || {},
+        reportConfig: savedReport.reportConfig || {},
+        isFavorite: Boolean(savedReport.isFavorite),
+        duplicatedFromId: savedReport.duplicatedFromId || null,
+        lastOpenedAt: savedReport.lastOpenedAt || null,
+        createdAt: savedReport.createdAt,
+        updatedAt: savedReport.updatedAt
+    };
+}
+
+async function findTenantSavedReport(tenantId, reportId) {
+    return db.TenantSavedReport.findOne({
+        where: {
+            id: reportId,
+            tenantId
+        },
+        include: [
+            {
+                model: db.PlatformUser,
+                as: 'creator',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                required: false
+            }
+        ]
+    });
+}
+
 exports.getFullReport = async (req, res) => {
     try {
         const { startDate, endDate, sections: sectionsParam } = req.query;
@@ -1277,6 +1385,209 @@ exports.getPaymentMethodsReport = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate payment methods report',
+            error: error.message
+        });
+    }
+};
+
+exports.getSavedReports = async (req, res) => {
+    try {
+        const savedReports = await db.TenantSavedReport.findAll({
+            where: {
+                tenantId: req.tenantId
+            },
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'creator',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
+            order: [
+                ['isFavorite', 'DESC'],
+                ['updatedAt', 'DESC'],
+                ['createdAt', 'DESC']
+            ]
+        });
+
+        res.json({
+            success: true,
+            data: savedReports.map(serializeSavedReport)
+        });
+    } catch (error) {
+        console.error('Get saved reports error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load saved reports',
+            error: error.message
+        });
+    }
+};
+
+exports.getSavedReport = async (req, res) => {
+    try {
+        const savedReport = await findTenantSavedReport(req.tenantId, req.params.id);
+
+        if (!savedReport) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: serializeSavedReport(savedReport)
+        });
+    } catch (error) {
+        console.error('Get saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load saved report',
+            error: error.message
+        });
+    }
+};
+
+exports.createSavedReport = async (req, res) => {
+    try {
+        const duplicatedFromId = req.body?.duplicatedFromId || null;
+        let fallback = {};
+
+        if (duplicatedFromId) {
+            const source = await findTenantSavedReport(req.tenantId, duplicatedFromId);
+            if (!source) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Source report not found'
+                });
+            }
+
+            fallback = {
+                reportType: source.reportType,
+                title: `${source.title} Copy`,
+                description: source.description,
+                sections: source.sections,
+                filters: source.filters,
+                selectedMetrics: source.selectedMetrics,
+                grouping: source.grouping,
+                sorting: source.sorting,
+                reportConfig: source.reportConfig
+            };
+        }
+
+        const normalized = buildSavedReportConfigFromBody(req.body || {}, fallback);
+        const title = `${req.body?.title || fallback.title || ''}`.trim();
+
+        if (!title) {
+            return res.status(400).json({
+                success: false,
+                message: 'title is required'
+            });
+        }
+
+        const savedReport = await db.TenantSavedReport.create({
+            tenantId: req.tenantId,
+            createdByUserId: req.userId || null,
+            reportType: normalized.reportType,
+            title,
+            description: req.body?.description ?? fallback.description ?? null,
+            sections: normalized.sections,
+            filters: normalized.filters,
+            selectedMetrics: normalized.selectedMetrics,
+            grouping: normalized.grouping,
+            sorting: normalized.sorting,
+            reportConfig: normalized.reportConfig,
+            isFavorite: Boolean(req.body?.isFavorite ?? fallback.isFavorite ?? false),
+            duplicatedFromId
+        });
+
+        const withCreator = await findTenantSavedReport(req.tenantId, savedReport.id);
+        res.status(201).json({
+            success: true,
+            data: serializeSavedReport(withCreator || savedReport)
+        });
+    } catch (error) {
+        console.error('Create saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to save report',
+            error: error.message
+        });
+    }
+};
+
+exports.updateSavedReport = async (req, res) => {
+    try {
+        const savedReport = await findTenantSavedReport(req.tenantId, req.params.id);
+        if (!savedReport) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        const normalized = buildSavedReportConfigFromBody(req.body || {}, savedReport.get({ plain: true }));
+
+        savedReport.title = req.body?.title?.trim?.() ? `${req.body.title}`.trim() : savedReport.title;
+        if (typeof req.body?.description === 'string') {
+            savedReport.description = req.body.description.trim() || null;
+        }
+        savedReport.sections = normalized.sections;
+        savedReport.filters = normalized.filters;
+        savedReport.selectedMetrics = normalized.selectedMetrics;
+        savedReport.grouping = normalized.grouping;
+        savedReport.sorting = normalized.sorting;
+        savedReport.reportConfig = normalized.reportConfig;
+        if (req.body?.isFavorite !== undefined) savedReport.isFavorite = Boolean(req.body.isFavorite);
+        if (req.body?.lastOpenedAt !== undefined) {
+            const parsed = req.body.lastOpenedAt ? new Date(req.body.lastOpenedAt) : null;
+            savedReport.lastOpenedAt = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+        }
+
+        await savedReport.save();
+
+        const withCreator = await findTenantSavedReport(req.tenantId, savedReport.id);
+        res.json({
+            success: true,
+            data: serializeSavedReport(withCreator || savedReport)
+        });
+    } catch (error) {
+        console.error('Update saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update saved report',
+            error: error.message
+        });
+    }
+};
+
+exports.deleteSavedReport = async (req, res) => {
+    try {
+        const deletedCount = await db.TenantSavedReport.destroy({
+            where: {
+                id: req.params.id,
+                tenantId: req.tenantId
+            }
+        });
+
+        if (!deletedCount) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Saved report deleted'
+        });
+    } catch (error) {
+        console.error('Delete saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete saved report',
             error: error.message
         });
     }

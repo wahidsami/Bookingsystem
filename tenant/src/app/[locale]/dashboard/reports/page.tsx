@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
+import { useRouter } from "next/navigation";
 import { TenantLayout } from "@/components/TenantLayout";
 import { ReportExportToolbar } from "@/components/ReportExportToolbar";
 import {
@@ -25,6 +26,7 @@ import {
 
 type ReportSectionId =
   | "overview"
+  | "savedReports"
   | "sales"
   | "financial"
   | "appointments"
@@ -54,6 +56,38 @@ function formatPercent(value: unknown) {
 
 function formatMoney(value: unknown) {
   return <Currency amount={safeNumber(value)} />;
+}
+
+function getReportSectionLabel(sectionId: ReportSectionId, locale: string) {
+  switch (sectionId) {
+    case "savedReports":
+      return locale === "ar" ? "التقارير المحفوظة" : "Saved reports";
+    case "sales":
+      return locale === "ar" ? "تقرير المبيعات" : "Sales reports";
+    case "financial":
+      return locale === "ar" ? "التقارير المالية" : "Financial reports";
+    case "appointments":
+      return locale === "ar" ? "تقارير المواعيد" : "Appointment reports";
+    case "rebookings":
+      return locale === "ar" ? "تحليلات إعادة الحجز" : "Rebooking analytics";
+    case "employees":
+      return locale === "ar" ? "تقارير الموظفين" : "Employee reports";
+    case "services":
+      return locale === "ar" ? "تقارير الخدمات" : "Service reports";
+    case "products":
+      return locale === "ar" ? "تقارير المنتجات" : "Product reports";
+    case "discounts":
+      return locale === "ar" ? "تقرير الخصومات" : "Discounts report";
+    case "refunds":
+      return locale === "ar" ? "تقرير الاستردادات" : "Refunds report";
+    case "paymentMethods":
+      return locale === "ar" ? "طرق الدفع" : "Payment methods";
+    case "customerSales":
+      return locale === "ar" ? "مبيعات العملاء" : "Customer sales";
+    case "overview":
+    default:
+      return locale === "ar" ? "نظرة عامة" : "Overview";
+  }
 }
 
 function TrendSparkline({
@@ -170,6 +204,8 @@ function SectionTable({
 
 function getPreviewSectionsForReportSection(sectionId: ReportSectionId) {
   switch (sectionId) {
+    case "savedReports":
+      return [];
     case "sales":
       return ["daily", "bookingTrends"];
     case "financial":
@@ -200,9 +236,11 @@ function getPreviewSectionsForReportSection(sectionId: ReportSectionId) {
 
 export default function ReportsPage() {
   const locale = useLocale();
+  const router = useRouter();
   const isRTL = locale === "ar";
 
   const [activeSection, setActiveSection] = useState<ReportSectionId>("overview");
+  const [savedReportTemplateSection, setSavedReportTemplateSection] = useState<ReportSectionId>("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dateRange, setDateRange] = useState("month");
@@ -221,12 +259,20 @@ export default function ReportsPage() {
   const [posClosingSummary, setPosClosingSummary] = useState<any>(null);
   const [refundsReport, setRefundsReport] = useState<any>(null);
   const [paymentMethodsReport, setPaymentMethodsReport] = useState<any>(null);
+  const [savedReports, setSavedReports] = useState<any[]>([]);
+  const [savedReportsLoading, setSavedReportsLoading] = useState(false);
+  const [savedReportsError, setSavedReportsError] = useState("");
+  const [savedReportTitle, setSavedReportTitle] = useState("");
+  const [savedReportDescription, setSavedReportDescription] = useState("");
+  const [savedReportFavorite, setSavedReportFavorite] = useState(false);
+  const [savingSavedReport, setSavingSavedReport] = useState(false);
 
   const sidebarGroups: FinanceSidebarGroup[] = [
     {
       title: locale === "ar" ? "الأقسام" : "Sections",
       items: [
         { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "savedReports", label: locale === "ar" ? "التقارير المحفوظة" : "Saved reports" },
         { id: "sales", label: locale === "ar" ? "المبيعات" : "Sales reports" },
         { id: "financial", label: locale === "ar" ? "المالية" : "Financial reports" },
         { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointment reports" },
@@ -378,10 +424,35 @@ export default function ReportsPage() {
     }
   };
 
+  const loadSavedReports = async () => {
+    setSavedReportsLoading(true);
+    setSavedReportsError("");
+    try {
+      const response = await tenantApi.getSavedReports();
+      if (response?.success) {
+        setSavedReports(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setSavedReports([]);
+        setSavedReportsError(locale === "ar" ? "تعذر تحميل التقارير المحفوظة" : "Failed to load saved reports");
+      }
+    } catch (err: any) {
+      console.error("Failed to load saved reports:", err);
+      setSavedReports([]);
+      setSavedReportsError(err?.message || (locale === "ar" ? "تعذر تحميل التقارير المحفوظة" : "Failed to load saved reports"));
+    } finally {
+      setSavedReportsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate, dateRange]);
+
+  useEffect(() => {
+    loadSavedReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setQuickRange = (mode: "week" | "month" | "quarter" | "year") => {
     const now = new Date();
@@ -410,6 +481,14 @@ export default function ReportsPage() {
     setEndDate(now.toISOString().split("T")[0]);
   };
 
+  const handleSectionChange = (sectionId: string) => {
+    const nextSection = sectionId as ReportSectionId;
+    setActiveSection(nextSection);
+    if (nextSection !== "savedReports") {
+      setSavedReportTemplateSection(nextSection);
+    }
+  };
+
   const bookingTrendValues = useMemo(() => bookingTrends.map((item) => safeNumber(item.bookings)), [bookingTrends]);
   const revenueTrendValues = useMemo(() => bookingTrends.map((item) => safeNumber(item.revenue)), [bookingTrends]);
   const paymentMethodTrendValues = useMemo(
@@ -426,8 +505,18 @@ export default function ReportsPage() {
   );
 
   const exportSections = useMemo(() => getPreviewSectionsForReportSection(activeSection), [activeSection]);
+  const savedReportTemplateSections = useMemo(
+    () => getPreviewSectionsForReportSection(savedReportTemplateSection),
+    [savedReportTemplateSection]
+  );
+  const savedReportDefaultTitle = useMemo(
+    () => `${getReportSectionLabel(savedReportTemplateSection, locale)} - ${startDate} → ${endDate}`,
+    [endDate, locale, savedReportTemplateSection, startDate]
+  );
   const reportTitle = useMemo(() => {
     switch (activeSection) {
+      case "savedReports":
+        return locale === "ar" ? "التقارير المحفوظة" : "Saved reports";
       case "sales":
         return locale === "ar" ? "تقرير المبيعات" : "Sales report";
       case "financial":
@@ -524,6 +613,146 @@ export default function ReportsPage() {
       sections: exportSections,
       tables: exportTables
     });
+  };
+
+  const saveCurrentReportConfiguration = async () => {
+    const title = savedReportTitle.trim() || savedReportDefaultTitle;
+    const description = savedReportDescription.trim() || undefined;
+    setSavingSavedReport(true);
+    try {
+      await tenantApi.createSavedReport({
+        reportType: savedReportTemplateSection,
+        title,
+        description,
+        sections: savedReportTemplateSections,
+        filters: {
+          startDate,
+          endDate,
+          dateRange
+        },
+        selectedMetrics: savedReportTemplateSections,
+        grouping: dateRange === "year" ? "month" : "day",
+        sorting: {
+          field: "date",
+          direction: "desc"
+        },
+        reportConfig: {
+          title,
+          description,
+          startDate,
+          endDate,
+          dateRange,
+          sections: savedReportTemplateSections
+        },
+        isFavorite: savedReportFavorite
+      });
+      setSavedReportTitle("");
+      setSavedReportDescription("");
+      setSavedReportFavorite(false);
+      await loadSavedReports();
+      setActiveSection("savedReports");
+    } catch (err) {
+      console.error("Failed to save report configuration:", err);
+    } finally {
+      setSavingSavedReport(false);
+    }
+  };
+
+  const openSavedReport = async (savedReport: any) => {
+    const sections = Array.isArray(savedReport.sections) && savedReport.sections.length
+      ? savedReport.sections
+      : getPreviewSectionsForReportSection(savedReport.reportType as ReportSectionId);
+    const config = savedReport.reportConfig || {};
+    const nextStartDate = config.startDate || savedReport.filters?.startDate || startDate;
+    const nextEndDate = config.endDate || savedReport.filters?.endDate || endDate;
+
+    try {
+      await tenantApi.updateSavedReport(savedReport.id, {
+        lastOpenedAt: new Date().toISOString()
+      });
+      await loadSavedReports();
+    } catch (err) {
+      console.error("Failed to mark saved report as opened:", err);
+    }
+
+    const query = new URLSearchParams({
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+      sections: sections.join(","),
+      title: savedReport.title
+    });
+
+    if (config.notes || savedReport.description) {
+      query.set("notes", config.notes || savedReport.description);
+    }
+
+    router.push(`/${locale}/dashboard/reports/preview?${query.toString()}`);
+  };
+
+  const duplicateSavedReport = async (savedReport: any) => {
+    const copyTitle = `${savedReport.title} Copy`;
+    try {
+      await tenantApi.createSavedReport({
+        reportType: savedReport.reportType,
+        title: copyTitle,
+        description: savedReport.description,
+        sections: savedReport.sections,
+        filters: savedReport.filters,
+        selectedMetrics: savedReport.selectedMetrics,
+        grouping: savedReport.grouping,
+        sorting: savedReport.sorting,
+        reportConfig: savedReport.reportConfig,
+        isFavorite: Boolean(savedReport.isFavorite),
+        duplicatedFromId: savedReport.id
+      });
+      await loadSavedReports();
+    } catch (err) {
+      console.error("Failed to duplicate saved report:", err);
+    }
+  };
+
+  const toggleSavedReportFavorite = async (savedReport: any) => {
+    try {
+      await tenantApi.updateSavedReport(savedReport.id, {
+        isFavorite: !savedReport.isFavorite
+      });
+      await loadSavedReports();
+    } catch (err) {
+      console.error("Failed to toggle saved report favorite:", err);
+    }
+  };
+
+  const renameSavedReport = async (savedReport: any) => {
+    const nextTitle = window.prompt(
+      locale === "ar" ? "أدخل عنوانًا جديدًا" : "Enter a new title",
+      savedReport.title
+    );
+    if (!nextTitle?.trim()) return;
+
+    try {
+      await tenantApi.updateSavedReport(savedReport.id, {
+        title: nextTitle.trim()
+      });
+      await loadSavedReports();
+    } catch (err) {
+      console.error("Failed to rename saved report:", err);
+    }
+  };
+
+  const deleteSavedReport = async (savedReport: any) => {
+    const confirmed = window.confirm(
+      locale === "ar"
+        ? `حذف التقرير المحفوظ "${savedReport.title}"؟`
+        : `Delete saved report "${savedReport.title}"?`
+    );
+    if (!confirmed) return;
+
+    try {
+      await tenantApi.deleteSavedReport(savedReport.id);
+      await loadSavedReports();
+    } catch (err) {
+      console.error("Failed to delete saved report:", err);
+    }
   };
 
   const totalBookings = safeNumber(summary?.totalBookings ?? financialOverview?.totalBookings);
@@ -643,6 +872,255 @@ export default function ReportsPage() {
               </FinanceSectionCard>
             </div>
           </>
+        );
+
+      case "savedReports":
+        return (
+          <div className="space-y-5">
+            <FinanceSectionCard
+              title={locale === "ar" ? "التقارير المحفوظة" : "Saved reports"}
+              subtitle={locale === "ar"
+                ? "احفظ إعدادات التقرير الحالية وأعد فتحها أو نسخها أو تمييزها كمفضلة."
+                : "Save the current report configuration and reopen, duplicate, or favorite it later."
+              }
+              action={
+                <Link
+                  href={`/${locale}/dashboard/reports/generate`}
+                  className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  {locale === "ar" ? "إنشاء تقرير جديد" : "Generate report"}
+                </Link>
+              }
+            >
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "نوع التقرير" : "Report type"}
+                      </span>
+                      <select
+                        value={savedReportTemplateSection}
+                        onChange={(event) => setSavedReportTemplateSection(event.target.value as ReportSectionId)}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        {[
+                          "overview",
+                          "sales",
+                          "financial",
+                          "appointments",
+                          "rebookings",
+                          "employees",
+                          "services",
+                          "products",
+                          "discounts",
+                          "refunds",
+                          "paymentMethods",
+                          "customerSales"
+                        ].map((section) => (
+                          <option key={section} value={section}>
+                            {getReportSectionLabel(section as ReportSectionId, locale)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "العنوان" : "Title"}
+                      </span>
+                      <input
+                        type="text"
+                        value={savedReportTitle}
+                        onChange={(event) => setSavedReportTitle(event.target.value)}
+                        placeholder={savedReportDefaultTitle}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "وصف مختصر" : "Description"}
+                    </span>
+                    <textarea
+                      value={savedReportDescription}
+                      onChange={(event) => setSavedReportDescription(event.target.value)}
+                      rows={4}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      placeholder={locale === "ar" ? "مثال: تقرير شهري للمبيعات" : "e.g. Monthly revenue summary"}
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={savedReportFavorite}
+                      onChange={(event) => setSavedReportFavorite(event.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <span>{locale === "ar" ? "إضافة إلى المفضلة" : "Mark as favorite"}</span>
+                  </label>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={saveCurrentReportConfiguration}
+                      disabled={savingSavedReport}
+                      className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingSavedReport
+                        ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...")
+                        : (locale === "ar" ? "حفظ التقرير" : "Save report")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSavedReportTitle("");
+                        setSavedReportDescription("");
+                        setSavedReportFavorite(false);
+                        setSavedReportTemplateSection(activeSection === "savedReports" ? "overview" : activeSection);
+                      }}
+                      className="rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إعادة الضبط" : "Reset"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {locale === "ar" ? "الإعداد الحالي" : "Current configuration"}
+                  </p>
+                  <div className="mt-4 grid gap-3 text-sm text-gray-700 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                      <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "النوع" : "Type"}</div>
+                      <div className="mt-1 font-semibold text-gray-900">{getReportSectionLabel(savedReportTemplateSection, locale)}</div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                      <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "الفترة" : "Date range"}</div>
+                      <div className="mt-1 font-semibold text-gray-900">{startDate} → {endDate}</div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:col-span-2">
+                      <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "الأقسام" : "Sections"}</div>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {savedReportTemplateSections.map((section) => (
+                          <span key={section} className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-700">
+                            {getReportSectionLabel(section as ReportSectionId, locale)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:col-span-2">
+                      <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "المفضلة" : "Favorite"}</div>
+                      <div className="mt-1 font-semibold text-gray-900">{savedReportFavorite ? (locale === "ar" ? "نعم" : "Yes") : (locale === "ar" ? "لا" : "No")}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </FinanceSectionCard>
+
+            <FinanceSectionCard
+              title={locale === "ar" ? "المحفوظات" : "Saved presets"}
+              subtitle={locale === "ar"
+                ? "أعد فتح أو نسخ أو تعديل أي إعداد محفوظ دون إعادة بناء التقرير من الصفر."
+                : "Reopen, duplicate, or edit saved presets without rebuilding the report from scratch."
+              }
+            >
+              {savedReportsError ? (
+                <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {savedReportsError}
+                </div>
+              ) : null}
+
+              {savedReportsLoading ? (
+                <div className="space-y-3">
+                  <div className="h-24 animate-pulse rounded-3xl border border-gray-200 bg-gray-50" />
+                  <div className="h-24 animate-pulse rounded-3xl border border-gray-200 bg-gray-50" />
+                </div>
+              ) : savedReports.length ? (
+                <div className="space-y-4">
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {savedReports.map((savedReport) => (
+                      <article key={savedReport.id} className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className={`flex flex-col gap-3 ${isRTL ? "xl:flex-row-reverse" : "xl:flex-row"} xl:items-start xl:justify-between`}>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-base font-bold text-gray-900">{savedReport.title}</h3>
+                              {savedReport.isFavorite ? (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                                  {locale === "ar" ? "مفضلة" : "Favorite"}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-sm text-gray-600">{getReportSectionLabel(savedReport.reportType as ReportSectionId, locale)}</p>
+                            <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                              <span className="rounded-full bg-gray-100 px-2.5 py-1">{savedReport.filters?.startDate || startDate} → {savedReport.filters?.endDate || endDate}</span>
+                              <span className="rounded-full bg-gray-100 px-2.5 py-1">{savedReport.sections?.length || 0} {locale === "ar" ? "أقسام" : "sections"}</span>
+                              {savedReport.lastOpenedAt ? (
+                                <span className="rounded-full bg-gray-100 px-2.5 py-1">
+                                  {locale === "ar" ? "آخر فتح" : "Last opened"} {new Date(savedReport.lastOpenedAt).toLocaleString()}
+                                </span>
+                              ) : null}
+                            </div>
+                            {savedReport.description ? (
+                              <p className="text-sm text-gray-500">{savedReport.description}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openSavedReport(savedReport)}
+                              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+                            >
+                              {locale === "ar" ? "فتح" : "Open"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleSavedReportFavorite(savedReport)}
+                              className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                            >
+                              {savedReport.isFavorite ? (locale === "ar" ? "إلغاء المفضلة" : "Unfavorite") : (locale === "ar" ? "تفضيل" : "Favorite")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => renameSavedReport(savedReport)}
+                              className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                            >
+                              {locale === "ar" ? "إعادة تسمية" : "Rename"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => duplicateSavedReport(savedReport)}
+                              className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                            >
+                              {locale === "ar" ? "نسخ" : "Duplicate"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteSavedReport(savedReport)}
+                              className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                            >
+                              {locale === "ar" ? "حذف" : "Delete"}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <FinanceEmptyState
+                  title={locale === "ar" ? "لا توجد تقارير محفوظة" : "No saved reports"}
+                  description={locale === "ar"
+                    ? "احفظ إعدادًا من أي تقرير لتتمكن من إعادة فتحه لاحقًا."
+                    : "Save a report configuration to reopen it later."
+                  }
+                />
+              )}
+            </FinanceSectionCard>
+          </div>
         );
 
       case "sales":
@@ -1028,7 +1506,7 @@ export default function ReportsPage() {
         locale={locale}
         sidebarGroups={sidebarGroups}
         activeSection={activeSection}
-        onSectionChange={(sectionId) => setActiveSection(sectionId as ReportSectionId)}
+        onSectionChange={handleSectionChange}
         startDate={startDate}
         endDate={endDate}
         onStartDateChange={setStartDate}
@@ -1040,6 +1518,9 @@ export default function ReportsPage() {
           { id: "year", label: locale === "ar" ? "هذا العام" : "This year", onClick: () => setQuickRange("year") }
         ]}
         toolbarExtras={
+          activeSection === "savedReports"
+            ? null
+            : (
           <ReportExportToolbar
             locale={locale}
             previewHref={`/${locale}/dashboard/reports/preview?${new URLSearchParams({
@@ -1054,6 +1535,7 @@ export default function ReportsPage() {
             onPrint={printReport}
             disabled={loading}
           />
+            )
         }
         actions={
           <>

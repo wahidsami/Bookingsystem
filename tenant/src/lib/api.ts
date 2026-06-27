@@ -1964,6 +1964,51 @@ class TenantApiClient {
     return this.get(`/tenant/reports/payment-methods${query ? `?${query}` : ''}`);
   }
 
+  async getSavedReports(): Promise<any> {
+    return this.get('/tenant/reports/saved');
+  }
+
+  async getSavedReport(id: string): Promise<any> {
+    return this.get(`/tenant/reports/saved/${id}`);
+  }
+
+  async createSavedReport(data: {
+    reportType: string;
+    title: string;
+    description?: string | null;
+    sections?: string[];
+    filters?: Record<string, any>;
+    selectedMetrics?: string[];
+    grouping?: string | null;
+    sorting?: Record<string, any>;
+    reportConfig?: Record<string, any>;
+    isFavorite?: boolean;
+    duplicatedFromId?: string | null;
+  }): Promise<any> {
+    return this.post('/tenant/reports/saved', data);
+  }
+
+  async updateSavedReport(id: string, data: {
+    reportType?: string;
+    title?: string;
+    description?: string | null;
+    sections?: string[];
+    filters?: Record<string, any>;
+    selectedMetrics?: string[];
+    grouping?: string | null;
+    sorting?: Record<string, any>;
+    reportConfig?: Record<string, any>;
+    isFavorite?: boolean;
+    duplicatedFromId?: string | null;
+    lastOpenedAt?: string | null;
+  }): Promise<any> {
+    return this.put(`/tenant/reports/saved/${id}`, data);
+  }
+
+  async deleteSavedReport(id: string): Promise<any> {
+    return this.delete(`/tenant/reports/saved/${id}`);
+  }
+
   /**
    * Get full report (multiple sections in one request).
    */
