@@ -18,6 +18,21 @@ import {
 } from '@/utils/csvExport';
 import type { ReportSectionId } from '../generate/page';
 
+function EmptyReportSection({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <section className="break-inside-avoid rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5">
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+      <p className="text-sm text-gray-600">{description}</p>
+    </section>
+  );
+}
+
 export default function ReportPreviewPage() {
   const searchParams = useSearchParams();
   const params = useParams();
@@ -479,6 +494,42 @@ export default function ReportPreviewPage() {
                   <div><span className="text-gray-600">{locale === 'ar' ? 'معدل الاحتفاظ:' : 'Retention rate:'}</span> {data.customerAnalytics.retentionRate ?? 0}%</div>
                 </div>
               </section>
+            )}
+
+            {sections.includes('discounts') && (
+              <EmptyReportSection
+                title={locale === 'ar' ? 'تقرير الخصومات' : 'Discounts report'}
+                description={locale === 'ar'
+                  ? 'لا يوجد حتى الآن مصدر تجميعي مخصص للخصومات، لكن يمكن إضافة هذا القسم لاحقاً بدون تغيير نموذج المحاسبة.'
+                  : 'There is no dedicated discount aggregate yet, but this section can be added later without changing the accounting model.'}
+              />
+            )}
+
+            {sections.includes('refunds') && (
+              <EmptyReportSection
+                title={locale === 'ar' ? 'تقرير الاستردادات' : 'Refunds report'}
+                description={locale === 'ar'
+                  ? 'الاستردادات تظهر حالياً في ملخص الإقفال اليومي POS ويمكن ربطها هنا لاحقاً.'
+                  : 'Refunds currently surface in the POS closing summary and can be linked here later.'}
+              />
+            )}
+
+            {sections.includes('paymentMethods') && (
+              <EmptyReportSection
+                title={locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}
+                description={locale === 'ar'
+                  ? 'تفصيل طرق الدفع موجود حالياً ضمن التحصيل اليومي POS.'
+                  : 'The payment method breakdown currently lives in the POS closing summary.'}
+              />
+            )}
+
+            {sections.includes('customerSales') && (
+              <EmptyReportSection
+                title={locale === 'ar' ? 'مبيعات العملاء' : 'Customer sales'}
+                description={locale === 'ar'
+                  ? 'يمكن توسيع تحليلات العملاء الحالية إلى تقرير مستقل لاحقاً.'
+                  : 'Current customer analytics can be expanded into a dedicated report later.'}
+              />
             )}
           </div>
         )}

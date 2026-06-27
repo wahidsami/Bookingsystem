@@ -1,649 +1,683 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
-import { getImageUrl, tenantApi } from '@/lib/api';
-import { TenantLayout } from '@/components/TenantLayout';
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { useLocale } from "next-intl";
+import { TenantLayout } from "@/components/TenantLayout";
 import {
-  ChartBarIcon,
-  CalendarDaysIcon,
-  UserGroupIcon,
-  ClockIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  CurrencyDollarIcon,
-} from '@heroicons/react/24/outline';
-import { Currency } from '@/components/Currency';
+  FinanceEmptyState,
+  FinanceMetricCard,
+  FinanceSectionCard,
+  FinanceWorkspaceShell,
+  type FinanceSidebarGroup
+} from "@/components/FinanceWorkspaceShell";
+import { Currency } from "@/components/Currency";
+import { tenantApi } from "@/lib/api";
+
+type ReportSectionId =
+  | "overview"
+  | "sales"
+  | "financial"
+  | "appointments"
+  | "employees"
+  | "services"
+  | "products"
+  | "discounts"
+  | "refunds"
+  | "paymentMethods"
+  | "customerSales";
+
+function safeNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatDateInput(daysOffset = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysOffset);
+  return date.toISOString().split("T")[0];
+}
+
+function formatPercent(value: unknown) {
+  return `${safeNumber(value).toFixed(1)}%`;
+}
+
+function formatMoney(value: unknown) {
+  return <Currency amount={safeNumber(value)} />;
+}
+
+function TrendSparkline({
+  values,
+  color = "#7c3aed",
+  height = 120
+}: {
+  values: number[];
+  color?: string;
+  height?: number;
+}) {
+  const points = useMemo(() => {
+    if (!values.length) return "";
+    const max = Math.max(...values, 1);
+    return values
+      .map((value, index) => {
+        const x = values.length === 1 ? 50 : (index / (values.length - 1)) * 100;
+        const y = height - (safeNumber(value) / max) * (height - 12) - 6;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }, [height, values]);
+
+  const areaPath = useMemo(() => {
+    if (!values.length) {
+      return `M 0 ${height} L 100 ${height} Z`;
+    }
+
+    const max = Math.max(...values, 1);
+    const coords = values.map((value, index) => {
+      const x = values.length === 1 ? 50 : (index / (values.length - 1)) * 100;
+      const y = height - (safeNumber(value) / max) * (height - 12) - 6;
+      return `${x},${y}`;
+    });
+
+    return `M ${coords[0]} ${coords.slice(1).map((point) => `L ${point}`).join(" ")} L 100 ${height} L 0 ${height} Z`;
+  }, [height, values]);
+
+  if (!values.length) {
+    return <FinanceEmptyState title="No data" description="No time-series data is available." />;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white">
+      <svg viewBox={`0 0 100 ${height}`} className="block h-56 w-full">
+        <defs>
+          <linearGradient id="report-spark-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill="url(#report-spark-fill)" />
+        <polyline
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function SectionTable({
+  headers,
+  rows,
+  rtl = false
+}: {
+  headers: string[];
+  rows: ReactNode[][];
+  rtl?: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-3xl border border-gray-200">
+      <table className="min-w-full bg-white text-sm">
+        <thead className="bg-gray-50">
+          <tr>
+            {headers.map((header) => (
+              <th
+                key={header}
+                className={`px-4 py-3 font-semibold text-gray-600 ${rtl ? "text-right" : "text-left"}`}
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.length ? (
+            rows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="hover:bg-gray-50/70">
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} className="px-4 py-3 align-top text-gray-800">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td className="px-4 py-10 text-center text-gray-500" colSpan={headers.length}>
+                No rows found.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ReportsPage() {
-  const t = useTranslations('Reports');
   const locale = useLocale();
-  const isRTL = locale === 'ar';
+  const isRTL = locale === "ar";
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeSection, setActiveSection] = useState<ReportSectionId>("overview");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState('month');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [error, setError] = useState("");
+  const [dateRange, setDateRange] = useState("month");
+  const [startDate, setStartDate] = useState(formatDateInput(-29));
+  const [endDate, setEndDate] = useState(formatDateInput(0));
 
-  // Data states
   const [summary, setSummary] = useState<any>(null);
+  const [financialOverview, setFinancialOverview] = useState<any>(null);
   const [bookingTrends, setBookingTrends] = useState<any[]>([]);
   const [servicePerformance, setServicePerformance] = useState<any[]>([]);
   const [employeePerformance, setEmployeePerformance] = useState<any[]>([]);
   const [peakHours, setPeakHours] = useState<any>(null);
   const [customerAnalytics, setCustomerAnalytics] = useState<any>(null);
+  const [posClosingSummary, setPosClosingSummary] = useState<any>(null);
 
-  const safeNumber = (value: any) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
-
-  const bookingTrendRangeLabel = {
-    week: t('week'),
-    month: t('month'),
-    quarter: t('quarter'),
-    year: t('year'),
-  }[dateRange] || t('month');
-
-  const visibleBookingTrends = useMemo(() => {
-    if (!startDate || !endDate) {
-      return [];
+  const sidebarGroups: FinanceSidebarGroup[] = [
+    {
+      title: locale === "ar" ? "الأقسام" : "Sections",
+      items: [
+        { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "sales", label: locale === "ar" ? "المبيعات" : "Sales reports" },
+        { id: "financial", label: locale === "ar" ? "المالية" : "Financial reports" },
+        { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointment reports" },
+        { id: "employees", label: locale === "ar" ? "الموظفون" : "Employee reports" },
+        { id: "services", label: locale === "ar" ? "الخدمات" : "Service reports" },
+        { id: "products", label: locale === "ar" ? "المنتجات" : "Product reports" },
+        { id: "discounts", label: locale === "ar" ? "الخصومات" : "Discounts report" },
+        { id: "refunds", label: locale === "ar" ? "الاستردادات" : "Refunds report" },
+        { id: "paymentMethods", label: locale === "ar" ? "طرق الدفع" : "Payment methods" },
+        { id: "customerSales", label: locale === "ar" ? "مبيعات العملاء" : "Customer sales" }
+      ]
     }
-
-    const totalsByKey = new Map<string, { bookings: number; revenue: number; completed: number }>();
-    bookingTrends.forEach((point) => {
-      if (!point?.date) {
-        return;
-      }
-
-      totalsByKey.set(point.date, {
-        bookings: safeNumber(point.bookings),
-        revenue: safeNumber(point.revenue),
-        completed: safeNumber(point.completed),
-      });
-    });
-
-    const rangeStart = new Date(startDate);
-    const rangeEnd = new Date(endDate);
-    if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
-      return bookingTrends;
-    }
-
-    rangeStart.setHours(0, 0, 0, 0);
-    rangeEnd.setHours(0, 0, 0, 0);
-
-    const densePoints: Array<{ date: string; bookings: number; revenue: number; completed: number }> = [];
-
-    if (dateRange === 'year') {
-      const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
-      const lastMonth = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1);
-
-      while (cursor <= lastMonth) {
-        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
-        const existing = totalsByKey.get(key);
-
-        densePoints.push({
-          date: key,
-          bookings: existing?.bookings || 0,
-          revenue: existing?.revenue || 0,
-          completed: existing?.completed || 0,
-        });
-
-        cursor.setMonth(cursor.getMonth() + 1);
-      }
-
-      return densePoints;
-    }
-
-    const cursor = new Date(rangeStart);
-    while (cursor <= rangeEnd) {
-      const key = cursor.toISOString().split('T')[0];
-      const existing = totalsByKey.get(key);
-
-      densePoints.push({
-        date: key,
-        bookings: existing?.bookings || 0,
-        revenue: existing?.revenue || 0,
-        completed: existing?.completed || 0,
-      });
-
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    return densePoints;
-  }, [bookingTrends, dateRange, endDate, startDate]);
-
-  const setDateRangePreset = (preset: string) => {
-    const now = new Date();
-    let start: Date;
-    
-    switch (preset) {
-      case 'week':
-        start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'month':
-        start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case 'quarter':
-        start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-      case 'year':
-        start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    }
-    
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(now.toISOString().split('T')[0]);
-    setDateRange(preset);
-  };
-
-  useEffect(() => {
-    setDateRangePreset('month');
-  }, []);
+  ];
 
   const loadData = async () => {
+    setLoading(true);
+    setError("");
     try {
-      setLoading(true);
-      setError(null);
       const params = { startDate, endDate };
-      const [summaryRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes] = await Promise.allSettled([
+      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, peakRes, customerRes, posRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
-        tenantApi.getBookingTrends({ ...params, groupBy: dateRange === 'year' ? 'month' : 'day' }),
+        tenantApi.getFinancialOverview(params),
+        tenantApi.getBookingTrends({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
         tenantApi.getServicePerformance(params),
         tenantApi.getEmployeePerformance(params),
         tenantApi.getPeakHoursAnalysis(params),
         tenantApi.getCustomerAnalytics(params),
+        tenantApi.getPosClosingSummary({ date: endDate })
       ]);
+
       const failedSections: string[] = [];
 
-      if (summaryRes.status === 'fulfilled' && summaryRes.value.success) {
-        setSummary(summaryRes.value.data);
+      if (summaryRes.status === "fulfilled" && summaryRes.value.success) {
+        setSummary(summaryRes.value.data || null);
       } else {
         setSummary(null);
-        failedSections.push(t('overview'));
+        failedSections.push(locale === "ar" ? "ملخص التقارير" : "report summary");
       }
 
-      if (trendsRes.status === 'fulfilled' && trendsRes.value.success) {
+      if (financialRes.status === "fulfilled" && financialRes.value.success) {
+        setFinancialOverview(financialRes.value.overview || null);
+      } else {
+        setFinancialOverview(null);
+        failedSections.push(locale === "ar" ? "الملخص المالي" : "financial overview");
+      }
+
+      if (trendsRes.status === "fulfilled" && trendsRes.value.success) {
         setBookingTrends(trendsRes.value.data || []);
       } else {
         setBookingTrends([]);
-        failedSections.push(t('bookingTrends'));
+        failedSections.push(locale === "ar" ? "اتجاهات الحجز" : "booking trends");
       }
 
-      if (servicesRes.status === 'fulfilled' && servicesRes.value.success) {
+      if (servicesRes.status === "fulfilled" && servicesRes.value.success) {
         setServicePerformance(servicesRes.value.data || []);
       } else {
         setServicePerformance([]);
-        failedSections.push(t('services'));
+        failedSections.push(locale === "ar" ? "أداء الخدمات" : "service performance");
       }
 
-      if (employeesRes.status === 'fulfilled' && employeesRes.value.success) {
+      if (employeesRes.status === "fulfilled" && employeesRes.value.success) {
         setEmployeePerformance(employeesRes.value.data || []);
       } else {
         setEmployeePerformance([]);
-        failedSections.push(t('employees'));
+        failedSections.push(locale === "ar" ? "أداء الموظفين" : "employee performance");
       }
 
-      if (peakRes.status === 'fulfilled' && peakRes.value.success) {
+      if (peakRes.status === "fulfilled" && peakRes.value.success) {
         setPeakHours(peakRes.value.data || null);
       } else {
         setPeakHours(null);
-        failedSections.push(t('peakHours'));
+        failedSections.push(locale === "ar" ? "ساعات الذروة" : "peak hours");
       }
 
-      if (customerRes.status === 'fulfilled' && customerRes.value.success) {
+      if (customerRes.status === "fulfilled" && customerRes.value.success) {
         setCustomerAnalytics(customerRes.value.data || null);
       } else {
         setCustomerAnalytics(null);
-        failedSections.push(t('customers'));
+        failedSections.push(locale === "ar" ? "تحليلات العملاء" : "customer analytics");
+      }
+
+      if (posRes.status === "fulfilled" && posRes.value.success) {
+        setPosClosingSummary(posRes.value.summary || null);
+      } else {
+        setPosClosingSummary(null);
+        failedSections.push(locale === "ar" ? "ملخص الإقفال POS" : "POS closing summary");
       }
 
       if (failedSections.length > 0) {
         setError(
-          locale === 'ar'
-            ? `تعذر تحميل بعض أقسام التقارير: ${failedSections.join('، ')}`
-            : `Some report sections failed to load: ${failedSections.join(', ')}`
+          locale === "ar"
+            ? `تعذر تحميل بعض التقارير: ${failedSections.join("، ")}`
+            : `Some report sections failed to load: ${failedSections.join(", ")}`
         );
       }
-
     } catch (err: any) {
-      console.error('Failed to load reports:', err);
-      setError(err.message);
+      console.error("Failed to load reports:", err);
+      setError(err?.message || (locale === "ar" ? "تعذر تحميل التقارير" : "Failed to load reports"));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (startDate && endDate) {
-      loadData();
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, dateRange]);
+
+  const setQuickRange = (mode: "week" | "month" | "quarter" | "year") => {
+    const now = new Date();
+    let start: Date;
+
+    switch (mode) {
+      case "week":
+        start = new Date(now);
+        start.setDate(now.getDate() - 7);
+        break;
+      case "quarter":
+        start = new Date(now);
+        start.setDate(now.getDate() - 90);
+        break;
+      case "year":
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
+      case "month":
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
     }
-  }, [dateRange, endDate, startDate]);
 
-  const tabs = [
-    { id: 'overview', icon: ChartBarIcon, label: t('overview') },
-    { id: 'services', icon: CurrencyDollarIcon, label: t('services') },
-    { id: 'employees', icon: UserGroupIcon, label: t('employees') },
-    { id: 'peakHours', icon: ClockIcon, label: t('peakHours') },
-    { id: 'customers', icon: UserGroupIcon, label: t('customers') },
-  ];
+    setDateRange(mode);
+    setStartDate(start.toISOString().split("T")[0]);
+    setEndDate(now.toISOString().split("T")[0]);
+  };
 
-  const getMaxValue = (data: number[]) => Math.max(...data, 1);
+  const bookingTrendValues = useMemo(() => bookingTrends.map((item) => safeNumber(item.bookings)), [bookingTrends]);
+  const revenueTrendValues = useMemo(() => bookingTrends.map((item) => safeNumber(item.revenue)), [bookingTrends]);
 
-  if (loading) {
-    return (
-      <TenantLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        </div>
-      </TenantLayout>
-    );
-  }
+  const totalBookings = safeNumber(summary?.totalBookings ?? financialOverview?.totalBookings);
+  const totalRevenue = safeNumber(summary?.totalRevenue ?? financialOverview?.totalRevenue);
+  const tenantRevenue = safeNumber(financialOverview?.totalTenantRevenue);
+  const avgBookingValue = safeNumber(summary?.avgBookingValue ?? financialOverview?.avgBookingValue);
+  const completionRate = safeNumber(summary?.completionRate ?? financialOverview?.completionRate);
+  const retentionRate = safeNumber(customerAnalytics?.retentionRate);
 
   return (
     <TenantLayout>
-    <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {t('title')}
-          </h1>
-          <p className="text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-          <a
-            href={`/${locale}/dashboard/reports/generate`}
-            className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 no-print"
-          >
-            {locale === 'ar' ? 'إنشاء تقرير' : 'Generate report'}
-          </a>
-          {['week', 'month', 'quarter', 'year'].map((preset) => (
-            <button
-              key={preset}
-              onClick={() => setDateRangePreset(preset)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                dateRange === preset
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {t(preset)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1">
-        <div className="flex gap-1 overflow-x-auto" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-            >
-              <tab.icon className="w-5 h-5" />
-              <span className="font-medium">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      {/* Overview Tab */}
-      {activeTab === 'overview' && summary && (
-        <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('totalBookings')}</p>
-                  <p className="text-2xl font-bold text-gray-900">{summary.totalBookings}</p>
-                  <p className="text-xs text-gray-400">{summary.completedBookings} {t('completed')}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <CalendarDaysIcon className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('totalRevenue')}</p>
-                  <Currency amount={safeNumber(summary.totalRevenue)} className="text-2xl font-bold text-green-600" />
-                  <p className="text-xs text-gray-400">{t('avgBooking')}: <Currency amount={safeNumber(summary.avgBookingValue)} /></p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CurrencyDollarIcon className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('completionRate')}</p>
-                  <p className="text-2xl font-bold text-purple-600">{summary.completionRate}%</p>
-                  <p className="text-xs text-gray-400">{summary.cancelledBookings} {t('cancelled')}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <ArrowTrendingUpIcon className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('uniqueCustomers')}</p>
-                  <p className="text-2xl font-bold text-orange-600">{summary.uniqueCustomers}</p>
-                  <p className="text-xs text-gray-400">{summary.noShowBookings} {t('noShows')}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <UserGroupIcon className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </div>
+      <FinanceWorkspaceShell
+        title={locale === "ar" ? "التقارير" : "Reports"}
+        subtitle={locale === "ar"
+          ? "منطقة تقارير بأسلوب Fresha تعرض مؤشرات التنفيذ، التقارير التفصيلية، والتحصيل في لوحة واحدة."
+          : "A Fresha-style reporting workspace for execution metrics, detailed reports, and collections in one place."
+        }
+        locale={locale}
+        sidebarGroups={sidebarGroups}
+        activeSection={activeSection}
+        onSectionChange={(sectionId) => setActiveSection(sectionId as ReportSectionId)}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        quickRanges={[
+          { id: "week", label: locale === "ar" ? "7 أيام" : "7 days", onClick: () => setQuickRange("week") },
+          { id: "month", label: locale === "ar" ? "هذا الشهر" : "This month", onClick: () => setQuickRange("month") },
+          { id: "quarter", label: locale === "ar" ? "ربع سنة" : "Quarter", onClick: () => setQuickRange("quarter") },
+          { id: "year", label: locale === "ar" ? "هذا العام" : "This year", onClick: () => setQuickRange("year") }
+        ]}
+        actions={
+          <>
+            <Link href={`/${locale}/dashboard/reports/generate`} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+              {locale === "ar" ? "إنشاء تقرير" : "Generate report"}
+            </Link>
+            <Link href={`/${locale}/dashboard/financial`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+              {locale === "ar" ? "المالية" : "Financial"}
+            </Link>
+          </>
+        }
+      >
+        {error ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {error}
           </div>
+        ) : null}
 
-          {/* Booking Trends Chart */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t('bookingTrends')}
-            </h3>
-            <div className="h-64 flex items-end gap-1">
-              {visibleBookingTrends.map((day, index) => (
-                <div
-                  key={index}
-                  className="flex-1 bg-primary-200 hover:bg-primary-400 transition-colors rounded-t"
-                  style={{
-                    height: `${(safeNumber(day.bookings) / getMaxValue(visibleBookingTrends.map(d => safeNumber(d.bookings)))) * 100}%`,
-                    minHeight: day.bookings > 0 ? '8px' : '2px'
-                  }}
-                  title={`${day.date}: ${day.bookings} ${t('bookings')}`}
-                />
+        {loading ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="h-28 animate-pulse rounded-3xl border border-gray-200 bg-white" />
               ))}
             </div>
-            <p className="text-center text-sm text-gray-500 mt-2">{bookingTrendRangeLabel}</p>
+            <div className="grid gap-5 xl:grid-cols-2">
+              <div className="h-72 animate-pulse rounded-3xl border border-gray-200 bg-white" />
+              <div className="h-72 animate-pulse rounded-3xl border border-gray-200 bg-white" />
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-5">
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FinanceMetricCard label={locale === "ar" ? "إجمالي الحجوزات" : "Total bookings"} value={totalBookings} tone="blue" />
+              <FinanceMetricCard label={locale === "ar" ? "الإيراد" : "Total revenue"} value={formatMoney(totalRevenue)} tone="green" />
+              <FinanceMetricCard label={locale === "ar" ? "إيراد المركز" : "Tenant revenue"} value={formatMoney(tenantRevenue)} tone="purple" />
+              <FinanceMetricCard label={locale === "ar" ? "العملاء الفريدون" : "Unique customers"} value={safeNumber(summary?.uniqueCustomers)} tone="amber" />
+            </section>
 
-      {/* Services Tab */}
-      {activeTab === 'services' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t('servicePerformance')}
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('service')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('bookings')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('revenue')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('avgRevenue')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('completionRate')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {servicePerformance.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <p className="font-medium text-gray-900">
-                        {locale === 'ar' ? service.name_ar : service.name_en}
-                      </p>
-                      <p className="text-sm text-gray-500">{service.category}</p>
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <span className="font-medium">{service.totalBookings}</span>
-                      <span className="text-sm text-gray-500"> ({service.completedBookings} {t('completed')})</span>
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={safeNumber(service.revenue)} className="font-medium text-green-600" />
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={safeNumber(service.avgRevenue)} />
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <span className={`font-medium ${parseFloat(service.completionRate) >= 80 ? 'text-green-600' : parseFloat(service.completionRate) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {service.completionRate}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FinanceMetricCard label={locale === "ar" ? "متوسط قيمة الحجز" : "Average booking value"} value={formatMoney(avgBookingValue)} />
+              <FinanceMetricCard label={locale === "ar" ? "معدل الإكمال" : "Completion rate"} value={formatPercent(completionRate)} tone="green" />
+              <FinanceMetricCard label={locale === "ar" ? "معدل الاحتفاظ" : "Retention rate"} value={formatPercent(retentionRate)} tone="purple" />
+              <FinanceMetricCard label={locale === "ar" ? "المدفوعات المعلقة" : "Pending revenue"} value={formatMoney(summary?.pendingRevenue ?? financialOverview?.pendingPayments)} tone="rose" />
+            </section>
 
-      {/* Employees Tab */}
-      {activeTab === 'employees' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t('employeePerformance')}
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('employee')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('bookings')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('revenue')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('commission')}
-                  </th>
-                  <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {t('completionRate')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {employeePerformance.map((employee) => (
-                  <tr key={employee.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                          {employee.photo ? (
-                            <img src={getImageUrl(employee.photo)} alt={employee.name} className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            <span className="text-primary-600 font-medium">{employee.name?.charAt(0)}</span>
-                          )}
-                        </div>
-                        <span className="font-medium text-gray-900">{employee.name}</span>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
+              <FinanceSectionCard
+                title={locale === "ar" ? "اتجاهات الحجز" : "Booking trends"}
+                subtitle={locale === "ar" ? "الاتجاه اليومي أو الشهري بحسب النطاق المحدد." : "Daily or monthly booking trend based on the selected range."}
+              >
+                <div className="space-y-4">
+                  <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#0ea5e9" />
+                  <SectionTable
+                    rtl={isRTL}
+                    headers={[
+                      locale === "ar" ? "التاريخ" : "Date",
+                      locale === "ar" ? "الحجوزات" : "Bookings",
+                      locale === "ar" ? "المكتملة" : "Completed",
+                      locale === "ar" ? "الإيراد" : "Revenue"
+                    ]}
+                    rows={bookingTrends.slice(0, 8).map((trend) => [
+                      trend.date,
+                      safeNumber(trend.bookings),
+                      safeNumber(trend.completed),
+                      formatMoney(trend.revenue)
+                    ])}
+                  />
+                </div>
+              </FinanceSectionCard>
+
+              <FinanceSectionCard
+                title={locale === "ar" ? "ملخص التشغيل" : "Operational summary"}
+                subtitle={locale === "ar" ? "مؤشرات سريعة من الملخص المالي والتقارير." : "Quick KPIs from the financial and report summaries."}
+              >
+                <div className="space-y-3">
+                  {[
+                    { label: locale === "ar" ? "الحجوزات المكتملة" : "Completed bookings", value: safeNumber(summary?.completedBookings ?? financialOverview?.completedBookings), tone: "bg-emerald-500" },
+                    { label: locale === "ar" ? "الحجوزات الملغاة" : "Cancelled bookings", value: safeNumber(summary?.cancelledBookings ?? financialOverview?.cancelledBookings), tone: "bg-rose-500" },
+                    { label: locale === "ar" ? "حالات عدم الحضور" : "No-show cases", value: safeNumber(summary?.noShowBookings ?? financialOverview?.noShowBookings), tone: "bg-amber-500" },
+                    { label: locale === "ar" ? "العملاء العائدون" : "Returning customers", value: safeNumber(customerAnalytics?.returningCustomers), tone: "bg-violet-500" }
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-2xl border border-gray-200 p-4">
+                      <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                        <span className="text-sm font-medium text-gray-600">{item.label}</span>
+                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <span className="font-medium">{employee.totalBookings}</span>
-                      <span className="text-sm text-gray-500"> ({employee.completedBookings} {t('completed')})</span>
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={safeNumber(employee.revenue)} className="font-medium text-green-600" />
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <Currency amount={safeNumber(employee.commission)} />
-                    </td>
-                    <td className="px-6 py-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <span className={`font-medium ${parseFloat(employee.completionRate) >= 80 ? 'text-green-600' : parseFloat(employee.completionRate) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {employee.completionRate}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Peak Hours Tab */}
-      {activeTab === 'peakHours' && peakHours && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Hourly Distribution */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t('hourlyDistribution')}
-              </h3>
-              <div className="space-y-2">
-                {peakHours.hourlyData.filter((h: any) => h.bookings > 0).map((hour: any) => (
-                  <div key={hour.hour} className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <span className="w-16 text-sm text-gray-600">{hour.hour}</span>
-                    <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary-500 rounded-full"
-                        style={{ width: `${(hour.bookings / getMaxValue(peakHours.hourlyData.map((h: any) => h.bookings))) * 100}%` }}
-                      />
+                      <div className="mt-3 h-2 rounded-full bg-gray-100">
+                        <div className={`h-2 rounded-full ${item.tone}`} style={{ width: "100%" }} />
+                      </div>
                     </div>
-                    <span className="w-12 text-sm font-medium text-gray-900">{hour.bookings}</span>
+                  ))}
+                </div>
+              </FinanceSectionCard>
+            </div>
+
+            {activeSection === "overview" ? (
+              <div className="grid gap-5 xl:grid-cols-2">
+                <FinanceSectionCard
+                  title={locale === "ar" ? "الخدمات الأعلى أداء" : "Top services"}
+                  subtitle={locale === "ar" ? "الخدمات الأكثر توليدا للإيراد." : "Highest revenue-generating services."}
+                >
+                  <SectionTable
+                    rtl={isRTL}
+                    headers={[
+                      locale === "ar" ? "الخدمة" : "Service",
+                      locale === "ar" ? "الحجوزات" : "Bookings",
+                      locale === "ar" ? "الإيراد" : "Revenue"
+                    ]}
+                    rows={servicePerformance.slice(0, 6).map((service) => [
+                      locale === "ar" ? service.name_ar : service.name_en,
+                      safeNumber(service.totalBookings),
+                      formatMoney(service.revenue ?? service.totalRevenue)
+                    ])}
+                  />
+                </FinanceSectionCard>
+
+                <FinanceSectionCard
+                  title={locale === "ar" ? "أكبر العملاء" : "Top customers"}
+                  subtitle={locale === "ar" ? "العملاء الأكثر إنفاقا." : "Customers with the highest revenue contribution."}
+                >
+                  <SectionTable
+                    rtl={isRTL}
+                    headers={[
+                      locale === "ar" ? "العميل" : "Customer",
+                      locale === "ar" ? "الحجوزات" : "Bookings",
+                      locale === "ar" ? "الإيراد" : "Revenue"
+                    ]}
+                    rows={(customerAnalytics?.topCustomers || []).slice(0, 6).map((customer: any) => [
+                      customer.id,
+                      safeNumber(customer.bookings),
+                      formatMoney(customer.revenue)
+                    ])}
+                  />
+                </FinanceSectionCard>
+              </div>
+            ) : null}
+
+            {activeSection === "sales" ? (
+              <FinanceSectionCard
+                title={locale === "ar" ? "تقرير المبيعات" : "Sales report"}
+                subtitle={locale === "ar" ? "السلسلة الزمنية، الخدمات، والعملاء." : "Time series, services, and customer contribution."}
+              >
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <div className="rounded-2xl border border-gray-200 p-4">
+                    <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الإيراد" : "Revenue"}</p>
+                    <TrendSparkline values={revenueTrendValues.length ? revenueTrendValues : [0]} color="#7c3aed" height={110} />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Daily Distribution */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {t('dailyDistribution')}
-              </h3>
-              <div className="space-y-3">
-                {peakHours.dailyData.map((day: any) => (
-                  <div key={day.day} className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                    <span className="w-24 text-sm text-gray-600">{t(day.day.toLowerCase())}</span>
-                    <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 rounded-lg"
-                        style={{ width: `${(day.bookings / getMaxValue(peakHours.dailyData.map((d: any) => d.bookings))) * 100}%` }}
-                      />
-                    </div>
-                    <span className="w-12 text-sm font-medium text-gray-900">{day.bookings}</span>
+                  <div className="rounded-2xl border border-gray-200 p-4">
+                    <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "إيراد المركز" : "Tenant revenue"}</p>
+                    <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#10b981" height={110} />
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                  <div className="rounded-2xl border border-gray-200 p-4">
+                    <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الحجوزات" : "Bookings"}</p>
+                    <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#0ea5e9" height={110} />
+                  </div>
+                </div>
+              </FinanceSectionCard>
+            ) : null}
 
-          {/* Peak Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h4 className="text-sm text-gray-500 mb-2">{t('peakHoursLabel')}</h4>
-              <div className="flex flex-wrap gap-2">
-                {peakHours.peakHours.map((hour: string) => (
-                  <span key={hour} className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
-                    {hour}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h4 className="text-sm text-gray-500 mb-2">{t('busiestDays')}</h4>
-              <div className="flex flex-wrap gap-2">
-                {peakHours.busiestDays.map((day: string) => (
-                  <span key={day} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                    {t(day.toLowerCase())}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+            {activeSection === "financial" ? (
+              <div className="grid gap-5 xl:grid-cols-2">
+                <FinanceSectionCard title={locale === "ar" ? "ملخص مالي" : "Financial summary"}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FinanceMetricCard label={locale === "ar" ? "الإيراد الخام" : "Gross revenue"} value={formatMoney(financialOverview?.totalRevenue ?? summary?.totalRevenue)} tone="green" />
+                    <FinanceMetricCard label={locale === "ar" ? "إيراد المركز" : "Tenant revenue"} value={formatMoney(financialOverview?.totalTenantRevenue)} tone="blue" />
+                    <FinanceMetricCard label={locale === "ar" ? "الرسوم والعمولات" : "Fees and commissions"} value={formatMoney((financialOverview?.totalPlatformFees || 0) + (financialOverview?.totalEmployeeCommissions || 0))} tone="amber" />
+                    <FinanceMetricCard label={locale === "ar" ? "صافي الإيراد" : "Net revenue"} value={formatMoney(financialOverview?.netRevenue)} tone="purple" />
+                  </div>
+                </FinanceSectionCard>
 
-      {/* Customers Tab */}
-      {activeTab === 'customers' && customerAnalytics && (
-        <div className="space-y-6">
-          {/* Customer Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <p className="text-sm text-gray-500">{t('totalCustomers')}</p>
-              <p className="text-2xl font-bold text-gray-900">{customerAnalytics.totalCustomers}</p>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <p className="text-sm text-gray-500">{t('newCustomers')}</p>
-              <p className="text-2xl font-bold text-green-600">{customerAnalytics.newCustomers}</p>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <p className="text-sm text-gray-500">{t('returningCustomers')}</p>
-              <p className="text-2xl font-bold text-blue-600">{customerAnalytics.returningCustomers}</p>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <p className="text-sm text-gray-500">{t('retentionRate')}</p>
-              <p className="text-2xl font-bold text-purple-600">{customerAnalytics.retentionRate}%</p>
-            </div>
-          </div>
+                <FinanceSectionCard title={locale === "ar" ? "طرق الدفع" : "Payment methods"}>
+                  {posClosingSummary?.totalsByMethod?.length ? (
+                    <SectionTable
+                      rtl={isRTL}
+                      headers={[
+                        locale === "ar" ? "الطريقة" : "Method",
+                        locale === "ar" ? "المحصّل" : "Collected",
+                        locale === "ar" ? "الاسترداد" : "Refunded"
+                      ]}
+                      rows={posClosingSummary.totalsByMethod.map((method: any) => [
+                        method.paymentMethodLabel,
+                        formatMoney(method.collected),
+                        formatMoney(method.refunded)
+                      ])}
+                    />
+                  ) : (
+                    <FinanceEmptyState
+                      title={locale === "ar" ? "لا توجد طرق دفع" : "No payment methods"}
+                      description={locale === "ar" ? "اختر نطاق تاريخ يحتوي على تحصيل POS." : "Pick a date range with POS closing activity."}
+                    />
+                  )}
+                </FinanceSectionCard>
+              </div>
+            ) : null}
 
-          {/* Customer Segments */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t('customerSegments')}
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-3xl font-bold text-gray-600">{customerAnalytics.segments.oneTime}</p>
-                <p className="text-sm text-gray-500">{t('oneTime')}</p>
-                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.oneTime)} className="text-xs text-gray-400" />
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-3xl font-bold text-blue-600">{customerAnalytics.segments.occasional}</p>
-                <p className="text-sm text-gray-500">{t('occasional')}</p>
-                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.occasional)} className="text-xs text-blue-400" />
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-3xl font-bold text-green-600">{customerAnalytics.segments.regular}</p>
-                <p className="text-sm text-gray-500">{t('regular')}</p>
-                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.regular)} className="text-xs text-green-400" />
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <p className="text-3xl font-bold text-purple-600">{customerAnalytics.segments.loyal}</p>
-                <p className="text-sm text-gray-500">{t('loyal')}</p>
-                <Currency amount={safeNumber(customerAnalytics.segmentRevenue.loyal)} className="text-xs text-purple-400" />
-              </div>
-            </div>
+            {activeSection === "appointments" ? (
+              <FinanceSectionCard title={locale === "ar" ? "تقرير المواعيد" : "Appointment report"}>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <FinanceMetricCard label={locale === "ar" ? "الإجمالي" : "Total"} value={totalBookings} tone="blue" />
+                  <FinanceMetricCard label={locale === "ar" ? "المكتمل" : "Completed"} value={safeNumber(summary?.completedBookings)} tone="green" />
+                  <FinanceMetricCard label={locale === "ar" ? "الملغى" : "Cancelled"} value={safeNumber(summary?.cancelledBookings)} tone="rose" />
+                  <FinanceMetricCard label={locale === "ar" ? "عدم الحضور" : "No-shows"} value={safeNumber(summary?.noShowBookings)} tone="amber" />
+                </div>
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "employees" ? (
+              <FinanceSectionCard title={locale === "ar" ? "أداء الموظفين" : "Employee performance"}>
+                <SectionTable
+                  rtl={isRTL}
+                  headers={[
+                    locale === "ar" ? "الموظف" : "Employee",
+                    locale === "ar" ? "الحجوزات" : "Bookings",
+                    locale === "ar" ? "الإيراد" : "Revenue",
+                    locale === "ar" ? "العمولة" : "Commission"
+                  ]}
+                  rows={employeePerformance.map((employee: any) => [
+                    employee.name,
+                    safeNumber(employee.totalBookings),
+                    formatMoney(employee.revenue ?? employee.totalRevenueGenerated),
+                    formatMoney(employee.commission ?? employee.totalCommission)
+                  ])}
+                />
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "services" ? (
+              <FinanceSectionCard title={locale === "ar" ? "أداء الخدمات" : "Service performance"}>
+                <SectionTable
+                  rtl={isRTL}
+                  headers={[
+                    locale === "ar" ? "الخدمة" : "Service",
+                    locale === "ar" ? "الحجوزات" : "Bookings",
+                    locale === "ar" ? "الإيراد" : "Revenue",
+                    locale === "ar" ? "معدل الإكمال" : "Completion rate"
+                  ]}
+                  rows={servicePerformance.map((service: any) => [
+                    locale === "ar" ? service.name_ar : service.name_en,
+                    safeNumber(service.totalBookings),
+                    formatMoney(service.revenue ?? service.totalRevenue),
+                    `${safeNumber(service.completionRate).toFixed(1)}%`
+                  ])}
+                />
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "products" ? (
+              <FinanceSectionCard title={locale === "ar" ? "تقرير المنتجات" : "Product report"}>
+                <FinanceEmptyState
+                  title={locale === "ar" ? "لا يوجد تقرير منتجات" : "No product report"}
+                  description={locale === "ar" ? "التقارير الحالية لا تعرض بعد تقرير منتجات منفصل." : "The current report API does not yet expose a dedicated product report."}
+                />
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "discounts" ? (
+              <FinanceSectionCard title={locale === "ar" ? "الخصومات" : "Discounts"}>
+                <FinanceEmptyState
+                  title={locale === "ar" ? "لا يوجد تجميع خصومات مخصص" : "No dedicated discount aggregate"}
+                  description={locale === "ar" ? "يمكن إضافة هذا القسم لاحقا كتوسعة إضافية." : "This section can be added later as an additive extension."}
+                />
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "refunds" ? (
+              <FinanceSectionCard title={locale === "ar" ? "الاستردادات" : "Refunds"}>
+                {posClosingSummary ? (
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <FinanceMetricCard label={locale === "ar" ? "إجمالي الاسترداد" : "Refunds total"} value={formatMoney(posClosingSummary.refundsTotal)} tone="rose" />
+                    <FinanceMetricCard label={locale === "ar" ? "الصافي" : "Net collected"} value={formatMoney(posClosingSummary.netCollected)} tone="green" />
+                    <FinanceMetricCard label={locale === "ar" ? "العمليات" : "Transactions"} value={safeNumber(posClosingSummary.transactionCount)} tone="blue" />
+                  </div>
+                ) : (
+                  <FinanceEmptyState
+                    title={locale === "ar" ? "لا توجد بيانات استرداد" : "No refund data"}
+                    description={locale === "ar" ? "ملخص الإقفال اليومي غير متوفر لهذا النطاق." : "The daily closing snapshot is not available for this range."}
+                  />
+                )}
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "paymentMethods" ? (
+              <FinanceSectionCard title={locale === "ar" ? "طرق الدفع" : "Payment methods"}>
+                {posClosingSummary?.totalsByMethod?.length ? (
+                  <SectionTable
+                    rtl={isRTL}
+                    headers={[
+                      locale === "ar" ? "الطريقة" : "Method",
+                      locale === "ar" ? "المحصّل" : "Collected",
+                      locale === "ar" ? "الاسترداد" : "Refunded",
+                      locale === "ar" ? "العمليات" : "Transactions"
+                    ]}
+                    rows={posClosingSummary.totalsByMethod.map((method: any) => [
+                      method.paymentMethodLabel,
+                      formatMoney(method.collected),
+                      formatMoney(method.refunded),
+                      method.transactionCount
+                    ])}
+                  />
+                ) : (
+                  <FinanceEmptyState
+                    title={locale === "ar" ? "لا توجد طرق دفع" : "No payment methods"}
+                    description={locale === "ar" ? "اختر نطاق تاريخ فيه تحصيل POS." : "Pick a range with POS closing activity."}
+                  />
+                )}
+              </FinanceSectionCard>
+            ) : null}
+
+            {activeSection === "customerSales" ? (
+              <FinanceSectionCard title={locale === "ar" ? "مبيعات العملاء" : "Customer sales"}>
+                {customerAnalytics ? (
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <FinanceMetricCard label={locale === "ar" ? "إجمالي العملاء" : "Total customers"} value={safeNumber(customerAnalytics.totalCustomers)} tone="blue" />
+                    <FinanceMetricCard label={locale === "ar" ? "عملاء جدد" : "New customers"} value={safeNumber(customerAnalytics.newCustomers)} tone="green" />
+                    <FinanceMetricCard label={locale === "ar" ? "عملاء عائدون" : "Returning customers"} value={safeNumber(customerAnalytics.returningCustomers)} tone="purple" />
+                    <FinanceMetricCard label={locale === "ar" ? "الاحتفاظ" : "Retention"} value={formatPercent(customerAnalytics.retentionRate)} tone="amber" />
+                  </div>
+                ) : (
+                  <FinanceEmptyState
+                    title={locale === "ar" ? "لا توجد تحليلات العملاء" : "No customer analytics"}
+                    description={locale === "ar" ? "البيانات غير متاحة لهذا النطاق." : "No analytics are available for this date range."}
+                  />
+                )}
+              </FinanceSectionCard>
+            ) : null}
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </FinanceWorkspaceShell>
     </TenantLayout>
   );
 }
-

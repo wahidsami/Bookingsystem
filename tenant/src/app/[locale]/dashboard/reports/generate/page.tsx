@@ -2,26 +2,28 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import { TenantLayout } from '@/components/TenantLayout';
 
 const SECTION_OPTIONS = [
-  { id: 'overview', labelKey: 'overview', labelEn: 'Financial overview' },
-  { id: 'employees', labelKey: 'employees', labelEn: 'Employee revenue' },
-  { id: 'services', labelKey: 'services', labelEn: 'Service revenue' },
-  { id: 'products', labelKey: 'products', labelEn: 'Product revenue' },
-  { id: 'daily', labelKey: 'daily', labelEn: 'Daily revenue' },
-  { id: 'bookingTrends', labelKey: 'bookingTrends', labelEn: 'Booking trends' },
-  { id: 'servicePerformance', labelKey: 'servicePerformance', labelEn: 'Service performance' },
-  { id: 'employeePerformance', labelKey: 'employeePerformance', labelEn: 'Employee performance' },
-  { id: 'peakHours', labelKey: 'peakHours', labelEn: 'Peak hours' },
-  { id: 'customerAnalytics', labelKey: 'customerAnalytics', labelEn: 'Customer analytics' },
+  { id: 'overview', labelAr: 'نظرة مالية', labelEn: 'Financial overview' },
+  { id: 'employees', labelAr: 'إيراد الموظفين', labelEn: 'Employee revenue' },
+  { id: 'services', labelAr: 'إيراد الخدمات', labelEn: 'Service revenue' },
+  { id: 'products', labelAr: 'إيراد المنتجات', labelEn: 'Product revenue' },
+  { id: 'daily', labelAr: 'الإيراد اليومي', labelEn: 'Daily revenue' },
+  { id: 'bookingTrends', labelAr: 'اتجاهات الحجز', labelEn: 'Booking trends' },
+  { id: 'servicePerformance', labelAr: 'أداء الخدمات', labelEn: 'Service performance' },
+  { id: 'employeePerformance', labelAr: 'أداء الموظفين', labelEn: 'Employee performance' },
+  { id: 'peakHours', labelAr: 'ساعات الذروة', labelEn: 'Peak hours' },
+  { id: 'customerAnalytics', labelAr: 'تحليلات العملاء', labelEn: 'Customer analytics' },
+  { id: 'discounts', labelAr: 'تقرير الخصومات', labelEn: 'Discounts report' },
+  { id: 'refunds', labelAr: 'تقرير الاستردادات', labelEn: 'Refunds report' },
+  { id: 'paymentMethods', labelAr: 'طرق الدفع', labelEn: 'Payment methods' },
+  { id: 'customerSales', labelAr: 'مبيعات العملاء', labelEn: 'Customer sales' },
 ] as const;
 
 export type ReportSectionId = (typeof SECTION_OPTIONS)[number]['id'];
 
 export default function GenerateReportPage() {
-  const t = useTranslations('Reports');
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'ar';
@@ -101,7 +103,7 @@ export default function GenerateReportPage() {
                       onChange={() => toggleSection(opt.id)}
                       className="rounded border-gray-300"
                     />
-                    <span className="text-gray-700 font-medium">{locale === 'ar' ? t(opt.labelKey) : opt.labelEn}</span>
+                    <span className="text-gray-700 font-medium">{locale === 'ar' ? opt.labelAr : opt.labelEn}</span>
                   </label>
                 ))}
               </div>
