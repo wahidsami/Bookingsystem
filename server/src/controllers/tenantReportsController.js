@@ -7,6 +7,7 @@ const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const {
     generateReportPdfBuffer,
+    generateFallbackReportPdfBuffer,
     resolveUploadPath,
     sanitizeFileNamePart
 } = require('../services/tenantReportPdfService');
@@ -947,7 +948,14 @@ function runHandler(handler, req) {
         const res = {
             json(body) { resolve(body); },
             status() { return this; },
-            send() { resolve(null); }
+            send(body) { resolve(body); },
+            end(body) { resolve(body); },
+            setHeader() { return this; },
+            getHeader() { return null; },
+            sendStatus(statusCode) {
+                resolve({ success: false, statusCode });
+                return this;
+            }
         };
         Promise.resolve(handler(req, res)).catch(reject);
     });
@@ -1603,13 +1611,13 @@ exports.deleteSavedReport = async (req, res) => {
 };
 
 exports.downloadReportPdf = async (req, res) => {
-    try {
-        const tenantId = req.tenantId;
-        const { startDate, endDate, sections: sectionsParam, title } = req.query;
-        const sections = typeof sectionsParam === 'string'
-            ? sectionsParam.split(',').map((section) => section.trim()).filter(Boolean)
-            : [];
+    const tenantId = req.tenantId;
+    const { startDate, endDate, sections: sectionsParam, title } = req.query;
+    const sections = typeof sectionsParam === 'string'
+        ? sectionsParam.split(',').map((section) => section.trim()).filter(Boolean)
+        : [];
 
+    try {
         if (!startDate || !endDate || sections.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -1643,11 +1651,33 @@ exports.downloadReportPdf = async (req, res) => {
         return res.send(buffer);
     } catch (error) {
         console.error('Download report PDF error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to generate report PDF',
-            error: error.message
-        });
+        try {
+            const tenant = await db.Tenant.findByPk(tenantId, {
+                attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
+            });
+            const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+            const fallbackBuffer = await generateFallbackReportPdfBuffer({
+                tenantName,
+                reportTitle: title ? `${title}` : 'Refah Report',
+                startDate,
+                endDate,
+                generatedAt: new Date().toISOString(),
+                errorMessage: error.message,
+                sections
+            });
+            const fileName = `report-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.setHeader('Content-Length', fallbackBuffer.length);
+            return res.send(fallbackBuffer);
+        } catch (fallbackError) {
+            console.error('Fallback report PDF generation failed:', fallbackError);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to generate report PDF',
+                error: fallbackError.message || error.message
+            });
+        }
     }
 };
 

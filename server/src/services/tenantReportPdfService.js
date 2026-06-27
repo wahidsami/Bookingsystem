@@ -106,6 +106,22 @@ function drawSimpleTable(doc, title, columns, rows) {
     doc.y = y + 4;
 }
 
+function drawGenericTable(doc, title, columns, rows) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return;
+    }
+
+    drawSimpleTable(doc, title, columns, rows);
+}
+
+function toMoney(value) {
+    return formatMoney(value);
+}
+
+function safeArray(value) {
+    return Array.isArray(value) ? value : [];
+}
+
 function generateReportPdfBuffer(payload) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -114,109 +130,223 @@ function generateReportPdfBuffer(payload) {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        drawCover(doc, payload);
-        doc.addPage();
+        try {
+            const data = payload?.data || {};
 
-        const overview = payload.data?.overview;
-        if (overview) {
-            drawSectionTitle(doc, 'Overview');
-            drawKeyValueGrid(doc, [
-                ['Total Revenue', formatMoney(overview.totalRevenue)],
-                ['Tenant Revenue', formatMoney(overview.totalTenantRevenue)],
-                ['Net Revenue', formatMoney(overview.netRevenue)],
-                ['Total Bookings', overview.totalBookings || 0],
-                ['Completed Bookings', overview.completedBookings || 0],
-                ['Cancelled Bookings', overview.cancelledBookings || 0],
-                ['No-show Bookings', overview.noShowBookings || 0],
-                ['Unique Customers', overview.uniqueCustomers || 0],
-            ]);
-        }
+            drawCover(doc, payload);
+            doc.addPage();
 
-        if (payload.data?.discounts) {
-            const discounts = payload.data.discounts;
-            drawSectionTitle(doc, 'Discounts');
-            drawKeyValueGrid(doc, [
-                ['Total Discounts', formatMoney(discounts.totalDiscountAmount)],
-                ['Booking Discounts', formatMoney(discounts.appointmentDiscountAmount)],
-                ['Order Discounts', formatMoney(discounts.orderDiscountAmount)],
-                ['Average Discount', formatMoney(discounts.averageDiscountAmount)],
-            ]);
+            const overview = data.overview;
+            if (overview) {
+                drawSectionTitle(doc, 'Overview');
+                drawKeyValueGrid(doc, [
+                    ['Total Revenue', toMoney(overview.totalRevenue)],
+                    ['Tenant Revenue', toMoney(overview.totalTenantRevenue)],
+                    ['Net Revenue', toMoney(overview.netRevenue)],
+                    ['Total Bookings', overview.totalBookings || 0],
+                    ['Completed Bookings', overview.completedBookings || 0],
+                    ['Cancelled Bookings', overview.cancelledBookings || 0],
+                    ['No-show Bookings', overview.noShowBookings || 0],
+                    ['Unique Customers', overview.uniqueCustomers || 0],
+                ]);
+            }
 
-            if (Array.isArray(discounts.topDiscountedServices) && discounts.topDiscountedServices.length > 0) {
-                drawSimpleTable(
+            if (data.dailyRevenue?.length) {
+                drawGenericTable(
+                    doc,
+                    'Daily Revenue',
+                    ['Date', 'Bookings', 'Orders', 'Revenue', 'Tenant Revenue'],
+                    data.dailyRevenue.map((row) => [
+                        row.date || '-',
+                        row.bookings ?? 0,
+                        row.orders ?? 0,
+                        toMoney(row.revenue),
+                        toMoney(row.tenantRevenue),
+                    ])
+                );
+            }
+
+            if (data.bookingTrends?.length) {
+                drawGenericTable(
+                    doc,
+                    'Booking Trends',
+                    ['Date', 'Bookings', 'Completed', 'Revenue'],
+                    data.bookingTrends.map((row) => [
+                        row.date || '-',
+                        row.bookings ?? 0,
+                        row.completed ?? 0,
+                        toMoney(row.revenue),
+                    ])
+                );
+            }
+
+            if (data.paymentMethods?.rows?.length) {
+                drawGenericTable(
+                    doc,
+                    'Payment Methods',
+                    ['Method', 'Revenue', 'Transactions'],
+                    data.paymentMethods.rows.map((row) => [
+                        row.paymentMethodLabel || row.paymentMethod || '-',
+                        toMoney(row.revenue),
+                        row.transactionCount ?? 0,
+                    ])
+                );
+            }
+
+            if (data.refunds?.rows?.length) {
+                drawGenericTable(
+                    doc,
+                    'Refunds',
+                    ['Date', 'Customer', 'Reference', 'Amount', 'Method'],
+                    data.refunds.rows.map((row) => [
+                        row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-',
+                        row.customer || '-',
+                        row.reference || '-',
+                        toMoney(row.amount),
+                        row.paymentMethodLabel || '-',
+                    ])
+                );
+            }
+
+            if (data.customerSales?.rows?.length) {
+                drawGenericTable(
+                    doc,
+                    'Customer Sales',
+                    ['Customer', 'Bookings', 'Completed', 'Revenue'],
+                    data.customerSales.rows.map((row) => [
+                        row.customerName || row.customer || row.name || '-',
+                        row.bookings ?? 0,
+                        row.completed ?? 0,
+                        toMoney(row.revenue),
+                    ])
+                );
+            }
+
+            if (data.rebookings?.rows?.length) {
+                drawGenericTable(
+                    doc,
+                    'Rebookings',
+                    ['Date', 'Customer', 'Reference', 'Revenue'],
+                    data.rebookings.rows.map((row) => [
+                        row.date ? new Date(row.date).toLocaleDateString('en-GB') : '-',
+                        row.customer || row.customerName || '-',
+                        row.reference || '-',
+                        toMoney(row.revenue ?? row.amount),
+                    ])
+                );
+            }
+
+            if (data.discounts) {
+                const discounts = data.discounts;
+                drawSectionTitle(doc, 'Discounts');
+                drawKeyValueGrid(doc, [
+                    ['Total Discounts', toMoney(discounts.totalDiscountAmount)],
+                    ['Booking Discounts', toMoney(discounts.appointmentDiscountAmount)],
+                    ['Order Discounts', toMoney(discounts.orderDiscountAmount)],
+                    ['Average Discount', toMoney(discounts.averageDiscountAmount)],
+                ]);
+
+                drawGenericTable(
                     doc,
                     'Top Discounted Services',
                     ['Service', 'Bookings', 'Discount'],
-                    discounts.topDiscountedServices.map((service) => [
+                    safeArray(discounts.topDiscountedServices).map((service) => [
                         service.name_en || service.name_ar || '-',
                         service.bookingCount ?? 0,
-                        formatMoney(service.discountAmount),
+                        toMoney(service.discountAmount),
                     ])
                 );
-            }
 
-            if (Array.isArray(discounts.topDiscountedOrders) && discounts.topDiscountedOrders.length > 0) {
-                drawSimpleTable(
+                drawGenericTable(
                     doc,
                     'Top Discounted Orders',
                     ['Order', 'Base Amount', 'Discount'],
-                    discounts.topDiscountedOrders.map((order) => [
+                    safeArray(discounts.topDiscountedOrders).map((order) => [
                         order.orderNumber || order.id || '-',
-                        formatMoney(order.baseAmount),
-                        formatMoney(order.discountAmount),
+                        toMoney(order.baseAmount),
+                        toMoney(order.discountAmount),
                     ])
                 );
             }
-        }
 
-        if (Array.isArray(payload.data?.employees)) {
-            drawSimpleTable(
+            drawGenericTable(
                 doc,
                 'Employee Revenue',
                 ['Employee', 'Bookings', 'Revenue', 'Commission'],
-                payload.data.employees.map((e) => [
-                    e.name,
+                safeArray(data.employees).map((e) => [
+                    e.name || '-',
                     e.totalBookings ?? 0,
-                    formatMoney(e.totalRevenueGenerated),
-                    formatMoney(e.totalCommission),
+                    toMoney(e.totalRevenueGenerated ?? e.revenue),
+                    toMoney(e.totalCommission),
                 ])
             );
-        }
 
-        if (Array.isArray(payload.data?.services)) {
-            drawSimpleTable(
+            drawGenericTable(
                 doc,
                 'Service Revenue',
                 ['Service', 'Bookings', 'Revenue', 'Tenant Revenue'],
-                payload.data.services.map((s) => [
-                    s.name_en || s.name_ar,
+                safeArray(data.services).map((s) => [
+                    s.name_en || s.name_ar || '-',
                     s.totalBookings ?? 0,
-                    formatMoney(s.totalRevenue),
-                    formatMoney(s.totalTenantRevenue),
+                    toMoney(s.totalRevenue),
+                    toMoney(s.totalTenantRevenue),
                 ])
             );
-        }
 
-        if (Array.isArray(payload.data?.products)) {
-            drawSimpleTable(
+            drawGenericTable(
                 doc,
                 'Product Revenue',
                 ['Product', 'Orders', 'Quantity', 'Revenue'],
-                payload.data.products.map((p) => [
-                    p.name_en || p.name_ar,
+                safeArray(data.products).map((p) => [
+                    p.name_en || p.name_ar || '-',
                     p.totalOrders ?? 0,
                     p.totalQuantity ?? 0,
-                    formatMoney(p.totalRevenue),
+                    toMoney(p.totalRevenue),
                 ])
             );
-        }
 
-        doc.end();
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function generateFallbackReportPdfBuffer(payload) {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const chunks = [];
+        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        try {
+            drawCover(doc, payload);
+            doc.addPage();
+            drawSectionTitle(doc, 'Report summary');
+            drawKeyValueGrid(doc, [
+                ['Tenant', payload.tenantName || 'Tenant'],
+                ['Report', payload.reportTitle || 'Business Report'],
+                ['Period', `${payload.startDate || '-'} -> ${payload.endDate || '-'}`],
+                ['Generated at', payload.generatedAt || '-'],
+                ['Selected sections', Array.isArray(payload.sections) ? payload.sections.join(', ') : '-'],
+            ]);
+            if (payload.errorMessage) {
+                drawSectionTitle(doc, 'Export notice');
+                doc.fontSize(11).fillColor('#6B7280').text(
+                    `The report data loaded, but PDF rendering hit a recovery path: ${payload.errorMessage}`
+                );
+            }
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 
 module.exports = {
     generateReportPdfBuffer,
+    generateFallbackReportPdfBuffer,
     resolveUploadPath,
     sanitizeFileNamePart,
 };

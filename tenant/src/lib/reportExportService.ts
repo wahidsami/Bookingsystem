@@ -164,7 +164,7 @@ function downloadBlob(blob: Blob, filename: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function buildFileName(payload: ReportExportPayload, extension: 'csv' | 'xls') {
@@ -208,7 +208,7 @@ export function exportCsv(payload: ReportExportPayload) {
 export function exportExcel(payload: ReportExportPayload) {
   if (typeof document === 'undefined') return false;
   const html = buildExcelHtml(payload);
-  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
   downloadBlob(blob, buildFileName(payload, 'xls'));
   return true;
 }
