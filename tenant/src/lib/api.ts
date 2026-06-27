@@ -1157,8 +1157,12 @@ class TenantApiClient {
       dateOfBirth?: string | null;
     } | null;
     assignmentMode?: string;
+    notifyCustomer?: boolean;
   }): Promise<any> {
-    return this.post('/tenant/appointments', data);
+    return this.post('/tenant/appointments', {
+      ...data,
+      notifyCustomer: data.notifyCustomer ?? true
+    });
   }
 
   /**
@@ -1323,7 +1327,7 @@ class TenantApiClient {
   async updateAppointmentStatus(id: string, status: string, notes?: string): Promise<any> {
     return this.request(`/tenant/appointments/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status, notes })
+      body: JSON.stringify({ status, notes, notifyCustomer: true })
     });
   }
 
@@ -1366,7 +1370,10 @@ class TenantApiClient {
     id: string,
     data: { staffId: string; startTime: string; notifyCustomer?: boolean }
   ): Promise<any> {
-    return this.patch(`/tenant/appointments/${id}/reassign-reschedule`, data);
+    return this.patch(`/tenant/appointments/${id}/reassign-reschedule`, {
+      ...data,
+      notifyCustomer: data.notifyCustomer ?? true
+    });
   }
 
   /**
@@ -1489,11 +1496,14 @@ class TenantApiClient {
    */
   async rescheduleAppointment(
     id: string,
-    data: { startTime: string; staffId?: string }
+    data: { startTime: string; staffId?: string; notifyCustomer?: boolean }
   ): Promise<any> {
     return this.request(`/tenant/appointments/${id}/reschedule`, {
       method: 'PATCH',
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        ...data,
+        notifyCustomer: data.notifyCustomer ?? true
+      })
     });
   }
 

@@ -1466,6 +1466,7 @@ export function AppointmentActionDrawer({
           })()
         } : undefined,
         platformUserId: resolvedCustomerMode === "existing" ? selectedCustomer?.id : undefined,
+        notifyCustomer: true,
         customer: resolvedCustomerMode === "new" || resolvedCustomerMode === "guest"
           ? {
               ...newCustomer,

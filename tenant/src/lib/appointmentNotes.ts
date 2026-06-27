@@ -6,6 +6,18 @@ export type GroupGuestMeta = {
   isFree?: boolean | null;
 };
 
+export type AppointmentGuestCard = {
+  id: string;
+  fullName: string;
+  phone?: string | null;
+  email?: string | null;
+  serviceName?: string | null;
+  servicePrice?: number | null;
+  isFree?: boolean | null;
+  staffName?: string | null;
+  source: "session" | "notes";
+};
+
 const GROUP_GUEST_MARKER = "[GROUP_GUEST]";
 const RESCHEDULE_AUDIT_MARKER = "[RESCHEDULE_AUDIT]";
 const CANCELLATION_AUDIT_MARKER = "[CANCELLATION_AUDIT]";
@@ -55,4 +67,99 @@ export function sanitizeAppointmentNotes(notes?: string | null): string {
     .filter((line) => line.trim().length > 0 && !SYSTEM_MARKERS.some((marker) => line.includes(marker)))
     .join("\n")
     .trim();
+}
+
+export function extractAppointmentGuestCards(appointment?: {
+  notes?: string | null;
+  user?: {
+    id?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+  bookingSession?: {
+    appointments?: Array<{
+      id?: string | null;
+      bookingItemIndex?: number | null;
+      price?: number | null;
+      status?: string | null;
+      paymentStatus?: string | null;
+      notes?: string | null;
+      service?: {
+        id?: string | null;
+        name_en?: string | null;
+        name_ar?: string | null;
+      } | null;
+      staff?: {
+        name?: string | null;
+      } | null;
+      user?: {
+        id?: string | null;
+        firstName?: string | null;
+        lastName?: string | null;
+        email?: string | null;
+        phone?: string | null;
+      } | null;
+    }> | null;
+  } | null;
+}): AppointmentGuestCard[] {
+  const primaryUserId = `${appointment?.user?.id || ""}`.trim();
+  const sessionAppointments = Array.isArray(appointment?.bookingSession?.appointments)
+    ? appointment.bookingSession?.appointments || []
+    : [];
+  const guestCards: AppointmentGuestCard[] = [];
+
+  sessionAppointments.forEach((sessionAppointment, index) => {
+    const sessionUser = sessionAppointment.user || null;
+    const sessionUserId = `${sessionUser?.id || ""}`.trim();
+    const isGuestSession =
+      (primaryUserId && sessionUserId && sessionUserId !== primaryUserId) ||
+      (!primaryUserId && sessionAppointments.length > 1 && index > 0);
+
+    if (!isGuestSession) {
+      return;
+    }
+
+    const fullName = `${sessionUser?.firstName || ""} ${sessionUser?.lastName || ""}`.trim();
+    const notesGuest = parseGroupGuestFromNotes(sessionAppointment.notes || appointment?.notes || "");
+    const serviceName = `${sessionAppointment.service?.name_en || sessionAppointment.service?.name_ar || notesGuest?.serviceName || ""}`.trim();
+    const safeName = fullName || notesGuest?.fullName || serviceName || (index > 0 ? `Guest ${index}` : "Guest");
+    const resolvedPrice = Number(sessionAppointment.price || 0);
+
+    guestCards.push({
+      id: `${sessionAppointment.id || `session-guest-${index}`}`,
+      fullName: safeName,
+      phone: sessionUser?.phone || notesGuest?.phone || null,
+      email: sessionUser?.email || null,
+      serviceName: serviceName || notesGuest?.serviceName || null,
+      servicePrice: Number.isFinite(resolvedPrice) ? resolvedPrice : null,
+      isFree: notesGuest?.isFree === true || resolvedPrice <= 0,
+      staffName: sessionAppointment.staff?.name || null,
+      source: "session"
+    });
+  });
+
+  if (guestCards.length > 0) {
+    return guestCards;
+  }
+
+  const parsedGuest = parseGroupGuestFromNotes(appointment?.notes);
+  if (!parsedGuest) {
+    return [];
+  }
+
+  return [
+    {
+      id: "notes-guest",
+      fullName: parsedGuest.fullName,
+      phone: parsedGuest.phone || null,
+      email: null,
+      serviceName: parsedGuest.serviceName || null,
+      servicePrice: null,
+      isFree: parsedGuest.isFree || false,
+      staffName: null,
+      source: "notes"
+    }
+  ];
 }

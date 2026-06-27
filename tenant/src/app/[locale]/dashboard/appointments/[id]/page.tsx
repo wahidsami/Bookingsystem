@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Currency } from "@/components/Currency";
 import Link from "next/link";
-import { parseGroupGuestFromNotes, sanitizeAppointmentNotes } from "@/lib/appointmentNotes";
+import { extractAppointmentGuestCards, sanitizeAppointmentNotes } from "@/lib/appointmentNotes";
 
 function avatarUrl(path: string | undefined): string {
   if (!path) return "";
@@ -473,7 +473,7 @@ export default function AppointmentDetailsPage() {
     ? `${appointment.user.firstName} ${appointment.user.lastName}`.trim()
     : t("unknownCustomer");
   const cleanNotes = sanitizeAppointmentNotes(appointment.notes || "");
-  const groupGuest = parseGroupGuestFromNotes(appointment.notes || "");
+  const guestCards = extractAppointmentGuestCards(appointment);
 
   return (
     <TenantLayout>
@@ -682,19 +682,59 @@ export default function AppointmentDetailsPage() {
               </p>
             </div>
           )}
-          {groupGuest && (
+          {guestCards.length > 0 && (
             <div className="card">
               <h3 className="text-xl font-semibold text-gray-900 mb-4" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details"}
+                {guestCards.length > 1
+                  ? (locale === "ar" ? "بيانات الضيوف" : "Guest details")
+                  : (locale === "ar" ? "بيانات الضيف الإضافي" : "Additional guest details")}
               </h3>
-              <p className="text-gray-800 font-semibold" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                {groupGuest.fullName}
-              </p>
-              {groupGuest.phone && (
-                <p className="text-gray-600 mt-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  {groupGuest.phone}
-                </p>
-              )}
+              <div className="space-y-3">
+                {guestCards.map((guest, index) => (
+                  <div key={`${guest.id}-${index}`} className="rounded-3xl border border-fuchsia-200 bg-fuchsia-50 p-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-base font-semibold text-gray-900">{guest.fullName}</p>
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200">
+                            {guest.isFree ? (locale === "ar" ? "مجاني" : "Free") : (locale === "ar" ? "مدفوع" : "Paid")}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                          {guest.phone ? <span className="rounded-full bg-white px-3 py-1 font-semibold ring-1 ring-gray-200">{guest.phone}</span> : null}
+                          {guest.email ? <span className="rounded-full bg-white px-3 py-1 font-semibold ring-1 ring-gray-200">{guest.email}</span> : null}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fuchsia-700">
+                          {locale === "ar" ? "السعر" : "Price"}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-fuchsia-800">
+                          {guest.isFree ? (locale === "ar" ? "مجاني" : "Free") : <Currency amount={Number(guest.servicePrice || 0)} />}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-white bg-white px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                          {locale === "ar" ? "الخدمة" : "Service"}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">
+                          {guest.serviceName || (locale === "ar" ? "غير محددة" : "Not set")}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-white bg-white px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                          {locale === "ar" ? "الموظف" : "Provider"}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">
+                          {guest.staffName || (locale === "ar" ? "تعيين تلقائي" : "Auto assign")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
