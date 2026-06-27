@@ -3477,7 +3477,7 @@ export function AppointmentDetailsDrawer({
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <aside
-        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl lg:top-[88px] lg:h-[calc(100dvh-88px)] lg:max-w-[72rem] 2xl:max-w-[80rem]`}
+        className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} h-full w-full max-w-[60rem] bg-white shadow-2xl lg:top-[88px] lg:h-[calc(100dvh-88px)] lg:w-[88vw] lg:max-w-[88vw] 2xl:w-[84vw] 2xl:max-w-[84vw]`}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <div className="flex h-full flex-col overflow-hidden">
