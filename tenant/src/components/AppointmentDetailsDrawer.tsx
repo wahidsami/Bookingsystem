@@ -1474,8 +1474,7 @@ export function AppointmentDetailsDrawer({
   const renderAppointmentWorkspace = () => {
     if (!appointment) return null;
 
-    const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
-    const currentStatusOptions = getManualStatusOptions(appointment.status);
+  const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
     const appointmentDateTime = new Date(appointment.startTime);
     const appointmentEndDateTime = new Date(appointment.endTime);
     const durationMinutes = Math.max(
@@ -1898,11 +1897,10 @@ export function AppointmentDetailsDrawer({
             <div className="mt-4 flex items-center gap-2">
               <button
                 type="button"
-                onClick={toggleMoreActionsMenu}
-                ref={moreActionsButtonRef}
+                onClick={openCustomerWorkspace}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
               >
-                {locale === "ar" ? "إجراءات" : "Actions"}
+                {locale === "ar" ? "الملف" : "Workspace"}
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                   <path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -1915,46 +1913,6 @@ export function AppointmentDetailsDrawer({
                 {locale === "ar" ? "الملف" : "Profile"}
               </button>
             </div>
-            {moreActionsOpen && moreActionsMenuStyle ? (
-              <div
-                id="appointment-more-actions-menu"
-                className="fixed z-[9999] w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
-                style={{
-                  top: `${moreActionsMenuStyle.top}px`,
-                  left: moreActionsMenuStyle.left != null ? `${moreActionsMenuStyle.left}px` : undefined,
-                  right: moreActionsMenuStyle.right != null ? `${moreActionsMenuStyle.right}px` : undefined
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => triggerMoreAction("rebook")}
-                  className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  {locale === "ar" ? "إعادة الحجز" : "Rebook"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerMoreAction("reschedule")}
-                  className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerMoreAction("mark_refunded")}
-                  className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  {locale === "ar" ? "إرجاع المبلغ" : "Refund"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerMoreAction("open_full_page")}
-                  className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
-                </button>
-              </div>
-            ) : null}
               </div>
             </div>
 
@@ -1991,7 +1949,126 @@ export function AppointmentDetailsDrawer({
           </aside>
 
           <section className="min-h-0 overflow-y-auto pr-1">
-            <div className="space-y-3 pb-4">
+            <div className="sticky top-0 z-30 -mx-3 border-b border-gray-200 bg-white/95 px-3 py-3 backdrop-blur lg:-mx-4 lg:px-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-[180px]">
+                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {locale === "ar" ? "الحالة" : "Status"}
+                    </label>
+                    <select
+                      value={appointment.status}
+                      disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
+                      onChange={(event) => {
+                        const nextStatus = event.target.value as AppointmentItem["status"];
+                        if (nextStatus === appointment.status) return;
+                        if (nextStatus === "checked_in" && paymentDueAmount > 0) {
+                          setPendingStatusAfterPayment("checked_in");
+                          openPaymentCollection(currentPaymentStatus === "deposit_paid" ? "remainder" : "full", "checked_in");
+                          setActionNotice({
+                            kind: "success",
+                            message: locale === "ar"
+                              ? "أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول."
+                              : "Collect payment first, then we will mark the appointment as arrived."
+                          });
+                          return;
+                        }
+                        void handleQuickStatusUpdate(nextStatus);
+                      }}
+                      className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {getManualStatusOptions(appointment.status).map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="hidden h-11 w-px bg-gray-200 sm:block" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRebook}
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إعادة الحجز" : "Rebook"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReschedule}
+                      className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handlePayNow()}
+                      className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      {locale === "ar" ? "الدفع" : "Checkout"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleMoreActionsMenu}
+                      ref={moreActionsButtonRef}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                    >
+                      {locale === "ar" ? "إجراءات سريعة" : "Quick actions"}
+                      <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  {locale === "ar" ? "إغلاق" : "Close"}
+                </button>
+              </div>
+              {moreActionsOpen && moreActionsMenuStyle ? (
+                <div
+                  id="appointment-more-actions-menu"
+                  className="fixed z-[9999] w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+                  style={{
+                    top: `${moreActionsMenuStyle.top}px`,
+                    left: moreActionsMenuStyle.left != null ? `${moreActionsMenuStyle.left}px` : undefined,
+                    right: moreActionsMenuStyle.right != null ? `${moreActionsMenuStyle.right}px` : undefined
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => triggerMoreAction("rebook")}
+                    className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إعادة الحجز" : "Rebook"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerMoreAction("reschedule")}
+                    className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إعادة الجدولة" : "Reschedule"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerMoreAction("mark_refunded")}
+                    className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "إرجاع المبلغ" : "Refund"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerMoreAction("open_full_page")}
+                    className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {locale === "ar" ? "فتح الصفحة الكاملة" : "Open full page"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-3 pb-4 pt-3">
               <WorkspacePanel
                 title={locale === "ar" ? "تفاصيل الموعد" : "Appointment details"}
                 subtitle={appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}
@@ -2031,47 +2108,28 @@ export function AppointmentDetailsDrawer({
                     ) : null}
                   </div>
 
-                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
-                    <div className="min-w-0">
+                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-3">
+                    <div className="min-w-0 rounded-2xl border border-gray-200 bg-white p-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                         {locale === "ar" ? "تاريخ الخدمة" : "Service date"}
                       </p>
                       <p className="mt-1 truncate text-sm font-semibold text-gray-900">{appointmentDateLabel}</p>
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 rounded-2xl border border-gray-200 bg-white p-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                        {locale === "ar" ? "الحالة" : "Status"}
+                        {locale === "ar" ? "الحالة الحالية" : "Current status"}
                       </p>
-                      <select
-                        value={appointment.status}
-                        disabled={statusUpdating || ["completed", "cancelled", "no_show"].includes(appointment.status)}
-                        onChange={(event) => {
-                          const nextStatus = event.target.value as AppointmentItem["status"];
-                          if (nextStatus === appointment.status) return;
-                          if (nextStatus === "checked_in" && paymentDueAmount > 0) {
-                            setPendingStatusAfterPayment("checked_in");
-                            openPaymentCollection(currentPaymentStatus === "deposit_paid" ? "remainder" : "full", "checked_in");
-                            setActionNotice({
-                              kind: "success",
-                              message: locale === "ar"
-                                ? "أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول."
-                                : "Collect payment first, then we will mark the appointment as arrived."
-                            });
-                            return;
-                          }
-                          if (nextStatus === "confirmed" || nextStatus === "checked_in" || nextStatus === "in_service" || nextStatus === "completed" || nextStatus === "no_show" || nextStatus === "cancelled") {
-                            void handleQuickStatusUpdate(nextStatus);
-                            return;
-                          }
-                        }}
-                        className="mt-1 w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {currentStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      <p className="mt-2 inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                        {getStatusLabel(appointment.status, locale)}
+                      </p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-gray-200 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {locale === "ar" ? "الحالة المالية" : "Payment status"}
+                      </p>
+                      <p className="mt-2 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                        {getPaymentStatusLabel(currentPaymentStatus, locale)}
+                      </p>
                     </div>
                   </div>
                 </div>
