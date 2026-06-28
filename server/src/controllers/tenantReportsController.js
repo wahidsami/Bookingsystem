@@ -1100,8 +1100,12 @@ async function buildFullReportData(req, sections, startDate, endDate) {
                 }
                 if (sections.includes('discounts') && overview.discountTotals) {
                     result.discounts = overview.discountTotals;
-                }
-            }
+    }
+}
+
+function getTenantDisplayName(tenant) {
+    return tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+}
         });
     }
 
@@ -1669,11 +1673,11 @@ exports.downloadReportPdf = async (req, res) => {
         }
 
         const tenant = await db.Tenant.findByPk(tenantId, {
-            attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
+            attributes: ['id', 'name', 'name_en', 'name_ar', 'logo']
         });
 
         const data = safePlainClone(await buildFullReportData(req, sections, startDate, endDate));
-        const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+        const tenantName = getTenantDisplayName(tenant);
         const tenantLogoPath = resolveUploadPath(tenant?.logo);
         const generatedAt = new Date().toISOString();
 
@@ -1696,9 +1700,9 @@ exports.downloadReportPdf = async (req, res) => {
         console.error('Download report PDF error:', error);
         try {
             const tenant = await db.Tenant.findByPk(tenantId, {
-                attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
+                attributes: ['id', 'name', 'name_en', 'name_ar', 'logo']
             });
-            const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+            const tenantName = getTenantDisplayName(tenant);
             const fallbackBuffer = await generateFallbackReportPdfBuffer({
                 tenantName,
                 reportTitle: title ? `${title}` : 'Refah Report',
@@ -1717,9 +1721,9 @@ exports.downloadReportPdf = async (req, res) => {
             console.error('Fallback report PDF generation failed:', fallbackError);
             try {
                 const tenant = await db.Tenant.findByPk(tenantId, {
-                    attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'logo']
                 });
-                const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+                const tenantName = getTenantDisplayName(tenant);
                 const emergencyBuffer = await generateEmergencyReportPdfBuffer({
                     tenantName,
                     reportTitle: title ? `${title}` : 'Refah Report',
