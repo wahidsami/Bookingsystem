@@ -380,6 +380,18 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
             where: historyAppointmentWhere,
             include: [
                 {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'tenantId', 'name_en', 'name_ar', 'rawPrice'],
+                    required: false
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'tenantId', 'name', 'commissionRate', 'isActive'],
+                    required: false
+                },
+                {
                     model: db.PlatformUser,
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
