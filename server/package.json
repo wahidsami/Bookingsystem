@@ -7,6 +7,7 @@
         "start": "node src/index.js",
         "dev": "nodemon src/index.js",
         "test": "jest",
+        "test:report-export": "jest src/services/tenantReportPdfService.test.js",
         "import:tenant-seed": "node import-tenant-seed.js"
     },
     "keywords": [],
