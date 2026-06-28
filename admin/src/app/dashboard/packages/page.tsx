@@ -68,6 +68,7 @@ function getKeyLimitsList(limits: any): { label: string; value: string }[] {
     // Numeric features — only list if > 0 (included)
     if (isIncludedNum(limits.whatsappNotifications)) list.push({ label: 'WhatsApp notifications', value: `${limits.whatsappNotifications} /mo` });
     if (isIncludedNum(limits.inAppMarketingNotifications)) list.push({ label: 'In-app marketing', value: `${limits.inAppMarketingNotifications} /mo` });
+    if (limits.aiConsultant === true) list.push({ label: 'AI Consultant', value: 'Included' });
     if (isIncludedNum(limits.aiContentAssistant)) list.push({ label: 'AI content assistant', value: `${limits.aiContentAssistant} tokens` });
     if (isIncludedNum(limits.promotionalEmails)) list.push({ label: 'Promotional emails', value: `${limits.promotionalEmails} /mo` });
     if (isIncludedNum(limits.searchRankingBoost)) list.push({ label: 'Search ranking boost', value: `${limits.searchRankingBoost} /mo` });

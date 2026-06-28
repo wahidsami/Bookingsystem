@@ -38,6 +38,12 @@ export function hasAIAssistantEntitlement(entitlements: PackageEntitlements): bo
   );
 }
 
+export function hasAIConsultantEntitlement(entitlements: PackageEntitlements): boolean {
+  return isEntitlementEnabled(
+    firstDefinedEntitlement(entitlements, ["aiConsultant", "ai_consultant", "hasAIConsultant"])
+  );
+}
+
 export function hasProductsAndOrdersEntitlement(entitlements: PackageEntitlements): boolean {
   return isEntitlementEnabled(
     firstDefinedEntitlement(entitlements, ["hasProductsAndOrders", "productsAndOrders", "maxProducts"])

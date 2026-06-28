@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { TenantLayout } from "@/components/TenantLayout";
 import { tenantApi } from "@/lib/api";
+import { hasAIConsultantEntitlement } from "@/lib/packageEntitlements";
 
 type ConsultantTabId = "chat" | "reports" | "settings";
 type ConsultantLanguage = "ar" | "en";
@@ -182,7 +183,15 @@ const ui = {
     errorPrefix: "We could not load the consultant workspace.",
     openReports: "Open reports",
     openSettings: "Open settings",
-    activeHistory: "Current focus"
+    activeHistory: "Current focus",
+    premiumTitle: "AI Consultant is not included in your subscription.",
+    premiumDescription: "Upgrade your package to unlock AI business advisor insights, daily executive briefings, operational alerts, growth recommendations, and predictive insights.",
+    premiumUpgrade: "Upgrade package",
+    accessDenied: "AI Consultant is not included in your package.",
+    automaticBriefings: "Automatic briefings",
+    automaticBriefingsHelp: "This controls automation only. Manual analysis always works when the package includes AI Consultant.",
+    automaticBriefingsEnabled: "Automatic briefings are enabled.",
+    automaticBriefingsDisabled: "Automatic briefings are disabled in settings."
   },
   ar: {
     eyebrow: "مستشار ذكي",
@@ -249,7 +258,15 @@ const ui = {
     errorPrefix: "تعذر تحميل مساحة المستشار.",
     openReports: "فتح التقارير",
     openSettings: "فتح الإعدادات",
-    activeHistory: "العنصر الحالي"
+    activeHistory: "العنصر الحالي",
+    premiumTitle: "مستشار الذكاء الاصطناعي غير مشمول في اشتراكك.",
+    premiumDescription: "قم بترقية باقتك لفتح رؤى المستشار التنفيذي، والملخصات اليومية، والتنبيهات التشغيلية، وتوصيات النمو، والرؤى التنبؤية.",
+    premiumUpgrade: "ترقية الباقة",
+    accessDenied: "مستشار الذكاء الاصطناعي غير مشمول في باقتك.",
+    automaticBriefings: "الملخصات التلقائية",
+    automaticBriefingsHelp: "هذا الخيار يتحكم في الأتمتة فقط. التحليل اليدوي يعمل دائماً عندما تتضمن الباقة مستشار الذكاء الاصطناعي.",
+    automaticBriefingsEnabled: "الملخصات التلقائية مفعلة.",
+    automaticBriefingsDisabled: "الملخصات التلقائية معطلة في الإعدادات."
   }
 } as const;
 
@@ -901,6 +918,8 @@ export default function ConsultantPage() {
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [consultantAccess, setConsultantAccess] = useState<boolean | null>(null);
+  const [automaticBriefingsEnabled, setAutomaticBriefingsEnabled] = useState(false);
   const [consultantPreferences, setConsultantPreferences] = useState<ConsultantCommunicationPreferences>({
     language: isRTL ? "ar" : "en",
     tone: isRTL ? "saudi_executive_style" : "executive_english",
@@ -910,41 +929,60 @@ export default function ConsultantPage() {
 
   useEffect(() => {
     let mounted = true;
-
-    const loadSettings = async () => {
-      try {
-        const response = await tenantApi.getSettings();
-        if (!mounted || !response?.success) return;
-
-        const business = response.data?.business || {};
-        const settings = response.data?.settings || {};
-        const workflow = settings.notificationSettings?.consultantWorkflow || {};
-        const preferences = workflow.communicationPreferences || {};
-        const defaults = getDefaultConsultantPreferences({
-          businessCountry: business.country,
-          defaultLanguage: settings.defaultLanguage
-        });
-
-        setLoadedSettings({
-          businessCountry: business.country,
-          defaultLanguage: settings.defaultLanguage,
-          consultantWorkflow: workflow
-        });
-
-        setConsultantPreferences({
-          language: (preferences.language as ConsultantLanguage) || defaults.language,
-          tone: (preferences.tone as ConsultantTone) || defaults.tone,
-          addressingStyle: (preferences.addressingStyle as ConsultantAddressingStyle) || defaults.addressingStyle
-        });
-      } catch (loadError) {
-        console.error("Failed to load consultant settings:", loadError);
-      }
-    };
-
     const loadWorkspace = async () => {
       try {
         setLoading(true);
         setError(null);
+
+        const limitsResponse = await tenantApi.getSubscriptionLimits().catch((loadError) => {
+          console.error("Failed to load consultant subscription limits:", loadError);
+          return null;
+        });
+
+        if (!mounted) return;
+
+        const consultantEnabled = limitsResponse?.success
+          ? hasAIConsultantEntitlement(limitsResponse.limits)
+          : true;
+
+        setConsultantAccess(consultantEnabled);
+
+        if (!consultantEnabled) {
+          setHistory([]);
+          setSelectedHistoryId(null);
+          return;
+        }
+
+        const settingsResponse = await tenantApi.getSettings().catch((loadError) => {
+          console.error("Failed to load consultant settings:", loadError);
+          return null;
+        });
+
+        if (!mounted) return;
+
+        if (settingsResponse?.success) {
+          const business = settingsResponse.data?.business || {};
+          const settings = settingsResponse.data?.settings || {};
+          const workflow = settings.notificationSettings?.consultantWorkflow || {};
+          const preferences = workflow.communicationPreferences || {};
+          const defaults = getDefaultConsultantPreferences({
+            businessCountry: business.country,
+            defaultLanguage: settings.defaultLanguage
+          });
+
+          setLoadedSettings({
+            businessCountry: business.country,
+            defaultLanguage: settings.defaultLanguage,
+            consultantWorkflow: workflow
+          });
+          setAutomaticBriefingsEnabled(Boolean(workflow.automaticBriefingsEnabled));
+
+          setConsultantPreferences({
+            language: (preferences.language as ConsultantLanguage) || defaults.language,
+            tone: (preferences.tone as ConsultantTone) || defaults.tone,
+            addressingStyle: (preferences.addressingStyle as ConsultantAddressingStyle) || defaults.addressingStyle
+          });
+        }
 
         const [reportsResponse, briefingsResponse] = await Promise.all([
           tenantApi.getConsultantReports({ page: 1, limit: 12 }),
@@ -1000,11 +1038,13 @@ export default function ConsultantPage() {
         console.error("Failed to load consultant workspace:", loadError);
         setError(loadError?.message || (locale === "ar" ? "تعذر تحميل السجل." : "Failed to load consultant workspace."));
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    void Promise.all([loadSettings(), loadWorkspace()]);
+    void loadWorkspace();
 
     return () => {
       mounted = false;
@@ -1087,10 +1127,29 @@ export default function ConsultantPage() {
   };
 
   const runAnalysis = async () => {
+    if (consultantAccess === false) {
+      setError(text.accessDenied);
+      setActiveTab("settings");
+      return;
+    }
+
     try {
       setRunningAnalysis(true);
       setError(null);
-      await tenantApi.runConsultantWorkflow({ force: true });
+      const workflowResponse = await tenantApi.runConsultantWorkflow({ force: true });
+      const workflowResult = workflowResponse?.data?.data ?? workflowResponse?.data ?? workflowResponse;
+
+      if (workflowResult?.allowed === false && workflowResult?.reason === "subscription_required") {
+        setConsultantAccess(false);
+        setError(workflowResponse?.message || text.accessDenied);
+        return;
+      }
+
+      if (workflowResult?.skipped && workflowResult?.reason === "workflow_disabled") {
+        setSettingsMessage(text.automaticBriefingsDisabled);
+        return;
+      }
+
       const [reportsResponse, briefingsResponse] = await Promise.all([
         tenantApi.getConsultantReports({ page: 1, limit: 12 }),
         tenantApi.getConsultantBriefings({ page: 1, limit: 12 })
@@ -1146,6 +1205,7 @@ export default function ConsultantPage() {
       await tenantApi.updateNotificationSettings({
         consultantWorkflow: {
           ...(loadedSettings?.consultantWorkflow || {}),
+          automaticBriefingsEnabled,
           communicationPreferences: consultantPreferences
         }
       });
@@ -1184,25 +1244,85 @@ export default function ConsultantPage() {
               <p className="mt-2 text-sm leading-7 text-gray-600">{text.subtitle}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={runAnalysis}
-                disabled={runningAnalysis}
-                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {runningAnalysis ? text.running : text.newAnalysis}
-              </button>
-              <button
-                type="button"
-                onClick={() => void runAnalysis()}
-                className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-              >
-                {text.refreshHistory}
-              </button>
+              {consultantAccess === false ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/${locale}/dashboard/subscription`)}
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+                >
+                  {text.premiumUpgrade}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={runAnalysis}
+                    disabled={runningAnalysis}
+                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {runningAnalysis ? text.running : text.newAnalysis}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runAnalysis()}
+                    className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {text.refreshHistory}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </section>
 
+        {consultantAccess === false ? (
+          <section className="rounded-[2rem] border border-gray-200 bg-white p-8 shadow-sm">
+            <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-lg">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">{text.eyebrow}</p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight">{text.premiumTitle}</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-white/75">{text.premiumDescription}</p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/${locale}/dashboard/subscription`)}
+                    className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-gray-100"
+                  >
+                    {text.premiumUpgrade}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/${locale}/dashboard/subscription`)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    {locale === "ar" ? "عرض الاشتراك" : "View subscription"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-[2rem] border border-gray-200 bg-gray-50 p-6">
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+                  {text.accessDenied}
+                </div>
+                <div className="rounded-3xl border border-gray-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.suggestedQuestions}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {suggestedQuestions.map((question) => (
+                      <button
+                        key={question}
+                        type="button"
+                        onClick={() => router.push(`/${locale}/dashboard/subscription`)}
+                        className="rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : (
         <section className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-4 rounded-[2rem] border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:h-fit">
             <div className="space-y-2">
@@ -1430,6 +1550,20 @@ export default function ConsultantPage() {
                       <h3 className="text-lg font-bold text-gray-900">
                         {locale === "ar" ? "تفضيلات التواصل" : "Communication preferences"}
                       </h3>
+                      <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                        <label className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={automaticBriefingsEnabled}
+                            onChange={(event) => setAutomaticBriefingsEnabled(event.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <span className="space-y-1">
+                            <span className="block text-sm font-semibold text-gray-900">{text.automaticBriefings}</span>
+                            <span className="block text-sm leading-6 text-gray-600">{text.automaticBriefingsHelp}</span>
+                          </span>
+                        </label>
+                      </div>
                       <div className="mt-5 grid gap-4 md:grid-cols-3">
                         <label className="space-y-2">
                           <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.language}</span>
@@ -1562,6 +1696,7 @@ export default function ConsultantPage() {
             </div>
           </main>
         </section>
+        )}
       </div>
     </TenantLayout>
   );

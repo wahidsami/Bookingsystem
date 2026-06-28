@@ -26,6 +26,7 @@ const DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES = Object.freeze({
 
 const DEFAULT_CONSULTANT_WORKFLOW_SETTINGS = Object.freeze({
     enabled: false,
+    automaticBriefingsEnabled: false,
     frequency: 'daily',
     channels: ['dashboard'],
     thresholds: {
@@ -116,7 +117,8 @@ const getDefaultConsultantCommunicationPreferences = (tenant = {}) => {
 };
 
 const normalizeConsultantWorkflowSettings = (value = {}, communicationFallback = DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES) => ({
-    enabled: Boolean(value?.enabled),
+    automaticBriefingsEnabled: Boolean(value?.automaticBriefingsEnabled ?? value?.enabled),
+    enabled: Boolean(value?.automaticBriefingsEnabled ?? value?.enabled),
     frequency: SUPPORTED_FREQUENCIES.has(`${value?.frequency || ''}`.trim().toLowerCase())
         ? `${value.frequency}`.trim().toLowerCase()
         : DEFAULT_CONSULTANT_WORKFLOW_SETTINGS.frequency,
@@ -944,14 +946,15 @@ async function deliverWorkflowChannels({
 async function processConsultantWorkflowForTenant({
     tenantId,
     now = new Date(),
-    force = false
+    force = false,
+    bypassAutomationGate = false
 } = {}) {
     if (!tenantId) {
         throw new Error('tenantId is required to process consultant workflows');
     }
 
     const context = await loadTenantConsultantWorkflowContext(tenantId);
-    if (!context.workflowSettings.enabled) {
+    if (!bypassAutomationGate && !context.workflowSettings.automaticBriefingsEnabled) {
         return { skipped: true, reason: 'workflow_disabled' };
     }
 
@@ -1041,7 +1044,7 @@ async function processConsultantWorkflows({ now = new Date(), force = false } = 
     const results = [];
     for (const row of tenantSettings) {
         const workflow = normalizeConsultantWorkflowSettings(row.notificationSettings?.consultantWorkflow || {});
-        if (!workflow.enabled) {
+        if (!workflow.automaticBriefingsEnabled) {
             continue;
         }
 

@@ -299,11 +299,11 @@ router.post('/ai/generate-product', checkTenantFeature('hasAIContentAssistant'),
 router.post('/ai/generate-service', checkTenantFeature('hasAIContentAssistant'), aiController.generateService);
 router.post('/ai/generate-about-us', checkTenantFeature('hasAIContentAssistant'), aiController.generateAboutUs);
 router.post('/ai/translate', checkTenantFeature('hasAIContentAssistant'), aiController.translateText);
-router.post('/ai/consultant/analyze', checkTenantFeature('hasAIContentAssistant'), aiController.analyzeConsultantSnapshot);
-router.get('/ai/consultant/reports', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantReports);
-router.get('/ai/consultant/reports/:id', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantReport);
-router.get('/ai/consultant/briefings', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantBriefings);
-router.get('/ai/consultant/briefings/:id', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantBriefing);
-router.post('/ai/consultant/workflows/run', checkTenantFeature('hasAIContentAssistant'), aiController.runConsultantWorkflow);
+router.post('/ai/consultant/analyze', aiController.requireConsultantSubscription, aiController.analyzeConsultantSnapshot);
+router.get('/ai/consultant/reports', aiController.requireConsultantSubscription, aiController.getConsultantReports);
+router.get('/ai/consultant/reports/:id', aiController.requireConsultantSubscription, aiController.getConsultantReport);
+router.get('/ai/consultant/briefings', aiController.requireConsultantSubscription, aiController.getConsultantBriefings);
+router.get('/ai/consultant/briefings/:id', aiController.requireConsultantSubscription, aiController.getConsultantBriefing);
+router.post('/ai/consultant/workflows/run', aiController.requireConsultantSubscription, aiController.runConsultantWorkflow);
 
 module.exports = router;

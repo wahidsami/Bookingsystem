@@ -1,6 +1,8 @@
 const FEATURE_ALIASES = {
     hasAIContentAssistant: ['hasAIContentAssistant', 'aiContentAssistant'],
     aiContentAssistant: ['aiContentAssistant', 'hasAIContentAssistant'],
+    aiConsultant: ['aiConsultant', 'ai_consultant', 'hasAIConsultant'],
+    ai_consultant: ['ai_consultant', 'aiConsultant', 'hasAIConsultant'],
     hasInternalMessaging: ['hasInternalMessaging', 'internalMessaging'],
     internalMessaging: ['internalMessaging', 'hasInternalMessaging'],
     hasProductsAndOrders: ['hasProductsAndOrders', 'productsAndOrders', 'maxProducts'],
@@ -63,6 +65,7 @@ const normalizePackageEntitlements = (...sources) => {
     const normalized = Object.assign({}, ...sources.filter((source) => source && typeof source === 'object'));
 
     const aiContentAssistant = firstDefinedValue(normalized, 'aiContentAssistant');
+    const aiConsultant = firstDefinedValue(normalized, 'aiConsultant');
     const internalMessaging = firstDefinedValue(normalized, 'internalMessaging');
     const productsAndOrders = firstDefinedValue(normalized, 'productsAndOrders');
     const hotDeals = firstDefinedValue(normalized, 'maxHotDeals');
@@ -74,6 +77,8 @@ const normalizePackageEntitlements = (...sources) => {
 
     normalized.aiContentAssistant = toNumericEntitlement(aiContentAssistant, 0);
     normalized.hasAIContentAssistant = isFeatureEnabled(aiContentAssistant);
+    normalized.aiConsultant = isFeatureEnabled(aiConsultant);
+    normalized.hasAIConsultant = normalized.aiConsultant;
 
     if (internalMessaging !== undefined) {
         normalized.internalMessaging = internalMessaging;

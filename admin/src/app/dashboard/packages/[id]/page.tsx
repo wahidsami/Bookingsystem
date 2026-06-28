@@ -20,6 +20,7 @@ const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boole
     reports: { featureKey: 'reports', isBoolean: true },
     payroll: { featureKey: 'payroll', isBoolean: true },
     publicPageCustomization: { featureKey: 'publicPageCustomization', isBoolean: true },
+    aiConsultant: { featureKey: 'aiConsultant', isBoolean: true },
     whatsappNotifications: { featureKey: 'whatsappNotifications' },
     inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
     aiContentAssistant: { featureKey: 'aiContentAssistant' },
@@ -50,6 +51,7 @@ const defaultFormData = {
     reports: false,
     payroll: false,
     publicPageCustomization: false,
+    aiConsultant: false,
     whatsappNotifications: '0',
     inAppMarketingNotifications: '0',
     aiContentAssistant: '0',
@@ -119,6 +121,7 @@ export default function EditPackagePage() {
                 reports: toBool(limits.reports ?? limits.hasAdvancedReports ?? limits.advancedAnalytics, false),
                 payroll: toBool(limits.payroll ?? limits.hasPayroll, false),
                 publicPageCustomization: toBool(limits.publicPageCustomization ?? limits.hasCustomBranding ?? limits.whiteLabel, false),
+                aiConsultant: toBool(limits.aiConsultant ?? limits.ai_consultant, false),
                 whatsappNotifications: toStr(limits.whatsappNotifications, '0'),
                 inAppMarketingNotifications: toStr(limits.inAppMarketingNotifications, '0'),
                 aiContentAssistant: toStr(limits.aiContentAssistant, '0'),
@@ -197,6 +200,7 @@ export default function EditPackagePage() {
                 reports: formData.reports,
                 payroll: formData.payroll,
                 publicPageCustomization: formData.publicPageCustomization,
+                aiConsultant: formData.aiConsultant,
                 whatsappNotifications: parseInt(formData.whatsappNotifications) || 0,
                 inAppMarketingNotifications: parseInt(formData.inAppMarketingNotifications) || 0,
                 aiContentAssistant: parseInt(formData.aiContentAssistant) || 0,
@@ -461,12 +465,13 @@ export default function EditPackagePage() {
                                 </span>
                             </div>
                             <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-2 border-b border-dark-700 pb-6">
-                                {[
+                            {[
                                     { key: 'hasProductsAndOrders', label: 'Products & Orders (E-commerce)' },
                                     { key: 'hasInternalMessaging', label: 'Internal Messaging' },
                                     { key: 'reports', label: 'Reports & Analytics' },
                                     { key: 'payroll', label: 'Payroll Management' },
                                     { key: 'publicPageCustomization', label: 'Public Page Customization' },
+                                    { key: 'aiConsultant', label: 'AI Consultant' },
                                 ].map((feature) => {
                                     const cost = getFeatureItemCost(feature.key);
                                     return (
@@ -538,6 +543,28 @@ export default function EditPackagePage() {
                                         <div className="mt-2 text-xs text-right">
                                             {getFeatureItemCost('newToRefahDays') > 0 ? <span className="text-green-400 font-medium">SAR {getFeatureItemCost('newToRefahDays').toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-dark-900/50 p-3 rounded-lg border border-dark-600/50">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.aiConsultant}
+                                            onChange={(e) => setFormData({ ...formData, aiConsultant: e.target.checked })}
+                                            className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                                        />
+                                        <span className="text-sm font-medium text-white">🤖 AI Consultant</span>
+                                    </label>
+                                    <div className="text-xs text-dark-400 ml-6">
+                                        Enable consultant access
+                                    </div>
+                                    <div className="mt-2 text-xs text-right">
+                                        {getFeatureItemCost('aiConsultant') > 0 ? (
+                                            <span className="text-green-400 font-medium">SAR {getFeatureItemCost('aiConsultant').toFixed(2)}</span>
+                                        ) : (
+                                            <span className="text-dark-500">SAR 0.00</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>

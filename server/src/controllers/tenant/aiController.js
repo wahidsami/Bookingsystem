@@ -12,6 +12,8 @@ const {
     getDefaultConsultantCommunicationPreferences,
     normalizeCommunicationPreferences
 } = require('../../services/consultantWorkflowService');
+const { getActiveSubscriptionForTenant } = require('../../services/tenantSubscriptionService');
+const { normalizePackageEntitlements } = require('../../utils/packageEntitlements');
 const { successResponse, errorResponse, paginatedResponse } = require('../../utils/responses');
 const crypto = require('crypto');
 
@@ -41,6 +43,43 @@ async function recordAiUsage(req) {
     const tenantId = req.tenantId || req.tenant?.id;
     if (!tenantId) return;
     await incrementMonthlyFeatureUsage(tenantId, AI_FEATURE_KEY, 1);
+}
+
+async function requireConsultantSubscription(req, res, next) {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId },
+            attributes: ['features']
+        });
+
+        const tenantFeatures = normalizePackageEntitlements(tenantSettings?.features || {});
+        if (tenantFeatures.aiConsultant) {
+            return next();
+        }
+
+        const subscription = await getActiveSubscriptionForTenant(tenantId, {
+            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+        });
+        const packageFeatures = normalizePackageEntitlements(subscription?.package?.limits || {});
+        if (packageFeatures.aiConsultant) {
+            return next();
+        }
+
+        return res.status(403).json({
+            success: false,
+            allowed: false,
+            reason: 'subscription_required',
+            message: 'AI Consultant is not included in your subscription.'
+        });
+    } catch (error) {
+        console.error('Consultant subscription check error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to verify AI Consultant subscription.',
+            error: error.message
+        });
+    }
 }
 
 function normalizeConsultantSnapshotInput(snapshot) {
@@ -695,7 +734,8 @@ exports.runConsultantWorkflow = async (req, res) => {
         const result = await processConsultantWorkflowForTenant({
             tenantId,
             now: new Date(),
-            force: Boolean(req.body?.force)
+            force: Boolean(req.body?.force),
+            bypassAutomationGate: true
         });
 
         return res.status(200).json(successResponse('Consultant workflow processed', result));
@@ -710,3 +750,5 @@ exports.__consultantFormatter = {
     enrichConsultantResponseRoutes,
     inferConsultantActionRoute
 };
+
+exports.requireConsultantSubscription = requireConsultantSubscription;
