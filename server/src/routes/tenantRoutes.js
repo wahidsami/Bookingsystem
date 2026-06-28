@@ -302,5 +302,8 @@ router.post('/ai/translate', checkTenantFeature('hasAIContentAssistant'), aiCont
 router.post('/ai/consultant/analyze', checkTenantFeature('hasAIContentAssistant'), aiController.analyzeConsultantSnapshot);
 router.get('/ai/consultant/reports', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantReports);
 router.get('/ai/consultant/reports/:id', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantReport);
+router.get('/ai/consultant/briefings', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantBriefings);
+router.get('/ai/consultant/briefings/:id', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantBriefing);
+router.post('/ai/consultant/workflows/run', checkTenantFeature('hasAIContentAssistant'), aiController.runConsultantWorkflow);
 
 module.exports = router;

@@ -15,6 +15,10 @@ const {
 const {
     normalizeAppointmentNotificationSettings
 } = require('../services/appointmentAutomationService');
+const {
+    normalizeConsultantWorkflowSettings,
+    DEFAULT_CONSULTANT_WORKFLOW_SETTINGS
+} = require('../services/consultantWorkflowService');
 
 const DASHBOARD_LANDING_PAGES = new Set(['home', 'appointments', 'pos']);
 
@@ -24,7 +28,10 @@ const normalizeDashboardSettings = (value = {}) => ({
         : 'home'
 });
 
-const normalizeNotificationSettings = (value = {}) => normalizeAppointmentNotificationSettings(value);
+const normalizeNotificationSettings = (value = {}) => ({
+    ...normalizeAppointmentNotificationSettings(value),
+    consultantWorkflow: normalizeConsultantWorkflowSettings(value?.consultantWorkflow || {})
+});
 
 /**
  * Get subscription limits and current usage for the tenant.
@@ -140,7 +147,9 @@ exports.getSettings = async (req, res) => {
                 defaultLanguage: 'ar',
                 supportedLanguages: ['ar', 'en'],
                 dashboardSettings: normalizeDashboardSettings(),
-                notificationSettings: normalizeNotificationSettings()
+                notificationSettings: normalizeNotificationSettings({
+                    consultantWorkflow: DEFAULT_CONSULTANT_WORKFLOW_SETTINGS
+                })
             }
         });
 
@@ -396,6 +405,7 @@ exports.updateNotificationSettings = async (req, res) => {
             enableSmsNotifications,
             enableWhatsAppNotifications,
             enableVoiceAlerts,
+            consultantWorkflow,
             remindRemainderToCollect,
             appointmentGracePeriodMinutes,
             autoMarkNoShowAfterGracePeriod,
@@ -411,6 +421,9 @@ exports.updateNotificationSettings = async (req, res) => {
         const currentNotificationSettings = normalizeNotificationSettings(settings.notificationSettings);
         const nextNotificationSettings = normalizeNotificationSettings({
             ...currentNotificationSettings,
+            consultantWorkflow: normalizeConsultantWorkflowSettings(
+                consultantWorkflow || currentNotificationSettings.consultantWorkflow || {}
+            ),
             remindRemainderToCollect,
             appointmentGracePeriodMinutes,
             autoMarkNoShowAfterGracePeriod,

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultant Briefing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', 'Cairo', sans-serif; background:#f4f7fb; margin:0; padding:0; }
+        .container { max-width: 720px; margin:0 auto; background:#ffffff; }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 36px 28px; color:#fff; }
+        .header h1 { margin:0; font-size: 28px; line-height:1.2; }
+        .header p { margin:10px 0 0; color:#dbeafe; }
+        .content { padding: 32px 28px 36px; }
+        .panel { border:1px solid #e2e8f0; border-radius:16px; padding:20px; margin-bottom:18px; background:#f8fafc; }
+        .panel h2 { font-size:18px; margin:0 0 12px; color:#0f172a; }
+        .summary { font-size:16px; line-height:1.7; color:#334155; }
+        .score { display:inline-block; padding:8px 14px; border-radius:999px; background:#dbeafe; color:#1d4ed8; font-weight:700; }
+        .cta { display:inline-block; margin-top:16px; padding:12px 20px; background:#111827; color:#fff !important; text-decoration:none; border-radius:10px; font-weight:700; }
+        .footer { padding: 0 28px 28px; color:#64748b; font-size:13px; }
+        .note { color:#64748b; font-size:13px; line-height:1.6; margin-top:10px; }
+        ul { margin:0; padding-left:20px; color:#334155; line-height:1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="RifahNewLogoWhite.png" alt="Rifah" style="max-width:160px;height:auto;margin-bottom:14px;" />
+            <h1>{{briefingTitle}}</h1>
+            <p>{{periodLine}}</p>
+        </div>
+        <div class="content">
+            <div class="panel">
+                <h2>Executive Summary</h2>
+                <div class="summary">{{summaryHtml}}</div>
+                <div style="margin-top:14px;"><span class="score">Health Score: {{healthScore}}</span></div>
+            </div>
+
+            <div class="panel">
+                <h2>KPIs</h2>
+                {{kpiHtml}}
+            </div>
+
+            <div class="panel">
+                <h2>Alerts</h2>
+                {{alertsHtml}}
+            </div>
+
+            <div class="panel">
+                <h2>Recommendations</h2>
+                {{recommendationsHtml}}
+            </div>
+
+            <div class="panel">
+                <h2>Suggested Actions</h2>
+                {{actionsHtml}}
+                <a class="cta" href="{{dashboardUrl}}">Open Consultant Workspace</a>
+                <div class="note">Generated at {{generatedAt}}</div>
+            </div>
+        </div>
+        <div class="footer">
+            Rifah AI Consultant briefing for {{briefingTitle}}.
+        </div>
+    </div>
+</body>
+</html>

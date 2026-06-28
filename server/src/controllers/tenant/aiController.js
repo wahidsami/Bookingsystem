@@ -6,6 +6,10 @@ const {
     incrementMonthlyFeatureUsage
 } = require('../../services/subscriptionConsumptionService');
 const { saveConsultantReport } = require('../../services/consultantSnapshotService');
+const {
+    processConsultantWorkflowForTenant,
+    listConsultantBriefings
+} = require('../../services/consultantWorkflowService');
 const { successResponse, errorResponse, paginatedResponse } = require('../../utils/responses');
 const crypto = require('crypto');
 
@@ -607,4 +611,71 @@ exports.getConsultantReport = async (req, res) => {
         console.error('Get consultant report error:', error);
         return res.status(500).json(errorResponse('Failed to load consultant report', error.message));
     }
+};
+
+exports.getConsultantBriefings = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '20', 10), 1), 100);
+        const page = Math.max(Number.parseInt(req.query.page || '1', 10), 1);
+        const { count, rows } = await listConsultantBriefings({
+            tenantId,
+            limit,
+            page
+        });
+
+        return res.status(200).json(paginatedResponse(
+            rows.map((row) => row.toJSON()),
+            count,
+            page,
+            limit
+        ));
+    } catch (error) {
+        console.error('Get consultant briefings error:', error);
+        return res.status(500).json(errorResponse('Failed to load consultant briefings', error.message));
+    }
+};
+
+exports.getConsultantBriefing = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const briefing = await db.ConsultantReport.findOne({
+            where: {
+                id: req.params.id,
+                tenantId,
+                reportType: 'consultant_briefing'
+            }
+        });
+
+        if (!briefing) {
+            return res.status(404).json(errorResponse('Consultant briefing not found'));
+        }
+
+        return res.status(200).json(successResponse('Consultant briefing retrieved', briefing.toJSON()));
+    } catch (error) {
+        console.error('Get consultant briefing error:', error);
+        return res.status(500).json(errorResponse('Failed to load consultant briefing', error.message));
+    }
+};
+
+exports.runConsultantWorkflow = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.tenant?.id;
+        const result = await processConsultantWorkflowForTenant({
+            tenantId,
+            now: new Date(),
+            force: Boolean(req.body?.force)
+        });
+
+        return res.status(200).json(successResponse('Consultant workflow processed', result));
+    } catch (error) {
+        console.error('Run consultant workflow error:', error);
+        return res.status(500).json(errorResponse('Failed to process consultant workflow', error.message));
+    }
+};
+
+exports.__consultantFormatter = {
+    normalizeConsultantStructuredResponse,
+    enrichConsultantResponseRoutes,
+    inferConsultantActionRoute
 };
