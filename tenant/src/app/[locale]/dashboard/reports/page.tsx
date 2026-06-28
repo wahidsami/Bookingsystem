@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { TenantLayout } from "@/components/TenantLayout";
 import { ReportExportToolbar } from "@/components/ReportExportToolbar";
 import { ReportPdfDebugPanel, type ReportPdfDebugState } from "@/components/ReportPdfDebugPanel";
+import { AnalyticsDetailsDrawer } from "@/components/AnalyticsDetailsDrawer";
 import {
   FinanceEmptyState,
   FinanceMetricCard,
@@ -160,6 +161,7 @@ function SectionTable({
   headers,
   rows,
   rtl = false,
+  onRowClick,
   sourceLabel,
   totalRows,
   truncatedLabel
@@ -167,6 +169,7 @@ function SectionTable({
   headers: string[];
   rows: ReactNode[][];
   rtl?: boolean;
+  onRowClick?: (rowIndex: number) => void;
   sourceLabel?: string;
   totalRows?: number;
   truncatedLabel?: string;
@@ -179,6 +182,7 @@ function SectionTable({
         align: index === 0 ? (rtl ? "right" : "left") : "right",
       }))}
       rows={rows}
+      onRowClick={onRowClick}
       sourceLabel={sourceLabel || "rows"}
       totalRows={totalRows}
       truncatedLabel={truncatedLabel}
@@ -221,6 +225,19 @@ function getPreviewSectionsForReportSection(sectionId: ReportSectionId) {
   }
 }
 
+type DrilldownTabId = "overview" | "source";
+
+type DrilldownState = {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  summaryItems: Array<{ label: ReactNode; value: ReactNode; note?: ReactNode }>;
+  tabs: Array<{ id: DrilldownTabId; label: ReactNode; description?: ReactNode }>;
+  activeTab: DrilldownTabId;
+  tabPanels: Record<DrilldownTabId, ReactNode>;
+  actions?: ReactNode;
+  sideNote?: ReactNode;
+};
+
 export default function ReportsPage() {
   const locale = useLocale();
   const router = useRouter();
@@ -248,6 +265,7 @@ export default function ReportsPage() {
   const [refundsReport, setRefundsReport] = useState<any>(null);
   const [paymentMethodsReport, setPaymentMethodsReport] = useState<any>(null);
   const [savedReports, setSavedReports] = useState<any[]>([]);
+  const [detailDrawer, setDetailDrawer] = useState<DrilldownState | null>(null);
   const [savedReportsLoading, setSavedReportsLoading] = useState(false);
   const [savedReportsError, setSavedReportsError] = useState("");
   const [exportError, setExportError] = useState("");
@@ -800,6 +818,52 @@ export default function ReportsPage() {
     }
   };
 
+  const openSummaryDetail = (config: {
+    title: ReactNode;
+    subtitle?: ReactNode;
+    summaryItems: Array<{ label: ReactNode; value: ReactNode; note?: ReactNode }>;
+    sourceHref?: string;
+    sourceLabel?: ReactNode;
+    sideNote?: ReactNode;
+  }) => {
+    setDetailDrawer({
+      title: config.title,
+      subtitle: config.subtitle,
+      summaryItems: config.summaryItems,
+      tabs: [
+        { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+      ],
+      activeTab: "overview",
+      tabPanels: {
+        overview: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            {locale === "ar"
+              ? "تفاصيل تفصيلية للعنصر المحدد."
+              : "Detailed context for the selected analytics record."}
+          </div>
+        ),
+        source: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            {config.sourceHref ? (
+              <Link className="text-primary underline" href={config.sourceHref}>
+                {config.sourceLabel || (locale === "ar" ? "فتح المصدر" : "Open source")}
+              </Link>
+            ) : (
+              <span>{locale === "ar" ? "لا يوجد مصدر مباشر لهذا السطر." : "No direct source link exists for this row."}</span>
+            )}
+          </div>
+        )
+      },
+      actions: config.sourceHref ? (
+        <Link href={config.sourceHref} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+          {config.sourceLabel || (locale === "ar" ? "فتح المصدر" : "Open source")}
+        </Link>
+      ) : undefined,
+      sideNote: config.sideNote
+    });
+  };
+
   const totalBookings = safeNumber(summary?.totalBookings ?? financialOverview?.totalBookings);
   const totalRevenue = safeNumber(summary?.totalRevenue ?? financialOverview?.totalRevenue);
   const tenantRevenue = safeNumber(financialOverview?.totalTenantRevenue);
@@ -848,6 +912,22 @@ export default function ReportsPage() {
                       safeNumber(trend.completed),
                       formatMoney(trend.revenue)
                     ])}
+                    onRowClick={(index) => {
+                      const row = bookingTrends[index];
+                      if (!row) return;
+                      openSummaryDetail({
+                        title: row.date ? new Date(row.date).toLocaleDateString() : (locale === "ar" ? "اتجاه الحجز" : "Booking trend"),
+                        subtitle: locale === "ar" ? "تفاصيل صف الاتجاه" : "Trend row detail",
+                        summaryItems: [
+                          { label: locale === "ar" ? "الحجوزات" : "Bookings", value: safeNumber(row.bookings) },
+                          { label: locale === "ar" ? "المكتملة" : "Completed", value: safeNumber(row.completed) },
+                          { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue) }
+                        ],
+                        sideNote: locale === "ar"
+                          ? "هذا الصف يمثل بيانات مجمعة للنطاق الحالي."
+                          : "This row reflects aggregated data for the current range."
+                      });
+                    }}
                   />
                 </div>
               </FinanceSectionCard>
@@ -894,6 +974,20 @@ export default function ReportsPage() {
                     safeNumber(service.totalBookings),
                     formatMoney(service.revenue ?? service.totalRevenue)
                   ])}
+                  onRowClick={(index) => {
+                    const row = servicePerformance[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: locale === "ar" ? row.name_ar || row.name_en : row.name_en || row.name_ar,
+                      subtitle: locale === "ar" ? "تفاصيل الخدمة" : "Service drill-down",
+                      summaryItems: [
+                        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: safeNumber(row.totalBookings) },
+                        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue ?? row.totalRevenue) }
+                      ],
+                      sourceHref: `/${locale}/dashboard/services/${row.id}`,
+                      sourceLabel: locale === "ar" ? "فتح الخدمة" : "Open service"
+                    });
+                  }}
                 />
               </FinanceSectionCard>
 
@@ -913,6 +1007,21 @@ export default function ReportsPage() {
                     safeNumber(customer.bookings),
                     formatMoney(customer.revenue)
                   ])}
+                  onRowClick={(index) => {
+                    const row = customerAnalytics?.topCustomers?.[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: row.name || row.id,
+                      subtitle: locale === "ar" ? "أعلى العملاء" : "Top customer",
+                      summaryItems: [
+                        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: safeNumber(row.bookings) },
+                        { label: locale === "ar" ? "المكتملة" : "Completed", value: safeNumber(row.completed) },
+                        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue) }
+                      ],
+                      sourceHref: row.id ? `/${locale}/dashboard/customers/${row.id}` : undefined,
+                      sourceLabel: locale === "ar" ? "فتح العميل" : "Open customer"
+                    });
+                  }}
                   countLabel={
                     customerAnalytics?.topCustomers?.length
                       ? (locale === "ar"
@@ -1280,11 +1389,25 @@ export default function ReportsPage() {
                         locale === "ar" ? "إعادة الحجز" : "Rebooked",
                         locale === "ar" ? "الإيراد" : "Revenue"
                       ]}
-                      rows={(rebookingAnalytics.topRebookingEmployees || []).map((employee: any) => [
+                  rows={(rebookingAnalytics.topRebookingEmployees || []).map((employee: any) => [
                         employee.name,
                         safeNumber(employee.rebookedAppointments ?? employee.rebookingCount),
                         formatMoney(employee.rebookedRevenue ?? employee.revenue)
                       ])}
+                      onRowClick={(index) => {
+                        const row = rebookingAnalytics.topRebookingEmployees?.[index];
+                        if (!row) return;
+                        openSummaryDetail({
+                          title: row.name,
+                          subtitle: locale === "ar" ? "أعلى موظف لإعادة الحجز" : "Top rebooking employee",
+                          summaryItems: [
+                            { label: locale === "ar" ? "إعادة الحجز" : "Rebooked", value: safeNumber(row.rebookedAppointments ?? row.rebookingCount) },
+                            { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.rebookedRevenue ?? row.revenue) }
+                          ],
+                          sourceHref: `/${locale}/dashboard/employees/${row.id}`,
+                          sourceLabel: locale === "ar" ? "فتح الموظف" : "Open employee"
+                        });
+                      }}
                     />
                   </FinanceSectionCard>
                 </div>
@@ -1305,6 +1428,22 @@ export default function ReportsPage() {
                     row.rebooked ? (locale === "ar" ? "نعم" : "Yes") : (locale === "ar" ? "لا" : "No"),
                     formatMoney(row.rebookedRevenue ?? row.revenue ?? row.amount)
                   ])}
+                  onRowClick={(index) => {
+                    const row = rebookingAnalytics.rows?.[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: row.customerName || row.customer || (locale === "ar" ? "إعادة حجز" : "Rebooking"),
+                      subtitle: locale === "ar" ? "صف إعادة الحجز" : "Rebooking row detail",
+                      summaryItems: [
+                        { label: locale === "ar" ? "المرجع" : "Reference", value: row.reference || row.bookingNumber || "-" },
+                        { label: locale === "ar" ? "إعادة الحجز" : "Rebooked", value: row.rebooked ? (locale === "ar" ? "نعم" : "Yes") : (locale === "ar" ? "لا" : "No") },
+                        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.rebookedRevenue ?? row.revenue ?? row.amount) }
+                      ],
+                      sideNote: locale === "ar"
+                        ? "لا يوجد رابط مباشر لهذا الصف، لكنه يبقى قابلاً للمراجعة داخل التقرير."
+                        : "This row has no direct source link but remains reviewable within the report."
+                    });
+                  }}
                 />
               </div>
             ) : (
@@ -1333,6 +1472,21 @@ export default function ReportsPage() {
                 formatMoney(employee.revenue ?? employee.totalRevenueGenerated),
                 formatMoney(employee.commission ?? employee.totalCommission)
               ])}
+              onRowClick={(index) => {
+                const row = employeePerformance[index];
+                if (!row) return;
+                openSummaryDetail({
+                  title: row.name,
+                  subtitle: locale === "ar" ? "أداء الموظف" : "Employee performance",
+                  summaryItems: [
+                    { label: locale === "ar" ? "الحجوزات" : "Bookings", value: row.totalBookings ?? 0 },
+                    { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue ?? row.totalRevenueGenerated) },
+                    { label: locale === "ar" ? "العمولة" : "Commission", value: formatMoney(row.commission ?? row.totalCommission) }
+                  ],
+                  sourceHref: `/${locale}/dashboard/employees/${row.id}`,
+                  sourceLabel: locale === "ar" ? "فتح الموظف" : "Open employee"
+                });
+              }}
             />
           </FinanceSectionCard>
         );
@@ -1354,6 +1508,21 @@ export default function ReportsPage() {
                 formatMoney(service.revenue ?? service.totalRevenue),
                 `${safeNumber(service.completionRate).toFixed(1)}%`
               ])}
+              onRowClick={(index) => {
+                const row = servicePerformance[index];
+                if (!row) return;
+                openSummaryDetail({
+                  title: locale === "ar" ? row.name_ar || row.name_en : row.name_en || row.name_ar,
+                  subtitle: locale === "ar" ? "تفاصيل الخدمة" : "Service drill-down",
+                  summaryItems: [
+                    { label: locale === "ar" ? "الحجوزات" : "Bookings", value: row.totalBookings ?? 0 },
+                    { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue ?? row.totalRevenue) },
+                    { label: locale === "ar" ? "معدل الإكمال" : "Completion %", value: `${safeNumber(row.completionRate).toFixed(1)}%` }
+                  ],
+                  sourceHref: `/${locale}/dashboard/services/${row.id}`,
+                  sourceLabel: locale === "ar" ? "فتح الخدمة" : "Open service"
+                });
+              }}
             />
           </FinanceSectionCard>
         );
@@ -1385,6 +1554,22 @@ export default function ReportsPage() {
                     formatMoney(product.totalRevenue),
                     formatMoney(product.totalTenantRevenue)
                   ])}
+                  onRowClick={(index) => {
+                    const row = productRevenue.rows?.[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: locale === "ar" ? row.name_ar || row.name_en : row.name_en || row.name_ar,
+                      subtitle: locale === "ar" ? "تفاصيل المنتج" : "Product detail",
+                      summaryItems: [
+                        { label: locale === "ar" ? "الطلبات" : "Orders", value: safeNumber(row.totalOrders) },
+                        { label: locale === "ar" ? "الكمية" : "Quantity", value: safeNumber(row.totalQuantity) },
+                        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.totalRevenue) },
+                        { label: locale === "ar" ? "إيراد المركز" : "Tenant revenue", value: formatMoney(row.totalTenantRevenue) }
+                      ],
+                      sourceHref: `/${locale}/dashboard/products/${row.id}`,
+                      sourceLabel: locale === "ar" ? "فتح المنتج" : "Open product"
+                    });
+                  }}
                 />
               </div>
             ) : (
@@ -1419,6 +1604,20 @@ export default function ReportsPage() {
                     safeNumber(service.bookingCount),
                     formatMoney(service.discountAmount)
                   ])}
+                  onRowClick={(index) => {
+                    const row = discountTotals.topDiscountedServices?.[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: locale === "ar" ? row.name_ar || row.name_en : row.name_en || row.name_ar,
+                      subtitle: locale === "ar" ? "أعلى الخصومات" : "Top discounted service",
+                      summaryItems: [
+                        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: safeNumber(row.bookingCount) },
+                        { label: locale === "ar" ? "الخصم" : "Discount", value: formatMoney(row.discountAmount) }
+                      ],
+                      sourceHref: `/${locale}/dashboard/services/${row.id}`,
+                      sourceLabel: locale === "ar" ? "فتح الخدمة" : "Open service"
+                    });
+                  }}
                 />
               </div>
             ) : (
@@ -1467,6 +1666,21 @@ export default function ReportsPage() {
                     row.employee || "-",
                     row.refundMode
                   ])}
+                  onRowClick={(index) => {
+                    const row = refundsReport.rows?.[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: row.reference || row.customer || (locale === "ar" ? "استرداد" : "Refund"),
+                      subtitle: locale === "ar" ? "صف الاسترداد" : "Refund row detail",
+                      summaryItems: [
+                        { label: locale === "ar" ? "العميل" : "Customer", value: row.customer || "-" },
+                        { label: locale === "ar" ? "المبلغ" : "Amount", value: formatMoney(row.amount) },
+                        { label: locale === "ar" ? "طريقة الدفع" : "Payment method", value: row.paymentMethodLabel || "-" },
+                        { label: locale === "ar" ? "النوع" : "Type", value: row.refundMode || "-" }
+                      ],
+                      sideNote: row.refundReason || undefined
+                    });
+                  }}
                 />
               </div>
             ) : (
@@ -1514,6 +1728,22 @@ export default function ReportsPage() {
                     method.transactionCount,
                     `${paymentMethodsReport.totals?.revenue ? ((safeNumber(method.revenue) / safeNumber(paymentMethodsReport.totals.revenue)) * 100).toFixed(1) : "0.0"}%`
                   ])}
+                  onRowClick={(index) => {
+                    const row = paymentMethodsReport.rows?.[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: row.paymentMethodLabel,
+                      subtitle: locale === "ar" ? "طريقة الدفع" : "Payment method detail",
+                      summaryItems: [
+                        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue) },
+                        { label: locale === "ar" ? "العمليات" : "Transactions", value: safeNumber(row.transactionCount) },
+                        { label: locale === "ar" ? "النسبة" : "Share", value: `${paymentMethodsReport.totals?.revenue ? ((safeNumber(row.revenue) / safeNumber(paymentMethodsReport.totals.revenue)) * 100).toFixed(1) : "0.0"}%` }
+                      ],
+                      sideNote: locale === "ar"
+                        ? "هذه قراءة تجميعية وليست قائمة معاملات فردية."
+                        : "This is an aggregate view rather than an individual transaction list."
+                    });
+                  }}
                 />
               </div>
             ) : (
@@ -1637,6 +1867,22 @@ export default function ReportsPage() {
             {renderSectionWorkspace()}
           </div>
         )}
+
+        {detailDrawer ? (
+          <AnalyticsDetailsDrawer
+            open
+            title={detailDrawer.title}
+            subtitle={detailDrawer.subtitle}
+            onClose={() => setDetailDrawer(null)}
+            summaryItems={detailDrawer.summaryItems}
+            tabs={detailDrawer.tabs}
+            activeTab={detailDrawer.activeTab}
+            onTabChange={(tabId) => setDetailDrawer((current) => current ? { ...current, activeTab: tabId as DrilldownTabId } : current)}
+            tabPanels={detailDrawer.tabPanels}
+            actions={detailDrawer.actions}
+            sideNote={detailDrawer.sideNote}
+          />
+        ) : null}
       </FinanceWorkspaceShell>
     </TenantLayout>
   );

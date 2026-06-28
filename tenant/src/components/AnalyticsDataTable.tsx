@@ -19,6 +19,7 @@ type AnalyticsDataTableProps = {
   rows: TableRow[];
   loading?: boolean;
   error?: string | null;
+  onRowClick?: (rowIndex: number) => void;
   emptyTitle?: ReactNode;
   emptyDescription?: ReactNode;
   searchPlaceholder?: string;
@@ -115,6 +116,7 @@ export function AnalyticsDataTable({
   rows,
   loading = false,
   error = null,
+  onRowClick,
   emptyTitle,
   emptyDescription,
   searchPlaceholder = "Search this table",
@@ -312,7 +314,11 @@ export function AnalyticsDataTable({
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                 {pagedRows.map((entry, rowIndex) => (
-                  <tr key={`${entry.rowIndex}-${rowIndex}`} className="transition hover:bg-gray-50/70">
+                  <tr
+                    key={`${entry.rowIndex}-${rowIndex}`}
+                    onClick={onRowClick ? () => onRowClick(entry.rowIndex) : undefined}
+                    className={`transition ${onRowClick ? "cursor-pointer hover:bg-gray-50/70" : "hover:bg-gray-50/70"}`}
+                  >
                     {entry.row.map((cell, cellIndex) => {
                       const alignClass =
                         columns[cellIndex]?.align === "right"

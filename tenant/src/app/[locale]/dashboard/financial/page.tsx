@@ -14,6 +14,7 @@ import {
 } from "@/components/FinanceWorkspaceShell";
 import { Currency } from "@/components/Currency";
 import { AnalyticsDataTable } from "@/components/AnalyticsDataTable";
+import { AnalyticsDetailsDrawer } from "@/components/AnalyticsDetailsDrawer";
 import { tenantApi } from "@/lib/api";
 import {
   buildRuleBasedAlerts,
@@ -298,6 +299,7 @@ function SectionTable({
   headers,
   rows,
   rtl = false,
+  onRowClick,
   sourceLabel,
   totalRows,
   truncatedLabel
@@ -305,6 +307,7 @@ function SectionTable({
   headers: string[];
   rows: ReactNode[][];
   rtl?: boolean;
+  onRowClick?: (rowIndex: number) => void;
   sourceLabel?: string;
   totalRows?: number;
   truncatedLabel?: string;
@@ -317,6 +320,7 @@ function SectionTable({
         align: index === 0 ? (rtl ? "right" : "left") : "right",
       }))}
       rows={rows}
+      onRowClick={onRowClick}
       sourceLabel={sourceLabel || "rows"}
       totalRows={totalRows}
       truncatedLabel={truncatedLabel}
@@ -329,6 +333,23 @@ function SectionTable({
 
 function formatMoney(value: unknown) {
   return <Currency amount={safeNumber(value)} />;
+}
+
+type DrilldownTabId = "overview" | "appointments" | "transactions" | "wallet" | "source";
+
+type DrilldownState = {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  summaryItems: Array<{ label: ReactNode; value: ReactNode; note?: ReactNode }>;
+  tabs: Array<{ id: DrilldownTabId; label: ReactNode; description?: ReactNode }>;
+  activeTab: DrilldownTabId;
+  tabPanels: Record<DrilldownTabId, ReactNode>;
+  actions?: ReactNode;
+  sideNote?: ReactNode;
+};
+
+function isLikelyId(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 export default function FinancialPage() {
@@ -351,6 +372,7 @@ export default function FinancialPage() {
   const [previousCustomerAnalytics, setPreviousCustomerAnalytics] = useState<CustomerAnalytics | null>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<PosClosingSummary | null>(null);
   const [previousPosClosingSummary, setPreviousPosClosingSummary] = useState<PosClosingSummary | null>(null);
+  const [detailDrawer, setDetailDrawer] = useState<DrilldownState | null>(null);
 
   const [startDate, setStartDate] = useState(() => formatDateInput(-29));
   const [endDate, setEndDate] = useState(() => formatDateInput(0));
@@ -537,6 +559,495 @@ export default function FinancialPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const closeDetailDrawer = () => setDetailDrawer(null);
+
+  const openCustomerDetails = async (customer: any) => {
+    const customerId = `${customer?.id || ""}`;
+    const customerName = customer?.name || `${customer?.firstName || ""} ${customer?.lastName || ""}`.trim() || customerId || (locale === "ar" ? "عميل" : "Customer");
+
+    setDetailDrawer({
+      title: customerName,
+      subtitle: locale === "ar" ? "تفاصيل العميل ومصادره" : "Customer detail and source records",
+      summaryItems: [
+        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: customer?.bookings ?? customer?.totalBookings ?? 0 },
+        { label: locale === "ar" ? "مكتمل" : "Completed", value: customer?.completed ?? customer?.completedBookings ?? 0 },
+        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(customer?.revenue ?? customer?.totalSpent ?? 0) },
+        { label: locale === "ar" ? "متوسط الإنفاق" : "Average spend", value: formatMoney(customer?.averageSpend ?? customer?.averageBookingValue ?? 0) }
+      ],
+      tabs: [
+        { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
+        { id: "transactions", label: locale === "ar" ? "المدفوعات" : "Transactions" },
+        { id: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
+        { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+      ],
+      activeTab: "overview",
+      tabPanels: {
+        overview: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">
+            {locale === "ar"
+              ? "جاري تحميل تفاصيل العميل من سجل العميل الفعلي."
+              : "Loading customer details from the live customer record."}
+          </div>
+        ),
+        appointments: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">
+            {locale === "ar"
+              ? "جاري تحميل سجل المواعيد."
+              : "Loading appointment history."}
+          </div>
+        ),
+        transactions: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">
+            {locale === "ar"
+              ? "جاري تحميل سجل العمليات."
+              : "Loading transaction history."}
+          </div>
+        ),
+        wallet: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">
+            {locale === "ar"
+              ? "جاري تحميل سجل المحفظة."
+              : "Loading wallet history."}
+          </div>
+        ),
+        source: (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              {locale === "ar"
+                ? "سيتم فتح ملف العميل الكامل من صفحة العملاء الحالية."
+                : "Open the full customer profile in the existing customer workspace."}
+            </p>
+          </div>
+        )
+      },
+      actions: customerId && isLikelyId(customerId) ? (
+        <>
+          <Link href={`/${locale}/dashboard/customers/${customerId}`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+            {locale === "ar" ? "ملف العميل" : "Customer profile"}
+          </Link>
+          <Link href={`/${locale}/dashboard/customers/${customerId}/wallet`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+            {locale === "ar" ? "المحفظة" : "Wallet"}
+          </Link>
+        </>
+      ) : undefined,
+      sideNote: locale === "ar"
+        ? "هذا القسم يستخدم البيانات الحية للعميل حيثما كانت متاحة."
+        : "This explorer uses live customer data where available."
+    });
+
+    if (!customerId || !isLikelyId(customerId)) {
+      setDetailDrawer((current) => current ? {
+        ...current,
+        tabPanels: {
+          ...current.tabPanels,
+          overview: (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5 text-sm text-gray-600">
+              {locale === "ar"
+                ? "هذا الصف لا يملك معرف عميل مباشر."
+                : "This row does not have a direct customer identifier."}
+            </div>
+          )
+        }
+      } : current);
+      return;
+    }
+
+    try {
+      const [customerRes, transactionsRes] = await Promise.allSettled([
+        tenantApi.getCustomer(customerId, { includeWalletHistory: true }),
+        tenantApi.getCustomerTransactions(customerId, { limit: 50, startDate, endDate })
+      ]);
+
+      if (customerRes.status !== "fulfilled" || !customerRes.value.success) {
+        throw new Error(locale === "ar" ? "تعذر تحميل العميل" : "Failed to load customer");
+      }
+
+      const customerData = customerRes.value.data || {};
+      const transactions = transactionsRes.status === "fulfilled" && transactionsRes.value.success
+        ? (transactionsRes.value.data?.transactions || [])
+        : [];
+
+      setDetailDrawer({
+        title: customerName,
+        subtitle: locale === "ar" ? "تفاصيل العميل ومصادره" : "Customer detail and source records",
+        summaryItems: [
+          { label: locale === "ar" ? "الحجوزات" : "Bookings", value: customerData.totalBookings ?? customer?.bookings ?? 0 },
+          { label: locale === "ar" ? "مكتمل" : "Completed", value: customerData.completedBookings ?? customer?.completed ?? 0 },
+          { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(customerData.totalSpent ?? customer?.revenue ?? 0) },
+          { label: locale === "ar" ? "آخر زيارة" : "Last visit", value: customerData.lastVisit ? new Date(customerData.lastVisit).toLocaleDateString() : "-" }
+        ],
+        tabs: [
+          { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+          { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
+          { id: "transactions", label: locale === "ar" ? "المدفوعات" : "Transactions" },
+          { id: "wallet", label: locale === "ar" ? "المحفظة" : "Wallet" },
+          { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+        ],
+        activeTab: "overview",
+        tabPanels: {
+          overview: (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-gray-200 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "المفضلات" : "Favorites"}</div>
+                  <div className="mt-3 space-y-2 text-sm text-gray-700">
+                    <div>{locale === "ar" ? "الخدمات المفضلة:" : "Favorite services:"} {(customerData.favoriteServices || []).map((item: any) => item.name).join(", ") || "-"}</div>
+                    <div>{locale === "ar" ? "الموظفون المفضلون:" : "Preferred staff:"} {(customerData.preferredStaff || []).map((item: any) => item.name).join(", ") || "-"}</div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "الولاء" : "Loyalty"}</div>
+                  <div className="mt-3 space-y-2 text-sm text-gray-700">
+                    <div>{locale === "ar" ? "المستوى:" : "Tier:"} {customerData.loyaltyTier || "-"}</div>
+                    <div>{locale === "ar" ? "النقاط:" : "Points:"} {customerData.loyaltyPoints ?? 0}</div>
+                    <div>{locale === "ar" ? "نوع العميل:" : "Customer type:"} {customerData.customerType || "-"}</div>
+                  </div>
+                </div>
+              </div>
+              <AnalyticsDataTable
+                title={locale === "ar" ? "أحدث المواعيد" : "Recent appointments"}
+                columns={[
+                  { id: "date", header: locale === "ar" ? "التاريخ" : "Date" },
+                  { id: "service", header: locale === "ar" ? "الخدمة" : "Service" },
+                  { id: "status", header: locale === "ar" ? "الحالة" : "Status" },
+                  { id: "price", header: locale === "ar" ? "الإيراد" : "Revenue", align: "right" }
+                ]}
+                rows={(customerData.recentAppointments || []).map((appointment: any) => [
+                  appointment.date ? new Date(appointment.date).toLocaleDateString() : "-",
+                  appointment.service?.name_en || appointment.service?.name_ar || "-",
+                  appointment.status || "-",
+                  formatMoney(appointment.price)
+                ])}
+                sourceLabel={locale === "ar" ? "المواعيد" : "appointments"}
+              />
+            </div>
+          ),
+          appointments: (
+            <AnalyticsDataTable
+              columns={[
+                { id: "date", header: locale === "ar" ? "التاريخ" : "Date" },
+                { id: "service", header: locale === "ar" ? "الخدمة" : "Service" },
+                { id: "staff", header: locale === "ar" ? "الموظف" : "Staff" },
+                { id: "status", header: locale === "ar" ? "الحالة" : "Status" },
+                { id: "price", header: locale === "ar" ? "الإيراد" : "Revenue", align: "right" }
+              ]}
+              rows={(customerData.allAppointments || []).map((appointment: any) => [
+                appointment.date ? new Date(appointment.date).toLocaleDateString() : "-",
+                appointment.service?.name_en || appointment.service?.name_ar || "-",
+                appointment.staff?.name || "-",
+                appointment.status || "-",
+                formatMoney(appointment.price)
+              ])}
+              sourceLabel={locale === "ar" ? "المواعيد" : "appointments"}
+            />
+          ),
+          transactions: (
+            <AnalyticsDataTable
+              columns={[
+                { id: "date", header: locale === "ar" ? "التاريخ" : "Date" },
+                { id: "type", header: locale === "ar" ? "النوع" : "Type" },
+                { id: "reference", header: locale === "ar" ? "المرجع" : "Reference" },
+                { id: "amount", header: locale === "ar" ? "المبلغ" : "Amount", align: "right" },
+                { id: "status", header: locale === "ar" ? "الحالة" : "Status" }
+              ]}
+              rows={transactions.map((tx: any) => [
+                tx.processedAt ? new Date(tx.processedAt).toLocaleDateString() : "-",
+                tx.type || "-",
+                tx.reference || "-",
+                formatMoney(tx.amount),
+                tx.status || "-"
+              ])}
+              sourceLabel={locale === "ar" ? "العمليات" : "transactions"}
+            />
+          ),
+          wallet: (
+            <AnalyticsDataTable
+              columns={[
+                { id: "date", header: locale === "ar" ? "التاريخ" : "Date" },
+                { id: "type", header: locale === "ar" ? "النوع" : "Type" },
+                { id: "amount", header: locale === "ar" ? "المبلغ" : "Amount", align: "right" },
+                { id: "balance", header: locale === "ar" ? "الرصيد" : "Balance", align: "right" }
+              ]}
+              rows={(customerData.walletLedgerEntries || []).map((entry: any) => [
+                entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : "-",
+                entry.type || "-",
+                formatMoney(entry.amount),
+                formatMoney(entry.balanceAfter)
+              ])}
+              sourceLabel={locale === "ar" ? "المحفظة" : "wallet entries"}
+            />
+          ),
+          source: (
+            <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+              <p>{locale === "ar" ? "مصدر البيانات:" : "Data source:"} {locale === "ar" ? "سجل العميل المباشر" : "Live customer record"}</p>
+              <p>{locale === "ar" ? "الصفحة الأصلية:" : "Original page:"} <Link className="text-primary underline" href={`/${locale}/dashboard/customers/${customerId}`}>{locale === "ar" ? "ملف العميل" : "Customer profile"}</Link></p>
+              <p>{locale === "ar" ? "سجل المحفظة:" : "Wallet history:"} <Link className="text-primary underline" href={`/${locale}/dashboard/customers/${customerId}/wallet`}>{locale === "ar" ? "المحفظة" : "Wallet"}</Link></p>
+            </div>
+          )
+        },
+        actions: (
+          <>
+            <Link href={`/${locale}/dashboard/customers/${customerId}`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+              {locale === "ar" ? "ملف العميل" : "Customer profile"}
+            </Link>
+            <Link href={`/${locale}/dashboard/customers/${customerId}/wallet`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+              {locale === "ar" ? "المحفظة" : "Wallet"}
+            </Link>
+          </>
+        ),
+        sideNote: locale === "ar"
+          ? "البيانات أدناه مأخوذة من سجل العميل المباشر ولا تغير الحسابات الحالية."
+          : "The data below comes from the live customer record and does not change existing calculations."
+      });
+    } catch (error) {
+      setDetailDrawer({
+        title: customerName,
+        subtitle: locale === "ar" ? "تعذر تحميل التفاصيل" : "Failed to load drill-down data",
+        summaryItems: [
+          { label: locale === "ar" ? "الحجوزات" : "Bookings", value: customer?.bookings ?? customer?.totalBookings ?? 0 },
+          { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(customer?.revenue ?? customer?.totalSpent ?? 0) }
+        ],
+        tabs: [{ id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" }],
+        activeTab: "overview",
+        tabPanels: {
+          overview: (
+            <div className="rounded-2xl border border-dashed border-rose-300 bg-rose-50 p-5 text-sm text-rose-700">
+              {locale === "ar"
+                ? "تعذر تحميل سجلات العميل التفصيلية."
+                : "Unable to load the detailed customer records."}
+            </div>
+          )
+        }
+      });
+      console.error("Customer drill-down failed:", error);
+    }
+  };
+
+  const openEmployeeDetails = async (employee: EmployeeRevenue) => {
+    setDetailDrawer({
+      title: employee.name,
+      subtitle: locale === "ar" ? "تفاصيل الموظف المالية" : "Employee financial detail",
+      summaryItems: [
+        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: employee.totalBookings ?? 0 },
+        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(employee.totalRevenueGenerated) },
+        { label: locale === "ar" ? "العمولة" : "Commission", value: formatMoney(employee.totalCommission) },
+        { label: locale === "ar" ? "الإجمالي" : "Total earnings", value: formatMoney(employee.totalEarnings) }
+      ],
+      tabs: [
+        { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
+        { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+      ],
+      activeTab: "overview",
+      tabPanels: {
+        overview: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">
+            {locale === "ar"
+              ? "جاري تحميل تفاصيل الموظف."
+              : "Loading employee details."}
+          </div>
+        ),
+        appointments: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">
+            {locale === "ar"
+              ? "جاري تحميل سجل المواعيد."
+              : "Loading appointment history."}
+          </div>
+        ),
+        source: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            <Link className="text-primary underline" href={`/${locale}/dashboard/employees/${employee.id}`}>
+              {locale === "ar" ? "فتح صفحة الموظف" : "Open employee page"}
+            </Link>
+          </div>
+        )
+      },
+      actions: (
+        <Link href={`/${locale}/dashboard/employees/${employee.id}`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+          {locale === "ar" ? "صفحة الموظف" : "Employee page"}
+        </Link>
+      ),
+      sideNote: locale === "ar"
+        ? "يتم استخدام سجل الموظف المالي الحالي بدون تغيير الحسابات."
+        : "The current employee financial record is used without changing calculations."
+    });
+
+    try {
+      const response = await tenantApi.getEmployeeFinancialDetails(employee.id, { startDate, endDate });
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to load employee details");
+      }
+
+      const employeeData = response.employee || {};
+      const appointments = response.appointments || [];
+
+      setDetailDrawer({
+        title: employee.name,
+        subtitle: locale === "ar" ? "تفاصيل الموظف المالية" : "Employee financial detail",
+        summaryItems: [
+          { label: locale === "ar" ? "الحجوزات" : "Bookings", value: employeeData.stats?.totalBookings ?? employee.totalBookings ?? 0 },
+          { label: locale === "ar" ? "مكتمل" : "Completed", value: employeeData.stats?.completedBookings ?? 0 },
+          { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(employeeData.stats?.totalRevenueGenerated ?? employee.totalRevenueGenerated) },
+          { label: locale === "ar" ? "العمولة" : "Commission", value: formatMoney(employeeData.stats?.totalCommission ?? employee.totalCommission) }
+        ],
+        tabs: [
+          { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+          { id: "appointments", label: locale === "ar" ? "المواعيد" : "Appointments" },
+          { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+        ],
+        activeTab: "overview",
+        tabPanels: {
+          overview: (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-gray-200 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "الملف" : "Profile"}</div>
+                <div className="mt-2 space-y-2 text-sm text-gray-700">
+                  <div>{locale === "ar" ? "البريد:" : "Email:"} {employeeData.email || employee.email || "-"}</div>
+                  <div>{locale === "ar" ? "الهاتف:" : "Phone:"} {employeeData.phone || employee.phone || "-"}</div>
+                  <div>{locale === "ar" ? "الراتب:" : "Salary:"} {formatMoney(employeeData.salary ?? employee.salary)}</div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "الملخص" : "Summary"}</div>
+                <div className="mt-2 space-y-2 text-sm text-gray-700">
+                  <div>{locale === "ar" ? "الإجمالي:" : "Total earnings:"} {formatMoney(employeeData.stats?.totalEarnings ?? employee.totalEarnings)}</div>
+                  <div>{locale === "ar" ? "المواعيد المدفوعة:" : "Paid bookings:"} {employeeData.stats?.paidBookings ?? 0}</div>
+                </div>
+              </div>
+            </div>
+          ),
+          appointments: (
+            <AnalyticsDataTable
+              columns={[
+                { id: "date", header: locale === "ar" ? "التاريخ" : "Date" },
+                { id: "service", header: locale === "ar" ? "الخدمة" : "Service" },
+                { id: "customer", header: locale === "ar" ? "العميل" : "Customer" },
+                { id: "price", header: locale === "ar" ? "الإيراد" : "Revenue", align: "right" },
+                { id: "status", header: locale === "ar" ? "الحالة" : "Status" }
+              ]}
+              rows={appointments.map((appointment: any) => [
+                appointment.date ? new Date(appointment.date).toLocaleDateString() : "-",
+                appointment.service?.name_en || appointment.service?.name_ar || "-",
+                appointment.customer || "-",
+                formatMoney(appointment.price),
+                appointment.status || "-"
+              ])}
+              sourceLabel={locale === "ar" ? "المواعيد" : "appointments"}
+            />
+          ),
+          source: (
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+              <Link className="text-primary underline" href={`/${locale}/dashboard/employees/${employee.id}`}>
+                {locale === "ar" ? "فتح صفحة الموظف" : "Open employee page"}
+              </Link>
+            </div>
+          )
+        },
+        actions: (
+          <Link href={`/${locale}/dashboard/employees/${employee.id}`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+            {locale === "ar" ? "صفحة الموظف" : "Employee page"}
+          </Link>
+        ),
+        sideNote: locale === "ar"
+          ? "يأتي هذا العرض من endpoint تفاصيل الموظف المالي الحالي."
+          : "This view comes from the existing employee financial details endpoint."
+      });
+    } catch (error) {
+      console.error("Employee drill-down failed:", error);
+      setDetailDrawer((current) => current ? {
+        ...current,
+        tabPanels: {
+          ...current.tabPanels,
+          overview: (
+            <div className="rounded-2xl border border-dashed border-rose-300 bg-rose-50 p-5 text-sm text-rose-700">
+              {locale === "ar"
+                ? "تعذر تحميل تفاصيل الموظف."
+                : "Unable to load employee details."}
+            </div>
+          )
+        }
+      } : current);
+    }
+  };
+
+  const openServiceDetails = (service: ServiceRevenue) => {
+    setDetailDrawer({
+      title: locale === "ar" ? service.name_ar || service.name_en : service.name_en || service.name_ar,
+      subtitle: locale === "ar" ? "تفاصيل الخدمة" : "Service drill-down",
+      summaryItems: [
+        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: service.totalBookings ?? 0 },
+        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(service.totalRevenue) },
+        { label: locale === "ar" ? "إيراد المركز" : "Tenant revenue", value: formatMoney(service.totalTenantRevenue) }
+      ],
+      tabs: [
+        { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+      ],
+      activeTab: "overview",
+      tabPanels: {
+        overview: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            {locale === "ar"
+              ? "لا يوجد endpoint تفصيلي للخدمة حالياً. هذا العرض يعتمد على ملخص الخدمة الحالي مع رابط الصفحة الأصلية."
+              : "There is no dedicated service detail endpoint yet. This view uses the current service summary and links to the original page."}
+          </div>
+        ),
+        source: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            <Link className="text-primary underline" href={`/${locale}/dashboard/services/${service.id}`}>
+              {locale === "ar" ? "فتح صفحة الخدمة" : "Open service page"}
+            </Link>
+          </div>
+        )
+      },
+      actions: (
+        <Link href={`/${locale}/dashboard/services/${service.id}`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+          {locale === "ar" ? "صفحة الخدمة" : "Service page"}
+        </Link>
+      )
+    });
+  };
+
+  const openProductDetails = (product: ProductRevenue) => {
+    setDetailDrawer({
+      title: locale === "ar" ? product.name_ar || product.name_en : product.name_en || product.name_ar,
+      subtitle: locale === "ar" ? "تفاصيل المنتج" : "Product drill-down",
+      summaryItems: [
+        { label: locale === "ar" ? "الطلبات" : "Orders", value: product.totalOrders ?? 0 },
+        { label: locale === "ar" ? "الكمية" : "Quantity", value: product.totalQuantity ?? 0 },
+        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(product.totalRevenue) },
+        { label: locale === "ar" ? "إيراد المركز" : "Tenant revenue", value: formatMoney(product.totalTenantRevenue) }
+      ],
+      tabs: [
+        { id: "overview", label: locale === "ar" ? "نظرة عامة" : "Overview" },
+        { id: "source", label: locale === "ar" ? "المصدر" : "Source" }
+      ],
+      activeTab: "overview",
+      tabPanels: {
+        overview: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            {locale === "ar"
+              ? "لا يوجد endpoint تفصيلي للمنتج حالياً. هذا العرض يعتمد على ملخص المنتج الحالي مع رابط الصفحة الأصلية."
+              : "There is no dedicated product detail endpoint yet. This view uses the current product summary and links to the original page."}
+          </div>
+        ),
+        source: (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+            <Link className="text-primary underline" href={`/${locale}/dashboard/products/${product.id}`}>
+              {locale === "ar" ? "فتح صفحة المنتج" : "Open product page"}
+            </Link>
+          </div>
+        )
+      },
+      actions: (
+        <Link href={`/${locale}/dashboard/products/${product.id}`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+          {locale === "ar" ? "صفحة المنتج" : "Product page"}
+        </Link>
+      )
+    });
   };
 
   useEffect(() => {
@@ -1023,6 +1534,10 @@ export default function FinancialPage() {
                     formatMoney(emp.totalCommission),
                     formatMoney(emp.totalEarnings)
                   ])}
+                  onRowClick={(index) => {
+                    const row = employees[index];
+                    if (row) void openEmployeeDetails(row);
+                  }}
                 />
               </FinanceSectionCard>
             ) : null}
@@ -1046,6 +1561,10 @@ export default function FinancialPage() {
                     formatMoney(service.totalRevenue),
                     formatMoney(service.totalTenantRevenue)
                   ])}
+                  onRowClick={(index) => {
+                    const row = services[index];
+                    if (row) openServiceDetails(row);
+                  }}
                 />
               </FinanceSectionCard>
             ) : null}
@@ -1071,6 +1590,10 @@ export default function FinancialPage() {
                     formatMoney(product.totalRevenue),
                     formatMoney(product.totalTenantRevenue)
                   ])}
+                  onRowClick={(index) => {
+                    const row = products[index];
+                    if (row) openProductDetails(row);
+                  }}
                 />
               </FinanceSectionCard>
             ) : null}
@@ -1251,6 +1774,10 @@ export default function FinancialPage() {
                         customer.completed,
                         formatMoney(customer.revenue)
                       ])}
+                      onRowClick={(index) => {
+                        const row = customerAnalytics.topCustomers?.[index];
+                        if (row) void openCustomerDetails(row);
+                      }}
                       countLabel={
                         customerAnalytics.topCustomers?.length
                           ? (locale === "ar"
@@ -1424,6 +1951,10 @@ export default function FinancialPage() {
                       customer.bookings,
                       formatMoney(customer.revenue)
                     ])}
+                    onRowClick={(index) => {
+                      const row = customerAnalytics?.topCustomers?.[index];
+                      if (row) void openCustomerDetails(row);
+                    }}
                     countLabel={
                       customerAnalytics?.topCustomers?.length
                         ? (locale === "ar"
@@ -1466,6 +1997,21 @@ export default function FinancialPage() {
           </div>
         )}
       </FinanceWorkspaceShell>
+      {detailDrawer ? (
+        <AnalyticsDetailsDrawer
+          open={true}
+          title={detailDrawer.title}
+          subtitle={detailDrawer.subtitle}
+          onClose={closeDetailDrawer}
+          summaryItems={detailDrawer.summaryItems}
+          tabs={detailDrawer.tabs}
+          activeTab={detailDrawer.activeTab}
+          onTabChange={(tabId) => setDetailDrawer((current) => current ? { ...current, activeTab: tabId as DrilldownTabId } : current)}
+          tabPanels={detailDrawer.tabPanels}
+          actions={detailDrawer.actions}
+          sideNote={detailDrawer.sideNote}
+        />
+      ) : null}
     </TenantLayout>
   );
 }
