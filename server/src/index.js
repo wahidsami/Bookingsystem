@@ -106,6 +106,7 @@ app.use((req, res, next) => {
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Vary', 'Origin');
         res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
         res.setHeader(
             'Access-Control-Allow-Headers',
             req.headers['access-control-request-headers'] || 'Content-Type,Authorization,X-Requested-With,Accept,Origin'
@@ -132,6 +133,7 @@ app.use(cors({
         return callback(null, false);
     },
     credentials: true,
+    exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
     optionsSuccessStatus: 204
 }));
 

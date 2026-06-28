@@ -284,10 +284,17 @@ class TenantApiClient {
 
     const contentDisposition = response.headers.get('content-disposition') || '';
     const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+    const defaultFilename = endpoint.includes('/tenant/reports/pdf')
+      ? 'report.pdf'
+      : endpoint.includes('/invoice-pdf') || endpoint.includes('/receipt-pdf')
+        ? 'invoice.pdf'
+        : endpoint.includes('/pos/closing/export')
+          ? 'pos-closing.pdf'
+          : 'document.pdf';
 
     return {
       blob: await response.blob(),
-      filename: filenameMatch?.[1] || 'invoice.pdf'
+      filename: filenameMatch?.[1] || defaultFilename
     };
   }
 
