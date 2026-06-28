@@ -1100,12 +1100,8 @@ async function buildFullReportData(req, sections, startDate, endDate) {
                 }
                 if (sections.includes('discounts') && overview.discountTotals) {
                     result.discounts = overview.discountTotals;
-    }
-}
-
-function getTenantDisplayName(tenant) {
-    return tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
-}
+                }
+            }
         });
     }
 
@@ -1249,6 +1245,10 @@ function getTenantDisplayName(tenant) {
     }
 
     return result;
+}
+
+function getTenantDisplayName(tenant) {
+    return tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
 }
 
 const SAVED_REPORT_SECTION_IDS = new Set([
