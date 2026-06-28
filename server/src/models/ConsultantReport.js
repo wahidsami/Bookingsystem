@@ -56,6 +56,17 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 'business_snapshot'
         },
+        analysisVersion: {
+            type: DataTypes.STRING(32),
+            allowNull: false,
+            defaultValue: 'v1'
+        },
+        snapshotHash: {
+            type: DataTypes.STRING(128),
+            allowNull: false,
+            defaultValue: '',
+            comment: 'Stable hash of the input snapshot used to generate this analysis'
+        },
         title: {
             type: DataTypes.STRING(255),
             allowNull: false
@@ -121,6 +132,11 @@ module.exports = (sequelize, DataTypes) => {
             {
                 fields: ['tenantId', 'snapshotId'],
                 name: 'idx_consultant_reports_snapshot'
+            },
+            {
+                fields: ['tenantId', 'snapshotHash', 'analysisVersion'],
+                unique: true,
+                name: 'idx_consultant_reports_hash'
             }
         ]
     });

@@ -299,5 +299,8 @@ router.post('/ai/generate-product', checkTenantFeature('hasAIContentAssistant'),
 router.post('/ai/generate-service', checkTenantFeature('hasAIContentAssistant'), aiController.generateService);
 router.post('/ai/generate-about-us', checkTenantFeature('hasAIContentAssistant'), aiController.generateAboutUs);
 router.post('/ai/translate', checkTenantFeature('hasAIContentAssistant'), aiController.translateText);
+router.post('/ai/consultant/analyze', checkTenantFeature('hasAIContentAssistant'), aiController.analyzeConsultantSnapshot);
+router.get('/ai/consultant/reports', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantReports);
+router.get('/ai/consultant/reports/:id', checkTenantFeature('hasAIContentAssistant'), aiController.getConsultantReport);
 
 module.exports = router;

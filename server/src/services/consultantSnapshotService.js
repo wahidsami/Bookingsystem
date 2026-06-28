@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const db = require('../models');
 
@@ -11,6 +12,8 @@ const toNumber = (value) => {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const buildStableHash = (value) => crypto.createHash('sha256').update(JSON.stringify(value || {})).digest('hex');
 
 const toDate = (value) => (value ? new Date(value) : new Date());
 
@@ -760,6 +763,12 @@ async function buildBusinessSnapshot({
         periodStart: window.periodStart,
         periodEnd: window.periodEnd,
         previousWindow,
+        snapshotHash: buildStableHash({
+            periodType: window.periodType,
+            periodStart: window.periodStart.toISOString(),
+            periodEnd: window.periodEnd.toISOString(),
+            data
+        }),
         data,
         summary,
         currentInputs
@@ -788,6 +797,7 @@ async function saveBusinessSnapshot({
         periodEnd: snapshot.periodEnd,
         generatedAt: new Date(),
         datasetVersion: 'v1',
+        snapshotHash: snapshot.snapshotHash || buildStableHash(snapshot.data),
         currency: DEFAULT_CURRENCY,
         summary: snapshot.summary,
         financial: snapshot.data.financial,
@@ -826,6 +836,8 @@ async function saveConsultantReport({
     tenantId,
     snapshotId = null,
     createdByUserId = null,
+    snapshotHash = '',
+    analysisVersion = 'v1',
     title = 'Business Snapshot',
     description = null,
     periodType = 'daily',
@@ -844,9 +856,11 @@ async function saveConsultantReport({
         tenantId,
         snapshotId,
         createdByUserId,
+        snapshotHash,
+        analysisVersion,
         title,
         description,
-        reportType: 'business_snapshot',
+        reportType: 'consultant_analysis',
         periodType,
         periodStart,
         periodEnd,

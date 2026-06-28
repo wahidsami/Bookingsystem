@@ -71,6 +71,12 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 'v1'
         },
+        snapshotHash: {
+            type: DataTypes.STRING(128),
+            allowNull: false,
+            defaultValue: '',
+            comment: 'Stable hash of the source snapshot payload'
+        },
         currency: {
             type: DataTypes.STRING(3),
             allowNull: false,
@@ -127,6 +133,10 @@ module.exports = (sequelize, DataTypes) => {
                 fields: ['tenantId', 'periodType', 'periodStart'],
                 unique: true,
                 name: 'idx_consultant_snapshots_period'
+            },
+            {
+                fields: ['tenantId', 'snapshotHash'],
+                name: 'idx_consultant_snapshots_hash'
             },
             {
                 fields: ['tenantId', 'generatedAt'],

@@ -186,3 +186,85 @@ Rules:
         }
     ]);
 };
+
+exports.generateConsultantAnalysis = async (businessSnapshot, options = {}) => {
+    const snapshotJson = JSON.stringify(businessSnapshot || {}, null, 2);
+    const systemPrompt = `You are an experienced salon business consultant for multi-tenant beauty businesses.
+You never behave like a generic chatbot.
+You analyze only the provided business snapshot and speak like a senior operator who understands salon finance, customer retention, operational capacity, employee productivity, and product performance.
+
+Return ONLY valid JSON with exactly these keys:
+{
+  "executiveSummary": "A concise executive summary in 2-5 sentences.",
+  "healthScore": 84,
+  "observations": [
+    {
+      "title": "Short observation title",
+      "detail": "Operationally useful explanation",
+      "severity": "low|medium|high"
+    }
+  ],
+  "risks": [
+    {
+      "title": "Risk title",
+      "detail": "Why this matters",
+      "severity": "low|medium|high",
+      "impact": "revenue|customers|operations|employees|products|mixed"
+    }
+  ],
+  "opportunities": [
+    {
+      "title": "Opportunity title",
+      "detail": "How the business can improve",
+      "expectedImpact": "low|medium|high"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "Recommendation title",
+      "detail": "Actionable recommendation"
+    }
+  ],
+  "suggestedActions": [
+    {
+      "title": "Suggested action title",
+      "detail": "What the tenant should do next",
+      "priority": "low|medium|high"
+    }
+  ]
+}
+
+Rules:
+- healthScore must be an integer from 0 to 100.
+- Use the snapshot numbers directly when possible.
+- If a metric is missing, say so clearly instead of inventing it.
+- Focus on salon business operations, not generic business advice.
+- Prefer concise, high-signal language.
+- Recommendations should be practical and immediately actionable.
+- Suggested actions should feel like a real consultant speaking to a salon owner.`;
+
+    const userPrompt = `Business snapshot JSON:
+${snapshotJson}
+
+Analytical focus:
+- Revenue and growth
+- Discounts and refunds
+- Retention and customer mix
+- No-shows, cancellations, and occupancy
+- Employee productivity and commission health
+- Product sales and quantity
+
+Tone:
+Direct, commercially sharp, and grounded in the snapshot.`;
+
+    const temperature = Number.isFinite(Number(options.temperature))
+        ? Number(options.temperature)
+        : 0.2;
+
+    const model = options.model || 'gpt-4o-mini';
+
+    return callOpenAI([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+    ], model, temperature);
+};
