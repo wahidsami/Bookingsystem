@@ -15,6 +15,7 @@ import {
   FinanceWorkspaceShell,
   type FinanceSidebarGroup
 } from "@/components/FinanceWorkspaceShell";
+import { AnalyticsDataTable } from "@/components/AnalyticsDataTable";
 import { Currency } from "@/components/Currency";
 import { tenantApi } from "@/lib/api";
 import {
@@ -158,48 +159,33 @@ function TrendSparkline({
 function SectionTable({
   headers,
   rows,
-  rtl = false
+  rtl = false,
+  sourceLabel,
+  totalRows,
+  truncatedLabel
 }: {
   headers: string[];
   rows: ReactNode[][];
   rtl?: boolean;
+  sourceLabel?: string;
+  totalRows?: number;
+  truncatedLabel?: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-3xl border border-gray-200">
-      <table className="min-w-full bg-white text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            {headers.map((header) => (
-              <th
-                key={header}
-                className={`px-4 py-3 font-semibold text-gray-600 ${rtl ? "text-right" : "text-left"}`}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {rows.length ? (
-            rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-gray-50/70">
-                {row.map((cell, cellIndex) => (
-                  <td key={cellIndex} className="px-4 py-3 align-top text-gray-800">
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td className="px-4 py-10 text-center text-gray-500" colSpan={headers.length}>
-                No rows found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <AnalyticsDataTable
+      columns={headers.map((header, index) => ({
+        id: `${header}-${index}`,
+        header,
+        align: index === 0 ? (rtl ? "right" : "left") : "right",
+      }))}
+      rows={rows}
+      sourceLabel={sourceLabel || "rows"}
+      totalRows={totalRows}
+      truncatedLabel={truncatedLabel}
+      emptyTitle={rtl ? "لا توجد صفوف" : "No rows found"}
+      emptyDescription={rtl ? "لا توجد بيانات مطابقة للمرشحات الحالية." : "No rows match the current filters."}
+      searchPlaceholder={rtl ? "ابحث داخل الجدول" : "Search this table"}
+    />
   );
 }
 
@@ -856,7 +842,7 @@ export default function ReportsPage() {
                       locale === "ar" ? "المكتملة" : "Completed",
                       locale === "ar" ? "الإيراد" : "Revenue"
                     ]}
-                    rows={bookingTrends.slice(0, 8).map((trend) => [
+                    rows={bookingTrends.map((trend) => [
                       trend.date,
                       safeNumber(trend.bookings),
                       safeNumber(trend.completed),
@@ -903,7 +889,7 @@ export default function ReportsPage() {
                     locale === "ar" ? "الحجوزات" : "Bookings",
                     locale === "ar" ? "الإيراد" : "Revenue"
                   ]}
-                  rows={servicePerformance.slice(0, 6).map((service) => [
+                  rows={servicePerformance.map((service) => [
                     locale === "ar" ? service.name_ar : service.name_en,
                     safeNumber(service.totalBookings),
                     formatMoney(service.revenue ?? service.totalRevenue)
@@ -922,11 +908,20 @@ export default function ReportsPage() {
                     locale === "ar" ? "الحجوزات" : "Bookings",
                     locale === "ar" ? "الإيراد" : "Revenue"
                   ]}
-                  rows={(customerAnalytics?.topCustomers || []).slice(0, 6).map((customer: any) => [
+                  rows={(customerAnalytics?.topCustomers || []).map((customer: any) => [
                     customer.name || customer.id,
                     safeNumber(customer.bookings),
                     formatMoney(customer.revenue)
                   ])}
+                  countLabel={
+                    customerAnalytics?.topCustomers?.length
+                      ? (locale === "ar"
+                        ? `عرض أفضل ${customerAnalytics.topCustomers.length} سجلات`
+                        : `Showing Top ${customerAnalytics.topCustomers.length} Records`)
+                      : undefined
+                  }
+                  sourceLabel={locale === "ar" ? "العملاء" : "customers"}
+                  totalRows={customerAnalytics?.topCustomers?.length}
                 />
               </FinanceSectionCard>
             </div>

@@ -13,6 +13,7 @@ import {
   type FinanceSidebarGroup
 } from "@/components/FinanceWorkspaceShell";
 import { Currency } from "@/components/Currency";
+import { AnalyticsDataTable } from "@/components/AnalyticsDataTable";
 import { tenantApi } from "@/lib/api";
 import {
   buildRuleBasedAlerts,
@@ -296,51 +297,33 @@ function TrendSparkline({
 function SectionTable({
   headers,
   rows,
-  rtl = false
+  rtl = false,
+  sourceLabel,
+  totalRows,
+  truncatedLabel
 }: {
   headers: string[];
   rows: ReactNode[][];
   rtl?: boolean;
+  sourceLabel?: string;
+  totalRows?: number;
+  truncatedLabel?: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-3xl border border-gray-200">
-      <table className="min-w-full bg-white text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            {headers.map((header) => (
-              <th
-                key={header}
-                className={`px-4 py-3 font-semibold text-gray-600 ${rtl ? "text-right" : "text-left"}`}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {rows.length ? (
-            rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-gray-50/70">
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    className={`px-4 py-3 align-top text-gray-800 ${cellIndex === 0 && !rtl ? "font-medium" : ""}`}
-                  >
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td className="px-4 py-10 text-center text-gray-500" colSpan={headers.length}>
-                No rows found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <AnalyticsDataTable
+      columns={headers.map((header, index) => ({
+        id: `${header}-${index}`,
+        header,
+        align: index === 0 ? (rtl ? "right" : "left") : "right",
+      }))}
+      rows={rows}
+      sourceLabel={sourceLabel || "rows"}
+      totalRows={totalRows}
+      truncatedLabel={truncatedLabel}
+      emptyTitle={rtl ? "لا توجد صفوف" : "No rows found"}
+      emptyDescription={rtl ? "لا توجد بيانات مطابقة للمرشحات الحالية." : "No rows match the current filters."}
+      searchPlaceholder={rtl ? "ابحث داخل الجدول" : "Search this table"}
+    />
   );
 }
 
@@ -966,7 +949,7 @@ export default function FinancialPage() {
                       <SectionTable
                         rtl={isRTL}
                         headers={[locale === "ar" ? "التاريخ" : "Date", locale === "ar" ? "الحجوزات" : "Bookings", locale === "ar" ? "الإيراد" : "Revenue", locale === "ar" ? "إيراد المركز" : "Tenant revenue"]}
-                        rows={dailyRevenue.slice(0, 8).map((day) => [
+                        rows={dailyRevenue.map((day) => [
                           day.date,
                           day.bookings,
                           formatMoney(day.revenue),
@@ -1268,6 +1251,15 @@ export default function FinancialPage() {
                         customer.completed,
                         formatMoney(customer.revenue)
                       ])}
+                      countLabel={
+                        customerAnalytics.topCustomers?.length
+                          ? (locale === "ar"
+                            ? `عرض أفضل ${customerAnalytics.topCustomers.length} سجلات`
+                            : `Showing Top ${customerAnalytics.topCustomers.length} Records`)
+                          : undefined
+                      }
+                      sourceLabel={locale === "ar" ? "العملاء" : "customers"}
+                      totalRows={customerAnalytics.topCustomers?.length}
                     />
                   </div>
                 ) : (
@@ -1427,11 +1419,20 @@ export default function FinancialPage() {
                       locale === "ar" ? "الحجوزات" : "Bookings",
                       locale === "ar" ? "الإيراد" : "Revenue"
                     ]}
-                    rows={(customerAnalytics?.topCustomers || []).slice(0, 5).map((customer) => [
+                    rows={(customerAnalytics?.topCustomers || []).map((customer) => [
                       customer.id,
                       customer.bookings,
                       formatMoney(customer.revenue)
                     ])}
+                    countLabel={
+                      customerAnalytics?.topCustomers?.length
+                        ? (locale === "ar"
+                          ? `عرض أفضل ${customerAnalytics.topCustomers.length} سجلات`
+                          : `Showing Top ${customerAnalytics.topCustomers.length} Records`)
+                        : undefined
+                    }
+                    sourceLabel={locale === "ar" ? "العملاء" : "customers"}
+                    totalRows={customerAnalytics?.topCustomers?.length}
                   />
                 </FinanceSectionCard>
 
@@ -1441,7 +1442,7 @@ export default function FinancialPage() {
                 >
                   {posClosingSummary ? (
                     <div className="space-y-3">
-                      {(posClosingSummary.totalsByMethod || []).slice(0, 4).map((method) => (
+                      {(posClosingSummary.totalsByMethod || []).map((method) => (
                         <div key={method.paymentMethod} className="rounded-2xl border border-gray-200 p-4">
                           <div className={`flex items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
                             <span className="font-medium text-gray-700">{method.paymentMethodLabel}</span>

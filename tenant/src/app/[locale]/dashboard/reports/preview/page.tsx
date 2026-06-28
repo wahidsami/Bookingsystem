@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTenantAuth } from '@/contexts/TenantAuthContext';
 import { ReportHeader } from '@/components/ReportHeader';
 import { ReportExportToolbar } from '@/components/ReportExportToolbar';
+import { AnalyticsDataTable } from '@/components/AnalyticsDataTable';
 import { API_BASE_URL, tenantApi } from '@/lib/api';
 import { Currency } from '@/components/Currency';
 import { ReportPdfDebugPanel, type ReportPdfDebugState } from '@/components/ReportPdfDebugPanel';
@@ -347,28 +348,23 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الموظف' : 'Employee'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'العمولة' : 'Commission'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإجمالي' : 'Total earnings'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.employees || []).map((emp: any) => (
-                      <tr key={emp.id} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{emp.name}</td>
-                        <td className="px-3 py-2 text-right">{emp.totalBookings ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={emp.totalRevenueGenerated ?? 0} /></td>
-                        <td className="px-3 py-2 text-right"><Currency amount={emp.totalCommission ?? 0} /></td>
-                        <td className="px-3 py-2 text-right"><Currency amount={emp.totalEarnings ?? 0} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'employee', header: locale === 'ar' ? 'الموظف' : 'Employee' },
+                    { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                    { id: 'commission', header: locale === 'ar' ? 'العمولة' : 'Commission', align: 'right' },
+                    { id: 'earnings', header: locale === 'ar' ? 'الإجمالي' : 'Total earnings', align: 'right' },
+                  ]}
+                  rows={(data.employees || []).map((emp: any) => [
+                    emp.name,
+                    emp.totalBookings ?? 0,
+                    <Currency amount={emp.totalRevenueGenerated ?? 0} />,
+                    <Currency amount={emp.totalCommission ?? 0} />,
+                    <Currency amount={emp.totalEarnings ?? 0} />,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'الموظفين' : 'employees'}
+                />
               </section>
             )}
 
@@ -386,26 +382,21 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'إيرادك' : 'Tenant revenue'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.services || []).map((s: any) => (
-                      <tr key={s.id} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{locale === 'ar' ? s.name_ar : s.name_en}</td>
-                        <td className="px-3 py-2 text-right">{s.totalBookings ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={s.totalRevenue ?? 0} /></td>
-                        <td className="px-3 py-2 text-right"><Currency amount={s.totalTenantRevenue ?? 0} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'service', header: locale === 'ar' ? 'الخدمة' : 'Service' },
+                    { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                    { id: 'tenant-revenue', header: locale === 'ar' ? 'إيرادك' : 'Tenant revenue', align: 'right' },
+                  ]}
+                  rows={(data.services || []).map((s: any) => [
+                    locale === 'ar' ? s.name_ar : s.name_en,
+                    s.totalBookings ?? 0,
+                    <Currency amount={s.totalRevenue ?? 0} />,
+                    <Currency amount={s.totalTenantRevenue ?? 0} />,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'الخدمات' : 'services'}
+                />
               </section>
             )}
 
@@ -423,28 +414,23 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'المنتج' : 'Product'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الطلبات' : 'Orders'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'إيرادك' : 'Tenant revenue'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.products || []).map((p: any) => (
-                      <tr key={p.id} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{locale === 'ar' ? p.name_ar : p.name_en}</td>
-                        <td className="px-3 py-2 text-right">{p.totalOrders ?? 0}</td>
-                        <td className="px-3 py-2 text-right">{p.totalQuantity ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={p.totalRevenue ?? 0} /></td>
-                        <td className="px-3 py-2 text-right"><Currency amount={p.totalTenantRevenue ?? 0} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'product', header: locale === 'ar' ? 'المنتج' : 'Product' },
+                    { id: 'orders', header: locale === 'ar' ? 'الطلبات' : 'Orders', align: 'right' },
+                    { id: 'quantity', header: locale === 'ar' ? 'الكمية' : 'Quantity', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                    { id: 'tenant-revenue', header: locale === 'ar' ? 'إيرادك' : 'Tenant revenue', align: 'right' },
+                  ]}
+                  rows={(data.products || []).map((p: any) => [
+                    locale === 'ar' ? p.name_ar : p.name_en,
+                    p.totalOrders ?? 0,
+                    p.totalQuantity ?? 0,
+                    <Currency amount={p.totalRevenue ?? 0} />,
+                    <Currency amount={p.totalTenantRevenue ?? 0} />,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'المنتجات' : 'products'}
+                />
               </section>
             )}
 
@@ -462,26 +448,21 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الطلبات' : 'Orders'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.dailyRevenue || []).map((d: any) => (
-                      <tr key={d.date} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{d.date}</td>
-                        <td className="px-3 py-2 text-right">{d.bookings ?? 0}</td>
-                        <td className="px-3 py-2 text-right">{d.orders ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={d.revenue ?? 0} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'date', header: locale === 'ar' ? 'التاريخ' : 'Date' },
+                    { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                    { id: 'orders', header: locale === 'ar' ? 'الطلبات' : 'Orders', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                  ]}
+                  rows={(data.dailyRevenue || []).map((d: any) => [
+                    d.date,
+                    d.bookings ?? 0,
+                    d.orders ?? 0,
+                    <Currency amount={d.revenue ?? 0} />,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'الأيام' : 'days'}
+                />
               </section>
             )}
 
@@ -499,26 +480,21 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'المكتملة' : 'Completed'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.bookingTrends || []).map((t: any) => (
-                      <tr key={t.date} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{t.date}</td>
-                        <td className="px-3 py-2 text-right">{t.bookings ?? 0}</td>
-                        <td className="px-3 py-2 text-right">{t.completed ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={t.revenue ?? 0} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'date', header: locale === 'ar' ? 'التاريخ' : 'Date' },
+                    { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                    { id: 'completed', header: locale === 'ar' ? 'المكتملة' : 'Completed', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                  ]}
+                  rows={(data.bookingTrends || []).map((t: any) => [
+                    t.date,
+                    t.bookings ?? 0,
+                    t.completed ?? 0,
+                    <Currency amount={t.revenue ?? 0} />,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'الأيام' : 'days'}
+                />
               </section>
             )}
 
@@ -536,26 +512,21 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'معدل الإكمال' : 'Completion %'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.servicePerformance || []).map((s: any) => (
-                      <tr key={s.id} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{locale === 'ar' ? s.name_ar : s.name_en}</td>
-                        <td className="px-3 py-2 text-right">{s.totalBookings ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={s.revenue ?? 0} /></td>
-                        <td className="px-3 py-2 text-right">{s.completionRate ?? 0}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'service', header: locale === 'ar' ? 'الخدمة' : 'Service' },
+                    { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                    { id: 'completion', header: locale === 'ar' ? 'معدل الإكمال' : 'Completion %', align: 'right' },
+                  ]}
+                  rows={(data.servicePerformance || []).map((s: any) => [
+                    locale === 'ar' ? s.name_ar : s.name_en,
+                    s.totalBookings ?? 0,
+                    <Currency amount={s.revenue ?? 0} />,
+                    `${s.completionRate ?? 0}%`,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'الخدمات' : 'services'}
+                />
               </section>
             )}
 
@@ -573,28 +544,23 @@ export default function ReportPreviewPage() {
                     {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
                   </button>
                 </div>
-                <table className="w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الموظف' : 'Employee'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'العمولة' : 'Commission'}</th>
-                      <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'معدل الإكمال' : 'Completion %'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.employeePerformance || []).map((e: any) => (
-                      <tr key={e.id} className="border-b border-gray-100">
-                        <td className="px-3 py-2">{e.name}</td>
-                        <td className="px-3 py-2 text-right">{e.totalBookings ?? 0}</td>
-                        <td className="px-3 py-2 text-right"><Currency amount={e.revenue ?? 0} /></td>
-                        <td className="px-3 py-2 text-right"><Currency amount={e.commission ?? 0} /></td>
-                        <td className="px-3 py-2 text-right">{e.completionRate ?? 0}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AnalyticsDataTable
+                  columns={[
+                    { id: 'employee', header: locale === 'ar' ? 'الموظف' : 'Employee' },
+                    { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                    { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                    { id: 'commission', header: locale === 'ar' ? 'العمولة' : 'Commission', align: 'right' },
+                    { id: 'completion', header: locale === 'ar' ? 'معدل الإكمال' : 'Completion %', align: 'right' },
+                  ]}
+                  rows={(data.employeePerformance || []).map((e: any) => [
+                    e.name,
+                    e.totalBookings ?? 0,
+                    <Currency amount={e.revenue ?? 0} />,
+                    <Currency amount={e.commission ?? 0} />,
+                    `${e.completionRate ?? 0}%`,
+                  ])}
+                  sourceLabel={locale === 'ar' ? 'الموظفين' : 'employees'}
+                />
               </section>
             )}
 
@@ -643,45 +609,49 @@ export default function ReportPreviewPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <p className="text-sm font-semibold text-gray-900 mb-2">{locale === 'ar' ? 'أكبر الخدمات المخفضة' : 'Top discounted services'}</p>
-                      <table className="w-full border border-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
-                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
-                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الخصم' : 'Discount'}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(data.discounts.topDiscountedServices || []).map((item: any) => (
-                            <tr key={item.id} className="border-b border-gray-100">
-                              <td className="px-3 py-2">{locale === 'ar' ? item.name_ar : item.name_en}</td>
-                              <td className="px-3 py-2 text-right">{item.bookingCount ?? 0}</td>
-                              <td className="px-3 py-2 text-right"><Currency amount={item.discountAmount ?? 0} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <AnalyticsDataTable
+                        columns={[
+                          { id: 'service', header: locale === 'ar' ? 'الخدمة' : 'Service' },
+                          { id: 'bookings', header: locale === 'ar' ? 'الحجوزات' : 'Bookings', align: 'right' },
+                          { id: 'discount', header: locale === 'ar' ? 'الخصم' : 'Discount', align: 'right' },
+                        ]}
+                        rows={(data.discounts.topDiscountedServices || []).map((item: any) => [
+                          locale === 'ar' ? item.name_ar : item.name_en,
+                          item.bookingCount ?? 0,
+                          <Currency amount={item.discountAmount ?? 0} />,
+                        ])}
+                        countLabel={
+                          (data.discounts.topDiscountedServices || []).length
+                            ? (locale === 'ar'
+                              ? `عرض أفضل ${(data.discounts.topDiscountedServices || []).length} سجلات`
+                              : `Showing Top ${(data.discounts.topDiscountedServices || []).length} Records`)
+                            : undefined
+                        }
+                        sourceLabel={locale === 'ar' ? 'الخدمات' : 'services'}
+                      />
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-900 mb-2">{locale === 'ar' ? 'أكبر الطلبات المخفضة' : 'Top discounted orders'}</p>
-                      <table className="w-full border border-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الطلب' : 'Order'}</th>
-                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'القيمة الأساسية' : 'Base amount'}</th>
-                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الخصم' : 'Discount'}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(data.discounts.topDiscountedOrders || []).map((item: any) => (
-                            <tr key={item.id} className="border-b border-gray-100">
-                              <td className="px-3 py-2">{item.orderNumber}</td>
-                              <td className="px-3 py-2 text-right"><Currency amount={item.baseAmount ?? 0} /></td>
-                              <td className="px-3 py-2 text-right"><Currency amount={item.discountAmount ?? 0} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <AnalyticsDataTable
+                        columns={[
+                          { id: 'order', header: locale === 'ar' ? 'الطلب' : 'Order' },
+                          { id: 'base', header: locale === 'ar' ? 'القيمة الأساسية' : 'Base amount', align: 'right' },
+                          { id: 'discount', header: locale === 'ar' ? 'الخصم' : 'Discount', align: 'right' },
+                        ]}
+                        rows={(data.discounts.topDiscountedOrders || []).map((item: any) => [
+                          item.orderNumber,
+                          <Currency amount={item.baseAmount ?? 0} />,
+                          <Currency amount={item.discountAmount ?? 0} />,
+                        ])}
+                        countLabel={
+                          (data.discounts.topDiscountedOrders || []).length
+                            ? (locale === 'ar'
+                              ? `عرض أفضل ${(data.discounts.topDiscountedOrders || []).length} سجلات`
+                              : `Showing Top ${(data.discounts.topDiscountedOrders || []).length} Records`)
+                            : undefined
+                        }
+                        sourceLabel={locale === 'ar' ? 'الطلبات' : 'orders'}
+                      />
                     </div>
                   </div>
                 </section>
@@ -705,32 +675,27 @@ export default function ReportPreviewPage() {
                     <div><span className="text-gray-600">{locale === 'ar' ? 'إجمالي الاسترداد:' : 'Refunds total:'}</span> <Currency amount={data.refunds?.totals?.totalRefunds ?? 0} /></div>
                     <div><span className="text-gray-600">{locale === 'ar' ? 'عدد الاستردادات:' : 'Refund count:'}</span> {data.refunds?.totals?.refundCount ?? 0}</div>
                   </div>
-                  <table className="w-full border border-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'العميل' : 'Customer'}</th>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'المرجع' : 'Reference'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'المبلغ' : 'Amount'}</th>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'طريقة الدفع' : 'Payment method'}</th>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'السبب' : 'Reason'}</th>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'النوع' : 'Type'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(data.refunds?.rows || []).map((item: any) => (
-                        <tr key={item.id} className="border-b border-gray-100">
-                          <td className="px-3 py-2">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
-                          <td className="px-3 py-2">{item.customer}</td>
-                          <td className="px-3 py-2">{item.reference}</td>
-                          <td className="px-3 py-2 text-right"><Currency amount={item.amount ?? 0} /></td>
-                          <td className="px-3 py-2">{item.paymentMethodLabel}</td>
-                          <td className="px-3 py-2">{item.refundReason || '-'}</td>
-                          <td className="px-3 py-2">{item.refundMode}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <AnalyticsDataTable
+                    columns={[
+                      { id: 'date', header: locale === 'ar' ? 'التاريخ' : 'Date' },
+                      { id: 'customer', header: locale === 'ar' ? 'العميل' : 'Customer' },
+                      { id: 'reference', header: locale === 'ar' ? 'المرجع' : 'Reference' },
+                      { id: 'amount', header: locale === 'ar' ? 'المبلغ' : 'Amount', align: 'right' },
+                      { id: 'method', header: locale === 'ar' ? 'طريقة الدفع' : 'Payment method' },
+                      { id: 'reason', header: locale === 'ar' ? 'السبب' : 'Reason' },
+                      { id: 'type', header: locale === 'ar' ? 'النوع' : 'Type' },
+                    ]}
+                    rows={(data.refunds?.rows || []).map((item: any) => [
+                      item.date ? new Date(item.date).toLocaleDateString() : '-',
+                      item.customer,
+                      item.reference,
+                      <Currency amount={item.amount ?? 0} />,
+                      item.paymentMethodLabel,
+                      item.refundReason || '-',
+                      item.refundMode,
+                    ])}
+                    sourceLabel={locale === 'ar' ? 'الاستردادات' : 'refunds'}
+                  />
                 </section>
               ) : (
                 <EmptyReportSection
@@ -754,24 +719,26 @@ export default function ReportPreviewPage() {
                     <div><span className="text-gray-600">{locale === 'ar' ? 'إيراد معاد حجزه:' : 'Rebooked revenue:'}</span> <Currency amount={data.rebookings?.totals?.rebookedRevenue ?? 0} /></div>
                     <div><span className="text-gray-600">{locale === 'ar' ? 'الحجوزات المعادة:' : 'Rebooked appointments:'}</span> {data.rebookings?.totals?.rebookedAppointments ?? 0}</div>
                   </div>
-                  <table className="w-full border border-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الموظف' : 'Employee'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'إعادة الحجز' : 'Rebooked'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(data.rebookings?.topRebookingEmployees || []).map((item: any) => (
-                        <tr key={item.id || item.name} className="border-b border-gray-100">
-                          <td className="px-3 py-2">{item.name}</td>
-                          <td className="px-3 py-2 text-right">{item.rebookedAppointments ?? item.rebookingCount ?? 0}</td>
-                          <td className="px-3 py-2 text-right"><Currency amount={item.rebookedRevenue ?? item.revenue ?? 0} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <AnalyticsDataTable
+                    columns={[
+                      { id: 'employee', header: locale === 'ar' ? 'الموظف' : 'Employee' },
+                      { id: 'rebooked', header: locale === 'ar' ? 'إعادة الحجز' : 'Rebooked', align: 'right' },
+                      { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                    ]}
+                    rows={(data.rebookings?.topRebookingEmployees || []).map((item: any) => [
+                      item.name,
+                      item.rebookedAppointments ?? item.rebookingCount ?? 0,
+                      <Currency amount={item.rebookedRevenue ?? item.revenue ?? 0} />,
+                    ])}
+                    countLabel={
+                      (data.rebookings?.topRebookingEmployees || []).length
+                        ? (locale === 'ar'
+                          ? `عرض أفضل ${(data.rebookings?.topRebookingEmployees || []).length} سجلات`
+                          : `Showing Top ${(data.rebookings?.topRebookingEmployees || []).length} Records`)
+                        : undefined
+                    }
+                    sourceLabel={locale === 'ar' ? 'الموظفين' : 'employees'}
+                  />
                 </section>
               ) : (
                 <EmptyReportSection
@@ -789,46 +756,36 @@ export default function ReportPreviewPage() {
                   </h3>
                   {Array.isArray(data.paymentMethods?.trend) && data.paymentMethods.trend.length > 0 && (
                     <div className="mb-4">
-                      <table className="w-full border border-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
-                            <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'طريقة الدفع' : 'Payment method'}</th>
-                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                            <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'العمليات' : 'Transactions'}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.paymentMethods.trend.slice(0, 10).map((item: any, index: number) => (
-                            <tr key={`${item.date || item.label || index}`} className="border-b border-gray-100">
-                              <td className="px-3 py-2">{item.date || item.label || '-'}</td>
-                              <td className="px-3 py-2">{item.paymentMethodLabel || item.paymentMethod || '-'}</td>
-                              <td className="px-3 py-2 text-right"><Currency amount={item.revenue ?? item.totalRevenue ?? item.collected ?? 0} /></td>
-                              <td className="px-3 py-2 text-right">{item.transactionCount ?? 0}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <AnalyticsDataTable
+                        columns={[
+                          { id: 'date', header: locale === 'ar' ? 'التاريخ' : 'Date' },
+                          { id: 'method', header: locale === 'ar' ? 'طريقة الدفع' : 'Payment method' },
+                          { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                          { id: 'transactions', header: locale === 'ar' ? 'العمليات' : 'Transactions', align: 'right' },
+                        ]}
+                        rows={(data.paymentMethods.trend || []).map((item: any, index: number) => [
+                          item.date || item.label || '-',
+                          item.paymentMethodLabel || item.paymentMethod || '-',
+                          <Currency amount={item.revenue ?? item.totalRevenue ?? item.collected ?? 0} />,
+                          item.transactionCount ?? 0,
+                        ])}
+                        sourceLabel={locale === 'ar' ? 'المدفوعات' : 'payments'}
+                      />
                     </div>
                   )}
-                  <table className="w-full border border-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'الطريقة' : 'Method'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإيراد' : 'Revenue'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'العمليات' : 'Transactions'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(data.paymentMethods?.rows || []).map((item: any) => (
-                        <tr key={item.paymentMethod} className="border-b border-gray-100">
-                          <td className="px-3 py-2">{item.paymentMethodLabel}</td>
-                          <td className="px-3 py-2 text-right"><Currency amount={item.revenue ?? 0} /></td>
-                          <td className="px-3 py-2 text-right">{item.transactionCount ?? 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <AnalyticsDataTable
+                    columns={[
+                      { id: 'method', header: locale === 'ar' ? 'الطريقة' : 'Method' },
+                      { id: 'revenue', header: locale === 'ar' ? 'الإيراد' : 'Revenue', align: 'right' },
+                      { id: 'transactions', header: locale === 'ar' ? 'العمليات' : 'Transactions', align: 'right' },
+                    ]}
+                    rows={(data.paymentMethods?.rows || []).map((item: any) => [
+                      item.paymentMethodLabel,
+                      <Currency amount={item.revenue ?? 0} />,
+                      item.transactionCount ?? 0,
+                    ])}
+                    sourceLabel={locale === 'ar' ? 'طرق الدفع' : 'payment methods'}
+                  />
                 </section>
               ) : (
                 <EmptyReportSection
@@ -846,28 +803,23 @@ export default function ReportPreviewPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {locale === 'ar' ? 'مبيعات العملاء' : 'Customer sales'}
                   </h3>
-                  <table className="w-full border border-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'العميل' : 'Customer'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الزيارات' : 'Visits'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'الإجمالي' : 'Total spent'}</th>
-                        <th className="border-b px-3 py-2 text-right font-semibold">{locale === 'ar' ? 'المتوسط' : 'Average spend'}</th>
-                        <th className="border-b px-3 py-2 text-left font-semibold">{locale === 'ar' ? 'آخر زيارة' : 'Last visit'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(data.customerSales || []).map((item: any) => (
-                        <tr key={item.id} className="border-b border-gray-100">
-                          <td className="px-3 py-2">{item.customerName || item.customer || item.name || item.id}</td>
-                          <td className="px-3 py-2 text-right">{item.bookings ?? item.visits ?? 0}</td>
-                          <td className="px-3 py-2 text-right"><Currency amount={item.revenue ?? item.totalSpent ?? 0} /></td>
-                          <td className="px-3 py-2 text-right"><Currency amount={item.averageSpend ?? 0} /></td>
-                          <td className="px-3 py-2">{item.lastVisit ? new Date(item.lastVisit).toLocaleDateString() : '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <AnalyticsDataTable
+                    columns={[
+                      { id: 'customer', header: locale === 'ar' ? 'العميل' : 'Customer' },
+                      { id: 'visits', header: locale === 'ar' ? 'الزيارات' : 'Visits', align: 'right' },
+                      { id: 'total', header: locale === 'ar' ? 'الإجمالي' : 'Total spent', align: 'right' },
+                      { id: 'average', header: locale === 'ar' ? 'المتوسط' : 'Average spend', align: 'right' },
+                      { id: 'last-visit', header: locale === 'ar' ? 'آخر زيارة' : 'Last visit' },
+                    ]}
+                    rows={(data.customerSales || []).map((item: any) => [
+                      item.customerName || item.customer || item.name || item.id,
+                      item.bookings ?? item.visits ?? 0,
+                      <Currency amount={item.revenue ?? item.totalSpent ?? 0} />,
+                      <Currency amount={item.averageSpend ?? 0} />,
+                      item.lastVisit ? new Date(item.lastVisit).toLocaleDateString() : '-',
+                    ])}
+                    sourceLabel={locale === 'ar' ? 'العملاء' : 'customers'}
+                  />
                 </section>
               ) : (
                 <EmptyReportSection
