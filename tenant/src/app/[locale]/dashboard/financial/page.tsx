@@ -376,6 +376,7 @@ export default function FinancialPage() {
   const [products, setProducts] = useState<ProductRevenue[]>([]);
   const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
   const [customerAnalytics, setCustomerAnalytics] = useState<CustomerAnalytics | null>(null);
+  const [customerSalesReport, setCustomerSalesReport] = useState<any[]>([]);
   const [previousCustomerAnalytics, setPreviousCustomerAnalytics] = useState<CustomerAnalytics | null>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<PosClosingSummary | null>(null);
   const [previousPosClosingSummary, setPreviousPosClosingSummary] = useState<PosClosingSummary | null>(null);
@@ -432,6 +433,10 @@ export default function FinancialPage() {
   const revenueSeries = useMemo(() => dailyRevenue.map((day) => safeNumber(day.revenue)), [dailyRevenue]);
   const tenantRevenueSeries = useMemo(() => dailyRevenue.map((day) => safeNumber(day.tenantRevenue)), [dailyRevenue]);
   const bookingSeries = useMemo(() => dailyRevenue.map((day) => safeNumber(day.bookings)), [dailyRevenue]);
+  const customerSalesRows = useMemo(
+    () => (customerSalesReport.length ? customerSalesReport : (customerAnalytics?.topCustomers || [])),
+    [customerAnalytics, customerSalesReport]
+  );
   const operationalAlerts = useMemo(
     () =>
       buildRuleBasedAlerts({
@@ -465,7 +470,7 @@ export default function FinancialPage() {
     try {
       const params = { startDate, endDate };
       const previousParams = getPreviousDateRange(startDate, endDate);
-      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes, previousOverviewRes, previousLandingRes, previousCustomerRes] = await Promise.allSettled([
+      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes, customerSalesRes, previousOverviewRes, previousLandingRes, previousCustomerRes] = await Promise.allSettled([
         tenantApi.getFinancialOverview(params),
         tenantApi.getFinancialLandingSummary(params),
         tenantApi.getEmployeeRevenue(params),
@@ -473,6 +478,7 @@ export default function FinancialPage() {
         tenantApi.getProductRevenue(params),
         tenantApi.getDailyRevenue(params),
         tenantApi.getCustomerAnalytics(params),
+        tenantApi.getFullReport({ startDate, endDate, sections: ["customerSales"] }),
         tenantApi.getFinancialOverview(previousParams),
         tenantApi.getFinancialLandingSummary(previousParams),
         tenantApi.getCustomerAnalytics(previousParams)
@@ -545,6 +551,13 @@ export default function FinancialPage() {
       } else {
         setCustomerAnalytics(null);
         failedSections.push(locale === "ar" ? "مبيعات العملاء" : "customer sales");
+      }
+
+      if (customerSalesRes.status === "fulfilled" && customerSalesRes.value.success) {
+        const reportData = customerSalesRes.value.data || {};
+        setCustomerSalesReport(Array.isArray(reportData.customerSales) ? reportData.customerSales : []);
+      } else {
+        setCustomerSalesReport([]);
       }
 
       if (previousCustomerRes.status === "fulfilled" && previousCustomerRes.value.success) {
@@ -1743,7 +1756,7 @@ export default function FinancialPage() {
             {activeSection === "customerSales" ? (
               <FinanceSectionCard
                 title={locale === "ar" ? "مبيعات العملاء" : "Customer sales"}
-                subtitle={locale === "ar" ? "عملاء نشطون، عائدون، وتوزيع الشرائح." : "Active customers, retention, and segment revenue distribution."}
+                subtitle={locale === "ar" ? "عرض تفصيلي للعملاء والهوية والزيارات من التقرير الكامل." : "Detailed customer identity and visit data from the full report."}
               >
                 {customerAnalytics ? (
                   <div className="space-y-5">
@@ -1781,11 +1794,12 @@ export default function FinancialPage() {
                         locale === "ar" ? "الهوية" : "Identity",
                         locale === "ar" ? "الحجوزات" : "Bookings",
                         locale === "ar" ? "المكتملة" : "Completed",
-                        locale === "ar" ? "الإيراد" : "Revenue"
+                        locale === "ar" ? "الإيراد" : "Revenue",
+                        locale === "ar" ? "آخر زيارة" : "Last visit"
                       ]}
-                      rows={(customerAnalytics.topCustomers || []).map((customer: any) => [
+                      rows={customerSalesRows.map((customer: any) => [
                         <CustomerIdentityCell
-                          name={customer.customerDisplayName || customer.name || customer.id || "-"}
+                          name={customer.customerDisplayName || customer.customerName || customer.customer || customer.name || customer.id || "-"}
                           badge={customer.customerBadge || (customer.customerType === "registered_customer"
                             ? (locale === "ar" ? "عميل مسجل" : "Registered Customer")
                             : customer.customerType === "walk_in_customer"
@@ -1796,23 +1810,24 @@ export default function FinancialPage() {
                         />,
                         customer.customerType || customer.type || "-",
                         customer.customerIdentityLine || customer.email || customer.phone || customer.id || "-",
-                        customer.bookings,
-                        customer.completed,
-                        formatMoney(customer.revenue)
+                        safeNumber(customer.bookings ?? customer.visits),
+                        safeNumber(customer.completed ?? customer.visits),
+                        formatMoney(customer.revenue ?? customer.totalSpent),
+                        customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString() : "-"
                       ])}
                       onRowClick={(index) => {
-                        const row = customerAnalytics.topCustomers?.[index];
+                        const row = customerSalesRows[index];
                         if (row) void openCustomerDetails(row);
                       }}
                       countLabel={
-                        customerAnalytics.topCustomers?.length
+                        customerSalesRows.length
                           ? (locale === "ar"
-                            ? `عرض أفضل ${customerAnalytics.topCustomers.length} سجلات`
-                            : `Showing Top ${customerAnalytics.topCustomers.length} Records`)
+                            ? `عرض ${customerSalesRows.length} سجل`
+                            : `Showing ${customerSalesRows.length} records`)
                           : undefined
                       }
                       sourceLabel={locale === "ar" ? "العملاء" : "customers"}
-                      totalRows={customerAnalytics.topCustomers?.length}
+                      totalRows={customerSalesRows.length}
                     />
                   </div>
                 ) : (
