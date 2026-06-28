@@ -108,6 +108,67 @@ function buildMetricTable(rows) {
     };
 }
 
+function buildKpiGrid(items, columns = 3) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return null;
+    }
+
+    const rows = [];
+    for (let index = 0; index < items.length; index += columns) {
+        rows.push(items.slice(index, index + columns));
+    }
+
+    const body = rows.map((row) => {
+        const cells = row.map((item) => ({
+            margin: [0, 0, 8, 8],
+            fillColor: '#FFFFFF',
+            table: {
+                widths: ['*'],
+                body: [
+                    [
+                        {
+                            text: item.label,
+                            fontSize: 9,
+                            color: '#6B7280',
+                            bold: true,
+                            margin: [0, 0, 0, 4]
+                        }
+                    ],
+                    [
+                        {
+                            text: item.value,
+                            fontSize: 14,
+                            color: '#111827',
+                            bold: true
+                        }
+                    ]
+                ]
+            }
+        }));
+
+        while (cells.length < columns) {
+            cells.push({ text: '', margin: [0, 0, 8, 8] });
+        }
+        return cells;
+    });
+
+    return {
+        table: {
+            widths: Array.from({ length: columns }, () => '*'),
+            body
+        },
+        layout: {
+            hLineWidth: () => 0,
+            vLineWidth: () => 0,
+            paddingLeft: () => 0,
+            paddingRight: () => 0,
+            paddingTop: () => 0,
+            paddingBottom: () => 0
+        },
+        margin: [0, 0, 0, 8]
+    };
+}
+
 function buildDataTable(title, headers, rows) {
     if (!Array.isArray(rows) || rows.length === 0) {
         return [
@@ -183,43 +244,43 @@ function buildPdfMakeDoc(payload) {
         content.push(
             { text: 'Overview', style: 'sectionTitle' },
             { text: 'Financial summary', style: 'subsectionTitle' },
-            buildMetricTable([
-                ['Total Revenue', formatMoney(overview.totalRevenue)],
-                ['Tenant Revenue', formatMoney(overview.totalTenantRevenue)],
-                ['Net Revenue', formatMoney(overview.netRevenue)],
-                ['Gross Appointment Revenue', formatMoney(overview.appointmentRevenue)],
-                ['Order Revenue', formatMoney(overview.orderRevenue)],
-                ['Gift Card Revenue', formatMoney(overview.giftCardRevenue)],
-                ['Total Tax', formatMoney(overview.totalTax)],
-                ['Platform Fees', formatMoney(overview.totalPlatformFees)],
-                ['Employee Commissions', formatMoney(overview.totalEmployeeCommissions)]
-            ]),
+            buildKpiGrid([
+                { label: 'Total Revenue', value: formatMoney(overview.totalRevenue) },
+                { label: 'Tenant Revenue', value: formatMoney(overview.totalTenantRevenue) },
+                { label: 'Net Revenue', value: formatMoney(overview.netRevenue) },
+                { label: 'Gross Appointment Revenue', value: formatMoney(overview.appointmentRevenue) },
+                { label: 'Order Revenue', value: formatMoney(overview.orderRevenue) },
+                { label: 'Gift Card Revenue', value: formatMoney(overview.giftCardRevenue) },
+                { label: 'Total Tax', value: formatMoney(overview.totalTax) },
+                { label: 'Platform Fees', value: formatMoney(overview.totalPlatformFees) },
+                { label: 'Employee Commissions', value: formatMoney(overview.totalEmployeeCommissions) }
+            ], 3),
             { text: 'Booking summary', style: 'subsectionTitle' },
-            buildMetricTable([
-                ['Total Bookings', overview.totalBookings || 0],
-                ['Completed Bookings', overview.completedBookings || 0],
-                ['Cancelled Bookings', overview.cancelledBookings || 0],
-                ['No-show Bookings', overview.noShowBookings || 0],
-                ['Paid Bookings', overview.paidBookings || 0],
-                ['Pending Payments', formatMoney(overview.pendingPayments)],
-                ['Completion Rate', formatPercent(overview.completionRate)],
-                ['Average Booking Value', formatMoney(overview.avgBookingValue)],
-                ['Unique Customers', overview.uniqueCustomers || 0]
-            ])
+            buildKpiGrid([
+                { label: 'Total Bookings', value: overview.totalBookings || 0 },
+                { label: 'Completed Bookings', value: overview.completedBookings || 0 },
+                { label: 'Cancelled Bookings', value: overview.cancelledBookings || 0 },
+                { label: 'No-show Bookings', value: overview.noShowBookings || 0 },
+                { label: 'Paid Bookings', value: overview.paidBookings || 0 },
+                { label: 'Pending Payments', value: formatMoney(overview.pendingPayments) },
+                { label: 'Completion Rate', value: formatPercent(overview.completionRate) },
+                { label: 'Average Booking Value', value: formatMoney(overview.avgBookingValue) },
+                { label: 'Unique Customers', value: overview.uniqueCustomers || 0 }
+            ], 3)
         );
 
         if (overview.discountTotals || overview.totalDiscountAmount != null) {
             const discounts = overview.discountTotals || overview;
             content.push(
                 { text: 'Discount summary', style: 'subsectionTitle' },
-                buildMetricTable([
-                    ['Total Discounts', formatMoney(discounts.totalDiscountAmount)],
-                    ['Appointment Discounts', formatMoney(discounts.appointmentDiscountAmount)],
-                    ['Order Discounts', formatMoney(discounts.orderDiscountAmount)],
-                    ['Discounted Bookings', discounts.discountedBookings || 0],
-                    ['Discounted Orders', discounts.discountedOrders || 0],
-                    ['Average Discount', formatMoney(discounts.averageDiscountAmount)]
-                ])
+                buildKpiGrid([
+                    { label: 'Total Discounts', value: formatMoney(discounts.totalDiscountAmount) },
+                    { label: 'Appointment Discounts', value: formatMoney(discounts.appointmentDiscountAmount) },
+                    { label: 'Order Discounts', value: formatMoney(discounts.orderDiscountAmount) },
+                    { label: 'Discounted Bookings', value: discounts.discountedBookings || 0 },
+                    { label: 'Discounted Orders', value: discounts.discountedOrders || 0 },
+                    { label: 'Average Discount', value: formatMoney(discounts.averageDiscountAmount) }
+                ], 3)
             );
 
             if (Array.isArray(discounts.topDiscountedServices) && discounts.topDiscountedServices.length) {
