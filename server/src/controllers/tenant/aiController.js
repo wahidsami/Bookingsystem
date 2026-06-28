@@ -8,7 +8,9 @@ const {
 const { saveConsultantReport } = require('../../services/consultantSnapshotService');
 const {
     processConsultantWorkflowForTenant,
-    listConsultantBriefings
+    listConsultantBriefings,
+    getDefaultConsultantCommunicationPreferences,
+    normalizeCommunicationPreferences
 } = require('../../services/consultantWorkflowService');
 const { successResponse, errorResponse, paginatedResponse } = require('../../utils/responses');
 const crypto = require('crypto');
@@ -91,6 +93,13 @@ function buildConsultantSnapshotHash(snapshot) {
 
 function buildConsultantAnalysisCacheKey(tenantId, snapshotHash) {
     return `consultant:analysis:${tenantId}:${snapshotHash}:${CONSULTANT_ANALYSIS_VERSION}`;
+}
+
+function buildConsultantAnalysisIdentityHash(snapshotHash, communicationPreferences) {
+    return crypto.createHash('sha256').update(JSON.stringify({
+        snapshotHash,
+        communicationPreferences: normalizeCommunicationPreferences(communicationPreferences || {})
+    })).digest('hex');
 }
 
 function normalizeConsultantList(value) {
@@ -463,6 +472,13 @@ exports.translateText = async (req, res) => {
 exports.analyzeConsultantSnapshot = async (req, res) => {
     try {
         const tenantId = req.tenantId || req.tenant?.id;
+        const tenant = await db.Tenant.findByPk(tenantId, {
+            attributes: ['id', 'country']
+        });
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId },
+            attributes: ['tenantId', 'notificationSettings', 'defaultLanguage']
+        });
         const prepared = await loadConsultantSnapshotInput(req);
 
         if (prepared.error) {
@@ -473,7 +489,15 @@ exports.analyzeConsultantSnapshot = async (req, res) => {
         }
 
         const snapshotHash = prepared.snapshotHash || buildConsultantSnapshotHash(prepared.snapshotInput);
-        const cacheKey = buildConsultantAnalysisCacheKey(tenantId, snapshotHash);
+        const communicationPreferences = normalizeCommunicationPreferences(
+            tenantSettings?.notificationSettings?.consultantWorkflow?.communicationPreferences || {},
+            getDefaultConsultantCommunicationPreferences({
+                country: tenant?.country,
+                defaultLanguage: tenantSettings?.defaultLanguage
+            })
+        );
+        const analysisIdentityHash = buildConsultantAnalysisIdentityHash(snapshotHash, communicationPreferences);
+        const cacheKey = buildConsultantAnalysisCacheKey(tenantId, analysisIdentityHash);
 
         const cached = await cacheService.get(cacheKey);
         if (cached) {
@@ -484,18 +508,18 @@ exports.analyzeConsultantSnapshot = async (req, res) => {
                 data,
                 reportId: cached.reportId || null,
                 snapshotId: cached.snapshotId || prepared.snapshotId || null,
-                snapshotHash
+                snapshotHash: analysisIdentityHash
             });
         }
 
-        const storedReport = await findStoredConsultantAnalysis(tenantId, snapshotHash);
+        const storedReport = await findStoredConsultantAnalysis(tenantId, analysisIdentityHash);
         if (storedReport?.reportData) {
             const data = enrichConsultantResponseRoutes(storedReport.reportData);
             const payload = {
                 data,
                 reportId: storedReport.id,
                 snapshotId: storedReport.snapshotId || prepared.snapshotId || null,
-                snapshotHash
+                snapshotHash: analysisIdentityHash
             };
             await cacheService.set(cacheKey, payload, 60 * 60 * 24);
             return res.status(200).json({
@@ -509,7 +533,8 @@ exports.analyzeConsultantSnapshot = async (req, res) => {
 
         const analysis = await aiService.generateConsultantAnalysis(prepared.snapshotInput, {
             temperature: 0.2,
-            model: 'gpt-4o-mini'
+            model: 'gpt-4o-mini',
+            communicationPreferences
         });
 
         const normalizedAnalysis = enrichConsultantResponseRoutes(analysis);
@@ -531,22 +556,28 @@ exports.analyzeConsultantSnapshot = async (req, res) => {
             outputFormat: 'json',
             reportData: normalizedAnalysis,
             metadata: {
-                snapshotHash,
-                analysisVersion: CONSULTANT_ANALYSIS_VERSION,
-                model: 'gpt-4o-mini',
-                temperature: 0.2,
-                source: 'openai'
-            }
+            snapshotHash,
+            analysisVersion: CONSULTANT_ANALYSIS_VERSION,
+            model: 'gpt-4o-mini',
+            temperature: 0.2,
+            source: 'openai',
+            communicationPreferences,
+            analysisIdentityHash
+        }
         });
 
         const responsePayload = {
             data: normalizedAnalysis,
             reportId: report.id,
             snapshotId: prepared.snapshotId || null,
-            snapshotHash
+            snapshotHash: analysisIdentityHash
         };
 
-        await cacheService.set(cacheKey, responsePayload, 60 * 60 * 24);
+        await cacheService.set(
+            buildConsultantAnalysisCacheKey(tenantId, analysisIdentityHash),
+            responsePayload,
+            60 * 60 * 24
+        );
 
         return res.status(200).json({
             success: true,

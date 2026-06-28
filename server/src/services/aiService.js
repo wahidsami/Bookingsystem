@@ -187,10 +187,56 @@ Rules:
     ]);
 };
 
+const normalizeConsultantCommunicationPreferences = (value = {}) => {
+    const language = `${value.language || ''}`.trim().toLowerCase();
+    const tone = `${value.tone || ''}`.trim().toLowerCase();
+    const addressingStyle = `${value.addressingStyle || ''}`.trim().toLowerCase();
+
+    return {
+        language: ['ar', 'en'].includes(language) ? language : 'en',
+        tone: ['professional_arabic', 'saudi_executive_style', 'executive_english'].includes(tone)
+            ? tone
+            : 'executive_english',
+        addressingStyle: ['neutral_professional', 'male_formal', 'female_formal', 'no_titles'].includes(addressingStyle)
+            ? addressingStyle
+            : 'neutral_professional'
+    };
+};
+
+const buildConsultantStyleGuidance = (preferences) => {
+    const languageLabel = preferences.language === 'ar' ? 'Arabic' : 'English';
+    const toneLabel = {
+        professional_arabic: 'Professional Arabic',
+        saudi_executive_style: 'Saudi Executive Style',
+        executive_english: 'Executive English'
+    }[preferences.tone] || 'Executive English';
+    const addressingLabel = {
+        neutral_professional: 'Neutral Professional',
+        male_formal: 'Male Formal',
+        female_formal: 'Female Formal',
+        no_titles: 'No Titles'
+    }[preferences.addressingStyle] || 'Neutral Professional';
+
+    const exampleLine = preferences.language === 'ar'
+        ? 'Example: الله يعافيك، عندنا ملاحظة بسيطة على أداء الإيرادات هذا الأسبوع.'
+        : 'Example: We have a concise observation on this week’s revenue performance.';
+
+    return [
+        `- Language: ${languageLabel}`,
+        `- Consultant tone: ${toneLabel}`,
+        `- Preferred addressing style: ${addressingLabel}`,
+        `- Keep the response polished, specific, and executive in nature.`,
+        `- Avoid casual wording and keep the advisor voice consistent throughout.`,
+        `- ${exampleLine}`
+    ].join('\n');
+};
+
 exports.generateConsultantAnalysis = async (businessSnapshot, options = {}) => {
     const snapshotJson = JSON.stringify(businessSnapshot || {}, null, 2);
-    const systemPrompt = `You are a senior salon business consultant for multi-tenant beauty businesses.
-You do not sound like generic ChatGPT.
+    const communicationPreferences = normalizeConsultantCommunicationPreferences(options.communicationPreferences || {});
+    const styleGuidance = buildConsultantStyleGuidance(communicationPreferences);
+    const systemPrompt = `You are an experienced Saudi salon business consultant for multi-tenant beauty businesses.
+You never sound like generic ChatGPT.
 You analyze only the provided business snapshot and return a structured dashboard response for an enterprise consultant workspace.
 
 Return ONLY valid JSON with exactly these top-level keys:
@@ -266,7 +312,17 @@ Rules:
 - The response must be structured and dashboard-ready.
 - Every action should point to an existing workspace route when possible.
 - Use charts only when the snapshot supports a real trend or comparison.
-- Use tables only when the snapshot includes row-level or grouped data.`;
+- Use tables only when the snapshot includes row-level or grouped data.
+
+Communication preferences:
+${styleGuidance}
+
+Voice rules:
+- Write the response in the requested language consistently across summary, alerts, recommendations, and actions.
+- Keep the tone professional, analytical, and advisory.
+- Never use casual slang, memes, or emoji.
+- Maintain the persona of a senior Saudi executive advisor or government consultant.
+- Use respectful phrasing naturally and sparingly when Arabic is selected.`;
 
     const userPrompt = `Business snapshot JSON:
 ${snapshotJson}

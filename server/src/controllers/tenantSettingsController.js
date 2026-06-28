@@ -17,7 +17,8 @@ const {
 } = require('../services/appointmentAutomationService');
 const {
     normalizeConsultantWorkflowSettings,
-    DEFAULT_CONSULTANT_WORKFLOW_SETTINGS
+    DEFAULT_CONSULTANT_WORKFLOW_SETTINGS,
+    getDefaultConsultantCommunicationPreferences
 } = require('../services/consultantWorkflowService');
 
 const DASHBOARD_LANDING_PAGES = new Set(['home', 'appointments', 'pos']);
@@ -28,9 +29,12 @@ const normalizeDashboardSettings = (value = {}) => ({
         : 'home'
 });
 
-const normalizeNotificationSettings = (value = {}) => ({
+const normalizeNotificationSettings = (value = {}, communicationFallback = undefined) => ({
     ...normalizeAppointmentNotificationSettings(value),
-    consultantWorkflow: normalizeConsultantWorkflowSettings(value?.consultantWorkflow || {})
+    consultantWorkflow: normalizeConsultantWorkflowSettings(
+        value?.consultantWorkflow || {},
+        communicationFallback
+    )
 });
 
 /**
@@ -148,8 +152,11 @@ exports.getSettings = async (req, res) => {
                 supportedLanguages: ['ar', 'en'],
                 dashboardSettings: normalizeDashboardSettings(),
                 notificationSettings: normalizeNotificationSettings({
-                    consultantWorkflow: DEFAULT_CONSULTANT_WORKFLOW_SETTINGS
-                })
+                    consultantWorkflow: {
+                        ...DEFAULT_CONSULTANT_WORKFLOW_SETTINGS,
+                        communicationPreferences: getDefaultConsultantCommunicationPreferences(tenant)
+                    }
+                }, getDefaultConsultantCommunicationPreferences(tenant))
             }
         });
 
@@ -159,7 +166,14 @@ exports.getSettings = async (req, res) => {
             acceptWallet: settings.acceptWallet
         });
         const normalizedDashboardSettings = normalizeDashboardSettings(settings.dashboardSettings);
-        const normalizedNotificationSettings = normalizeNotificationSettings(settings.notificationSettings);
+        const defaultCommunicationPreferences = getDefaultConsultantCommunicationPreferences({
+            country: tenant.country,
+            defaultLanguage: settings.defaultLanguage
+        });
+        const normalizedNotificationSettings = normalizeNotificationSettings(
+            settings.notificationSettings,
+            defaultCommunicationPreferences
+        );
 
         res.json({
             success: true,
@@ -418,18 +432,29 @@ exports.updateNotificationSettings = async (req, res) => {
             defaults: { tenantId }
         });
 
-        const currentNotificationSettings = normalizeNotificationSettings(settings.notificationSettings);
+        const tenant = await db.Tenant.findByPk(tenantId, {
+            attributes: ['id', 'country']
+        });
+        const defaultCommunicationPreferences = getDefaultConsultantCommunicationPreferences({
+            country: tenant?.country,
+            defaultLanguage: settings.defaultLanguage
+        });
+        const currentNotificationSettings = normalizeNotificationSettings(
+            settings.notificationSettings,
+            defaultCommunicationPreferences
+        );
         const nextNotificationSettings = normalizeNotificationSettings({
             ...currentNotificationSettings,
             consultantWorkflow: normalizeConsultantWorkflowSettings(
-                consultantWorkflow || currentNotificationSettings.consultantWorkflow || {}
+                consultantWorkflow || currentNotificationSettings.consultantWorkflow || {},
+                defaultCommunicationPreferences
             ),
             remindRemainderToCollect,
             appointmentGracePeriodMinutes,
             autoMarkNoShowAfterGracePeriod,
             customerReminderEnabled,
             customerReminderMinutesBefore
-        });
+        }, defaultCommunicationPreferences);
 
         await settings.update({
             enableEmailNotifications: enableEmailNotifications !== undefined ? enableEmailNotifications : settings.enableEmailNotifications,

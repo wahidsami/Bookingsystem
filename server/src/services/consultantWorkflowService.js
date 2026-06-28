@@ -18,6 +18,12 @@ const {
 const CONSULTANT_WORKFLOW_VERSION = 'wf-v1';
 const CONSULTANT_WORKFLOW_CACHE_TTL_SECONDS = 60 * 60 * 6;
 
+const DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES = Object.freeze({
+    language: 'en',
+    tone: 'executive_english',
+    addressingStyle: 'neutral_professional'
+});
+
 const DEFAULT_CONSULTANT_WORKFLOW_SETTINGS = Object.freeze({
     enabled: false,
     frequency: 'daily',
@@ -27,11 +33,15 @@ const DEFAULT_CONSULTANT_WORKFLOW_SETTINGS = Object.freeze({
         retentionDropPercent: 5,
         noShowIncreasePercent: 10,
         refundIncreasePercent: 10
-    }
+    },
+    communicationPreferences: DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES
 });
 
 const SUPPORTED_CHANNELS = new Set(['dashboard', 'email', 'push']);
 const SUPPORTED_FREQUENCIES = new Set(['daily', 'weekly', 'monthly']);
+const SUPPORTED_CONSULTANT_LANGUAGES = new Set(['ar', 'en']);
+const SUPPORTED_CONSULTANT_TONES = new Set(['professional_arabic', 'saudi_executive_style', 'executive_english']);
+const SUPPORTED_CONSULTANT_ADDRESSING_STYLES = new Set(['neutral_professional', 'male_formal', 'female_formal', 'no_titles']);
 
 const toNumber = (value) => {
     const parsed = Number.parseFloat(value);
@@ -75,13 +85,44 @@ const normalizeThresholds = (value = {}) => ({
     refundIncreasePercent: clampPercent(value?.refundIncreasePercent, DEFAULT_CONSULTANT_WORKFLOW_SETTINGS.thresholds.refundIncreasePercent)
 });
 
-const normalizeConsultantWorkflowSettings = (value = {}) => ({
+const normalizeCommunicationPreferences = (value = {}, fallback = DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES) => ({
+    language: SUPPORTED_CONSULTANT_LANGUAGES.has(`${value?.language || ''}`.trim().toLowerCase())
+        ? `${value.language}`.trim().toLowerCase()
+        : fallback.language,
+    tone: SUPPORTED_CONSULTANT_TONES.has(`${value?.tone || ''}`.trim().toLowerCase())
+        ? `${value.tone}`.trim().toLowerCase()
+        : fallback.tone,
+    addressingStyle: SUPPORTED_CONSULTANT_ADDRESSING_STYLES.has(`${value?.addressingStyle || ''}`.trim().toLowerCase())
+        ? `${value.addressingStyle}`.trim().toLowerCase()
+        : fallback.addressingStyle
+});
+
+const getDefaultConsultantCommunicationPreferences = (tenant = {}) => {
+    const country = `${tenant?.country || ''}`.trim().toLowerCase();
+    const defaultLanguage = `${tenant?.defaultLanguage || ''}`.trim().toLowerCase();
+    const isSaudiTenant = country.includes('saudi') || country === 'ksa' || country === 'sa';
+
+    if (isSaudiTenant || defaultLanguage === 'ar') {
+        return {
+            language: 'ar',
+            tone: 'saudi_executive_style',
+            addressingStyle: 'neutral_professional'
+        };
+    }
+
+    return {
+        ...DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES
+    };
+};
+
+const normalizeConsultantWorkflowSettings = (value = {}, communicationFallback = DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES) => ({
     enabled: Boolean(value?.enabled),
     frequency: SUPPORTED_FREQUENCIES.has(`${value?.frequency || ''}`.trim().toLowerCase())
         ? `${value.frequency}`.trim().toLowerCase()
         : DEFAULT_CONSULTANT_WORKFLOW_SETTINGS.frequency,
     channels: normalizeChannels(value?.channels),
     thresholds: normalizeThresholds(value?.thresholds || {}),
+    communicationPreferences: normalizeCommunicationPreferences(value?.communicationPreferences || {}, communicationFallback),
     lastRunAt: value?.lastRunAt || null,
     lastReportId: value?.lastReportId || null,
     lastWorkflowHash: value?.lastWorkflowHash || null
@@ -111,12 +152,14 @@ const buildWorkflowHash = ({
     tenantId,
     frequency,
     thresholds,
+    communicationPreferences,
     currentSnapshotHash,
     previousSnapshotHash
 }) => crypto.createHash('sha256').update(JSON.stringify({
     tenantId,
     frequency: normalizeFrequency(frequency),
     thresholds: normalizeThresholds(thresholds),
+    communicationPreferences: normalizeCommunicationPreferences(communicationPreferences || {}),
     currentSnapshotHash,
     previousSnapshotHash,
     version: CONSULTANT_WORKFLOW_VERSION
@@ -411,11 +454,11 @@ async function buildConsultantWorkflowSnapshots(tenantId, frequency, now = new D
 async function loadTenantConsultantWorkflowContext(tenantId) {
     const [tenant, settings, dashboardAccounts, activeStaff] = await Promise.all([
         db.Tenant.findByPk(tenantId, {
-            attributes: ['id', 'name', 'name_en', 'name_ar', 'email', 'phone']
+            attributes: ['id', 'name', 'name_en', 'name_ar', 'email', 'phone', 'country']
         }),
         db.TenantSettings.findOne({
             where: { tenantId },
-            attributes: ['tenantId', 'notificationSettings']
+            attributes: ['tenantId', 'notificationSettings', 'defaultLanguage']
         }),
         db.TenantDashboardAccount.findAll({
             where: { tenantId, isActive: true },
@@ -427,7 +470,13 @@ async function loadTenantConsultantWorkflowContext(tenantId) {
         })
     ]);
 
-    const workflowSettings = normalizeConsultantWorkflowSettings(settings?.notificationSettings?.consultantWorkflow || {});
+    const workflowSettings = normalizeConsultantWorkflowSettings(
+        settings?.notificationSettings?.consultantWorkflow || {},
+        getDefaultConsultantCommunicationPreferences({
+            country: tenant?.country,
+            defaultLanguage: settings?.defaultLanguage
+        })
+    );
 
     return {
         tenant,
@@ -675,6 +724,7 @@ async function generateWorkflowReport({
         tenantId,
         frequency: workflowSettings.frequency,
         thresholds: workflowSettings.thresholds,
+        communicationPreferences: workflowSettings.communicationPreferences,
         currentSnapshotHash: currentSnapshot.snapshotHash,
         previousSnapshotHash: previousSnapshot.snapshotHash
     });
@@ -718,7 +768,8 @@ async function generateWorkflowReport({
             frequency: workflowSettings.frequency,
             periodType: workflowSettings.frequency,
             thresholds: workflowSettings.thresholds,
-            channels: workflowSettings.channels
+            channels: workflowSettings.channels,
+            communicationPreferences: workflowSettings.communicationPreferences
         },
         comparison
     };
@@ -726,7 +777,8 @@ async function generateWorkflowReport({
     const analysis = enrichConsultantResponseRoutes(
         await aiService.generateConsultantAnalysis(aiInput, {
             temperature: 0.2,
-            model: 'gpt-4o-mini'
+            model: 'gpt-4o-mini',
+            communicationPreferences: workflowSettings.communicationPreferences
         })
     );
 
@@ -786,6 +838,7 @@ async function generateWorkflowReport({
             workflowHash,
             thresholds: workflowSettings.thresholds,
             channels: workflowSettings.channels,
+            communicationPreferences: workflowSettings.communicationPreferences,
             comparison,
             periodLabel,
             dashboardUrl,
@@ -912,6 +965,7 @@ async function processConsultantWorkflowForTenant({
         tenantId,
         frequency: context.workflowSettings.frequency,
         thresholds: context.workflowSettings.thresholds,
+        communicationPreferences: context.workflowSettings.communicationPreferences,
         currentSnapshotHash: currentSnapshot.snapshotHash,
         previousSnapshotHash: previousSnapshot.snapshotHash
     });
@@ -1032,6 +1086,9 @@ async function listConsultantBriefings({ tenantId, limit = 20, page = 1 } = {}) 
 module.exports = {
     CONSULTANT_WORKFLOW_VERSION,
     DEFAULT_CONSULTANT_WORKFLOW_SETTINGS,
+    DEFAULT_CONSULTANT_COMMUNICATION_PREFERENCES,
+    getDefaultConsultantCommunicationPreferences,
+    normalizeCommunicationPreferences,
     normalizeConsultantWorkflowSettings,
     processConsultantWorkflows,
     processConsultantWorkflowForTenant,
