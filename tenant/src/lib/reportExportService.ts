@@ -45,8 +45,9 @@ function buildDelimitedLines(payload: ReportExportPayload): string[] {
     lines.push(['Report', payload.reportTitle].map(escapeCsvCell).join(','));
   }
 
-  lines.push(['Period', `${payload.startDate} - ${payload.endDate}`].map(escapeCsvCell).join(','));
-  lines.push(['Sections', payload.sections.join(' | ') || ''].map(escapeCsvCell).join(','));
+  buildExportMetadataRows(payload).forEach(([label, value]) => {
+    lines.push([label, value].map(escapeCsvCell).join(','));
+  });
 
   if (payload.notes) {
     lines.push(['Notes', payload.notes].map(escapeCsvCell).join(','));
@@ -109,8 +110,9 @@ function buildExcelHtml(payload: ReportExportPayload): string {
     rows.push(rowXml(['Report', payload.reportTitle]));
   }
 
-  rows.push(rowXml(['Period', `${payload.startDate} - ${payload.endDate}`]));
-  rows.push(rowXml(['Sections', payload.sections.join(' | ') || '']));
+  buildExportMetadataRows(payload).forEach(([label, value]) => {
+    rows.push(rowXml([label, value]));
+  });
 
   if (payload.notes) {
     rows.push(rowXml(['Notes', payload.notes]));
@@ -354,6 +356,29 @@ function numberRow(value: unknown) {
 
 function metricRows(metrics: Array<[string, ReportExportCell]>) {
   return metrics;
+}
+
+function buildDataSourceLabel(sections: string[]) {
+  const normalized = sections.map((section) => section.toLowerCase());
+  if (normalized.some((section) => ['refunds', 'paymentmethods', 'customersales'].includes(section))) {
+    return 'Payments + Appointments';
+  }
+  if (normalized.some((section) => ['employees', 'services', 'appointments', 'rebookings'].includes(section))) {
+    return 'Appointments + Operations';
+  }
+  if (normalized.includes('products')) {
+    return 'Orders + Catalog';
+  }
+  return 'Finance and reporting aggregates';
+}
+
+function buildExportMetadataRows(payload: ReportExportPayload): Array<[string, ReportExportCell]> {
+  return [
+    ['Period', `${payload.startDate} - ${payload.endDate}`],
+    ['Data source', buildDataSourceLabel(payload.sections)],
+    ['Generated', new Date().toISOString()],
+    ['Sections', payload.sections.join(' | ') || '']
+  ];
 }
 
 function getCustomerDisplayName(item: Record<string, any>) {

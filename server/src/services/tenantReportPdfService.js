@@ -42,6 +42,20 @@ function formatMoney(value) {
     return `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
 }
 
+function buildPdfDataSourceLabel(sections = []) {
+    const normalized = sections.map((section) => `${section}`.toLowerCase());
+    if (normalized.some((section) => ['refunds', 'paymentmethods', 'customersales'].includes(section))) {
+        return 'Payments + Appointments';
+    }
+    if (normalized.some((section) => ['employees', 'services', 'appointments', 'rebookings'].includes(section))) {
+        return 'Appointments + Operations';
+    }
+    if (normalized.includes('products')) {
+        return 'Orders + Catalog';
+    }
+    return 'Finance and reporting aggregates';
+}
+
 function formatPercent(value) {
     const amount = Number(value || 0);
     return `${amount.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
@@ -576,6 +590,7 @@ function drawCover(doc, payload) {
     doc.fontSize(16).fillColor('#334155').text(tenantName || 'Tenant');
     doc.moveDown(0.8);
     doc.fontSize(13).fillColor('#475569').text(`Period: ${startDate} -> ${endDate}`);
+    doc.fontSize(13).fillColor('#475569').text(`Data source: ${buildPdfDataSourceLabel(payload.sections)}`);
     doc.fontSize(13).fillColor('#475569').text(`Generated at: ${generatedAt}`);
 }
 
