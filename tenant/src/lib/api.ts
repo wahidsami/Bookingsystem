@@ -1559,6 +1559,17 @@ class TenantApiClient {
     return this.get(`/tenant/financial/overview${query ? `?${query}` : ''}`);
   }
 
+  async getFinancialLedger(params?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    const query = queryParams.toString();
+    return this.get(`/tenant/financial/ledger${query ? `?${query}` : ''}`);
+  }
+
   async getEmployeeRevenue(params?: {
     startDate?: string;
     endDate?: string;

@@ -53,6 +53,269 @@ function buildDateRangeWhere(field, startDate, endDate) {
     };
 }
 
+function getLedgerCustomerName(user) {
+    const firstName = user?.firstName || '';
+    const lastName = user?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || user?.email || user?.phone || 'Guest Customer';
+}
+
+function getLedgerServiceName(service) {
+    return service?.name_en || service?.name_ar || 'Service';
+}
+
+function getLedgerOrderLabel(order) {
+    const itemNames = Array.isArray(order?.items)
+        ? order.items
+            .map((item) => item?.product?.name_en || item?.product?.name_ar)
+            .filter(Boolean)
+        : [];
+
+    return itemNames.length ? itemNames.slice(0, 2).join(', ') : 'Product order';
+}
+
+function formatLedgerPaymentMethodLabel(paymentMethod) {
+    return ({
+        online: 'Online',
+        cash: 'Cash',
+        card_pos: 'Card POS',
+        wallet: 'Wallet',
+        bank_transfer: 'Bank transfer',
+        gift_card_code: 'Gift card code',
+        pay_on_visit: 'Pay on visit',
+        cash_on_delivery: 'Cash on delivery',
+        split: 'Split payments'
+    }[paymentMethod] || paymentMethod || 'Not set');
+}
+
+function normalizeLedgerPaymentMethodGroup(paymentMethod) {
+    const method = `${paymentMethod || ''}`.trim().toLowerCase();
+    if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
+    if (['card_pos', 'online', 'online-full', 'mock_online', 'bank_transfer'].includes(method)) return 'card';
+    if (method === 'wallet') return 'wallet';
+    if (method === 'gift_card_code') return 'gift_card';
+    if (method === 'split') return 'split';
+    return 'other';
+}
+
+function getLedgerTransactionIncludes() {
+    return [
+        {
+            model: db.Appointment,
+            as: 'appointment',
+            attributes: [
+                'id',
+                'bookingNumber',
+                'tenantId',
+                'startTime',
+                'paymentStatus',
+                'status',
+                'price',
+                'rawPrice',
+                'taxAmount',
+                'platformFee',
+                'tenantRevenue',
+                'employeeCommission',
+                'employeeCommissionRate'
+            ],
+            required: false,
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    attributes: ['id', 'name_en', 'name_ar', 'category'],
+                    required: false
+                },
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ]
+        },
+        {
+            model: db.Order,
+            as: 'order',
+            attributes: [
+                'id',
+                'tenantId',
+                'orderNumber',
+                'paymentStatus',
+                'status',
+                'paymentMethod',
+                'subtotal',
+                'taxAmount',
+                'shippingFee',
+                'platformFee',
+                'totalAmount'
+            ],
+            required: false,
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                },
+                {
+                    model: db.OrderItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: db.Product,
+                            as: 'product',
+                            attributes: ['id', 'name_en', 'name_ar'],
+                            required: false
+                        }
+                    ],
+                    required: false
+                }
+            ]
+        },
+        {
+            model: db.Staff,
+            as: 'processor',
+            attributes: ['id', 'name'],
+            required: false
+        }
+    ];
+}
+
+function getTransactionReference(transaction) {
+    const appointment = transaction?.appointment;
+    const order = transaction?.order;
+    return appointment?.bookingNumber
+        || appointment?.id
+        || order?.orderNumber
+        || transaction?.transactionRef
+        || transaction?.id;
+}
+
+function getTransactionReferenceAmount(transaction) {
+    if (transaction?.appointment) {
+        return Number(transaction.appointment.price || 0);
+    }
+    if (transaction?.order) {
+        const subtotal = Number(transaction.order.subtotal || 0);
+        const taxAmount = Number(transaction.order.taxAmount || 0);
+        const shippingFee = Number(transaction.order.shippingFee || 0);
+        return subtotal + taxAmount + shippingFee;
+    }
+    return Number(transaction?.amount || 0);
+}
+
+function getTransactionDiscountAmount(transaction) {
+    const appointment = transaction?.appointment;
+    const order = transaction?.order;
+
+    if (appointment) {
+        const rawPrice = Number(appointment.rawPrice || 0);
+        const price = Number(appointment.price || 0);
+        return Math.max(rawPrice - price, 0);
+    }
+
+    if (order) {
+        const subtotal = Number(order.subtotal || 0);
+        const taxAmount = Number(order.taxAmount || 0);
+        const shippingFee = Number(order.shippingFee || 0);
+        const totalAmount = Number(order.totalAmount || 0);
+        return Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0);
+    }
+
+    return 0;
+}
+
+function getTransactionServiceLabel(transaction) {
+    const appointment = transaction?.appointment;
+    const order = transaction?.order;
+    if (appointment) {
+        return getLedgerServiceName(appointment.service);
+    }
+    return getLedgerOrderLabel(order);
+}
+
+function getTransactionEmployeeLabel(transaction) {
+    const appointment = transaction?.appointment;
+    return appointment?.staff?.name || transaction?.processor?.name || 'Tenant Dashboard';
+}
+
+function mapLedgerTransaction(transaction) {
+    const appointment = transaction.appointment;
+    const order = transaction.order;
+    const user = appointment?.user || order?.user;
+    const amount = Number(transaction.amount || 0);
+    const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
+    const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
+
+    return {
+        id: transaction.id,
+        date: transaction.processedAt || transaction.createdAt,
+        reference: getTransactionReference(transaction),
+        customer: getLedgerCustomerName(user),
+        employee: getTransactionEmployeeLabel(transaction),
+        service: getTransactionServiceLabel(transaction),
+        revenue: Number(signedAmount.toFixed(2)),
+        tax: Number((Number(appointment?.taxAmount || order?.taxAmount || 0)).toFixed(2)),
+        discount: Number(getTransactionDiscountAmount(transaction).toFixed(2)),
+        paymentMethod: transaction.paymentMethod,
+        paymentMethodLabel: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
+        status: transaction.status,
+        entityType: appointment ? 'appointment' : 'order',
+        entityId: appointment?.id || order?.id || null,
+        detailPath: appointment?.id
+            ? `/dashboard/appointments/${appointment.id}`
+            : order?.id
+                ? `/dashboard/orders/${order.id}`
+                : null
+    };
+}
+
+function mapRefundLedgerRow(transaction) {
+    const appointment = transaction.appointment;
+    const order = transaction.order;
+    const user = appointment?.user || order?.user;
+    const amount = Number(transaction.amount || 0);
+    const reference = getTransactionReference(transaction);
+    const referenceAmount = getTransactionReferenceAmount(transaction);
+    const refundReason = `${transaction.notes || transaction.metadata?.reason || transaction.metadata?.refundReason || transaction.gatewayResponse?.reason || ''}`.trim() || null;
+
+    return {
+        id: transaction.id,
+        date: transaction.processedAt || transaction.createdAt,
+        customer: getLedgerCustomerName(user),
+        amount: Number(amount.toFixed(2)),
+        reference,
+        reason: refundReason,
+        employee: transaction.processor?.name || null,
+        method: transaction.paymentMethod,
+        methodLabel: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
+        entityType: appointment ? 'appointment' : 'order',
+        entityLabel: appointment ? getLedgerServiceName(appointment.service) : getLedgerOrderLabel(order),
+        refundMode: getRefundModeLabel(amount, referenceAmount),
+        status: transaction.status,
+        detailPath: appointment?.id
+            ? `/dashboard/appointments/${appointment.id}`
+            : order?.id
+                ? `/dashboard/orders/${order.id}`
+                : null
+    };
+}
+
+function getRefundModeLabel(amount, referenceAmount) {
+    const numericAmount = Number(amount || 0);
+    const numericReference = Number(referenceAmount || 0);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return 'Partial';
+    if (!Number.isFinite(numericReference) || numericReference <= 0) return 'Partial';
+    return numericAmount >= (numericReference - 0.01) ? 'Full' : 'Partial';
+}
+
 function buildTenantAppointmentScope(tenantId) {
     return {
         [Op.or]: [
@@ -845,6 +1108,268 @@ exports.getDailyRevenue = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch daily revenue',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get financial ledger workspace datasets
+ * GET /api/v1/tenant/financial/ledger
+ */
+exports.getFinancialLedger = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { startDate, endDate } = req.query;
+
+        const fallbackEnd = new Date();
+        fallbackEnd.setHours(23, 59, 59, 999);
+        const end = parseDateValue(endDate, true) || fallbackEnd;
+        const fallbackStart = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+        fallbackStart.setHours(0, 0, 0, 0);
+        const start = parseDateValue(startDate, false) || fallbackStart;
+
+        const [transactions, employeeRevenueResponse, payrollRecords] = await Promise.all([
+            db.PaymentTransaction.findAll({
+                where: {
+                    [Op.or]: [
+                        { '$appointment.tenantId$': tenantId },
+                        { '$order.tenantId$': tenantId }
+                    ],
+                    status: { [Op.in]: ['completed', 'refunded'] },
+                    type: { [Op.in]: ['booking', 'product_purchase', 'refund'] },
+                    processedAt: {
+                        [Op.gte]: start,
+                        [Op.lte]: end
+                    }
+                },
+                include: getLedgerTransactionIncludes(),
+                order: [['processedAt', 'DESC']],
+                subQuery: false
+            }),
+            runHandler(exports.getEmployeeRevenue, {
+                ...req,
+                query: { startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0] }
+            }),
+            db.StaffPayroll.findAll({
+                where: {
+                    tenantId,
+                    periodStart: {
+                        [Op.gte]: start,
+                        [Op.lte]: end
+                    }
+                },
+                include: [{
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'name']
+                }],
+                order: [['periodStart', 'DESC'], ['createdAt', 'DESC']]
+            })
+        ]);
+
+        const revenueLedger = transactions.map(mapLedgerTransaction);
+
+        const paymentLedger = transactions.map((transaction) => ({
+            id: transaction.id,
+            date: transaction.processedAt || transaction.createdAt,
+            reference: getTransactionReference(transaction),
+            customer: getLedgerCustomerName(transaction.appointment?.user || transaction.order?.user),
+            method: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
+            amount: Number((Number(transaction.amount || 0)).toFixed(2)),
+            type: transaction.type,
+            status: transaction.status,
+            source: transaction.appointment ? 'appointment' : 'order',
+            detailPath: transaction.appointment?.id
+                ? `/dashboard/appointments/${transaction.appointment.id}`
+                : transaction.order?.id
+                    ? `/dashboard/orders/${transaction.order.id}`
+                    : null
+        }));
+
+        const refundLedger = transactions
+            .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
+            .map(mapRefundLedgerRow);
+
+        const employees = employeeRevenueResponse?.employees || [];
+        const payrollByStaff = new Map();
+        payrollRecords.forEach((record) => {
+            const key = record.staffId;
+            const existing = payrollByStaff.get(key) || {
+                staffId: key,
+                commissionPaid: 0,
+                commissionOutstanding: 0,
+                payrollCount: 0,
+                latestStatus: record.status || 'draft'
+            };
+
+            const commission = Number(record.commission || 0);
+            const isPaid = `${record.status || ''}`.toLowerCase() === 'paid';
+            existing.commissionPaid += isPaid ? commission : 0;
+            existing.commissionOutstanding += isPaid ? 0 : commission;
+            existing.payrollCount += 1;
+            existing.latestStatus = record.status || existing.latestStatus;
+            payrollByStaff.set(key, existing);
+        });
+
+        const commissionLedger = employees.map((employee) => {
+            const payroll = payrollByStaff.get(employee.id) || {
+                commissionPaid: 0,
+                commissionOutstanding: 0,
+                payrollCount: 0,
+                latestStatus: 'draft'
+            };
+            const earned = Number(employee.totalCommission || 0);
+            const paid = Number(payroll.commissionPaid || 0);
+            return {
+                id: employee.id,
+                employee: employee.name,
+                revenueGenerated: Number(employee.totalRevenueGenerated || 0),
+                commissionEarned: Number(earned.toFixed(2)),
+                commissionPaid: Number(paid.toFixed(2)),
+                commissionOutstanding: Number(Math.max(earned - paid, 0).toFixed(2)),
+                payrollCount: payroll.payrollCount,
+                latestStatus: payroll.latestStatus
+            };
+        });
+
+        const settlementBuckets = new Map();
+        transactions.forEach((transaction) => {
+            const date = (transaction.processedAt || transaction.createdAt || start).toISOString().split('T')[0];
+            const amount = Number(transaction.amount || 0);
+            const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
+            const method = normalizeLedgerPaymentMethodGroup(transaction.paymentMethod);
+            const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
+
+            const existing = settlementBuckets.get(date) || {
+                date,
+                grossRevenue: 0,
+                refunds: 0,
+                cash: 0,
+                card: 0,
+                wallet: 0
+            };
+
+            if (isRefund) {
+                existing.refunds += Math.abs(amount);
+            } else {
+                existing.grossRevenue += Math.abs(amount);
+                if (method === 'cash') existing.cash += Math.abs(amount);
+                if (method === 'card') existing.card += Math.abs(amount);
+                if (method === 'wallet') existing.wallet += Math.abs(amount);
+            }
+
+            settlementBuckets.set(date, existing);
+        });
+
+        const settlementLedger = Array.from(settlementBuckets.values())
+            .sort((left, right) => left.date.localeCompare(right.date))
+            .map((row) => ({
+                ...row,
+                grossRevenue: Number(row.grossRevenue.toFixed(2)),
+                refunds: Number(row.refunds.toFixed(2)),
+                netCollected: Number((row.grossRevenue - row.refunds).toFixed(2)),
+                cash: Number(row.cash.toFixed(2)),
+                card: Number(row.card.toFixed(2)),
+                wallet: Number(row.wallet.toFixed(2))
+            }));
+
+        const revenueTotals = revenueLedger.reduce((acc, row) => {
+            acc.revenue += Number(row.revenue || 0);
+            acc.tax += Number(row.tax || 0);
+            acc.discount += Number(row.discount || 0);
+            return acc;
+        }, { revenue: 0, tax: 0, discount: 0 });
+
+        const refundTotals = refundLedger.reduce((acc, row) => {
+            acc.amount += Number(row.amount || 0);
+            return acc;
+        }, { amount: 0 });
+
+        const commissionTotals = commissionLedger.reduce((acc, row) => {
+            acc.earned += Number(row.commissionEarned || 0);
+            acc.paid += Number(row.commissionPaid || 0);
+            acc.outstanding += Number(row.commissionOutstanding || 0);
+            return acc;
+        }, { earned: 0, paid: 0, outstanding: 0 });
+
+        const settlementTotals = settlementLedger.reduce((acc, row) => {
+            acc.grossRevenue += Number(row.grossRevenue || 0);
+            acc.refunds += Number(row.refunds || 0);
+            acc.netCollected += Number(row.netCollected || 0);
+            acc.cash += Number(row.cash || 0);
+            acc.card += Number(row.card || 0);
+            acc.wallet += Number(row.wallet || 0);
+            return acc;
+        }, { grossRevenue: 0, refunds: 0, netCollected: 0, cash: 0, card: 0, wallet: 0 });
+
+        res.json({
+            success: true,
+            overview: {
+                totalTransactions: transactions.length,
+                totalRevenue: Number(revenueTotals.revenue.toFixed(2)),
+                totalTax: Number(revenueTotals.tax.toFixed(2)),
+                totalDiscount: Number(revenueTotals.discount.toFixed(2)),
+                totalRefunds: Number(refundTotals.amount.toFixed(2)),
+                totalCommissionEarned: Number(commissionTotals.earned.toFixed(2)),
+                totalCommissionPaid: Number(commissionTotals.paid.toFixed(2)),
+                totalCommissionOutstanding: Number(commissionTotals.outstanding.toFixed(2)),
+                netCollected: Number((settlementTotals.grossRevenue - settlementTotals.refunds).toFixed(2))
+            },
+            revenueLedger: {
+                rows: revenueLedger,
+                totals: {
+                    totalRows: revenueLedger.length,
+                    revenue: Number(revenueTotals.revenue.toFixed(2)),
+                    tax: Number(revenueTotals.tax.toFixed(2)),
+                    discount: Number(revenueTotals.discount.toFixed(2))
+                }
+            },
+            paymentLedger: {
+                rows: paymentLedger,
+                totals: {
+                    totalRows: paymentLedger.length,
+                    revenue: Number(revenueLedger.reduce((sum, row) => sum + Number(row.revenue || 0), 0).toFixed(2))
+                }
+            },
+            refundLedger: {
+                rows: refundLedger,
+                totals: {
+                    totalRows: refundLedger.length,
+                    amount: Number(refundTotals.amount.toFixed(2))
+                }
+            },
+            commissionLedger: {
+                rows: commissionLedger,
+                totals: {
+                    totalRows: commissionLedger.length,
+                    earned: Number(commissionTotals.earned.toFixed(2)),
+                    paid: Number(commissionTotals.paid.toFixed(2)),
+                    outstanding: Number(commissionTotals.outstanding.toFixed(2))
+                }
+            },
+            settlementLedger: {
+                rows: settlementLedger,
+                totals: {
+                    totalRows: settlementLedger.length,
+                    grossRevenue: Number(settlementTotals.grossRevenue.toFixed(2)),
+                    refunds: Number(settlementTotals.refunds.toFixed(2)),
+                    netCollected: Number(settlementTotals.netCollected.toFixed(2)),
+                    cash: Number(settlementTotals.cash.toFixed(2)),
+                    card: Number(settlementTotals.card.toFixed(2)),
+                    wallet: Number(settlementTotals.wallet.toFixed(2))
+                }
+            },
+            dateRange: {
+                startDate: start.toISOString().split('T')[0],
+                endDate: end.toISOString().split('T')[0]
+            }
+        });
+    } catch (error) {
+        console.error('Get financial ledger error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch financial ledger',
             error: error.message
         });
     }

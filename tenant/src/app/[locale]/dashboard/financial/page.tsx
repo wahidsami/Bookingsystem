@@ -76,6 +76,9 @@ interface Overview {
 interface EmployeeRevenue {
   id: string;
   name: string;
+  email?: string;
+  phone?: string;
+  salary?: number;
   baseSalary?: number;
   commissionRate?: number;
   totalBookings: number;
@@ -302,7 +305,8 @@ function SectionTable({
   onRowClick,
   sourceLabel,
   totalRows,
-  truncatedLabel
+  truncatedLabel,
+  countLabel
 }: {
   headers: string[];
   rows: ReactNode[][];
@@ -311,6 +315,7 @@ function SectionTable({
   sourceLabel?: string;
   totalRows?: number;
   truncatedLabel?: string;
+  countLabel?: string;
 }) {
   return (
     <AnalyticsDataTable
@@ -324,6 +329,7 @@ function SectionTable({
       sourceLabel={sourceLabel || "rows"}
       totalRows={totalRows}
       truncatedLabel={truncatedLabel}
+      countLabel={countLabel}
       emptyTitle={rtl ? "لا توجد صفوف" : "No rows found"}
       emptyDescription={rtl ? "لا توجد بيانات مطابقة للمرشحات الحالية." : "No rows match the current filters."}
       searchPlaceholder={rtl ? "ابحث داخل الجدول" : "Search this table"}
@@ -341,9 +347,9 @@ type DrilldownState = {
   title: ReactNode;
   subtitle?: ReactNode;
   summaryItems: Array<{ label: ReactNode; value: ReactNode; note?: ReactNode }>;
-  tabs: Array<{ id: DrilldownTabId; label: ReactNode; description?: ReactNode }>;
-  activeTab: DrilldownTabId;
-  tabPanels: Record<DrilldownTabId, ReactNode>;
+  tabs: Array<{ id: string; label: ReactNode; description?: ReactNode }>;
+  activeTab: string;
+  tabPanels: Record<string, ReactNode>;
   actions?: ReactNode;
   sideNote?: ReactNode;
 };
@@ -1129,6 +1135,12 @@ export default function FinancialPage() {
               className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
             >
               {locale === "ar" ? "إنشاء تقرير" : "Generate report"}
+            </Link>
+            <Link
+              href={`/${locale}/dashboard/financial/ledger`}
+              className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              {locale === "ar" ? "سجل مالي" : "Ledger workspace"}
             </Link>
           </>
         }

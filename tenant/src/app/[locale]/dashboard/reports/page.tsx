@@ -164,7 +164,8 @@ function SectionTable({
   onRowClick,
   sourceLabel,
   totalRows,
-  truncatedLabel
+  truncatedLabel,
+  countLabel
 }: {
   headers: string[];
   rows: ReactNode[][];
@@ -173,6 +174,7 @@ function SectionTable({
   sourceLabel?: string;
   totalRows?: number;
   truncatedLabel?: string;
+  countLabel?: string;
 }) {
   return (
     <AnalyticsDataTable
@@ -186,6 +188,7 @@ function SectionTable({
       sourceLabel={sourceLabel || "rows"}
       totalRows={totalRows}
       truncatedLabel={truncatedLabel}
+      countLabel={countLabel}
       emptyTitle={rtl ? "لا توجد صفوف" : "No rows found"}
       emptyDescription={rtl ? "لا توجد بيانات مطابقة للمرشحات الحالية." : "No rows match the current filters."}
       searchPlaceholder={rtl ? "ابحث داخل الجدول" : "Search this table"}
