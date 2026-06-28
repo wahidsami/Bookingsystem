@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { useTenantAuth } from '@/contexts/TenantAuthContext';
 import { ReportHeader } from '@/components/ReportHeader';
 import { ReportExportToolbar } from '@/components/ReportExportToolbar';
-import { tenantApi } from '@/lib/api';
+import { API_BASE_URL, tenantApi } from '@/lib/api';
 import { Currency } from '@/components/Currency';
+import { ReportPdfDebugPanel, type ReportPdfDebugState } from '@/components/ReportPdfDebugPanel';
 import {
   exportEmployeesToCsv,
   exportServicesToCsv,
@@ -86,6 +87,7 @@ export default function ReportPreviewPage() {
 
   const [loading, setLoading] = useState(true);
   const [downloadError, setDownloadError] = useState<string>('');
+  const [pdfDebug, setPdfDebug] = useState<ReportPdfDebugState | null>(null);
   const [data, setData] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -156,18 +158,63 @@ export default function ReportPreviewPage() {
     reportTitle,
     notes
   });
+  const previewPdfUrl = `${API_BASE_URL}/tenant/reports/pdf?${new URLSearchParams({
+    startDate,
+    endDate,
+    sections: sections.join(','),
+    title: previewReportTitle
+  }).toString()}`;
 
   const handleExportPdf = async () => {
+    const startedAt = new Date();
+    const requestUrl = previewPdfUrl;
+    setPdfDebug({
+      status: 'running',
+      startedAt: startedAt.toISOString(),
+      requestUrl,
+      startDate,
+      endDate,
+      sections,
+      title: previewReportTitle
+    });
     try {
       setDownloadError('');
-      await exportPdf({
+      const file = await exportPdf({
         startDate,
         endDate,
         sections,
         title: previewReportTitle
       });
+      setPdfDebug({
+        status: 'success',
+        startedAt: startedAt.toISOString(),
+        finishedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt.getTime(),
+        requestUrl,
+        startDate,
+        endDate,
+        sections,
+        title: previewReportTitle,
+        filename: file.filename
+      });
     } catch (err: any) {
       console.error('Failed to download report PDF:', err);
+      setPdfDebug({
+        status: 'failed',
+        startedAt: startedAt.toISOString(),
+        finishedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt.getTime(),
+        requestUrl,
+        startDate,
+        endDate,
+        sections,
+        title: previewReportTitle,
+        httpStatus: err?.status,
+        statusText: err?.statusText,
+        contentType: err?.contentType,
+        errorMessage: err?.message,
+        responseBody: err?.responsePreview || err?.responseBody
+      });
       setDownloadError(
         err?.message
           || (locale === 'ar' ? 'تعذر تنزيل ملف PDF. حاول مرة أخرى.' : 'Failed to download PDF. Please try again.')
@@ -246,6 +293,11 @@ export default function ReportPreviewPage() {
           disabled={loading}
         />
       </div>
+      <ReportPdfDebugPanel
+        locale={locale}
+        debug={pdfDebug}
+        onClear={() => setPdfDebug(null)}
+      />
       {downloadError ? (
         <div className="no-print mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {downloadError}

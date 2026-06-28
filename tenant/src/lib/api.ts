@@ -29,6 +29,16 @@ interface ApiResponse<T = any> {
   [key: string]: any;
 }
 
+export type BlobDownloadError = Error & {
+  status?: number;
+  statusText?: string;
+  endpoint?: string;
+  url?: string;
+  contentType?: string;
+  responseBody?: string;
+  responsePreview?: string;
+};
+
 class TenantApiClient {
   private baseUrl: string;
 
@@ -206,12 +216,13 @@ class TenantApiClient {
   private async requestBlob(endpoint: string): Promise<{ blob: Blob; filename: string }> {
     const headers: Record<string, string> = {};
     const accessToken = this.getAccessToken();
+    const url = `${this.baseUrl}${endpoint}`;
 
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    let response = await fetch(`${this.baseUrl}${endpoint}`, {
+    let response = await fetch(url, {
       method: 'GET',
       headers
     });
@@ -244,11 +255,31 @@ class TenantApiClient {
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type') || '';
+      const bodyText = await response.text();
+      let errorMessage = `Failed to download document: ${response.status}`;
+
       if (contentType.includes('application/json')) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || 'Failed to download document');
+        try {
+          const errorData = JSON.parse(bodyText);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          errorMessage = bodyText || errorMessage;
+        }
+      } else if (bodyText.trim()) {
+        errorMessage = bodyText;
       }
-      throw new Error(`Failed to download document: ${response.status}`);
+
+      const error: BlobDownloadError = Object.assign(new Error(errorMessage), {
+        status: response.status,
+        statusText: response.statusText,
+        endpoint,
+        url,
+        contentType,
+        responseBody: bodyText,
+        responsePreview: bodyText.slice(0, 4000),
+      });
+
+      throw error;
     }
 
     const contentDisposition = response.headers.get('content-disposition') || '';

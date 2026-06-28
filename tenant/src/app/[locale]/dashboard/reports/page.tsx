@@ -7,6 +7,7 @@ import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { TenantLayout } from "@/components/TenantLayout";
 import { ReportExportToolbar } from "@/components/ReportExportToolbar";
+import { ReportPdfDebugPanel, type ReportPdfDebugState } from "@/components/ReportPdfDebugPanel";
 import {
   FinanceEmptyState,
   FinanceMetricCard,
@@ -243,6 +244,7 @@ export default function ReportsPage() {
   const [savedReportTemplateSection, setSavedReportTemplateSection] = useState<ReportSectionId>("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pdfDebug, setPdfDebug] = useState<ReportPdfDebugState | null>(null);
   const [dateRange, setDateRange] = useState("month");
   const [startDate, setStartDate] = useState(formatDateInput(-29));
   const [endDate, setEndDate] = useState(formatDateInput(0));
@@ -586,16 +588,60 @@ export default function ReportsPage() {
   );
 
   const handleExportPdf = async () => {
+    const startedAt = new Date();
+    const requestUrl = `${process.env.NEXT_PUBLIC_API_URL || ""}/tenant/reports/pdf?${new URLSearchParams({
+      startDate,
+      endDate,
+      sections: exportSections.join(","),
+      title: reportTitle
+    }).toString()}`;
+    setPdfDebug({
+      status: "running",
+      startedAt: startedAt.toISOString(),
+      requestUrl,
+      startDate,
+      endDate,
+      sections: exportSections,
+      title: reportTitle
+    });
     try {
       setExportError("");
-      await exportPdf({
+      const file = await exportPdf({
         startDate,
         endDate,
         sections: exportSections,
         title: reportTitle
       });
+      setPdfDebug({
+        status: "success",
+        startedAt: startedAt.toISOString(),
+        finishedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt.getTime(),
+        requestUrl,
+        startDate,
+        endDate,
+        sections: exportSections,
+        title: reportTitle,
+        filename: file.filename
+      });
     } catch (err: any) {
       console.error("Failed to download report PDF:", err);
+      setPdfDebug({
+        status: "failed",
+        startedAt: startedAt.toISOString(),
+        finishedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt.getTime(),
+        requestUrl,
+        startDate,
+        endDate,
+        sections: exportSections,
+        title: reportTitle,
+        httpStatus: err?.status,
+        statusText: err?.statusText,
+        contentType: err?.contentType,
+        errorMessage: err?.message,
+        responseBody: err?.responsePreview || err?.responseBody
+      });
       setExportError(err?.message || "Failed to download PDF.");
     }
   };
@@ -1561,6 +1607,12 @@ export default function ReportsPage() {
           </>
         }
       >
+        <ReportPdfDebugPanel
+          locale={locale}
+          debug={pdfDebug}
+          onClear={() => setPdfDebug(null)}
+        />
+
         {exportError ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {exportError}
