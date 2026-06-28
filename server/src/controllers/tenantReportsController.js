@@ -1691,7 +1691,7 @@ exports.downloadReportPdf = async (req, res) => {
             data
         });
 
-        const fileName = `report-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
+        const fileName = `${sanitizeFileNamePart(title || 'report')}-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
         res.setHeader('Content-Length', buffer.length);
@@ -1712,7 +1712,7 @@ exports.downloadReportPdf = async (req, res) => {
                 errorMessage: error.message,
                 sections
             });
-            const fileName = `report-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
+            const fileName = `${sanitizeFileNamePart(title || 'report')}-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
             res.setHeader('Content-Length', fallbackBuffer.length);
@@ -1733,7 +1733,7 @@ exports.downloadReportPdf = async (req, res) => {
                     errorMessage: fallbackError.message || error.message,
                     sections
                 });
-                const fileName = `report-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
+                const fileName = `${sanitizeFileNamePart(title || 'report')}-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
                 res.setHeader('Content-Type', 'application/pdf');
                 res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
                 res.setHeader('Content-Length', emergencyBuffer.length);

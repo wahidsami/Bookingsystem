@@ -42,6 +42,11 @@ function formatMoney(value) {
     return `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
 }
 
+function formatPercent(value) {
+    const amount = Number(value || 0);
+    return `${amount.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
 function normalizePdfText(value) {
     if (value === null || value === undefined) return '-';
     if (Array.isArray(value)) {
@@ -177,17 +182,74 @@ function buildPdfMakeDoc(payload) {
     if (overview) {
         content.push(
             { text: 'Overview', style: 'sectionTitle', pageBreak: 'before' },
+            { text: 'Financial summary', style: 'subsectionTitle' },
             buildMetricTable([
                 ['Total Revenue', formatMoney(overview.totalRevenue)],
                 ['Tenant Revenue', formatMoney(overview.totalTenantRevenue)],
                 ['Net Revenue', formatMoney(overview.netRevenue)],
+                ['Gross Appointment Revenue', formatMoney(overview.appointmentRevenue)],
+                ['Order Revenue', formatMoney(overview.orderRevenue)],
+                ['Gift Card Revenue', formatMoney(overview.giftCardRevenue)],
+                ['Total Tax', formatMoney(overview.totalTax)],
+                ['Platform Fees', formatMoney(overview.totalPlatformFees)],
+                ['Employee Commissions', formatMoney(overview.totalEmployeeCommissions)]
+            ]),
+            { text: 'Booking summary', style: 'subsectionTitle' },
+            buildMetricTable([
                 ['Total Bookings', overview.totalBookings || 0],
                 ['Completed Bookings', overview.completedBookings || 0],
                 ['Cancelled Bookings', overview.cancelledBookings || 0],
                 ['No-show Bookings', overview.noShowBookings || 0],
+                ['Paid Bookings', overview.paidBookings || 0],
+                ['Pending Payments', formatMoney(overview.pendingPayments)],
+                ['Completion Rate', formatPercent(overview.completionRate)],
+                ['Average Booking Value', formatMoney(overview.avgBookingValue)],
                 ['Unique Customers', overview.uniqueCustomers || 0]
             ])
         );
+
+        if (overview.discountTotals || overview.totalDiscountAmount != null) {
+            const discounts = overview.discountTotals || overview;
+            content.push(
+                { text: 'Discount summary', style: 'subsectionTitle' },
+                buildMetricTable([
+                    ['Total Discounts', formatMoney(discounts.totalDiscountAmount)],
+                    ['Appointment Discounts', formatMoney(discounts.appointmentDiscountAmount)],
+                    ['Order Discounts', formatMoney(discounts.orderDiscountAmount)],
+                    ['Discounted Bookings', discounts.discountedBookings || 0],
+                    ['Discounted Orders', discounts.discountedOrders || 0],
+                    ['Average Discount', formatMoney(discounts.averageDiscountAmount)]
+                ])
+            );
+
+            if (Array.isArray(discounts.topDiscountedServices) && discounts.topDiscountedServices.length) {
+                content.push(
+                    ...buildDataTable(
+                        'Top Discounted Services',
+                        ['Service', 'Bookings', 'Discount'],
+                        discounts.topDiscountedServices.map((service) => [
+                            service.name_en || service.name_ar || '-',
+                            service.bookingCount ?? 0,
+                            formatMoney(service.discountAmount)
+                        ])
+                    )
+                );
+            }
+
+            if (Array.isArray(discounts.topDiscountedOrders) && discounts.topDiscountedOrders.length) {
+                content.push(
+                    ...buildDataTable(
+                        'Top Discounted Orders',
+                        ['Order', 'Base Amount', 'Discount'],
+                        discounts.topDiscountedOrders.map((order) => [
+                            order.orderNumber || order.id || '-',
+                            formatMoney(order.baseAmount),
+                            formatMoney(order.discountAmount)
+                        ])
+                    )
+                );
+            }
+        }
     }
 
     if (Array.isArray(payload.data?.dailyRevenue) && payload.data.dailyRevenue.length) {
@@ -408,6 +470,12 @@ function buildPdfMakeDoc(payload) {
                 bold: true,
                 color: '#111827',
                 margin: [0, 0, 0, 10]
+            },
+            subsectionTitle: {
+                fontSize: 13,
+                bold: true,
+                color: '#4C1D95',
+                margin: [0, 8, 0, 6]
             },
             emptyText: {
                 fontSize: 10,
