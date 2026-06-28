@@ -2,51 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
+import { useRouter } from "next/navigation";
 import { TenantLayout } from "@/components/TenantLayout";
 import { tenantApi } from "@/lib/api";
 
-type ConsultantTabId =
-  | "overview"
-  | "conversations"
-  | "insights"
-  | "opportunities"
-  | "predictions"
-  | "reports"
-  | "settings";
-
-type ConsultantConversation = {
-  id: string;
-  title: string;
-  preview: string;
-  updatedAt: string;
-  status: "open" | "paused" | "completed";
-  tag: string;
-};
-
-type PriorityIssue = {
-  id: string;
-  title: string;
-  severity: "high" | "medium" | "low";
-  detail: string;
-};
-
-type Opportunity = {
-  id: string;
-  title: string;
-  impact: string;
-  description: string;
-};
-
-type SuggestedAction = {
-  id: string;
-  title: string;
-  detail: string;
-  tone: "neutral" | "positive" | "warning";
-};
-
+type ConsultantTabId = "chat" | "reports" | "settings";
 type ConsultantLanguage = "ar" | "en";
 type ConsultantTone = "professional_arabic" | "saudi_executive_style" | "executive_english";
 type ConsultantAddressingStyle = "neutral_professional" | "male_formal" | "female_formal" | "no_titles";
+type ConsultantHistoryKind = "analysis" | "briefing";
+type ConsultantHistoryStatus = "open" | "paused" | "completed";
+type ConsultantSeverity = "low" | "medium" | "high";
+type ConsultantTrend = "positive" | "negative" | "neutral";
+type ConsultantDirection = "up" | "down" | "flat";
+type ConsultantChartType = "line" | "bar" | "pie";
 
 type ConsultantCommunicationPreferences = {
   language: ConsultantLanguage;
@@ -62,162 +31,244 @@ type LoadedConsultantSettings = {
   } | null;
 };
 
-const tabs: Array<{ id: ConsultantTabId; label: string; description: string }> = [
-  { id: "overview", label: "Overview", description: "Daily brief and workspace summary" },
-  { id: "conversations", label: "Conversations", description: "History and searchable threads" },
-  { id: "insights", label: "Insights", description: "Patterns, signals, and highlights" },
-  { id: "opportunities", label: "Opportunities", description: "Growth and optimization ideas" },
-  { id: "predictions", label: "Predictions", description: "What may need attention next" },
-  { id: "reports", label: "Reports", description: "Structured export-ready views" },
-  { id: "settings", label: "Settings", description: "Module preferences and filters" }
-];
-
-const conversations: ConsultantConversation[] = [
-  {
-    id: "conv-1",
-    title: "Weekly financial review",
-    preview: "Revenue concentration increased in appointments, while refunds stayed stable.",
-    updatedAt: "2026-06-28T08:15:00.000Z",
-    status: "open",
-    tag: "Finance"
-  },
-  {
-    id: "conv-2",
-    title: "Customer retention audit",
-    preview: "Repeat bookings improved in premium services, but walk-in conversion needs work.",
-    updatedAt: "2026-06-27T18:22:00.000Z",
-    status: "paused",
-    tag: "Customers"
-  },
-  {
-    id: "conv-3",
-    title: "Report quality check",
-    preview: "Customer identity labels now include badges and identity lines in exports.",
-    updatedAt: "2026-06-26T12:40:00.000Z",
-    status: "completed",
-    tag: "Reports"
-  }
-];
-
-const priorityIssues: PriorityIssue[] = [
-  {
-    id: "issue-1",
-    title: "Refund spikes in one-day windows",
-    severity: "high",
-    detail: "Review the refunds list daily and investigate repeated refund patterns."
-  },
-  {
-    id: "issue-2",
-    title: "Top-N tables need clear labels",
-    severity: "medium",
-    detail: "Make sure summary cards always say whether the dataset is complete or truncated."
-  },
-  {
-    id: "issue-3",
-    title: "Customer identity fallback consistency",
-    severity: "low",
-    detail: "Keep badge behavior aligned across preview, exports, and PDFs."
-  }
-];
-
-const opportunities: Opportunity[] = [
-  {
-    id: "opp-1",
-    title: "Reduce empty report friction",
-    impact: "High",
-    description: "Add suggested next actions whenever a table has no rows in the selected range."
-  },
-  {
-    id: "opp-2",
-    title: "Highlight growth by segment",
-    impact: "Medium",
-    description: "Surface customer and service segments in a cleaner, Notion-like summary block."
-  },
-  {
-    id: "opp-3",
-    title: "Improve drill-down memory",
-    impact: "High",
-    description: "Persist the last-opened detail tab per workspace to keep exploration fast."
-  }
-];
-
-const suggestedActions: SuggestedAction[] = [
-  {
-    id: "action-1",
-    title: "Open finance ledger",
-    detail: "Review revenue, payments, refunds, and settlement rows.",
-    tone: "positive"
-  },
-  {
-    id: "action-2",
-    title: "Review customer sales",
-    detail: "Check identity quality and top customer changes.",
-    tone: "warning"
-  },
-  {
-    id: "action-3",
-    title: "Export weekly snapshot",
-    detail: "Prepare CSV / Excel / PDF reporting for leadership.",
-    tone: "neutral"
-  }
-];
-
-function statusBadgeClass(status: ConsultantConversation["status"]) {
-  switch (status) {
-    case "open":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "paused":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "completed":
-      return "border-sky-200 bg-sky-50 text-sky-800";
-    default:
-      return "border-gray-200 bg-gray-50 text-gray-700";
-  }
-}
-
-function severityBadgeClass(severity: PriorityIssue["severity"]) {
-  switch (severity) {
-    case "high":
-      return "border-rose-200 bg-rose-50 text-rose-700";
-    case "medium":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "low":
-    default:
-      return "border-slate-200 bg-slate-50 text-slate-700";
-  }
-}
-
-function toneClass(tone: SuggestedAction["tone"]) {
-  switch (tone) {
-    case "positive":
-      return "border-emerald-200 bg-emerald-50 text-emerald-900";
-    case "warning":
-      return "border-amber-200 bg-amber-50 text-amber-900";
-    default:
-      return "border-gray-200 bg-white text-gray-900";
-  }
-}
-
-function SkeletonCard() {
-  return <div className="h-24 animate-pulse rounded-3xl border border-gray-200 bg-gray-100" />;
-}
-
-const languageLabels: Record<ConsultantLanguage, string> = {
-  ar: "Arabic",
-  en: "English"
+type ConsultantKpi = {
+  type: string;
+  label: string;
+  value: number;
+  unit: string;
+  delta: number;
+  direction: ConsultantDirection;
+  trend: ConsultantTrend;
 };
 
-const toneLabels: Record<ConsultantTone, string> = {
-  professional_arabic: "Professional Arabic",
-  saudi_executive_style: "Saudi Executive Style",
-  executive_english: "Executive English"
+type ConsultantChart = {
+  type: ConsultantChartType;
+  title: string;
+  description: string;
+  labels: string[];
+  series: Array<{ name: string; data: number[] }>;
 };
 
-const addressingLabels: Record<ConsultantAddressingStyle, string> = {
-  neutral_professional: "Neutral Professional",
-  male_formal: "Male Formal",
-  female_formal: "Female Formal",
-  no_titles: "No Titles"
+type ConsultantTable = {
+  title: string;
+  description: string;
+  columns: string[];
+  rows: Array<Record<string, any> | any[]>;
+  source: string;
+};
+
+type ConsultantAlert = {
+  severity: ConsultantSeverity;
+  title: string;
+  detail: string;
+  deepLink: string | null;
+};
+
+type ConsultantRecommendation = {
+  priority: ConsultantSeverity;
+  title: string;
+  detail: string;
+  deepLink: string | null;
+};
+
+type ConsultantAction = {
+  title: string;
+  detail: string;
+  module: string;
+  deepLink: string | null;
+  priority: ConsultantSeverity;
+};
+
+type ConsultantResponse = {
+  summary: string;
+  healthScore: number;
+  kpis: ConsultantKpi[];
+  charts: ConsultantChart[];
+  tables: ConsultantTable[];
+  alerts: ConsultantAlert[];
+  recommendations: ConsultantRecommendation[];
+  actions: ConsultantAction[];
+};
+
+type ConsultantHistoryItem = {
+  id: string;
+  kind: ConsultantHistoryKind;
+  title: string;
+  preview: string;
+  generatedAt: string;
+  periodType: string;
+  periodLabel: string;
+  status: ConsultantHistoryStatus;
+  sourceLabel: string;
+  reportId: string | null;
+  snapshotId: string | null;
+  reportData: ConsultantResponse;
+};
+
+const defaultHistoryPreview = {
+  en: {
+    analysis: "Executive analysis ready for review.",
+    briefing: "Automated briefing ready for the team."
+  },
+  ar: {
+    analysis: "التحليل التنفيذي جاهز للمراجعة.",
+    briefing: "الملخص التلقائي جاهز للفريق."
+  }
+} as const;
+
+const ui = {
+  en: {
+    eyebrow: "AI Consultant",
+    title: "Executive advisor workspace",
+    subtitle: "A focused salon business console for chat, reports, and settings without dashboard clutter.",
+    newAnalysis: "New analysis",
+    startAnalysis: "Start new analysis",
+    refreshHistory: "Refresh history",
+    searchLabel: "Search history",
+    searchPlaceholder: "Search by title, brief, or module",
+    historyTitle: "Conversation history",
+    historyEmpty: "No analyses yet. Start a new analysis to generate the first executive briefing.",
+    historyEmptyMatch: "No matching items found.",
+    historyLoading: "Loading history...",
+    tabChat: "Chat",
+    tabReports: "Reports",
+    tabSettings: "Settings",
+    businessHealth: "Business Health",
+    healthScore: "Health score",
+    generated: "Generated",
+    period: "Period",
+    executiveBrief: "Daily Executive Brief",
+    executiveBriefHelp: "A concise, executive-ready readout of what needs attention now.",
+    askPlaceholder: "Ask the consultant for a new executive briefing...",
+    askHelper: "This runs the consultant workflow using the latest stored snapshot.",
+    runPrompt: "Run analysis",
+    suggestedQuestions: "Suggested questions",
+    suggestedActions: "Suggested actions",
+    analysisOutput: "Structured analysis",
+    kpis: "KPI cards",
+    charts: "Charts",
+    tables: "Tables",
+    alerts: "Alerts",
+    recommendations: "Recommendations",
+    actions: "Actions",
+    openModule: "Open module",
+    reportArchive: "Analysis archive",
+    reportArchiveHelp: "Stored analyses and generated briefings stay here for quick return.",
+    reportTypeAnalysis: "Analysis",
+    reportTypeBriefing: "Briefing",
+    openAnalysis: "Open analysis",
+    openBriefing: "Open briefing",
+    reportsEmpty: "No stored analyses are available yet.",
+    settingsTitle: "Consultant communication",
+    settingsHelp: "These preferences are stored per tenant and injected automatically into the prompt engine.",
+    language: "Language",
+    tone: "Consultant tone",
+    addressing: "Preferred addressing style",
+    save: "Save preferences",
+    saving: "Saving...",
+    saved: "Consultant preferences saved successfully.",
+    saveFailed: "Failed to save consultant preferences.",
+    defaultPolicy: "Saudi tenants default to Arabic, Saudi Executive Style, and Neutral Professional addressing.",
+    sampleOutputs: "Sample outputs",
+    sampleSummary: "Executive summary",
+    sampleRecommendation: "Recommendation",
+    sampleAction: "Suggested action",
+    voiceProfile: "Voice profile",
+    emptyStateTitle: "Ready for the first briefing",
+    emptyStateBody: "Run a new analysis to generate the first structured consultant report.",
+    loadingDetail: "Loading consultant detail...",
+    running: "Preparing executive briefing...",
+    retry: "Retry",
+    errorPrefix: "We could not load the consultant workspace.",
+    openReports: "Open reports",
+    openSettings: "Open settings",
+    activeHistory: "Current focus"
+  },
+  ar: {
+    eyebrow: "مستشار ذكي",
+    title: "مساحة المستشار التنفيذي",
+    subtitle: "واجهة مركزة لإدارة الأعمال تجمع المحادثة والتقارير والإعدادات بدون ازدحام لوحات التحكم.",
+    newAnalysis: "تحليل جديد",
+    startAnalysis: "بدء تحليل جديد",
+    refreshHistory: "تحديث السجل",
+    searchLabel: "البحث في السجل",
+    searchPlaceholder: "ابحث بالعنوان أو الملخص أو الوحدة",
+    historyTitle: "سجل المحادثات",
+    historyEmpty: "لا توجد تحليلات بعد. ابدأ بتحليل جديد لإنشاء أول موجز تنفيذي.",
+    historyEmptyMatch: "لا توجد عناصر مطابقة.",
+    historyLoading: "جارٍ تحميل السجل...",
+    tabChat: "المحادثة",
+    tabReports: "التقارير",
+    tabSettings: "الإعدادات",
+    businessHealth: "صحة الأعمال",
+    healthScore: "درجة الصحة",
+    generated: "تم الإنشاء",
+    period: "الفترة",
+    executiveBrief: "الملخص التنفيذي اليومي",
+    executiveBriefHelp: "قراءة مختصرة ومهنية لما يحتاج انتباه الإدارة الآن.",
+    askPlaceholder: "اطلب من المستشار إعداد موجز تنفيذي جديد...",
+    askHelper: "سيتم تشغيل سير العمل اعتماداً على آخر snapshot محفوظ.",
+    runPrompt: "تشغيل التحليل",
+    suggestedQuestions: "أسئلة مقترحة",
+    suggestedActions: "إجراءات مقترحة",
+    analysisOutput: "التحليل المنظم",
+    kpis: "بطاقات KPI",
+    charts: "الرسوم",
+    tables: "الجداول",
+    alerts: "التنبيهات",
+    recommendations: "التوصيات",
+    actions: "الإجراءات",
+    openModule: "فتح الوحدة",
+    reportArchive: "أرشيف التحليلات",
+    reportArchiveHelp: "تُحفظ التحليلات والموجزات التلقائية هنا للرجوع السريع.",
+    reportTypeAnalysis: "تحليل",
+    reportTypeBriefing: "موجز",
+    openAnalysis: "فتح التحليل",
+    openBriefing: "فتح الموجز",
+    reportsEmpty: "لا توجد تحليلات محفوظة حتى الآن.",
+    settingsTitle: "تواصل المستشار",
+    settingsHelp: "تُحفظ هذه التفضيلات لكل tenant وتُحقن تلقائياً في محرك الـ prompt.",
+    language: "اللغة",
+    tone: "نبرة المستشار",
+    addressing: "أسلوب النداء المفضل",
+    save: "حفظ الإعدادات",
+    saving: "جارٍ الحفظ...",
+    saved: "تم حفظ إعدادات المستشار بنجاح.",
+    saveFailed: "تعذر حفظ إعدادات المستشار.",
+    defaultPolicy: "الـ tenant السعودي الافتراضي يستخدم العربية ونبرة Saudi Executive Style مع أسلوب Neutral Professional.",
+    sampleOutputs: "نماذج مخرجات",
+    sampleSummary: "ملخص تنفيذي",
+    sampleRecommendation: "توصية",
+    sampleAction: "إجراء مقترح",
+    voiceProfile: "ملف النبرة",
+    emptyStateTitle: "جاهز لأولى الموجزات",
+    emptyStateBody: "ابدأ تحليلاً جديداً لإنشاء أول تقرير مستشار منظم.",
+    loadingDetail: "جارٍ تحميل تفاصيل المستشار...",
+    running: "جارٍ إعداد الموجز التنفيذي...",
+    retry: "إعادة المحاولة",
+    errorPrefix: "تعذر تحميل مساحة المستشار.",
+    openReports: "فتح التقارير",
+    openSettings: "فتح الإعدادات",
+    activeHistory: "العنصر الحالي"
+  }
+} as const;
+
+const languageLabels: Record<ConsultantLanguage, Record<"en" | "ar", string>> = {
+  ar: { en: "Arabic", ar: "العربية" },
+  en: { en: "English", ar: "الإنجليزية" }
+};
+
+const toneLabels: Record<ConsultantTone, Record<"en" | "ar", string>> = {
+  professional_arabic: { en: "Professional Arabic", ar: "عربية مهنية" },
+  saudi_executive_style: { en: "Saudi Executive Style", ar: "الأسلوب التنفيذي السعودي" },
+  executive_english: { en: "Executive English", ar: "الإنجليزية التنفيذية" }
+};
+
+const addressingLabels: Record<ConsultantAddressingStyle, Record<"en" | "ar", string>> = {
+  neutral_professional: { en: "Neutral Professional", ar: "مهني محايد" },
+  male_formal: { en: "Male Formal", ar: "صيغة رسمية للمذكر" },
+  female_formal: { en: "Female Formal", ar: "صيغة رسمية للمؤنث" },
+  no_titles: { en: "No Titles", ar: "بدون ألقاب" }
 };
 
 function getDefaultConsultantPreferences(settings?: LoadedConsultantSettings | null): ConsultantCommunicationPreferences {
@@ -240,51 +291,619 @@ function getDefaultConsultantPreferences(settings?: LoadedConsultantSettings | n
   };
 }
 
-function buildSampleConsultantVoice(preferences: ConsultantCommunicationPreferences) {
-  if (preferences.language === "ar") {
-    const intro =
-      preferences.tone === "saudi_executive_style"
-        ? "الله يعافيك، عندنا ملاحظة مهمة على الأداء الحالي."
-        : "لدينا ملاحظة تشغيلية مهمة على الأداء الحالي.";
-    const recommendation =
-      preferences.addressingStyle === "no_titles"
-        ? "أقترح مراجعة العملاء غير النشطين هذا الأسبوع."
-        : "أشوف أنه من المناسب مراجعة العملاء غير النشطين هذا الأسبوع.";
+function normalizeList(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
 
-    return {
-      summary: intro,
-      recommendation,
-      action: "افتح قائمة العملاء غير النشطين وابدأ متابعة موجهة للاحتفاظ."
-    };
-  }
-
-  const intro =
-    preferences.tone === "executive_english"
-      ? "We have a clear operational signal that merits executive review."
-      : "There is a notable performance signal that deserves close review.";
-  const recommendation =
-    preferences.addressingStyle === "no_titles"
-      ? "I recommend reviewing inactive customers and tightening the recovery plan."
-      : "I would recommend reviewing inactive customers and tightening the recovery plan.";
+function normalizeConsultantResponse(raw: any = {}): ConsultantResponse {
+  const summary = `${raw.summary || raw.executiveSummary || ""}`.trim();
+  const healthScore = Number.isFinite(Number(raw.healthScore))
+    ? Math.max(0, Math.min(100, Math.round(Number(raw.healthScore))))
+    : 0;
 
   return {
-    summary: intro,
-    recommendation,
-    action: "Open the inactive customer list and launch a targeted retention follow-up."
+    summary,
+    healthScore,
+    kpis: normalizeList(raw.kpis).map((item: any) => ({
+      type: `${item?.type || "revenue"}`.trim(),
+      label: `${item?.label || ""}`.trim(),
+      value: Number.isFinite(Number(item?.value)) ? Number(item.value) : 0,
+      unit: `${item?.unit || ""}`.trim() || "count",
+      delta: Number.isFinite(Number(item?.delta)) ? Number(item.delta) : 0,
+      direction: ["up", "down", "flat"].includes(item?.direction) ? item.direction : "flat",
+      trend: ["positive", "negative", "neutral"].includes(item?.trend) ? item.trend : "neutral"
+    })),
+    charts: normalizeList(raw.charts).map((chart: any) => ({
+      type: ["line", "bar", "pie"].includes(chart?.type) ? chart.type : "line",
+      title: `${chart?.title || ""}`.trim(),
+      description: `${chart?.description || ""}`.trim(),
+      labels: Array.isArray(chart?.labels) ? chart.labels.map((label: any) => `${label ?? ""}`) : [],
+      series: Array.isArray(chart?.series)
+        ? chart.series.map((serie: any) => ({
+            name: `${serie?.name || ""}`.trim(),
+            data: Array.isArray(serie?.data) ? serie.data.map((value: any) => (Number.isFinite(Number(value)) ? Number(value) : 0)) : []
+          }))
+        : []
+    })),
+    tables: normalizeList(raw.tables).map((table: any) => ({
+      title: `${table?.title || ""}`.trim(),
+      description: `${table?.description || ""}`.trim(),
+      columns: Array.isArray(table?.columns) ? table.columns.map((column: any) => `${column ?? ""}`) : [],
+      rows: Array.isArray(table?.rows) ? table.rows : [],
+      source: `${table?.source || ""}`.trim()
+    })),
+    alerts: normalizeList(raw.alerts).map((alert: any) => ({
+      severity: ["low", "medium", "high"].includes(alert?.severity) ? alert.severity : "medium",
+      title: `${alert?.title || ""}`.trim(),
+      detail: `${alert?.detail || ""}`.trim(),
+      deepLink: `${alert?.deepLink || ""}`.trim() || null
+    })),
+    recommendations: normalizeList(raw.recommendations).map((item: any) => ({
+      priority: ["low", "medium", "high"].includes(item?.priority) ? item.priority : "medium",
+      title: `${item?.title || ""}`.trim(),
+      detail: `${item?.detail || ""}`.trim(),
+      deepLink: `${item?.deepLink || ""}`.trim() || null
+    })),
+    actions: normalizeList(raw.actions).map((item: any) => ({
+      title: `${item?.title || ""}`.trim(),
+      detail: `${item?.detail || ""}`.trim(),
+      module: `${item?.module || ""}`.trim() || "consultant",
+      deepLink: `${item?.deepLink || ""}`.trim() || null,
+      priority: ["low", "medium", "high"].includes(item?.priority) ? item.priority : "medium"
+    }))
   };
+}
+
+function extractListPayload(response: any): any[] {
+  const payload = response?.data?.data ?? response?.data ?? response;
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function extractDetailPayload(response: any): any {
+  const payload = response?.data?.data ?? response?.data ?? response;
+  return payload?.reportData || payload?.data || payload || {};
+}
+
+function toLocalDateLabel(value: string, locale: string) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return locale === "ar" ? "غير متوفر" : "Unavailable";
+  }
+
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
+function formatNumber(value: number, locale: string) {
+  return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 1
+  }).format(value || 0);
+}
+
+function formatMetricValue(metric: ConsultantKpi, locale: string) {
+  const value = metric.value ?? 0;
+
+  if (metric.unit === "percent") return `${formatNumber(value, locale)}%`;
+  if (metric.unit === "currency") {
+    return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US", {
+      style: "currency",
+      currency: "SAR",
+      maximumFractionDigits: 0
+    }).format(value);
+  }
+
+  return formatNumber(value, locale);
+}
+
+function truncateText(value: string, limit = 120) {
+  const text = `${value || ""}`.trim();
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit - 1)}…`;
+}
+
+function ChartCard({ chart, locale }: { chart: ConsultantChart; locale: string }) {
+  const primarySeries = chart.series[0]?.data || [];
+  const maxValue = Math.max(...primarySeries, 1);
+
+  return (
+    <article className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {chart.type.toUpperCase()}
+          </p>
+          <h3 className="mt-1 text-lg font-bold text-gray-900">{chart.title}</h3>
+          {chart.description ? <p className="mt-1 text-sm text-gray-600">{chart.description}</p> : null}
+        </div>
+        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600">
+          {chart.series.length} {locale === "ar" ? "سلسلة" : "series"}
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {chart.labels.map((label, index) => {
+          const value = primarySeries[index] ?? 0;
+          const width = maxValue ? Math.max(6, Math.round((value / maxValue) * 100)) : 6;
+
+          return (
+            <div key={`${label}-${index}`} className="space-y-1">
+              <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-600">
+                <span>{label}</span>
+                <span>{formatNumber(value, locale)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className={`h-full rounded-full ${chart.type === "pie" ? "bg-amber-400" : "bg-primary"}`}
+                  style={{ width: `${width}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {chart.series.length > 1 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {chart.series.map((series, index) => (
+            <span key={`${series.name}-${index}`} className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+              {series.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function TableCard({ table, locale }: { table: ConsultantTable; locale: string }) {
+  const rows = Array.isArray(table.rows) ? table.rows : [];
+  const columns = table.columns || [];
+
+  const resolveCell = (row: Record<string, any> | any[], column: string, columnIndex: number) => {
+    if (Array.isArray(row)) {
+      return row[columnIndex] ?? row[`${columnIndex}`] ?? "";
+    }
+
+    if (row && typeof row === "object") {
+      const direct = row[column];
+      if (direct !== undefined && direct !== null) return direct;
+
+      const normalizedKey = column.replace(/\s+/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      const objectMatch = Object.entries(row).find(([key]) => key.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() === normalizedKey);
+      if (objectMatch) return objectMatch[1];
+    }
+
+    return "";
+  };
+
+  const renderValue = (value: any) => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (typeof value === "number") return formatNumber(value, locale);
+    if (typeof value === "object") return JSON.stringify(value);
+    return `${value}`;
+  };
+
+  return (
+    <article className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">{table.title}</h3>
+          {table.description ? <p className="mt-1 text-sm text-gray-600">{table.description}</p> : null}
+        </div>
+        {table.source ? (
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600">
+            {table.source}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 max-h-80 overflow-auto rounded-2xl border border-gray-200">
+        <table className="min-w-full text-left text-sm">
+          <thead className="sticky top-0 z-10 bg-gray-50">
+            <tr>
+              {columns.map((column) => (
+                <th key={column} className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((row, rowIndex) => (
+                <tr key={`${table.title}-${rowIndex}`} className="border-b border-gray-100 last:border-0">
+                  {columns.map((column, columnIndex) => (
+                    <td key={`${column}-${rowIndex}`} className="whitespace-nowrap px-4 py-3 text-gray-700">
+                      {renderValue(resolveCell(row, column, columnIndex))}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={Math.max(columns.length, 1)} className="px-4 py-8 text-center text-sm text-gray-500">
+                  {locale === "ar" ? "لا توجد بيانات لعرضها." : "No rows available."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
+
+function AnalysisBlock({
+  item,
+  locale,
+  onAction
+}: {
+  item: ConsultantHistoryItem;
+  locale: string;
+  onAction: (href: string) => void;
+}) {
+  const analysis = item.reportData;
+  const text = ui[locale as "en" | "ar"];
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[2rem] border border-gray-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-lg">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">{text.businessHealth}</p>
+            <div className="mt-3 flex items-center gap-4">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-white/10 text-2xl font-black">
+                {analysis.healthScore || 0}
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-2xl font-black tracking-tight">
+                  {analysis.summary || text.emptyStateBody}
+                </h3>
+                <p className="mt-2 text-sm text-white/75">
+                  {text.generated}: {toLocalDateLabel(item.generatedAt, locale)} · {text.period}: {item.periodLabel}
+                </p>
+              </div>
+            </div>
+          </div>
+          <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold">
+            {text.healthScore}: {analysis.healthScore || 0}/100
+          </span>
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.executiveBrief}</p>
+            <h3 className="mt-1 text-xl font-bold text-gray-900">{item.title}</h3>
+            <p className="mt-2 text-sm text-gray-600">{text.executiveBriefHelp}</p>
+          </div>
+          <div className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600">
+            {item.sourceLabel}
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm leading-7 text-gray-700">
+          {analysis.summary || (locale === "ar" ? "لا يوجد ملخص متاح." : "No executive summary is available yet.")}
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.suggestedQuestions}</p>
+            <h3 className="mt-1 text-lg font-bold text-gray-900">
+              {locale === "ar" ? "المقترحات التنفيذية" : "Executive prompts"}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => onAction(`/${locale}/dashboard/reports`)}
+            className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            {text.openReports}
+          </button>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(locale === "ar"
+            ? [
+                "ما الذي يحتاج انتباهاً هذا الأسبوع؟",
+                "أين تظهر إشارات تراجع الاحتفاظ؟",
+                "ما أهم إجراء لتحسين الإيراد اليوم؟"
+              ]
+            : [
+                "What needs attention this week?",
+                "Where is retention softening?",
+                "What is the fastest revenue fix?"
+              ]
+          ).map((question) => (
+            <button
+              key={question}
+              type="button"
+              className="rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary/30 hover:bg-primary/5"
+            >
+              {question}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {analysis.kpis.map((metric) => {
+            const positive = metric.direction === "up" || metric.trend === "positive";
+            const negative = metric.direction === "down" || metric.trend === "negative";
+            return (
+              <article key={`${metric.type}-${metric.label}`} className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{metric.label}</p>
+                <div className="mt-3 flex items-end justify-between gap-4">
+                  <div className="text-3xl font-black tracking-tight text-gray-900">
+                    {formatMetricValue(metric, locale)}
+                  </div>
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                      positive
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : negative
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-gray-200 bg-gray-50 text-gray-600"
+                    }`}
+                  >
+                    {metric.delta > 0 ? "+" : ""}
+                    {formatNumber(metric.delta, locale)}
+                  </span>
+                </div>
+                <div className="mt-2 text-xs uppercase tracking-[0.16em] text-gray-400">{metric.type}</div>
+              </article>
+            );
+          })}
+        </div>
+
+        {analysis.kpis.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
+            {locale === "ar" ? "لا توجد بطاقات KPI في هذا التحليل." : "No KPI cards were returned for this analysis."}
+          </div>
+        ) : null}
+      </section>
+
+      {analysis.charts.length ? (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900">{text.charts}</h3>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {analysis.charts.map((chart) => (
+              <ChartCard key={chart.title} chart={chart} locale={locale} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {analysis.tables.length ? (
+        <section className="space-y-4">
+          <h3 className="text-lg font-bold text-gray-900">{text.tables}</h3>
+          <div className="grid gap-4">
+            {analysis.tables.map((table) => (
+              <TableCard key={table.title} table={table} locale={locale} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900">{text.alerts}</h3>
+          <div className="mt-4 space-y-3">
+            {analysis.alerts.length ? (
+              analysis.alerts.map((alert) => (
+                <div key={`${alert.title}-${alert.detail}`} className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{alert.title}</div>
+                      <div className="mt-1 text-sm text-gray-600">{alert.detail}</div>
+                    </div>
+                    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      alert.severity === "high"
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : alert.severity === "medium"
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}>
+                      {alert.severity}
+                    </span>
+                  </div>
+                  {alert.deepLink ? (
+                    <button
+                      type="button"
+                      onClick={() => onAction(alert.deepLink as string)}
+                      className="mt-3 text-sm font-semibold text-primary hover:underline"
+                    >
+                      {text.openModule}
+                    </button>
+                  ) : null}
+                </div>
+              ))
+            ) : (
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                {locale === "ar" ? "لا توجد تنبيهات حالياً." : "No alerts are available right now."}
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900">{text.recommendations}</h3>
+          <div className="mt-4 space-y-3">
+            {analysis.recommendations.length ? (
+              analysis.recommendations.map((recommendation) => (
+                <div key={`${recommendation.title}-${recommendation.detail}`} className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{recommendation.title}</div>
+                      <div className="mt-1 text-sm text-gray-600">{recommendation.detail}</div>
+                    </div>
+                    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      recommendation.priority === "high"
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : recommendation.priority === "medium"
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}>
+                      {recommendation.priority}
+                    </span>
+                  </div>
+                  {recommendation.deepLink ? (
+                    <button
+                      type="button"
+                      onClick={() => onAction(recommendation.deepLink as string)}
+                      className="mt-3 text-sm font-semibold text-primary hover:underline"
+                    >
+                      {text.openModule}
+                    </button>
+                  ) : null}
+                </div>
+              ))
+            ) : (
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                {locale === "ar" ? "لا توجد توصيات حالياً." : "No recommendations are available right now."}
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900">{text.actions}</h3>
+          <div className="mt-4 space-y-3">
+            {analysis.actions.length ? (
+              analysis.actions.map((action) => (
+                <button
+                  key={`${action.title}-${action.detail}`}
+                  type="button"
+                  onClick={() => action.deepLink && onAction(action.deepLink)}
+                  className="w-full rounded-3xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-primary/30 hover:bg-primary/5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-gray-900">{action.title}</div>
+                      <div className="mt-1 text-sm text-gray-600">{action.detail}</div>
+                    </div>
+                    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      action.priority === "high"
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : action.priority === "medium"
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}>
+                      {action.module}
+                    </span>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                {locale === "ar" ? "لا توجد إجراءات حالياً." : "No actions are available right now."}
+              </div>
+            )}
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function ReportsArchive({
+  items,
+  locale,
+  onOpen
+}: {
+  items: ConsultantHistoryItem[];
+  locale: string;
+  onOpen: (item: ConsultantHistoryItem) => void;
+}) {
+  const text = ui[locale as "en" | "ar"];
+  return (
+    <section className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.reportArchive}</p>
+          <h3 className="mt-1 text-lg font-bold text-gray-900">{text.reportArchiveHelp}</h3>
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-3xl border border-gray-200">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "العنوان" : "Title"}</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "النوع" : "Type"}</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{text.generated}</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{text.healthScore}</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{locale === "ar" ? "إجراء" : "Action"}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length ? (
+              items.map((item) => (
+                <tr key={item.id} className="border-t border-gray-100">
+                  <td className="px-4 py-4">
+                    <div className="font-semibold text-gray-900">{item.title}</div>
+                    <div className="mt-1 text-xs text-gray-500">{truncateText(item.preview, 96)}</div>
+                  </td>
+                  <td className="px-4 py-4 text-gray-700">
+                    {item.kind === "analysis" ? text.reportTypeAnalysis : text.reportTypeBriefing}
+                  </td>
+                  <td className="px-4 py-4 text-gray-700">{toLocalDateLabel(item.generatedAt, locale)}</td>
+                  <td className="px-4 py-4 text-gray-700">{item.reportData.healthScore}</td>
+                  <td className="px-4 py-4">
+                    <button
+                      type="button"
+                      onClick={() => onOpen(item)}
+                      className="rounded-full border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      {item.kind === "analysis" ? text.openAnalysis : text.openBriefing}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
+                  {text.reportsEmpty}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 }
 
 export default function ConsultantPage() {
   const locale = useLocale();
   const isRTL = locale === "ar";
-  const [activeTab, setActiveTab] = useState<ConsultantTabId>("overview");
+  const router = useRouter();
+  const text = ui[locale as "en" | "ar"];
+
+  const [activeTab, setActiveTab] = useState<ConsultantTabId>("chat");
+  const [history, setHistory] = useState<ConsultantHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [runningAnalysis, setRunningAnalysis] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [draftPrompt, setDraftPrompt] = useState("");
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [consultantPreferences, setConsultantPreferences] = useState<ConsultantCommunicationPreferences>({
-    language: locale === "ar" ? "ar" : "en",
-    tone: locale === "ar" ? "saudi_executive_style" : "executive_english",
+    language: isRTL ? "ar" : "en",
+    tone: isRTL ? "saudi_executive_style" : "executive_english",
     addressingStyle: "neutral_professional"
   });
   const [loadedSettings, setLoadedSettings] = useState<LoadedConsultantSettings | null>(null);
@@ -292,7 +911,7 @@ export default function ConsultantPage() {
   useEffect(() => {
     let mounted = true;
 
-    const loadConsultantSettings = async () => {
+    const loadSettings = async () => {
       try {
         const response = await tenantApi.getSettings();
         if (!mounted || !response?.success) return;
@@ -317,24 +936,80 @@ export default function ConsultantPage() {
           tone: (preferences.tone as ConsultantTone) || defaults.tone,
           addressingStyle: (preferences.addressingStyle as ConsultantAddressingStyle) || defaults.addressingStyle
         });
-      } catch (error) {
-        console.error("Failed to load consultant settings:", error);
-        if (mounted) {
-          setLoadedSettings(null);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+      } catch (loadError) {
+        console.error("Failed to load consultant settings:", loadError);
       }
     };
 
-    loadConsultantSettings();
+    const loadWorkspace = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [reportsResponse, briefingsResponse] = await Promise.all([
+          tenantApi.getConsultantReports({ page: 1, limit: 12 }),
+          tenantApi.getConsultantBriefings({ page: 1, limit: 12 })
+        ]);
+
+        const toHistoryItem = (row: any, kind: ConsultantHistoryKind): ConsultantHistoryItem | null => {
+          if (!row?.id) return null;
+          const analysis = normalizeConsultantResponse(row.reportData || row.report_data || row.data || {});
+          const generatedAt = `${row.generatedAt || row.createdAt || row.updatedAt || ""}`.trim();
+          const periodType = `${row.periodType || row.period_type || "daily"}`.trim();
+          const start = row.periodStart || row.period_start || null;
+          const end = row.periodEnd || row.period_end || null;
+          const periodLabel = start && end
+            ? `${toLocalDateLabel(start, locale)} - ${toLocalDateLabel(end, locale)}`
+            : periodType;
+
+          return {
+            id: `${row.id}`,
+            kind,
+            title: `${row.title || (kind === "analysis" ? (locale === "ar" ? "تحليل أعمال" : "Business analysis") : (locale === "ar" ? "موجز تنفيذي" : "Executive briefing"))}`,
+            preview: truncateText(
+              analysis.summary || `${row.description || ""}`.trim() || defaultHistoryPreview[locale as "en" | "ar"][kind],
+              150
+            ),
+            generatedAt,
+            periodType,
+            periodLabel,
+            status: (row.status || "open") as ConsultantHistoryStatus,
+            sourceLabel: kind === "analysis" ? text.reportTypeAnalysis : text.reportTypeBriefing,
+            reportId: row.id ? `${row.id}` : null,
+            snapshotId: row.snapshotId ? `${row.snapshotId}` : null,
+            reportData: analysis
+          };
+        };
+
+        const analysisItems = extractListPayload(reportsResponse)
+          .map((row) => toHistoryItem(row, "analysis"))
+          .filter(Boolean) as ConsultantHistoryItem[];
+        const briefingItems = extractListPayload(briefingsResponse)
+          .map((row) => toHistoryItem(row, "briefing"))
+          .filter(Boolean) as ConsultantHistoryItem[];
+
+        const merged = [...analysisItems, ...briefingItems].sort((left, right) => {
+          const leftTime = new Date(left.generatedAt || 0).getTime();
+          const rightTime = new Date(right.generatedAt || 0).getTime();
+          return rightTime - leftTime;
+        });
+
+        setHistory(merged);
+        setSelectedHistoryId((current) => (current && merged.some((item) => item.id === current) ? current : merged[0]?.id || null));
+      } catch (loadError: any) {
+        console.error("Failed to load consultant workspace:", loadError);
+        setError(loadError?.message || (locale === "ar" ? "تعذر تحميل السجل." : "Failed to load consultant workspace."));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void Promise.all([loadSettings(), loadWorkspace()]);
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [locale, text.reportTypeAnalysis, text.reportTypeBriefing]);
 
   useEffect(() => {
     if (!settingsMessage) return;
@@ -342,24 +1017,128 @@ export default function ConsultantPage() {
     return () => window.clearTimeout(timer);
   }, [settingsMessage]);
 
-  const filteredConversations = useMemo(() => {
+  const filteredHistory = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return conversations;
-    return conversations.filter((conversation) =>
-      [conversation.title, conversation.preview, conversation.tag]
+    if (!query) return history;
+    return history.filter((item) =>
+      [item.title, item.preview, item.periodType, item.sourceLabel, item.reportData.summary]
         .join(" ")
         .toLowerCase()
         .includes(query)
     );
-  }, [search]);
+  }, [history, search]);
 
-  const dailyBrief = useMemo(() => [
-    "Daily brief: revenue is stable and customer identity quality is improved in exports.",
-    "Priority watch: refund patterns and top-N summary labeling remain the main operational checks.",
-    "Suggested next move: review the new ledger workspace for faster finance exploration."
-  ], []);
+  const selectedHistoryItem = useMemo(
+    () => history.find((item) => item.id === selectedHistoryId) || history[0] || null,
+    [history, selectedHistoryId]
+  );
 
-  const sampleVoice = useMemo(() => buildSampleConsultantVoice(consultantPreferences), [consultantPreferences]);
+  useEffect(() => {
+    if (!history.length) {
+      setSelectedHistoryId(null);
+      return;
+    }
+
+    if (!selectedHistoryId || !history.some((item) => item.id === selectedHistoryId)) {
+      setSelectedHistoryId(history[0].id);
+    }
+  }, [history, selectedHistoryId]);
+
+  const openModule = (href: string) => {
+    router.push(href);
+  };
+
+  const openHistoryItem = async (item: ConsultantHistoryItem) => {
+    try {
+      setLoadingDetail(true);
+      setError(null);
+      setSelectedHistoryId(item.id);
+      setActiveTab("chat");
+
+      const detailResponse =
+        item.kind === "analysis"
+          ? await tenantApi.getConsultantReport(item.reportId || item.id)
+          : await tenantApi.getConsultantBriefing(item.reportId || item.id);
+
+      const detailPayload = extractDetailPayload(detailResponse);
+      const normalized = normalizeConsultantResponse(detailPayload.reportData || detailPayload);
+      setHistory((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? {
+                ...entry,
+                title: `${detailPayload.title || entry.title}`,
+                preview: truncateText(
+                  normalized.summary || `${detailPayload.description || ""}`.trim() || entry.preview,
+                  150
+                ),
+                reportData: normalized,
+                sourceLabel: detailPayload.reportType === "consultant_briefing" ? text.reportTypeBriefing : text.reportTypeAnalysis
+              }
+            : entry
+        )
+      );
+    } catch (detailError: any) {
+      console.error("Failed to open consultant item:", detailError);
+      setError(detailError?.message || (locale === "ar" ? "تعذر فتح العنصر المحدد." : "Failed to open the selected item."));
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const runAnalysis = async () => {
+    try {
+      setRunningAnalysis(true);
+      setError(null);
+      await tenantApi.runConsultantWorkflow({ force: true });
+      const [reportsResponse, briefingsResponse] = await Promise.all([
+        tenantApi.getConsultantReports({ page: 1, limit: 12 }),
+        tenantApi.getConsultantBriefings({ page: 1, limit: 12 })
+      ]);
+
+      const toHistoryItem = (row: any, kind: ConsultantHistoryKind): ConsultantHistoryItem | null => {
+        if (!row?.id) return null;
+        const analysis = normalizeConsultantResponse(row.reportData || row.data || {});
+        const generatedAt = `${row.generatedAt || row.createdAt || row.updatedAt || ""}`.trim();
+        const periodType = `${row.periodType || "daily"}`.trim();
+        const start = row.periodStart || null;
+        const end = row.periodEnd || null;
+        const periodLabel = start && end
+          ? `${toLocalDateLabel(start, locale)} - ${toLocalDateLabel(end, locale)}`
+          : periodType;
+
+        return {
+          id: `${row.id}`,
+          kind,
+          title: `${row.title || (kind === "analysis" ? (locale === "ar" ? "تحليل أعمال" : "Business analysis") : (locale === "ar" ? "موجز تنفيذي" : "Executive briefing"))}`,
+          preview: truncateText(analysis.summary || `${row.description || ""}`.trim(), 150),
+          generatedAt,
+          periodType,
+          periodLabel,
+          status: (row.status || "open") as ConsultantHistoryStatus,
+          sourceLabel: kind === "analysis" ? text.reportTypeAnalysis : text.reportTypeBriefing,
+          reportId: row.id ? `${row.id}` : null,
+          snapshotId: row.snapshotId ? `${row.snapshotId}` : null,
+          reportData: analysis
+        };
+      };
+
+      const nextItems = [
+        ...extractListPayload(reportsResponse).map((row) => toHistoryItem(row, "analysis")).filter(Boolean),
+        ...extractListPayload(briefingsResponse).map((row) => toHistoryItem(row, "briefing")).filter(Boolean)
+      ] as ConsultantHistoryItem[];
+
+      nextItems.sort((left, right) => new Date(right.generatedAt || 0).getTime() - new Date(left.generatedAt || 0).getTime());
+      setHistory(nextItems);
+      setSelectedHistoryId(nextItems[0]?.id || null);
+      setActiveTab("chat");
+    } catch (runError: any) {
+      console.error("Failed to run consultant workflow:", runError);
+      setError(runError?.message || (locale === "ar" ? "تعذر تشغيل التحليل الجديد." : "Failed to run a new analysis."));
+    } finally {
+      setRunningAnalysis(false);
+    }
+  };
 
   const handleSaveConsultantPreferences = async () => {
     try {
@@ -370,118 +1149,143 @@ export default function ConsultantPage() {
           communicationPreferences: consultantPreferences
         }
       });
-      setSettingsMessage(locale === "ar" ? "تم حفظ إعدادات المستشار بنجاح." : "Consultant preferences saved successfully.");
-    } catch (error: any) {
-      setSettingsMessage(error?.message || (locale === "ar" ? "تعذر حفظ الإعدادات." : "Failed to save preferences."));
+      setSettingsMessage(text.saved);
+    } catch (saveError: any) {
+      setSettingsMessage(saveError?.message || text.saveFailed);
     } finally {
       setSettingsSaving(false);
     }
   };
 
+  const suggestedQuestions = useMemo(() => {
+    if (locale === "ar") {
+      return [
+        "ما الذي يحتاج انتباهاً هذا الأسبوع؟",
+        "أين تظهر إشارات تراجع الاحتفاظ؟",
+        "ما أهم إجراء لتحسين الإيراد اليوم؟"
+      ];
+    }
+
+    return [
+      "What needs attention this week?",
+      "Where is retention softening?",
+      "What is the fastest revenue fix?"
+    ];
+  }, [locale]);
+
   return (
     <TenantLayout>
       <div className="space-y-5" dir={isRTL ? "rtl" : "ltr"}>
         <section className="rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                {locale === "ar" ? "مستشار ذكي" : "AI Consultant"}
-              </p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900">
-                {locale === "ar" ? "مساحة المستشار الذكي" : "AI Consultant workspace"}
-              </h1>
-              <p className="mt-2 text-sm text-gray-600">
-                {locale === "ar"
-                  ? "واجهة حوارية وتحليلية تجمع التاريخ، الرؤى، التوصيات، والتقارير في تخطيط ثلاثي الأعمدة."
-                  : "A conversational analytics workspace that blends history, insights, actions, and reports in a crisp three-column layout."
-                }
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">{text.eyebrow}</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900">{text.title}</h1>
+              <p className="mt-2 text-sm leading-7 text-gray-600">{text.subtitle}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                onClick={runAnalysis}
+                disabled={runningAnalysis}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {locale === "ar" ? "تصدير" : "Export"}
+                {runningAnalysis ? text.running : text.newAnalysis}
               </button>
               <button
                 type="button"
-                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+                onClick={() => void runAnalysis()}
+                className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
               >
-                {locale === "ar" ? "تحليل جديد" : "New analysis"}
+                {text.refreshHistory}
               </button>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
-          <aside className="rounded-[2rem] border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                  {locale === "ar" ? "بحث" : "Search"}
-                </label>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={locale === "ar" ? "ابحث في المحادثات" : "Search conversations"}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
+        <section className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="space-y-4 rounded-[2rem] border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:h-fit">
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.searchLabel}</label>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={text.searchPlaceholder}
+                className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={runAnalysis}
+              disabled={runningAnalysis}
+              className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {text.startAnalysis}
+            </button>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.historyTitle}</p>
+                <span className="text-xs font-medium text-gray-500">{filteredHistory.length}</span>
               </div>
 
-              <button
-                type="button"
-                className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
-              >
-                {locale === "ar" ? "بدء تحليل جديد" : "Start new analysis"}
-              </button>
-
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                  {locale === "ar" ? "سجل المحادثات" : "Conversation history"}
-                </p>
-                {loading ? (
-                  <div className="space-y-3">
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                  </div>
-                ) : filteredConversations.length ? (
-                  filteredConversations.map((conversation) => (
-                    <article
-                      key={conversation.id}
-                      className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary/30 hover:shadow-md"
+              {loading ? (
+                <div className="space-y-3">
+                  <div className="h-24 animate-pulse rounded-3xl border border-gray-200 bg-gray-100" />
+                  <div className="h-24 animate-pulse rounded-3xl border border-gray-200 bg-gray-100" />
+                  <div className="h-24 animate-pulse rounded-3xl border border-gray-200 bg-gray-100" />
+                </div>
+              ) : filteredHistory.length ? (
+                filteredHistory.map((item) => {
+                  const active = item.id === selectedHistoryId;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => void openHistoryItem(item)}
+                      className={`w-full rounded-3xl border p-4 text-left transition ${
+                        active
+                          ? "border-primary/30 bg-primary/5 shadow-md"
+                          : "border-gray-200 bg-white hover:border-primary/20 hover:bg-gray-50"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{conversation.title}</h3>
-                          <p className="mt-1 text-sm text-gray-600">{conversation.preview}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-900">{item.title}</span>
+                            <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
+                              {item.sourceLabel}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-gray-600">{item.preview}</p>
                         </div>
-                        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusBadgeClass(conversation.status)}`}>
-                          {conversation.status}
-                        </span>
+                        <div className="shrink-0 text-right">
+                          <div className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
+                            {item.kind === "analysis" ? text.reportTypeAnalysis : text.reportTypeBriefing}
+                          </div>
+                          <div className="mt-2 text-[11px] text-gray-500">{toLocalDateLabel(item.generatedAt, locale)}</div>
+                        </div>
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-500">
-                        <span>{conversation.tag}</span>
-                        <span>{new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-US", { dateStyle: "medium" }).format(new Date(conversation.updatedAt))}</span>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-5 text-sm text-gray-600">
-                    {locale === "ar"
-                      ? "لا توجد محادثات مطابقة. ابدأ تحليلاً جديداً."
-                      : "No matching conversations. Start a new analysis."}
-                  </div>
-                )}
-              </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-5 text-sm leading-7 text-gray-600">
+                  {search.trim() ? text.historyEmptyMatch : text.historyEmpty}
+                </div>
+              )}
             </div>
           </aside>
 
           <main className="min-w-0 rounded-[2rem] border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 px-5 py-4">
               <div className="flex flex-wrap gap-2">
-                {tabs.map((tab) => {
+                {[
+                  { id: "chat" as const, label: text.tabChat },
+                  { id: "reports" as const, label: text.tabReports },
+                  { id: "settings" as const, label: text.tabSettings }
+                ].map((tab) => {
                   const active = tab.id === activeTab;
                   return (
                     <button
@@ -501,353 +1305,262 @@ export default function ConsultantPage() {
               </div>
             </div>
 
+            {error ? (
+              <div className="mx-5 mt-5 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <span>
+                    {text.errorPrefix} {error}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void runAnalysis()}
+                    className="rounded-full border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700"
+                  >
+                    {text.retry}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="space-y-5 p-5">
               {loading ? (
-                <div className="space-y-5">
-                  <SkeletonCard />
-                  <SkeletonCard />
-                  <SkeletonCard />
+                <div className="space-y-4">
+                  <div className="h-40 animate-pulse rounded-[1.75rem] border border-gray-200 bg-gray-100" />
+                  <div className="h-32 animate-pulse rounded-[1.75rem] border border-gray-200 bg-gray-100" />
+                  <div className="h-32 animate-pulse rounded-[1.75rem] border border-gray-200 bg-gray-100" />
                 </div>
-              ) : (
-                <>
-                  <section className="rounded-[1.75rem] border border-gray-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-5 text-white shadow-lg">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
-                          {locale === "ar" ? "الملخص اليومي" : "Daily brief"}
-                        </p>
-                        <h2 className="mt-2 text-2xl font-black tracking-tight">
-                          {locale === "ar" ? "موجز تنفيذي سريع" : "Quick executive brief"}
-                        </h2>
-                      </div>
-                      <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold">
-                        {locale === "ar" ? "جاهز للمراجعة" : "Ready for review"}
-                      </div>
+              ) : activeTab === "chat" ? (
+                <div className="space-y-5">
+                  {runningAnalysis ? (
+                    <div className="rounded-[1.75rem] border border-primary/20 bg-primary/5 p-4 text-sm font-medium text-primary">
+                      {text.running}
                     </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      {dailyBrief.map((item) => (
-                        <div key={item} className="rounded-3xl border border-white/10 bg-white/8 p-4 text-sm text-white/85 backdrop-blur">
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                  ) : null}
 
-                  {activeTab === "overview" ? (
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{locale === "ar" ? "حالة الجلسة" : "Session state"}</p>
-                        <p className="mt-2 text-lg font-bold text-gray-900">{locale === "ar" ? "لا يوجد AI بعد" : "No AI logic yet"}</p>
-                        <p className="mt-1 text-sm text-gray-600">{locale === "ar" ? "هذه واجهة UX فقط." : "This is UX-only scaffolding."}</p>
-                      </div>
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{locale === "ar" ? "المحادثات" : "Conversations"}</p>
-                        <p className="mt-2 text-lg font-bold text-gray-900">{conversations.length}</p>
-                        <p className="mt-1 text-sm text-gray-600">{locale === "ar" ? "تاريخ محفوظ للرجوع السريع." : "Saved history for quick context."}</p>
-                      </div>
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{locale === "ar" ? "المخرجات" : "Outputs"}</p>
-                        <p className="mt-2 text-lg font-bold text-gray-900">{locale === "ar" ? "تقارير وتوصيات" : "Reports and recommendations"}</p>
-                        <p className="mt-1 text-sm text-gray-600">{locale === "ar" ? "جاهز لربط الذكاء لاحقاً." : "Ready for AI wiring later."}</p>
-                      </div>
+                  {loadingDetail ? (
+                    <div className="rounded-[1.75rem] border border-gray-200 bg-gray-50 p-5">
+                      <div className="h-28 animate-pulse rounded-3xl border border-gray-200 bg-white" />
                     </div>
-                  ) : activeTab === "conversations" ? (
-                    <div className="space-y-4">
-                      {filteredConversations.map((conversation) => (
-                        <div key={conversation.id} className="rounded-3xl border border-gray-200 p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <h3 className="text-base font-bold text-gray-900">{conversation.title}</h3>
-                              <p className="mt-1 text-sm text-gray-600">{conversation.preview}</p>
-                            </div>
-                            <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusBadgeClass(conversation.status)}`}>
-                              {conversation.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : activeTab === "insights" ? (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-lg font-bold text-gray-900">{locale === "ar" ? "رؤى سريعة" : "Quick insights"}</h3>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {locale === "ar"
-                            ? "مناطق الإيراد والخصومات والهوية تظهر هنا كملخص بصري."
-                            : "Revenue, discount, and identity signals will appear here as a visual summary."
-                          }
-                        </p>
-                      </div>
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
-                        <h3 className="text-lg font-bold text-gray-900">{locale === "ar" ? "قالب Notion-like" : "Notion-like notes"}</h3>
-                        <div className="mt-3 space-y-2 text-sm text-gray-600">
-                          <div>• {locale === "ar" ? "ملخص تنفيذي" : "Executive summary"}</div>
-                          <div>• {locale === "ar" ? "نقاط المراقبة" : "Watch points"}</div>
-                          <div>• {locale === "ar" ? "خلاصة قابلة للتنفيذ" : "Actionable takeaway"}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : activeTab === "opportunities" ? (
-                    <div className="space-y-4">
-                      {opportunities.map((opportunity) => (
-                        <article key={opportunity.id} className="rounded-3xl border border-gray-200 p-5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h3 className="text-base font-bold text-gray-900">{opportunity.title}</h3>
-                              <p className="mt-1 text-sm text-gray-600">{opportunity.description}</p>
-                            </div>
-                            <span className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                              {opportunity.impact}
-                            </span>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : activeTab === "predictions" ? (
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
-                        <h3 className="text-base font-bold text-gray-900">{locale === "ar" ? "تنبيه" : "Alert"}</h3>
-                        <p className="mt-2 text-sm text-gray-600">{locale === "ar" ? "مراقبة كثافة الاسترداد اليومية." : "Monitor daily refund density."}</p>
-                      </div>
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
-                        <h3 className="text-base font-bold text-gray-900">{locale === "ar" ? "توقع" : "Prediction"}</h3>
-                        <p className="mt-2 text-sm text-gray-600">{locale === "ar" ? "الأسابيع القادمة قد تحتاج مراجعة ledger أكثر." : "Upcoming weeks may need closer ledger review."}</p>
-                      </div>
-                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
-                        <h3 className="text-base font-bold text-gray-900">{locale === "ar" ? "توصية" : "Recommendation"}</h3>
-                        <p className="mt-2 text-sm text-gray-600">{locale === "ar" ? "افتح التقرير الأسبوعي عند الحاجة." : "Open the weekly report when needed."}</p>
-                      </div>
-                    </div>
-                  ) : activeTab === "reports" ? (
-                    <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6">
-                      <h3 className="text-lg font-bold text-gray-900">{locale === "ar" ? "التقارير" : "Reports"}</h3>
-                      <p className="mt-2 text-sm text-gray-600">
-                        {locale === "ar"
-                          ? "هذه المنطقة جاهزة لاحقاً لربط التقارير المولدة."
-                          : "This area is ready for future generated report integrations."
-                        }
-                      </p>
-                    </div>
+                  ) : selectedHistoryItem ? (
+                    <AnalysisBlock item={selectedHistoryItem} locale={locale} onAction={openModule} />
                   ) : (
-                    <div className="space-y-5">
-                      <div className="rounded-[1.75rem] border border-gray-200 bg-gray-50 p-5">
-                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">{locale === "ar" ? "إعدادات أسلوب المستشار" : "Consultant voice settings"}</h3>
-                            <p className="mt-1 text-sm text-gray-600">
-                              {locale === "ar"
-                                ? "هذه الإعدادات تُحفظ لكل tenant وتُحقن تلقائياً في prompt engine."
-                                : "These preferences are stored per tenant and injected automatically into the prompt engine."
-                              }
-                            </p>
+                    <div className="space-y-4">
+                      <section className="rounded-[2rem] border border-gray-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-lg">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">{text.businessHealth}</p>
+                        <h2 className="mt-3 text-3xl font-black tracking-tight">{text.emptyStateTitle}</h2>
+                        <p className="mt-3 max-w-2xl text-sm leading-7 text-white/75">{text.emptyStateBody}</p>
+                      </section>
+
+                      <div className="rounded-[1.75rem] border border-dashed border-gray-300 bg-gray-50 p-5">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                          <div className="min-w-0">
+                            <h3 className="text-lg font-bold text-gray-900">{locale === "ar" ? "سؤال تنفيذي سريع" : "Quick executive request"}</h3>
+                            <p className="mt-1 text-sm text-gray-600">{text.askHelper}</p>
                           </div>
                           <button
                             type="button"
-                            onClick={handleSaveConsultantPreferences}
-                            disabled={settingsSaving}
+                            onClick={runAnalysis}
+                            disabled={runningAnalysis}
                             className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {settingsSaving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : (locale === "ar" ? "حفظ الإعدادات" : "Save preferences")}
+                            {text.runPrompt}
                           </button>
                         </div>
-
-                        {settingsMessage ? (
-                          <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
-                            {settingsMessage}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-5 grid gap-4 md:grid-cols-3">
-                          <label className="space-y-2">
-                            <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                              {locale === "ar" ? "اللغة" : "Language"}
-                            </span>
-                            <select
-                              value={consultantPreferences.language}
-                              onChange={(event) => setConsultantPreferences((current) => ({
-                                ...current,
-                                language: event.target.value as ConsultantLanguage
-                              }))}
-                              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        <textarea
+                          value={draftPrompt}
+                          onChange={(event) => setDraftPrompt(event.target.value)}
+                          placeholder={text.askPlaceholder}
+                          className="mt-4 min-h-28 w-full rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {suggestedQuestions.map((question) => (
+                            <button
+                              key={question}
+                              type="button"
+                              onClick={() => setDraftPrompt(question)}
+                              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                             >
-                              <option value="ar">Arabic</option>
-                              <option value="en">English</option>
-                            </select>
-                          </label>
-
-                          <label className="space-y-2">
-                            <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                              {locale === "ar" ? "نبرة المستشار" : "Consultant tone"}
-                            </span>
-                            <select
-                              value={consultantPreferences.tone}
-                              onChange={(event) => setConsultantPreferences((current) => ({
-                                ...current,
-                                tone: event.target.value as ConsultantTone
-                              }))}
-                              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                            >
-                              <option value="professional_arabic">Professional Arabic</option>
-                              <option value="saudi_executive_style">Saudi Executive Style</option>
-                              <option value="executive_english">Executive English</option>
-                            </select>
-                          </label>
-
-                          <label className="space-y-2">
-                            <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                              {locale === "ar" ? "أسلوب النداء" : "Preferred addressing style"}
-                            </span>
-                            <select
-                              value={consultantPreferences.addressingStyle}
-                              onChange={(event) => setConsultantPreferences((current) => ({
-                                ...current,
-                                addressingStyle: event.target.value as ConsultantAddressingStyle
-                              }))}
-                              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                            >
-                              <option value="neutral_professional">Neutral Professional</option>
-                              <option value="male_formal">Male Formal</option>
-                              <option value="female_formal">Female Formal</option>
-                              <option value="no_titles">No Titles</option>
-                            </select>
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                        <div className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
-                          <h3 className="text-lg font-bold text-gray-900">{locale === "ar" ? "نماذج مخرجات" : "Sample outputs"}</h3>
-                          <p className="mt-1 text-sm text-gray-600">
-                            {locale === "ar"
-                              ? "معاينة سريعة للنبرة قبل تفعيل التحليل."
-                              : "Quick preview of the configured voice before analysis is triggered."
-                            }
-                          </p>
-
-                          <div className="mt-4 space-y-4">
-                            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                                {locale === "ar" ? "ملخص تنفيذي" : "Executive summary"}
-                              </p>
-                              <p className="mt-2 text-sm leading-7 text-gray-800">{sampleVoice.summary}</p>
-                            </div>
-                            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                                {locale === "ar" ? "توصية نموذجية" : "Recommendation sample"}
-                              </p>
-                              <p className="mt-2 text-sm leading-7 text-gray-800">{sampleVoice.recommendation}</p>
-                            </div>
-                            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                                {locale === "ar" ? "إجراء مقترح" : "Suggested action"}
-                              </p>
-                              <p className="mt-2 text-sm leading-7 text-gray-800">{sampleVoice.action}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-[1.75rem] border border-gray-200 bg-slate-950 p-5 text-white shadow-sm">
-                          <h3 className="text-lg font-bold text-white">{locale === "ar" ? "مواصفات العرض" : "Voice profile"}</h3>
-                          <div className="mt-4 space-y-3 text-sm text-white/80">
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{locale === "ar" ? "اللغة" : "Language"}</div>
-                              <div className="mt-1 text-base font-semibold text-white">{languageLabels[consultantPreferences.language]}</div>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{locale === "ar" ? "النبرة" : "Tone"}</div>
-                              <div className="mt-1 text-base font-semibold text-white">{toneLabels[consultantPreferences.tone]}</div>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{locale === "ar" ? "أسلوب النداء" : "Addressing style"}</div>
-                              <div className="mt-1 text-base font-semibold text-white">{addressingLabels[consultantPreferences.addressingStyle]}</div>
-                            </div>
-                          </div>
-                          <div className="mt-4 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-50">
-                            {locale === "ar"
-                              ? "هذه الإعدادات تُطبَّق تلقائياً على التحليل اليومي، الأسبوعي، والشهري بدون تغيير في منطق البيانات."
-                              : "These settings are applied automatically to daily, weekly, and monthly analyses without changing the underlying data logic."
-                            }
-                          </div>
+                              {question}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </div>
                   )}
-                </>
+                </div>
+              ) : activeTab === "reports" ? (
+                <div className="space-y-5">
+                  <section className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.reportArchive}</p>
+                        <h2 className="mt-1 text-2xl font-black tracking-tight text-gray-900">
+                          {locale === "ar" ? "محفوظات التحليل" : "Stored analyses"}
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600">{text.reportArchiveHelp}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={runAnalysis}
+                        className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+                      >
+                        {text.newAnalysis}
+                      </button>
+                    </div>
+                  </section>
+
+                  <ReportsArchive items={history} locale={locale} onOpen={openHistoryItem} />
+                </div>
+              ) : (
+                <section className="space-y-5">
+                  <div className="rounded-[1.75rem] border border-gray-200 bg-gray-50 p-5">
+                    <h2 className="text-2xl font-black tracking-tight text-gray-900">{text.settingsTitle}</h2>
+                    <p className="mt-2 text-sm text-gray-600">{text.settingsHelp}</p>
+                    <p className="mt-2 text-sm text-gray-500">{text.defaultPolicy}</p>
+                  </div>
+
+                  {settingsMessage ? (
+                    <div className="rounded-3xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+                      {settingsMessage}
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+                    <div className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {locale === "ar" ? "تفضيلات التواصل" : "Communication preferences"}
+                      </h3>
+                      <div className="mt-5 grid gap-4 md:grid-cols-3">
+                        <label className="space-y-2">
+                          <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.language}</span>
+                          <select
+                            value={consultantPreferences.language}
+                            onChange={(event) =>
+                              setConsultantPreferences((current) => ({
+                                ...current,
+                                language: event.target.value as ConsultantLanguage
+                              }))
+                            }
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="ar">{languageLabels.ar[locale as "en" | "ar"]}</option>
+                            <option value="en">{languageLabels.en[locale as "en" | "ar"]}</option>
+                          </select>
+                        </label>
+
+                        <label className="space-y-2">
+                          <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.tone}</span>
+                          <select
+                            value={consultantPreferences.tone}
+                            onChange={(event) =>
+                              setConsultantPreferences((current) => ({
+                                ...current,
+                                tone: event.target.value as ConsultantTone
+                              }))
+                            }
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="professional_arabic">{toneLabels.professional_arabic[locale as "en" | "ar"]}</option>
+                            <option value="saudi_executive_style">{toneLabels.saudi_executive_style[locale as "en" | "ar"]}</option>
+                            <option value="executive_english">{toneLabels.executive_english[locale as "en" | "ar"]}</option>
+                          </select>
+                        </label>
+
+                        <label className="space-y-2">
+                          <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.addressing}</span>
+                          <select
+                            value={consultantPreferences.addressingStyle}
+                            onChange={(event) =>
+                              setConsultantPreferences((current) => ({
+                                ...current,
+                                addressingStyle: event.target.value as ConsultantAddressingStyle
+                              }))
+                            }
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="neutral_professional">{addressingLabels.neutral_professional[locale as "en" | "ar"]}</option>
+                            <option value="male_formal">{addressingLabels.male_formal[locale as "en" | "ar"]}</option>
+                            <option value="female_formal">{addressingLabels.female_formal[locale as "en" | "ar"]}</option>
+                            <option value="no_titles">{addressingLabels.no_titles[locale as "en" | "ar"]}</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="mt-5 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSaveConsultantPreferences}
+                          disabled={settingsSaving}
+                          className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {settingsSaving ? text.saving : text.save}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.75rem] border border-gray-200 bg-slate-950 p-5 text-white shadow-sm">
+                      <h3 className="text-lg font-bold text-white">{text.voiceProfile}</h3>
+                      <div className="mt-4 space-y-3 text-sm text-white/80">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{text.language}</div>
+                          <div className="mt-1 text-base font-semibold text-white">
+                            {languageLabels[consultantPreferences.language][locale as "en" | "ar"]}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{text.tone}</div>
+                          <div className="mt-1 text-base font-semibold text-white">
+                            {toneLabels[consultantPreferences.tone][locale as "en" | "ar"]}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{text.addressing}</div>
+                          <div className="mt-1 text-base font-semibold text-white">
+                            {addressingLabels[consultantPreferences.addressingStyle][locale as "en" | "ar"]}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-7 text-emerald-50">
+                        {locale === "ar"
+                          ? "هذه الإعدادات تُطبَّق تلقائياً على التحليل اليومي والأسبوعي والشهري بدون تغيير في منطق البيانات."
+                          : "These settings are applied automatically to daily, weekly, and monthly analyses without changing the underlying data logic."}
+                      </div>
+                    </div>
+                  </div>
+
+                  <section className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-900">{text.sampleOutputs}</h3>
+                    <div className="mt-4 grid gap-4 md:grid-cols-3">
+                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.sampleSummary}</p>
+                        <p className="mt-2 text-sm leading-7 text-gray-700">
+                          {consultantPreferences.language === "ar"
+                            ? "الله يعافيك، عندنا ملاحظة مهمة على الأداء الحالي وتحتاج متابعة تنفيذية هادئة وواضحة."
+                            : "We have a meaningful performance signal that deserves a calm, executive-level review."}
+                        </p>
+                      </div>
+                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.sampleRecommendation}</p>
+                        <p className="mt-2 text-sm leading-7 text-gray-700">
+                          {consultantPreferences.language === "ar"
+                            ? "أشوف أن مراجعة العملاء غير النشطين قد تساعد في رفع الإيراد خلال الفترة القادمة."
+                            : "Reviewing inactive customers should help improve revenue in the coming period."}
+                        </p>
+                      </div>
+                      <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{text.sampleAction}</p>
+                        <p className="mt-2 text-sm leading-7 text-gray-700">
+                          {consultantPreferences.language === "ar"
+                            ? "افتح قائمة العملاء غير النشطين وابدأ متابعة موجهة للاحتفاظ."
+                            : "Open inactive customers and launch a targeted retention follow-up."}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                </section>
               )}
             </div>
           </main>
-
-          <aside className="rounded-[2rem] border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                  {locale === "ar" ? "الأولويات" : "Priority issues"}
-                </p>
-                <div className="mt-3 space-y-3">
-                  {loading ? (
-                    <>
-                      <SkeletonCard />
-                      <SkeletonCard />
-                      <SkeletonCard />
-                    </>
-                  ) : (
-                    priorityIssues.map((issue) => (
-                      <article key={issue.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-semibold text-gray-900">{issue.title}</h3>
-                            <p className="mt-1 text-sm text-gray-600">{issue.detail}</p>
-                          </div>
-                          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${severityBadgeClass(issue.severity)}`}>
-                            {issue.severity}
-                          </span>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                  {locale === "ar" ? "الفرص" : "Opportunities"}
-                </p>
-                <div className="mt-3 space-y-3">
-                  {opportunities.slice(0, 2).map((opportunity) => (
-                    <div key={opportunity.id} className="rounded-3xl border border-gray-200 bg-white p-4">
-                      <h3 className="font-semibold text-gray-900">{opportunity.title}</h3>
-                      <p className="mt-1 text-sm text-gray-600">{opportunity.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                  {locale === "ar" ? "الإجراءات المقترحة" : "Suggested actions"}
-                </p>
-                <div className="mt-3 space-y-3">
-                  {suggestedActions.map((action) => (
-                    <button
-                      key={action.id}
-                      type="button"
-                      className={`w-full rounded-3xl border p-4 text-left shadow-sm transition hover:shadow-md ${toneClass(action.tone)}`}
-                    >
-                      <div className="font-semibold">{action.title}</div>
-                      <div className="mt-1 text-sm opacity-80">{action.detail}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
-                {locale === "ar"
-                  ? "لا توجد AI logic حتى الآن. هذه مساحة UX فقط وجاهزة للربط لاحقاً."
-                  : "No AI logic yet. This is UX scaffolding ready for later wiring."
-                }
-              </div>
-            </div>
-          </aside>
         </section>
       </div>
     </TenantLayout>

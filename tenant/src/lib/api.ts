@@ -2013,6 +2013,38 @@ class TenantApiClient {
     return this.get(`/tenant/reports/payment-methods${query ? `?${query}` : ''}`);
   }
 
+  async analyzeConsultantSnapshot(data: { snapshotId?: string; snapshot?: Record<string, any> }): Promise<any> {
+    return this.post('/tenant/ai/consultant/analyze', data);
+  }
+
+  async getConsultantReports(params?: { page?: number; limit?: number }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', `${params.page}`);
+    if (params?.limit) queryParams.append('limit', `${params.limit}`);
+    const query = queryParams.toString();
+    return this.get(`/tenant/ai/consultant/reports${query ? `?${query}` : ''}`);
+  }
+
+  async getConsultantReport(id: string): Promise<any> {
+    return this.get(`/tenant/ai/consultant/reports/${id}`);
+  }
+
+  async getConsultantBriefings(params?: { page?: number; limit?: number }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', `${params.page}`);
+    if (params?.limit) queryParams.append('limit', `${params.limit}`);
+    const query = queryParams.toString();
+    return this.get(`/tenant/ai/consultant/briefings${query ? `?${query}` : ''}`);
+  }
+
+  async getConsultantBriefing(id: string): Promise<any> {
+    return this.get(`/tenant/ai/consultant/briefings/${id}`);
+  }
+
+  async runConsultantWorkflow(data: { force?: boolean } = {}): Promise<any> {
+    return this.post('/tenant/ai/consultant/workflows/run', data);
+  }
+
   async getSavedReports(): Promise<any> {
     return this.get('/tenant/reports/saved');
   }
