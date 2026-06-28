@@ -21,6 +21,59 @@ function getCustomerName(user) {
     return fullName || user?.email || user?.phone || 'Guest Customer';
 }
 
+function resolveCustomerIdentity(user, customerId) {
+    const firstName = `${user?.firstName || ''}`.trim();
+    const lastName = `${user?.lastName || ''}`.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+    const displayName = `${user?.displayName || user?.name || user?.fullName || ''}`.trim();
+    const email = `${user?.email || ''}`.trim();
+    const phone = `${user?.phone || ''}`.trim();
+
+    const identityLine = email || phone || user?.id || customerId || 'Guest Customer';
+
+    if (fullName) {
+        return {
+            customerName: fullName,
+            customerBadge: 'Registered Customer',
+            customerBadgeKey: 'registered_customer',
+            customerIdentityLine: identityLine,
+            customerDisplayName: fullName,
+            customerType: 'registered_customer'
+        };
+    }
+
+    if (displayName) {
+        return {
+            customerName: displayName,
+            customerBadge: 'Registered Customer',
+            customerBadgeKey: 'registered_customer',
+            customerIdentityLine: identityLine,
+            customerDisplayName: displayName,
+            customerType: 'registered_customer'
+        };
+    }
+
+    if (email || phone) {
+        return {
+            customerName: email || phone || 'Walk-In Customer',
+            customerBadge: 'Walk-In Customer',
+            customerBadgeKey: 'walk_in_customer',
+            customerIdentityLine: identityLine,
+            customerDisplayName: 'Walk-In Customer',
+            customerType: 'walk_in_customer'
+        };
+    }
+
+    return {
+        customerName: 'Guest Customer',
+        customerBadge: 'Guest Customer',
+        customerBadgeKey: 'guest_customer',
+        customerIdentityLine: identityLine,
+        customerDisplayName: 'Guest Customer',
+        customerType: 'guest_customer'
+    };
+}
+
 function getServiceName(service) {
     return service?.name_en || service?.name_ar || 'Service';
 }
@@ -404,9 +457,15 @@ function buildCustomerSalesRows(transactions) {
         if (!user) return;
 
         const customerId = user.id || user.email || user.phone;
+        const identity = resolveCustomerIdentity(user, customerId);
         const current = customers.get(customerId) || {
             id: customerId,
-            name: getCustomerName(user),
+            name: identity.customerName,
+            customerDisplayName: identity.customerDisplayName,
+            customerBadge: identity.customerBadge,
+            customerBadgeKey: identity.customerBadgeKey,
+            customerIdentityLine: identity.customerIdentityLine,
+            customerType: identity.customerType,
             totalSpent: 0,
             visits: 0,
             averageSpend: 0,
@@ -435,7 +494,12 @@ function buildCustomerSalesRows(transactions) {
         .map((item) => ({
             ...item,
             customerName: item.name,
-            customer: item.name,
+            customer: item.customerDisplayName || item.name,
+            customerDisplayName: item.customerDisplayName || item.name,
+            customerBadge: item.customerBadge || 'Guest Customer',
+            customerBadgeKey: item.customerBadgeKey || 'guest_customer',
+            customerIdentityLine: item.customerIdentityLine || item.id || 'Guest Customer',
+            customerType: item.customerType || 'guest_customer',
             bookings: item.visits,
             completed: item.visits,
             revenue: item.totalSpent,

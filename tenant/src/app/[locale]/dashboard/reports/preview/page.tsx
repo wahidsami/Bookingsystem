@@ -7,6 +7,7 @@ import { useTenantAuth } from '@/contexts/TenantAuthContext';
 import { ReportHeader } from '@/components/ReportHeader';
 import { ReportExportToolbar } from '@/components/ReportExportToolbar';
 import { AnalyticsDataTable } from '@/components/AnalyticsDataTable';
+import { CustomerIdentityCell } from '@/components/CustomerIdentityCell';
 import { API_BASE_URL, tenantApi } from '@/lib/api';
 import { Currency } from '@/components/Currency';
 import { ReportPdfDebugPanel, type ReportPdfDebugState } from '@/components/ReportPdfDebugPanel';
@@ -812,7 +813,12 @@ export default function ReportPreviewPage() {
                       { id: 'last-visit', header: locale === 'ar' ? 'آخر زيارة' : 'Last visit' },
                     ]}
                     rows={(data.customerSales || []).map((item: any) => [
-                      item.customerName || item.customer || item.name || item.id,
+                      <CustomerIdentityCell
+                        name={item.customerDisplayName || item.customerName || item.customer || item.name || item.id || '-'}
+                        badge={item.customerBadge || (locale === 'ar' ? 'عميل' : 'Customer')}
+                        identityLine={item.customerIdentityLine}
+                        rtl={isRTL}
+                      />,
                       item.bookings ?? item.visits ?? 0,
                       <Currency amount={item.revenue ?? item.totalSpent ?? 0} />,
                       <Currency amount={item.averageSpend ?? 0} />,

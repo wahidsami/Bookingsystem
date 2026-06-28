@@ -378,9 +378,11 @@ function buildPdfMakeDoc(payload) {
         content.push(
             ...buildDataTable(
                 'Customer Sales',
-                ['Customer', 'Bookings', 'Completed', 'Revenue'],
+                ['Customer', 'Type', 'Identity', 'Bookings', 'Completed', 'Revenue'],
                 payload.data.customerSales.rows.map((row) => [
-                    row.customerName || row.customer || row.name || '-',
+                    row.customerDisplayName || row.customerName || row.customer || row.name || '-',
+                    row.customerBadge || '-',
+                    row.customerIdentityLine || row.email || row.phone || row.id || '-',
                     row.bookings ?? 0,
                     row.completed ?? 0,
                     formatMoney(row.revenue)

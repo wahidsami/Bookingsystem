@@ -356,6 +356,22 @@ function metricRows(metrics: Array<[string, ReportExportCell]>) {
   return metrics;
 }
 
+function getCustomerDisplayName(item: Record<string, any>) {
+  return item.customerDisplayName ?? item.customerName ?? item.customer ?? item.name ?? item.id ?? '';
+}
+
+function getCustomerBadge(item: Record<string, any>) {
+  return item.customerBadge ?? (item.customerType === 'walk_in_customer'
+    ? 'Walk-In Customer'
+    : item.customerType === 'guest_customer'
+      ? 'Guest Customer'
+      : 'Registered Customer');
+}
+
+function getCustomerIdentityLine(item: Record<string, any>) {
+  return item.customerIdentityLine ?? item.email ?? item.phone ?? item.id ?? '';
+}
+
 export function buildReportExportTables(params: {
   locale: string;
   sections: string[];
@@ -602,13 +618,17 @@ export function buildReportExportTables(params: {
       title: localizedLabel(locale, 'Customer sales', 'مبيعات العملاء'),
       columns: [
         localizedLabel(locale, 'Customer', 'العميل'),
+        localizedLabel(locale, 'Type', 'النوع'),
+        localizedLabel(locale, 'Identity', 'الهوية'),
         localizedLabel(locale, 'Bookings', 'الحجوزات'),
         localizedLabel(locale, 'Completed', 'المكتملة'),
         localizedLabel(locale, 'Revenue', 'الإيراد'),
         localizedLabel(locale, 'Last visit', 'آخر زيارة')
       ],
       rows: sourceRows.map((item: any) => [
-        item.customerName ?? item.customer ?? item.name ?? item.id ?? '',
+        getCustomerDisplayName(item),
+        getCustomerBadge(item),
+        getCustomerIdentityLine(item),
         numberRow(item.bookings ?? item.visits),
         numberRow(item.completed ?? item.visits),
         numberRow(item.revenue ?? item.totalSpent),
