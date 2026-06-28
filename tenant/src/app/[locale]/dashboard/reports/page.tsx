@@ -604,8 +604,8 @@ export default function ReportsPage() {
     });
   };
 
-  const handleExportExcel = () => {
-    exportExcel({
+  const handleExportExcel = async () => {
+    await exportExcel({
       fileName: reportTitle,
       reportTitle,
       startDate,

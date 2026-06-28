@@ -1,5 +1,6 @@
 'use client';
 
+import ExcelJS from 'exceljs';
 import { tenantApi } from '@/lib/api';
 
 export type ReportExportCell = string | number | boolean | null | undefined;
@@ -167,12 +168,130 @@ function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function buildFileName(payload: ReportExportPayload, extension: 'csv' | 'xls') {
+function buildFileName(payload: ReportExportPayload, extension: 'csv' | 'xlsx') {
   const base =
     payload.fileName ||
     payload.reportTitle ||
     `report-${payload.startDate}-${payload.endDate}`;
   return `${sanitizeFilePart(base)}.${extension}`;
+}
+
+function sanitizeWorksheetName(title: string) {
+  const cleaned = title
+    .replace(/[\[\]\*\/\\\?\:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (cleaned || 'Report').slice(0, 31);
+}
+
+async function buildExcelBuffer(payload: ReportExportPayload): Promise<ArrayBuffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Refah';
+  workbook.company = 'Refah';
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  const summary = workbook.addWorksheet('Summary', {
+    views: [{ state: 'frozen', ySplit: 4 }]
+  });
+
+  summary.columns = [
+    { width: 28 },
+    { width: 48 },
+    { width: 20 }
+  ];
+
+  const title = payload.reportTitle || 'Business report';
+  summary.addRow(['Report', title]);
+  summary.addRow(['Period', `${payload.startDate} - ${payload.endDate}`]);
+  summary.addRow(['Sections', payload.sections.join(' | ') || '-']);
+  if (payload.notes) {
+    summary.addRow(['Notes', payload.notes]);
+  }
+  summary.addRow([]);
+
+  summary.getCell('A1').font = { bold: true };
+  summary.getCell('B1').font = { bold: true };
+  summary.eachRow((row, rowNumber) => {
+    row.eachCell((cell, colNumber) => {
+      cell.alignment = { vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+      };
+      if (rowNumber <= 4) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: rowNumber % 2 === 0 ? 'FFF8FAFC' : 'FFFFFFFF' }
+        };
+      }
+      if (colNumber === 2) {
+        cell.font = { bold: rowNumber === 1 };
+      }
+    });
+  });
+
+  payload.tables.forEach((table) => {
+    const worksheet = workbook.addWorksheet(sanitizeWorksheetName(table.title), {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    });
+    worksheet.columns = table.columns.map(() => ({ width: 20 }));
+
+    const metadataRows = table.metadataRows || [];
+    const columnWidths = table.columns.map((header, columnIndex) => {
+      const candidates = [
+        safeText(header),
+        ...metadataRows.map(([, value]) => safeText(value)),
+        ...table.rows.map((row) => safeText(row[columnIndex])),
+        table.title
+      ];
+      return Math.max(
+        16,
+        Math.min(
+          42,
+          candidates.reduce((max, value) => Math.max(max, value.length + 2), 16)
+        )
+      );
+    });
+
+    const titleRow = worksheet.addRow([table.title]);
+    titleRow.font = { bold: true, size: 14 };
+    titleRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFEDE9FE' }
+    };
+    worksheet.mergeCells(worksheet.rowCount, 1, worksheet.rowCount, Math.max(table.columns.length, 2));
+
+    if (metadataRows.length > 0) {
+      metadataRows.forEach(([label, value]) => {
+        const row = worksheet.addRow([label, safeText(value)]);
+        row.getCell(1).font = { bold: true };
+      });
+      worksheet.addRow([]);
+    }
+
+    const headerRow = worksheet.addRow(table.columns.map((column) => safeText(column)));
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFEDE9FE' }
+    };
+
+    table.rows.forEach((rowValues) => {
+      worksheet.addRow(rowValues.map((value) => safeText(value)));
+    });
+
+    columnWidths.forEach((width, index) => {
+      worksheet.getColumn(index + 1).width = width;
+    });
+  });
+
+  return workbook.xlsx.writeBuffer();
 }
 
 function buildPdfFileName(params: {
@@ -205,11 +324,13 @@ export function exportCsv(payload: ReportExportPayload) {
   return true;
 }
 
-export function exportExcel(payload: ReportExportPayload) {
+export async function exportExcel(payload: ReportExportPayload) {
   if (typeof document === 'undefined') return false;
-  const html = buildExcelHtml(payload);
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-  downloadBlob(blob, buildFileName(payload, 'xls'));
+  const buffer = await buildExcelBuffer(payload);
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  downloadBlob(blob, buildFileName(payload, 'xlsx'));
   return true;
 }
 

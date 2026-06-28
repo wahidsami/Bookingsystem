@@ -187,9 +187,9 @@ export default function ReportPreviewPage() {
     });
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     setDownloadError('');
-    exportExcel({
+    await exportExcel({
       fileName: previewReportTitle,
       reportTitle: previewReportTitle,
       startDate,
