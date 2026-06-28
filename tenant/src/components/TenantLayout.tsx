@@ -475,6 +475,18 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
     </div>
   );
 
+  const renderConsultantShortcut = () => (
+    <Link
+      href={`/${locale}/dashboard/consultant`}
+      className="inline-flex h-11 items-center gap-2 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 text-sm font-semibold text-violet-700 shadow-sm transition hover:border-violet-300 hover:from-violet-100 hover:to-fuchsia-100"
+      aria-label={locale === 'ar' ? 'المستشار الذكي' : 'AI Consultant'}
+      title={locale === 'ar' ? 'المستشار الذكي' : 'AI Consultant'}
+    >
+      <SparklesIcon className="h-5 w-5" />
+      <span className="hidden xl:inline">{locale === 'ar' ? 'المستشار الذكي' : 'AI Consultant'}</span>
+    </Link>
+  );
+
   const renderUserMenuPanel = () => (
     <div
       ref={userMenuPanelRef}
@@ -1022,6 +1034,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             {isRTL ? (
               <>
                 <div className="flex items-center justify-start gap-3" style={{ flexDirection: 'row' }}>
+                  {renderConsultantShortcut()}
                   {renderNotificationMenu()}
 
                   <Link
@@ -1091,7 +1104,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3">
+              <div className="flex items-center justify-end gap-3">
+                  {renderConsultantShortcut()}
                   {renderNotificationMenu()}
 
                   <Link
