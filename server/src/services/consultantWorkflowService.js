@@ -464,7 +464,7 @@ async function loadTenantConsultantWorkflowContext(tenantId) {
         }),
         db.TenantDashboardAccount.findAll({
             where: { tenantId, isActive: true },
-            attributes: ['id', 'email', 'displayName']
+            attributes: ['id', 'email']
         }),
         db.Staff.findAll({
             where: { tenantId, isActive: true },

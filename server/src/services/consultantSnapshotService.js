@@ -243,7 +243,7 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'displayName', 'name', 'fullName', 'email', 'phone'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                     required: false
                 },
                 {
@@ -281,7 +281,7 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'displayName', 'name', 'fullName', 'email', 'phone'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                     required: false
                 },
                 {
@@ -328,7 +328,7 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
                         {
                             model: db.PlatformUser,
                             as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'displayName', 'name', 'fullName', 'email', 'phone'],
+                            attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                             required: false
                         },
                         {
@@ -348,7 +348,7 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
                         {
                             model: db.PlatformUser,
                             as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'displayName', 'name', 'fullName', 'email', 'phone'],
+                            attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                             required: false
                         }
                     ]
@@ -382,7 +382,7 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'displayName', 'name', 'fullName', 'email', 'phone'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                     required: false
                 },
                 {
@@ -402,7 +402,7 @@ async function loadTenantSnapshotInputs(tenantId, window, includeHistory = false
                 {
                     model: db.PlatformUser,
                     as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'displayName', 'name', 'fullName', 'email', 'phone'],
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                     required: false
                 }
             ],
