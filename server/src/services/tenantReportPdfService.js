@@ -111,13 +111,13 @@ function buildMetricTable(rows) {
 function buildDataTable(title, headers, rows) {
     if (!Array.isArray(rows) || rows.length === 0) {
         return [
-            { text: title, style: 'sectionTitle', pageBreak: 'before' },
+            { text: title, style: 'sectionTitle' },
             { text: 'No data in selected period.', style: 'emptyText' }
         ];
     }
 
     return [
-        { text: title, style: 'sectionTitle', pageBreak: 'before' },
+        { text: title, style: 'sectionTitle' },
         {
             table: {
                 headerRows: 1,
@@ -181,7 +181,7 @@ function buildPdfMakeDoc(payload) {
 
     if (overview) {
         content.push(
-            { text: 'Overview', style: 'sectionTitle', pageBreak: 'before' },
+            { text: 'Overview', style: 'sectionTitle' },
             { text: 'Financial summary', style: 'subsectionTitle' },
             buildMetricTable([
                 ['Total Revenue', formatMoney(overview.totalRevenue)],
@@ -346,7 +346,7 @@ function buildPdfMakeDoc(payload) {
     if (payload.data?.discounts) {
         const discounts = payload.data.discounts;
         content.push(
-            { text: 'Discounts', style: 'sectionTitle', pageBreak: 'before' },
+            { text: 'Discounts', style: 'sectionTitle' },
             buildMetricTable([
                 ['Total Discounts', formatMoney(discounts.totalDiscountAmount)],
                 ['Booking Discounts', formatMoney(discounts.appointmentDiscountAmount)],
@@ -483,9 +483,6 @@ function buildPdfMakeDoc(payload) {
                 margin: [0, 0, 0, 10]
             }
         },
-        pageBreakBefore(currentNode) {
-            return currentNode?.text === 'Overview';
-        }
     };
 
     return docDefinition;
