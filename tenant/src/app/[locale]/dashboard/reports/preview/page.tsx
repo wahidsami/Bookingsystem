@@ -188,15 +188,23 @@ export default function ReportPreviewPage() {
   };
 
   const handleExportExcel = async () => {
-    setDownloadError('');
-    await exportExcel({
-      fileName: previewReportTitle,
-      reportTitle: previewReportTitle,
-      startDate,
-      endDate,
-      sections,
-      tables: previewExportTables,
-    });
+    try {
+      setDownloadError('');
+      await exportExcel({
+        fileName: previewReportTitle,
+        reportTitle: previewReportTitle,
+        startDate,
+        endDate,
+        sections,
+        tables: previewExportTables,
+      });
+    } catch (err: any) {
+      console.error('Failed to download report Excel:', err);
+      setDownloadError(
+        err?.message
+          || (locale === 'ar' ? 'تعذر تنزيل ملف Excel. حاول مرة أخرى.' : 'Failed to download Excel. Please try again.')
+      );
+    }
   };
 
   if (!startDate || !endDate) {

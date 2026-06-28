@@ -262,6 +262,7 @@ export default function ReportsPage() {
   const [savedReports, setSavedReports] = useState<any[]>([]);
   const [savedReportsLoading, setSavedReportsLoading] = useState(false);
   const [savedReportsError, setSavedReportsError] = useState("");
+  const [exportError, setExportError] = useState("");
   const [savedReportTitle, setSavedReportTitle] = useState("");
   const [savedReportDescription, setSavedReportDescription] = useState("");
   const [savedReportFavorite, setSavedReportFavorite] = useState(false);
@@ -585,12 +586,18 @@ export default function ReportsPage() {
   );
 
   const handleExportPdf = async () => {
-    await exportPdf({
-      startDate,
-      endDate,
-      sections: exportSections,
-      title: reportTitle
-    });
+    try {
+      setExportError("");
+      await exportPdf({
+        startDate,
+        endDate,
+        sections: exportSections,
+        title: reportTitle
+      });
+    } catch (err: any) {
+      console.error("Failed to download report PDF:", err);
+      setExportError(err?.message || "Failed to download PDF.");
+    }
   };
 
   const handleExportCsv = () => {
@@ -605,14 +612,20 @@ export default function ReportsPage() {
   };
 
   const handleExportExcel = async () => {
-    await exportExcel({
-      fileName: reportTitle,
-      reportTitle,
-      startDate,
-      endDate,
-      sections: exportSections,
-      tables: exportTables
-    });
+    try {
+      setExportError("");
+      await exportExcel({
+        fileName: reportTitle,
+        reportTitle,
+        startDate,
+        endDate,
+        sections: exportSections,
+        tables: exportTables
+      });
+    } catch (err: any) {
+      console.error("Failed to download report Excel:", err);
+      setExportError(err?.message || "Failed to download Excel.");
+    }
   };
 
   const saveCurrentReportConfiguration = async () => {
@@ -1548,6 +1561,12 @@ export default function ReportsPage() {
           </>
         }
       >
+        {exportError ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {exportError}
+          </div>
+        ) : null}
+
         {error ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {error}
