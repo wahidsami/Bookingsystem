@@ -13,6 +13,7 @@ import {
   type FinanceSidebarGroup
 } from "@/components/FinanceWorkspaceShell";
 import { Currency } from "@/components/Currency";
+import { CustomerIdentityCell } from "@/components/CustomerIdentityCell";
 import { AnalyticsDataTable } from "@/components/AnalyticsDataTable";
 import { AnalyticsDetailsDrawer } from "@/components/AnalyticsDetailsDrawer";
 import { tenantApi } from "@/lib/api";
@@ -1776,12 +1777,25 @@ export default function FinancialPage() {
                       rtl={isRTL}
                       headers={[
                         locale === "ar" ? "العميل" : "Customer",
+                        locale === "ar" ? "النوع" : "Type",
+                        locale === "ar" ? "الهوية" : "Identity",
                         locale === "ar" ? "الحجوزات" : "Bookings",
                         locale === "ar" ? "المكتملة" : "Completed",
                         locale === "ar" ? "الإيراد" : "Revenue"
                       ]}
-                      rows={(customerAnalytics.topCustomers || []).map((customer, index) => [
-                        `${index + 1}. ${customer.name || customer.id}`,
+                      rows={(customerAnalytics.topCustomers || []).map((customer: any) => [
+                        <CustomerIdentityCell
+                          name={customer.customerDisplayName || customer.name || customer.id || "-"}
+                          badge={customer.customerBadge || (customer.customerType === "registered_customer"
+                            ? (locale === "ar" ? "عميل مسجل" : "Registered Customer")
+                            : customer.customerType === "walk_in_customer"
+                              ? (locale === "ar" ? "عميل زيارة" : "Walk-In Customer")
+                              : (locale === "ar" ? "ضيف" : "Guest Customer"))}
+                          identityLine={customer.customerIdentityLine || customer.email || customer.phone || customer.id || ""}
+                          rtl={isRTL}
+                        />,
+                        customer.customerType || customer.type || "-",
+                        customer.customerIdentityLine || customer.email || customer.phone || customer.id || "-",
                         customer.bookings,
                         customer.completed,
                         formatMoney(customer.revenue)

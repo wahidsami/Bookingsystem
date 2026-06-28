@@ -17,6 +17,7 @@ import {
   type FinanceSidebarGroup
 } from "@/components/FinanceWorkspaceShell";
 import { AnalyticsDataTable } from "@/components/AnalyticsDataTable";
+import { CustomerIdentityCell } from "@/components/CustomerIdentityCell";
 import { Currency } from "@/components/Currency";
 import { tenantApi } from "@/lib/api";
 import {
@@ -267,6 +268,7 @@ export default function ReportsPage() {
   const [posClosingSummary, setPosClosingSummary] = useState<any>(null);
   const [refundsReport, setRefundsReport] = useState<any>(null);
   const [paymentMethodsReport, setPaymentMethodsReport] = useState<any>(null);
+  const [customerSalesReport, setCustomerSalesReport] = useState<any[]>([]);
   const [savedReports, setSavedReports] = useState<any[]>([]);
   const [detailDrawer, setDetailDrawer] = useState<DrilldownState | null>(null);
   const [savedReportsLoading, setSavedReportsLoading] = useState(false);
@@ -303,7 +305,7 @@ export default function ReportsPage() {
     setError("");
     try {
       const params = { startDate, endDate };
-      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, rebookingRes, refundsRes, paymentMethodsRes, posRes] = await Promise.allSettled([
+      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, rebookingRes, refundsRes, paymentMethodsRes, posRes, customerSalesRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
         tenantApi.getFinancialOverview(params),
         tenantApi.getBookingTrends({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
@@ -315,7 +317,8 @@ export default function ReportsPage() {
         tenantApi.getRebookingAnalytics({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
         tenantApi.getRefundsReport(params),
         tenantApi.getPaymentMethodsReport({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
-        tenantApi.getPosClosingSummary({ date: endDate })
+        tenantApi.getPosClosingSummary({ date: endDate }),
+        tenantApi.getFullReport({ startDate, endDate, sections: ["customerSales"] })
       ]);
 
       const failedSections: string[] = [];
@@ -419,6 +422,14 @@ export default function ReportsPage() {
         failedSections.push(locale === "ar" ? "ملخص الإقفال POS" : "POS closing summary");
       }
 
+      if (customerSalesRes.status === "fulfilled" && customerSalesRes.value.success) {
+        const reportData = customerSalesRes.value.data || {};
+        setCustomerSalesReport(Array.isArray(reportData.customerSales) ? reportData.customerSales : []);
+      } else {
+        setCustomerSalesReport([]);
+        failedSections.push(locale === "ar" ? "مبيعات العملاء" : "customer sales");
+      }
+
       if (failedSections.length > 0) {
         setError(
           locale === "ar"
@@ -507,6 +518,10 @@ export default function ReportsPage() {
     ),
     [paymentMethodsReport]
   );
+  const customerSalesRows = useMemo(
+    () => (customerSalesReport.length ? customerSalesReport : (customerAnalytics?.topCustomers || [])),
+    [customerAnalytics, customerSalesReport]
+  );
   const rebookingTrendValues = useMemo(
     () => (rebookingAnalytics?.trend || []).map((item: any) =>
       safeNumber(item.rebookedRevenue ?? item.revenue ?? item.totalRevenue ?? item.value)
@@ -569,11 +584,13 @@ export default function ReportsPage() {
     refunds: refundsReport,
     paymentMethods: paymentMethodsReport,
     customerAnalytics,
+    customerSales: customerSalesRows,
     rebookings: rebookingAnalytics,
     posClosingSummary
   }), [
     bookingTrends,
     customerAnalytics,
+    customerSalesRows,
     employeePerformance,
     financialOverview,
     paymentMethodsReport,
@@ -1760,13 +1777,76 @@ export default function ReportsPage() {
 
       case "customerSales":
         return (
-          <FinanceSectionCard title={locale === "ar" ? "مبيعات العملاء" : "Customer sales"}>
-            {customerAnalytics ? (
-              <div className="grid gap-4 md:grid-cols-4">
-                <FinanceMetricCard label={locale === "ar" ? "إجمالي العملاء" : "Total customers"} value={safeNumber(customerAnalytics.totalCustomers)} tone="blue" />
-                <FinanceMetricCard label={locale === "ar" ? "عملاء جدد" : "New customers"} value={safeNumber(customerAnalytics.newCustomers)} tone="green" />
-                <FinanceMetricCard label={locale === "ar" ? "عملاء عائدون" : "Returning customers"} value={safeNumber(customerAnalytics.returningCustomers)} tone="purple" />
-                <FinanceMetricCard label={locale === "ar" ? "الاحتفاظ" : "Retention"} value={formatPercent(customerAnalytics.retentionRate)} tone="amber" />
+          <FinanceSectionCard
+            title={locale === "ar" ? "مبيعات العملاء" : "Customer sales"}
+            subtitle={locale === "ar"
+              ? "عرض تفصيلي للعملاء، الهوية، والزيارات من التقرير الكامل."
+              : "Detailed customer identity and visit data from the full report."}
+          >
+            {customerSalesRows.length || customerAnalytics ? (
+              <div className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <FinanceMetricCard label={locale === "ar" ? "إجمالي العملاء" : "Total customers"} value={safeNumber(customerAnalytics?.totalCustomers)} tone="blue" />
+                  <FinanceMetricCard label={locale === "ar" ? "عملاء جدد" : "New customers"} value={safeNumber(customerAnalytics?.newCustomers)} tone="green" />
+                  <FinanceMetricCard label={locale === "ar" ? "عملاء عائدون" : "Returning customers"} value={safeNumber(customerAnalytics?.returningCustomers)} tone="purple" />
+                  <FinanceMetricCard label={locale === "ar" ? "الاحتفاظ" : "Retention"} value={formatPercent(customerAnalytics?.retentionRate)} tone="amber" />
+                </div>
+                <SectionTable
+                  rtl={isRTL}
+                  headers={[
+                    locale === "ar" ? "العميل" : "Customer",
+                    locale === "ar" ? "النوع" : "Type",
+                    locale === "ar" ? "الهوية" : "Identity",
+                    locale === "ar" ? "الحجوزات" : "Bookings",
+                    locale === "ar" ? "المكتملة" : "Completed",
+                    locale === "ar" ? "الإيراد" : "Revenue",
+                    locale === "ar" ? "آخر زيارة" : "Last visit"
+                  ]}
+                  rows={customerSalesRows.map((customer: any) => [
+                    <CustomerIdentityCell
+                      name={customer.customerDisplayName || customer.customerName || customer.customer || customer.name || customer.id || "-"}
+                      badge={customer.customerBadge || (customer.customerType === "registered_customer"
+                        ? (locale === "ar" ? "عميل مسجل" : "Registered Customer")
+                        : customer.customerType === "walk_in_customer"
+                          ? (locale === "ar" ? "عميل زيارة" : "Walk-In Customer")
+                          : (locale === "ar" ? "ضيف" : "Guest Customer"))}
+                      identityLine={customer.customerIdentityLine || customer.email || customer.phone || customer.id || ""}
+                      rtl={isRTL}
+                    />,
+                    customer.customerType || customer.type || "-",
+                    customer.customerIdentityLine || customer.email || customer.phone || customer.id || "-",
+                    safeNumber(customer.bookings ?? customer.visits),
+                    safeNumber(customer.completed ?? customer.visits),
+                    formatMoney(customer.revenue ?? customer.totalSpent),
+                    customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString() : "-"
+                  ])}
+                  onRowClick={(index) => {
+                    const row = customerSalesRows[index];
+                    if (!row) return;
+                    openSummaryDetail({
+                      title: row.customerDisplayName || row.customerName || row.name || row.id || (locale === "ar" ? "عميل" : "Customer"),
+                      subtitle: locale === "ar" ? "تفاصيل العميل" : "Customer detail",
+                      summaryItems: [
+                        { label: locale === "ar" ? "النوع" : "Type", value: row.customerType || row.type || "-" },
+                        { label: locale === "ar" ? "الهوية" : "Identity", value: row.customerIdentityLine || row.email || row.phone || row.id || "-" },
+                        { label: locale === "ar" ? "الحجوزات" : "Bookings", value: safeNumber(row.bookings ?? row.visits) },
+                        { label: locale === "ar" ? "المكتملة" : "Completed", value: safeNumber(row.completed ?? row.visits) },
+                        { label: locale === "ar" ? "الإيراد" : "Revenue", value: formatMoney(row.revenue ?? row.totalSpent) }
+                      ],
+                      sourceHref: row.id ? `/${locale}/dashboard/customers/${row.id}` : undefined,
+                      sourceLabel: locale === "ar" ? "فتح العميل" : "Open customer"
+                    });
+                  }}
+                  countLabel={
+                    (customerSalesRows.length || customerAnalytics?.topCustomers?.length)
+                      ? (locale === "ar"
+                        ? `عرض ${customerSalesRows.length} سجلات`
+                        : `Showing ${customerSalesRows.length} records`)
+                      : undefined
+                  }
+                  sourceLabel={locale === "ar" ? "العملاء" : "customers"}
+                  totalRows={customerSalesRows.length}
+                />
               </div>
             ) : (
               <FinanceEmptyState
