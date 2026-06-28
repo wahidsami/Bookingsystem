@@ -122,6 +122,14 @@ function safeArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
+function safePlainClone(value) {
+    try {
+        return JSON.parse(JSON.stringify(value ?? {}));
+    } catch (_) {
+        return {};
+    }
+}
+
 function generateReportPdfBuffer(payload) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -344,9 +352,38 @@ function generateFallbackReportPdfBuffer(payload) {
     });
 }
 
+function generateEmergencyReportPdfBuffer(payload) {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const chunks = [];
+        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        try {
+            const safePayload = safePlainClone(payload);
+            doc.fontSize(24).fillColor('#111827').text('Refah Report', 50, 60);
+            doc.moveDown(0.6);
+            doc.fontSize(14).fillColor('#374151').text(safePayload.tenantName || 'Tenant');
+            doc.moveDown(0.6);
+            doc.fontSize(11).fillColor('#6B7280').text(`Period: ${safePayload.startDate || '-'} -> ${safePayload.endDate || '-'}`);
+            doc.fontSize(11).fillColor('#6B7280').text(`Generated at: ${safePayload.generatedAt || '-'}`);
+            if (safePayload.errorMessage) {
+                doc.moveDown(1);
+                doc.fontSize(11).fillColor('#991B1B').text(`Report PDF fallback was used: ${safePayload.errorMessage}`);
+            }
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
 module.exports = {
     generateReportPdfBuffer,
     generateFallbackReportPdfBuffer,
+    generateEmergencyReportPdfBuffer,
     resolveUploadPath,
     sanitizeFileNamePart,
+    safePlainClone,
 };

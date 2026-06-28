@@ -8,8 +8,10 @@ const { Op, fn, col, literal } = require('sequelize');
 const {
     generateReportPdfBuffer,
     generateFallbackReportPdfBuffer,
+    generateEmergencyReportPdfBuffer,
     resolveUploadPath,
-    sanitizeFileNamePart
+    sanitizeFileNamePart,
+    safePlainClone
 } = require('../services/tenantReportPdfService');
 
 function getCustomerName(user) {
@@ -1670,7 +1672,7 @@ exports.downloadReportPdf = async (req, res) => {
             attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
         });
 
-        const data = await buildFullReportData(req, sections, startDate, endDate);
+        const data = safePlainClone(await buildFullReportData(req, sections, startDate, endDate));
         const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
         const tenantLogoPath = resolveUploadPath(tenant?.logo);
         const generatedAt = new Date().toISOString();
@@ -1713,11 +1715,33 @@ exports.downloadReportPdf = async (req, res) => {
             return res.send(fallbackBuffer);
         } catch (fallbackError) {
             console.error('Fallback report PDF generation failed:', fallbackError);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to generate report PDF',
-                error: fallbackError.message || error.message
-            });
+            try {
+                const tenant = await db.Tenant.findByPk(tenantId, {
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'businessName', 'logo']
+                });
+                const tenantName = tenant?.businessName || tenant?.name_ar || tenant?.name_en || tenant?.name || 'Tenant';
+                const emergencyBuffer = await generateEmergencyReportPdfBuffer({
+                    tenantName,
+                    reportTitle: title ? `${title}` : 'Refah Report',
+                    startDate,
+                    endDate,
+                    generatedAt: new Date().toISOString(),
+                    errorMessage: fallbackError.message || error.message,
+                    sections
+                });
+                const fileName = `report-${sanitizeFileNamePart(tenantName, 'tenant')}-${startDate}-${endDate}.pdf`;
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+                res.setHeader('Content-Length', emergencyBuffer.length);
+                return res.send(emergencyBuffer);
+            } catch (emergencyError) {
+                console.error('Emergency report PDF generation failed:', emergencyError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Failed to generate report PDF',
+                    error: emergencyError.message || fallbackError.message || error.message
+                });
+            }
         }
     }
 };
