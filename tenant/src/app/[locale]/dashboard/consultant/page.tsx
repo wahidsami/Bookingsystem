@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { TenantLayout } from "@/components/TenantLayout";
@@ -558,11 +558,13 @@ function TableCard({ table, locale }: { table: ConsultantTable; locale: string }
 function AnalysisBlock({
   item,
   locale,
-  onAction
+  onAction,
+  isNavigating
 }: {
   item: ConsultantHistoryItem;
   locale: string;
   onAction: (href: string) => void;
+  isNavigating: boolean;
 }) {
   const analysis = item.reportData;
   const text = ui[locale as "en" | "ar"];
@@ -738,6 +740,7 @@ function AnalysisBlock({
                     <button
                       type="button"
                       onClick={() => onAction(alert.deepLink as string)}
+                      disabled={isNavigating}
                       className="mt-3 text-sm font-semibold text-primary hover:underline"
                     >
                       {text.openModule}
@@ -778,6 +781,7 @@ function AnalysisBlock({
                     <button
                       type="button"
                       onClick={() => onAction(recommendation.deepLink as string)}
+                      disabled={isNavigating}
                       className="mt-3 text-sm font-semibold text-primary hover:underline"
                     >
                       {text.openModule}
@@ -802,6 +806,7 @@ function AnalysisBlock({
                   key={`${action.title}-${action.detail}`}
                   type="button"
                   onClick={() => action.deepLink && onAction(action.deepLink)}
+                  disabled={isNavigating}
                   className="w-full rounded-3xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-primary/30 hover:bg-primary/5"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -920,6 +925,7 @@ export default function ConsultantPage() {
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [consultantAccess, setConsultantAccess] = useState<boolean | null>(null);
   const [automaticBriefingsEnabled, setAutomaticBriefingsEnabled] = useState(false);
+  const [isNavigating, startNavigation] = useTransition();
   const [consultantPreferences, setConsultantPreferences] = useState<ConsultantCommunicationPreferences>({
     language: isRTL ? "ar" : "en",
     tone: isRTL ? "saudi_executive_style" : "executive_english",
@@ -1085,7 +1091,15 @@ export default function ConsultantPage() {
   }, [history, selectedHistoryId]);
 
   const openModule = (href: string) => {
-    router.push(href);
+    const normalizedHref = href.startsWith(`/${locale}/`)
+      ? href
+      : href.startsWith("/")
+        ? `/${locale}${href}`
+        : `/${locale}/${href}`;
+
+    startNavigation(() => {
+      router.push(normalizedHref);
+    });
   };
 
   const openHistoryItem = async (item: ConsultantHistoryItem) => {
@@ -1462,7 +1476,7 @@ export default function ConsultantPage() {
                       <div className="h-28 animate-pulse rounded-3xl border border-gray-200 bg-white" />
                     </div>
                   ) : selectedHistoryItem ? (
-                    <AnalysisBlock item={selectedHistoryItem} locale={locale} onAction={openModule} />
+                    <AnalysisBlock item={selectedHistoryItem} locale={locale} onAction={openModule} isNavigating={isNavigating} />
                   ) : (
                     <div className="space-y-4">
                       <section className="rounded-[2rem] border border-gray-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-lg">
