@@ -810,6 +810,9 @@ const startServer = async () => {
         await db.CustomerInvoiceItem.sync({ force: false }); // Customer invoice line items
         await db.CustomerInvoiceEvent.sync({ force: false }); // Customer invoice audit trail
         await db.TenantSavedReport.sync({ force: false }); // Tenant custom reports
+        await db.ConsultantSnapshot.sync({ force: false }); // AI consultant analytics snapshots
+        await db.ConsultantReport.sync({ force: false }); // AI consultant generated reports
+        await db.ConsultantConversation.sync({ force: false }); // AI consultant conversation history
         await db.AdminSavedReport.sync({ force: false }); // Admin custom reports
         await db.PublicPageData.sync({ force: false }); // Public page data
 
