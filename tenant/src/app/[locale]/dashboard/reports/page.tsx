@@ -1312,18 +1312,43 @@ export default function ReportsPage() {
             title={locale === "ar" ? "تقرير المبيعات" : "Sales report"}
             subtitle={locale === "ar" ? "السلسلة الزمنية، الخدمات، والعملاء." : "Time series, services, and customer contribution."}
           >
-            <div className="grid gap-4 xl:grid-cols-3">
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الإيراد" : "Revenue"}</p>
-                <TrendSparkline values={revenueTrendValues.length ? revenueTrendValues : [0]} color="#7c3aed" height={110} />
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-gray-200 p-4">
+                  <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الإيراد" : "Revenue"}</p>
+                  <TrendSparkline values={revenueTrendValues.length ? revenueTrendValues : [0]} color="#7c3aed" height={110} />
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-4">
+                  <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "إيراد المركز" : "Tenant revenue"}</p>
+                  <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#10b981" height={110} />
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-4">
+                  <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الحجوزات" : "Bookings"}</p>
+                  <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#0ea5e9" height={110} />
+                </div>
               </div>
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "إيراد المركز" : "Tenant revenue"}</p>
-                <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#10b981" height={110} />
-              </div>
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "الحجوزات" : "Bookings"}</p>
-                <TrendSparkline values={bookingTrendValues.length ? bookingTrendValues : [0]} color="#0ea5e9" height={110} />
+
+              <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{locale === "ar" ? "مركز المبيعات" : "Sales hub"}</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {locale === "ar"
+                      ? "افتح التقارير الجديدة تحت المبيعات بما في ذلك الملخص والقوائم والتفاصيل."
+                      : "Open the new Sales workspaces, including summary, list, details, gift cards, discounts, and taxes."
+                    }
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link href={`/${locale}/dashboard/reports/sales`} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                    {locale === "ar" ? "فتح مركز المبيعات" : "Open sales hub"}
+                  </Link>
+                  <Link href={`/${locale}/dashboard/reports/sales/summary`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                    {locale === "ar" ? "ملخص المبيعات" : "Sales summary"}
+                  </Link>
+                  <Link href={`/${locale}/dashboard/reports/sales/list`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                    {locale === "ar" ? "قائمة المبيعات" : "Sales list"}
+                  </Link>
+                </div>
               </div>
             </div>
           </FinanceSectionCard>
