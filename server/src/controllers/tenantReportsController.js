@@ -18,6 +18,10 @@ const {
     normalizeDeliveryChannels,
     normalizeExportFormats
 } = require('../services/tenantReportDeliveryService');
+const {
+    buildAdvancedAnalytics,
+    buildRebookingAnalyticsEnhanced
+} = require('../services/tenantAdvancedAnalyticsService');
 
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
@@ -1382,6 +1386,12 @@ async function buildFullReportData(req, sections, startDate, endDate) {
         });
     }
 
+    if (sections.includes('advancedAnalytics')) {
+        await collectSection('advancedAnalytics', async () => {
+            result.advancedAnalytics = await buildAdvancedAnalytics(req, startDate, endDate, groupBy);
+        });
+    }
+
     return result;
 }
 
@@ -1401,7 +1411,8 @@ const SAVED_REPORT_SECTION_IDS = new Set([
     'discounts',
     'refunds',
     'paymentMethods',
-    'customerSales'
+    'customerSales',
+    'advancedAnalytics'
 ]);
 
 function normalizeSavedReportSections(sections, fallback = ['overview']) {
@@ -1663,6 +1674,25 @@ exports.getPaymentMethodsReport = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate payment methods report',
+            error: error.message
+        });
+    }
+};
+
+exports.getAdvancedAnalytics = async (req, res) => {
+    try {
+        const { startDate, endDate, groupBy } = req.query;
+        const report = await buildAdvancedAnalytics(req, startDate, endDate, groupBy);
+
+        res.json({
+            success: true,
+            data: report
+        });
+    } catch (error) {
+        console.error('Get advanced analytics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate advanced analytics',
             error: error.message
         });
     }

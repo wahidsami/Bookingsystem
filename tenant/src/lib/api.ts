@@ -2013,6 +2013,15 @@ class TenantApiClient {
     return this.get(`/tenant/reports/payment-methods${query ? `?${query}` : ''}`);
   }
 
+  async getAdvancedAnalytics(params?: { startDate?: string; endDate?: string; groupBy?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.groupBy) queryParams.append('groupBy', params.groupBy);
+    const query = queryParams.toString();
+    return this.get(`/tenant/reports/advanced-analytics${query ? `?${query}` : ''}`);
+  }
+
   async analyzeConsultantSnapshot(data: { snapshotId?: string; snapshot?: Record<string, any> }): Promise<any> {
     return this.post('/tenant/ai/consultant/analyze', data);
   }

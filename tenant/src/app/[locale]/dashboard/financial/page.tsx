@@ -380,6 +380,7 @@ export default function FinancialPage() {
   const [previousCustomerAnalytics, setPreviousCustomerAnalytics] = useState<CustomerAnalytics | null>(null);
   const [posClosingSummary, setPosClosingSummary] = useState<PosClosingSummary | null>(null);
   const [previousPosClosingSummary, setPreviousPosClosingSummary] = useState<PosClosingSummary | null>(null);
+  const [advancedAnalytics, setAdvancedAnalytics] = useState<any>(null);
   const [detailDrawer, setDetailDrawer] = useState<DrilldownState | null>(null);
 
   const [startDate, setStartDate] = useState(() => formatDateInput(-29));
@@ -463,6 +464,9 @@ export default function FinancialPage() {
       retentionRate
     ]
   );
+  const advancedOperationalAlerts = Array.isArray(advancedAnalytics?.operationalAlerts?.alerts)
+    ? advancedAnalytics.operationalAlerts.alerts
+    : [];
 
   const loadData = async () => {
     setLoading(true);
@@ -470,7 +474,7 @@ export default function FinancialPage() {
     try {
       const params = { startDate, endDate };
       const previousParams = getPreviousDateRange(startDate, endDate);
-      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes, customerSalesRes, previousOverviewRes, previousLandingRes, previousCustomerRes] = await Promise.allSettled([
+      const [overviewRes, landingRes, employeesRes, servicesRes, productsRes, dailyRes, customerRes, customerSalesRes, advancedRes, previousOverviewRes, previousLandingRes, previousCustomerRes] = await Promise.allSettled([
         tenantApi.getFinancialOverview(params),
         tenantApi.getFinancialLandingSummary(params),
         tenantApi.getEmployeeRevenue(params),
@@ -479,6 +483,7 @@ export default function FinancialPage() {
         tenantApi.getDailyRevenue(params),
         tenantApi.getCustomerAnalytics(params),
         tenantApi.getFullReport({ startDate, endDate, sections: ["customerSales"] }),
+        tenantApi.getAdvancedAnalytics(params),
         tenantApi.getFinancialOverview(previousParams),
         tenantApi.getFinancialLandingSummary(previousParams),
         tenantApi.getCustomerAnalytics(previousParams)
@@ -558,6 +563,12 @@ export default function FinancialPage() {
         setCustomerSalesReport(Array.isArray(reportData.customerSales) ? reportData.customerSales : []);
       } else {
         setCustomerSalesReport([]);
+      }
+
+      if (advancedRes.status === "fulfilled" && advancedRes.value.success) {
+        setAdvancedAnalytics(advancedRes.value.data || null);
+      } else {
+        setAdvancedAnalytics(null);
       }
 
       if (previousCustomerRes.status === "fulfilled" && previousCustomerRes.value.success) {
@@ -2033,6 +2044,31 @@ export default function FinancialPage() {
                     />
                   )}
                 </FinanceSectionCard>
+
+                {advancedOperationalAlerts.length ? (
+                  <FinanceSectionCard
+                    title={locale === "ar" ? "تنبيهات التحليلات المتقدمة" : "Advanced analytics alerts"}
+                    subtitle={locale === "ar" ? "تنبيهات مستخرجة من التحليلات المقارنة وأنماط السلوك." : "Signals derived from comparative analytics and behavioral patterns."}
+                  >
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {advancedOperationalAlerts.slice(0, 6).map((alert: any, index: number) => (
+                        <div
+                          key={`${alert.id || alert.title || index}`}
+                          className={`rounded-2xl border p-4 ${
+                            alert.severity === "high"
+                              ? "border-rose-200 bg-rose-50"
+                              : alert.severity === "medium"
+                                ? "border-amber-200 bg-amber-50"
+                                : "border-sky-200 bg-sky-50"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-gray-900">{alert.title || alert.name}</p>
+                          <p className="mt-2 text-sm text-gray-600">{alert.description || alert.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </FinanceSectionCard>
+                ) : null}
               </div>
             ) : null}
           </div>

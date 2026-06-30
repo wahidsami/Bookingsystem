@@ -41,7 +41,8 @@ type ReportSectionId =
   | "discounts"
   | "refunds"
   | "paymentMethods"
-  | "customerSales";
+  | "customerSales"
+  | "advancedAnalytics";
 
 function safeNumber(value: unknown) {
   const parsed = Number(value);
@@ -88,6 +89,8 @@ function getReportSectionLabel(sectionId: ReportSectionId, locale: string) {
       return locale === "ar" ? "طرق الدفع" : "Payment methods";
     case "customerSales":
       return locale === "ar" ? "مبيعات العملاء" : "Customer sales";
+    case "advancedAnalytics":
+      return locale === "ar" ? "التحليلات المتقدمة" : "Advanced analytics";
     case "overview":
     default:
       return locale === "ar" ? "نظرة عامة" : "Overview";
@@ -223,6 +226,8 @@ function getPreviewSectionsForReportSection(sectionId: ReportSectionId) {
       return ["paymentMethods"];
     case "customerSales":
       return ["customerSales"];
+    case "advancedAnalytics":
+      return ["advancedAnalytics"];
     case "overview":
     default:
       return ["overview"];
@@ -269,6 +274,7 @@ export default function ReportsPage() {
   const [refundsReport, setRefundsReport] = useState<any>(null);
   const [paymentMethodsReport, setPaymentMethodsReport] = useState<any>(null);
   const [customerSalesReport, setCustomerSalesReport] = useState<any[]>([]);
+  const [advancedAnalytics, setAdvancedAnalytics] = useState<any>(null);
   const [savedReports, setSavedReports] = useState<any[]>([]);
   const [detailDrawer, setDetailDrawer] = useState<DrilldownState | null>(null);
   const [savedReportsLoading, setSavedReportsLoading] = useState(false);
@@ -295,7 +301,8 @@ export default function ReportsPage() {
         { id: "discounts", label: locale === "ar" ? "الخصومات" : "Discounts report" },
         { id: "refunds", label: locale === "ar" ? "الاستردادات" : "Refunds report" },
         { id: "paymentMethods", label: locale === "ar" ? "طرق الدفع" : "Payment methods" },
-        { id: "customerSales", label: locale === "ar" ? "مبيعات العملاء" : "Customer sales" }
+        { id: "customerSales", label: locale === "ar" ? "مبيعات العملاء" : "Customer sales" },
+        { id: "advancedAnalytics", label: locale === "ar" ? "التحليلات المتقدمة" : "Advanced analytics" }
       ]
     }
   ];
@@ -305,7 +312,7 @@ export default function ReportsPage() {
     setError("");
     try {
       const params = { startDate, endDate };
-      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, rebookingRes, refundsRes, paymentMethodsRes, posRes, customerSalesRes] = await Promise.allSettled([
+      const [summaryRes, financialRes, trendsRes, servicesRes, employeesRes, productsRes, peakRes, customerRes, rebookingRes, refundsRes, paymentMethodsRes, posRes, customerSalesRes, advancedRes] = await Promise.allSettled([
         tenantApi.getReportsSummary(params),
         tenantApi.getFinancialOverview(params),
         tenantApi.getBookingTrends({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
@@ -318,7 +325,8 @@ export default function ReportsPage() {
         tenantApi.getRefundsReport(params),
         tenantApi.getPaymentMethodsReport({ ...params, groupBy: dateRange === "year" ? "month" : "day" }),
         tenantApi.getPosClosingSummary({ date: endDate }),
-        tenantApi.getFullReport({ startDate, endDate, sections: ["customerSales"] })
+        tenantApi.getFullReport({ startDate, endDate, sections: ["customerSales"] }),
+        tenantApi.getAdvancedAnalytics({ ...params, groupBy: dateRange === "year" ? "month" : "day" })
       ]);
 
       const failedSections: string[] = [];
@@ -428,6 +436,13 @@ export default function ReportsPage() {
       } else {
         setCustomerSalesReport([]);
         failedSections.push(locale === "ar" ? "مبيعات العملاء" : "customer sales");
+      }
+
+      if (advancedRes.status === "fulfilled" && advancedRes.value.success) {
+        setAdvancedAnalytics(advancedRes.value.data || null);
+      } else {
+        setAdvancedAnalytics(null);
+        failedSections.push(locale === "ar" ? "التحليلات المتقدمة" : "advanced analytics");
       }
 
       if (failedSections.length > 0) {
@@ -564,6 +579,8 @@ export default function ReportsPage() {
         return locale === "ar" ? "طرق الدفع" : "Payment methods";
       case "customerSales":
         return locale === "ar" ? "مبيعات العملاء" : "Customer sales";
+      case "advancedAnalytics":
+        return locale === "ar" ? "التحليلات المتقدمة" : "Advanced analytics";
       case "overview":
       default:
         return locale === "ar" ? "النظرة العامة" : "Overview";
@@ -586,11 +603,13 @@ export default function ReportsPage() {
     customerAnalytics,
     customerSales: customerSalesRows,
     rebookings: rebookingAnalytics,
-    posClosingSummary
+    posClosingSummary,
+    advancedAnalytics
   }), [
     bookingTrends,
     customerAnalytics,
     customerSalesRows,
+    advancedAnalytics,
     employeePerformance,
     financialOverview,
     paymentMethodsReport,
@@ -1098,8 +1117,9 @@ export default function ReportsPage() {
                           "products",
                           "discounts",
                           "refunds",
-                          "paymentMethods",
-                          "customerSales"
+                        "paymentMethods",
+                          "customerSales",
+                          "advancedAnalytics"
                         ].map((section) => (
                           <option key={section} value={section}>
                             {getReportSectionLabel(section as ReportSectionId, locale)}
@@ -1900,6 +1920,202 @@ export default function ReportsPage() {
               />
             )}
           </FinanceSectionCard>
+        );
+
+      case "advancedAnalytics":
+        return (
+          <div className="space-y-5">
+            <FinanceSectionCard
+              title={locale === "ar" ? "التحليلات المتقدمة" : "Advanced analytics"}
+              subtitle={locale === "ar"
+                ? "مقارنات الفترات، اتجاهات الدفع والاسترداد، cohorts العملاء، والتنبيهات التشغيلية."
+                : "Period comparisons, payment and refund trends, customer cohorts, and operational alerts."
+              }
+            >
+              {advancedAnalytics ? (
+                <div className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <FinanceMetricCard label={locale === "ar" ? "الإيراد الحالي" : "Current revenue"} value={formatMoney(advancedAnalytics.comparativeAnalytics?.current?.revenue)} tone="green" />
+                    <FinanceMetricCard label={locale === "ar" ? "الحجوزات الحالية" : "Current bookings"} value={safeNumber(advancedAnalytics.comparativeAnalytics?.current?.bookings)} tone="blue" />
+                    <FinanceMetricCard label={locale === "ar" ? "الاستردادات" : "Refunds"} value={formatMoney(advancedAnalytics.comparativeAnalytics?.current?.refunds)} tone="rose" />
+                    <FinanceMetricCard label={locale === "ar" ? "العملاء" : "Customers"} value={safeNumber(advancedAnalytics.comparativeAnalytics?.current?.customers)} tone="purple" />
+                    <FinanceMetricCard label={locale === "ar" ? "معدل الإكمال" : "Completion rate"} value={formatPercent(advancedAnalytics.comparativeAnalytics?.current?.completionRate)} tone="amber" />
+                  </div>
+
+                  <div className="grid gap-5 xl:grid-cols-2">
+                    <FinanceSectionCard title={locale === "ar" ? "مقارنة الفترات" : "Comparative analytics"}>
+                      <SectionTable
+                        rtl={isRTL}
+                        headers={[
+                          locale === "ar" ? "المقياس" : "Metric",
+                          locale === "ar" ? "مقارنة الفترة السابقة" : "Previous period",
+                          locale === "ar" ? "مقارنة العام الماضي" : "Previous year",
+                          locale === "ar" ? "شهر مقابل شهر" : "MoM",
+                          locale === "ar" ? "سنة مقابل سنة" : "YoY"
+                        ]}
+                        rows={[
+                          ["Revenue", "revenue", "revenue", "revenue", "revenue"],
+                          ["Bookings", "bookings", "bookings", "bookings", "bookings"],
+                          ["Refunds", "refunds", "refunds", "refunds", "refunds"],
+                          ["Customers", "customers", "customers", "customers", "customers"],
+                          ["Completion rate", "completionRate", "completionRate", "completionRate", "completionRate"]
+                        ].map(([label, key]) => {
+                          const comparisons = advancedAnalytics.comparativeAnalytics?.comparisons || {};
+                          const current = advancedAnalytics.comparativeAnalytics?.current || {};
+                          return [
+                            label,
+                            formatPercent(comparisons.previousPeriod?.[key]?.percentChange ?? 0),
+                            formatPercent(comparisons.previousYear?.[key]?.percentChange ?? 0),
+                            formatPercent(comparisons.monthOverMonth?.[key]?.percentChange ?? 0),
+                            formatPercent(comparisons.yearOverYear?.[key]?.percentChange ?? 0)
+                          ];
+                        })}
+                      />
+                    </FinanceSectionCard>
+
+                    <FinanceSectionCard title={locale === "ar" ? "تنبيهات تشغيلية" : "Operational alerts"}>
+                      <div className="space-y-3">
+                        {(advancedAnalytics.operationalAlerts?.alerts || []).map((alert: any, index: number) => (
+                          <div key={`${alert.type || 'alert'}-${index}`} className={`rounded-3xl border p-4 ${
+                            alert.severity === 'high'
+                              ? 'border-rose-200 bg-rose-50'
+                              : alert.severity === 'medium'
+                                ? 'border-amber-200 bg-amber-50'
+                                : 'border-emerald-200 bg-emerald-50'
+                          }`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                                <p className="mt-1 text-sm text-gray-600">{alert.detail}</p>
+                              </div>
+                              {alert.deepLink ? (
+                                <Link href={alert.deepLink} className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">
+                                  {locale === "ar" ? "فتح" : "Open"}
+                                </Link>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </FinanceSectionCard>
+                  </div>
+
+                  <div className="grid gap-5 xl:grid-cols-2">
+                    <FinanceSectionCard title={locale === "ar" ? "اتجاهات طرق الدفع" : "Payment method trends"}>
+                      <TrendSparkline
+                        values={(advancedAnalytics.paymentMethodTrends?.trends || []).map((item: any) => safeNumber(item.revenue))}
+                        color="#0ea5e9"
+                        height={110}
+                      />
+                      <div className="mt-4 space-y-2">
+                        {(advancedAnalytics.paymentMethodTrends?.trends || []).slice(0, 6).map((item: any, index: number) => (
+                          <div key={`${item.date || 'trend'}-${index}`} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                            <span className="font-medium text-gray-700">{item.paymentMethodLabel} · {item.date}</span>
+                            <span className="text-gray-900">{formatMoney(item.revenue)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </FinanceSectionCard>
+
+                    <FinanceSectionCard title={locale === "ar" ? "اتجاهات الاسترداد" : "Refund trends"}>
+                      <TrendSparkline
+                        values={(advancedAnalytics.refundTrends?.trends || []).map((item: any) => safeNumber(item.refundAmount))}
+                        color="#f43f5e"
+                        height={110}
+                      />
+                      <div className="mt-4 space-y-2">
+                        {(advancedAnalytics.refundTrends?.trends || []).slice(0, 6).map((item: any, index: number) => (
+                          <div key={`${item.date || 'refund'}-${index}`} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                            <span className="font-medium text-gray-700">{item.date}</span>
+                            <span className="text-gray-900">{formatMoney(item.refundAmount)} · {formatPercent(item.refundRate)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </FinanceSectionCard>
+                  </div>
+
+                  <div className="grid gap-5 xl:grid-cols-2">
+                    <FinanceSectionCard title={locale === "ar" ? "Customers cohorts" : "Customer cohorts"}>
+                      <SectionTable
+                        rtl={isRTL}
+                        headers={[
+                          locale === "ar" ? "الفئة" : "Cohort",
+                          locale === "ar" ? "العدد" : "Count",
+                          locale === "ar" ? "النسبة" : "Share"
+                        ]}
+                        rows={(advancedAnalytics.customerCohorts?.rows || []).map((row: any) => [
+                          row.label,
+                          safeNumber(row.count),
+                          formatPercent(row.share)
+                        ])}
+                      />
+                    </FinanceSectionCard>
+
+                    <FinanceSectionCard title={locale === "ar" ? "مقارنات الفروع" : "Branch comparisons"}>
+                      <SectionTable
+                        rtl={isRTL}
+                        headers={[
+                          locale === "ar" ? "الفرع" : "Branch",
+                          locale === "ar" ? "الإيراد" : "Revenue",
+                          locale === "ar" ? "الحجوزات" : "Bookings",
+                          locale === "ar" ? "الإكمال" : "Completion"
+                        ]}
+                        rows={(advancedAnalytics.multiLocationComparisons?.locations || []).map((location: any) => [
+                          location.name || "-",
+                          formatMoney(location.revenue),
+                          safeNumber(location.bookings),
+                          formatPercent(location.completionRate)
+                        ])}
+                      />
+                      {!advancedAnalytics.multiLocationComparisons?.datasetAvailable ? (
+                        <p className="mt-3 text-xs text-gray-500">
+                          {locale === "ar"
+                            ? "لا يوجد مخطط فروع فعلي في البيانات الحالية، لذلك يظهر الفرع الرئيسي كبديل."
+                            : "No branch dataset exists in the current schema, so the primary branch is shown as a fallback."}
+                        </p>
+                      ) : null}
+                    </FinanceSectionCard>
+                  </div>
+
+                  <FinanceSectionCard title={locale === "ar" ? "أعلى إعادة حجز" : "Rebooking highlights"}>
+                    <div className="grid gap-5 xl:grid-cols-2">
+                      <SectionTable
+                        rtl={isRTL}
+                        headers={[
+                          locale === "ar" ? "الموظف" : "Employee",
+                          locale === "ar" ? "إعادة الحجز" : "Rebooked",
+                          locale === "ar" ? "الإيراد" : "Revenue"
+                        ]}
+                        rows={(advancedAnalytics.rebookingAnalytics?.topRebookingEmployees || []).slice(0, 5).map((row: any) => [
+                          row.name,
+                          safeNumber(row.totalRebookings),
+                          formatMoney(row.rebookedRevenue)
+                        ])}
+                      />
+                      <SectionTable
+                        rtl={isRTL}
+                        headers={[
+                          locale === "ar" ? "الخدمة" : "Service",
+                          locale === "ar" ? "إعادة الحجز" : "Rebooked",
+                          locale === "ar" ? "الإيراد" : "Revenue"
+                        ]}
+                        rows={(advancedAnalytics.rebookingAnalytics?.topRebookedServices || []).slice(0, 5).map((row: any) => [
+                          row.name_en || row.name_ar || row.name || "-",
+                          safeNumber(row.totalRebookings),
+                          formatMoney(row.rebookedRevenue)
+                        ])}
+                      />
+                    </div>
+                  </FinanceSectionCard>
+                </div>
+              ) : (
+                <FinanceEmptyState
+                  title={locale === "ar" ? "لا توجد تحليلات متقدمة" : "No advanced analytics"}
+                  description={locale === "ar" ? "تعذر تحميل التحليلات المتقدمة لهذا النطاق." : "Advanced analytics could not be loaded for this range."}
+                />
+              )}
+            </FinanceSectionCard>
+          </div>
         );
 
       default:

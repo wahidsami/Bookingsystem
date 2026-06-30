@@ -678,8 +678,154 @@ export function buildReportExportTables(params: {
         numberRow(item.completed),
         numberRow(item.revenue),
         item.lastVisit ?? ''
-      ])
+      ])  
     });
+  }
+
+  if (include('advancedAnalytics') && data.advancedAnalytics) {
+    const advanced = data.advancedAnalytics;
+    const comparative = advanced.comparativeAnalytics || {};
+    const current = comparative.current || {};
+    const comparisons = comparative.comparisons || {};
+    const paymentTrends = Array.isArray(advanced.paymentMethodTrends?.trends) ? advanced.paymentMethodTrends.trends : [];
+    const refundTrends = Array.isArray(advanced.refundTrends?.trends) ? advanced.refundTrends.trends : [];
+    const cohortRows = Array.isArray(advanced.customerCohorts?.rows) ? advanced.customerCohorts.rows : [];
+    const branchRows = Array.isArray(advanced.multiLocationComparisons?.locations) ? advanced.multiLocationComparisons.locations : [];
+    const employeeRows = Array.isArray(advanced.rebookingAnalytics?.topRebookingEmployees) ? advanced.rebookingAnalytics.topRebookingEmployees : [];
+    const serviceRows = Array.isArray(advanced.rebookingAnalytics?.topRebookedServices) ? advanced.rebookingAnalytics.topRebookedServices : [];
+
+    tables.push({
+      title: localizedLabel(locale, 'Advanced analytics summary', 'ملخص التحليلات المتقدمة'),
+      columns: [
+        localizedLabel(locale, 'Metric', 'المؤشر'),
+        localizedLabel(locale, 'Current', 'الحالي'),
+        localizedLabel(locale, 'Previous period', 'الفترة السابقة'),
+        localizedLabel(locale, 'Previous year', 'العام السابق')
+      ],
+      rows: [
+        [localizedLabel(locale, 'Revenue', 'الإيراد'), numberRow(current.revenue), numberRow(comparisons.previousPeriod?.revenue?.value), numberRow(comparisons.previousYear?.revenue?.value)],
+        [localizedLabel(locale, 'Bookings', 'الحجوزات'), numberRow(current.bookings), numberRow(comparisons.previousPeriod?.bookings?.value), numberRow(comparisons.previousYear?.bookings?.value)],
+        [localizedLabel(locale, 'Refunds', 'الاستردادات'), numberRow(current.refunds), numberRow(comparisons.previousPeriod?.refunds?.value), numberRow(comparisons.previousYear?.refunds?.value)],
+        [localizedLabel(locale, 'Customers', 'العملاء'), numberRow(current.customers), numberRow(comparisons.previousPeriod?.customers?.value), numberRow(comparisons.previousYear?.customers?.value)],
+        [localizedLabel(locale, 'Completion rate', 'معدل الإكمال'), numberRow(current.completionRate), numberRow(comparisons.previousPeriod?.completionRate?.value), numberRow(comparisons.previousYear?.completionRate?.value)]
+      ]
+    });
+
+    if (advanced.operationalAlerts?.alerts?.length) {
+      tables.push({
+        title: localizedLabel(locale, 'Operational alerts', 'التنبيهات التشغيلية'),
+        columns: [
+          localizedLabel(locale, 'Severity', 'الأولوية'),
+          localizedLabel(locale, 'Title', 'العنوان'),
+          localizedLabel(locale, 'Detail', 'التفاصيل'),
+          localizedLabel(locale, 'Module', 'الوحدة')
+        ],
+        rows: advanced.operationalAlerts.alerts.map((alert: any) => [
+          alert.severity ?? '',
+          alert.title ?? '',
+          alert.description ?? alert.detail ?? '',
+          alert.module ?? ''
+        ])
+      });
+    }
+
+    if (paymentTrends.length) {
+      tables.push({
+        title: localizedLabel(locale, 'Payment method trends', 'اتجاهات طرق الدفع'),
+        columns: [
+          localizedLabel(locale, 'Date', 'التاريخ'),
+          localizedLabel(locale, 'Method', 'الطريقة'),
+          localizedLabel(locale, 'Revenue', 'الإيراد'),
+          localizedLabel(locale, 'Count', 'العدد')
+        ],
+        rows: paymentTrends.map((item: any) => [
+          item.date ?? '',
+          item.paymentMethodLabel ?? item.paymentMethod ?? '',
+          numberRow(item.revenue),
+          numberRow(item.count ?? item.transactionCount)
+        ])
+      });
+    }
+
+    if (refundTrends.length) {
+      tables.push({
+        title: localizedLabel(locale, 'Refund trends', 'اتجاهات الاستردادات'),
+        columns: [
+          localizedLabel(locale, 'Date', 'التاريخ'),
+          localizedLabel(locale, 'Amount', 'المبلغ'),
+          localizedLabel(locale, 'Count', 'العدد'),
+          localizedLabel(locale, 'Rate %', 'النسبة %')
+        ],
+        rows: refundTrends.map((item: any) => [
+          item.date ?? '',
+          numberRow(item.refundAmount),
+          numberRow(item.refundCount),
+          numberRow(item.refundRate)
+        ])
+      });
+    }
+
+    if (cohortRows.length) {
+      tables.push({
+        title: localizedLabel(locale, 'Customer cohorts', 'شرائح العملاء'),
+        columns: [
+          localizedLabel(locale, 'Segment', 'الشريحة'),
+          localizedLabel(locale, 'Customers', 'العملاء'),
+          localizedLabel(locale, 'Revenue', 'الإيراد'),
+          localizedLabel(locale, 'Share %', 'النسبة %')
+        ],
+        rows: cohortRows.map((row: any) => [
+          row.segment ?? row.name ?? '',
+          numberRow(row.customers),
+          numberRow(row.revenue),
+          numberRow(row.share)
+        ])
+      });
+    }
+
+    if (branchRows.length) {
+      tables.push({
+        title: localizedLabel(locale, 'Multi-location comparison', 'مقارنة الفروع'),
+        columns: [
+          localizedLabel(locale, 'Branch', 'الفرع'),
+          localizedLabel(locale, 'Revenue', 'الإيراد'),
+          localizedLabel(locale, 'Bookings', 'الحجوزات'),
+          localizedLabel(locale, 'Rank', 'الترتيب')
+        ],
+        rows: branchRows.map((row: any) => [
+          row.locationName ?? row.branchName ?? row.name ?? '',
+          numberRow(row.revenue),
+          numberRow(row.bookings),
+          numberRow(row.rank)
+        ])
+      });
+    }
+
+    if (employeeRows.length || serviceRows.length) {
+      tables.push({
+        title: localizedLabel(locale, 'Rebooking analytics', 'تحليلات إعادة الحجز'),
+        columns: [
+          localizedLabel(locale, 'Type', 'النوع'),
+          localizedLabel(locale, 'Name', 'الاسم'),
+          localizedLabel(locale, 'Rebooked revenue', 'إيراد إعادة الحجز'),
+          localizedLabel(locale, 'Rebooking rate %', 'معدل إعادة الحجز %')
+        ],
+        rows: [
+          ...employeeRows.map((row: any) => [
+            localizedLabel(locale, 'Employee', 'موظف'),
+            row.employeeName ?? row.name ?? '',
+            numberRow(row.rebookedRevenue),
+            numberRow(row.rebookingRate)
+          ]),
+          ...serviceRows.map((row: any) => [
+            localizedLabel(locale, 'Service', 'خدمة'),
+            row.serviceName ?? row.name ?? '',
+            numberRow(row.rebookedRevenue),
+            numberRow(row.rebookingRate)
+          ])
+        ]
+      });
+    }
   }
 
   if (include('peakHours') && data.peakHours) {

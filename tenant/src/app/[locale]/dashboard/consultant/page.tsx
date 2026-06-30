@@ -396,6 +396,17 @@ function toLocalDateLabel(value: string, locale: string) {
   }).format(date);
 }
 
+function getConsultantAnalyticsRange() {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 29);
+
+  return {
+    startDate: startDate.toISOString().split("T")[0],
+    endDate: endDate.toISOString().split("T")[0]
+  };
+}
+
 function formatNumber(value: number, locale: string) {
   return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US", {
     maximumFractionDigits: 1
@@ -932,6 +943,7 @@ export default function ConsultantPage() {
     addressingStyle: "neutral_professional"
   });
   const [loadedSettings, setLoadedSettings] = useState<LoadedConsultantSettings | null>(null);
+  const [advancedAnalytics, setAdvancedAnalytics] = useState<any>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -990,9 +1002,10 @@ export default function ConsultantPage() {
           });
         }
 
-        const [reportsResponse, briefingsResponse] = await Promise.all([
+        const [reportsResponse, briefingsResponse, analyticsResponse] = await Promise.all([
           tenantApi.getConsultantReports({ page: 1, limit: 12 }),
-          tenantApi.getConsultantBriefings({ page: 1, limit: 12 })
+          tenantApi.getConsultantBriefings({ page: 1, limit: 12 }),
+          tenantApi.getAdvancedAnalytics(getConsultantAnalyticsRange()).catch(() => null)
         ]);
 
         const toHistoryItem = (row: any, kind: ConsultantHistoryKind): ConsultantHistoryItem | null => {
@@ -1040,9 +1053,11 @@ export default function ConsultantPage() {
 
         setHistory(merged);
         setSelectedHistoryId((current) => (current && merged.some((item) => item.id === current) ? current : merged[0]?.id || null));
+        setAdvancedAnalytics(analyticsResponse?.success ? analyticsResponse.data || null : null);
       } catch (loadError: any) {
         console.error("Failed to load consultant workspace:", loadError);
         setError(loadError?.message || (locale === "ar" ? "تعذر تحميل السجل." : "Failed to load consultant workspace."));
+        setAdvancedAnalytics(null);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -1544,6 +1559,38 @@ export default function ConsultantPage() {
                   </section>
 
                   <ReportsArchive items={history} locale={locale} onOpen={openHistoryItem} />
+
+                  {Array.isArray(advancedAnalytics?.operationalAlerts?.alerts) && advancedAnalytics.operationalAlerts.alerts.length ? (
+                    <section className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                            {locale === "ar" ? "تنبيهات تشغيلية" : "Operational alerts"}
+                          </p>
+                          <h3 className="mt-1 text-lg font-bold text-gray-900">
+                            {locale === "ar" ? "إشارات من التحليلات المتقدمة" : "Signals from advanced analytics"}
+                          </h3>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {advancedAnalytics.operationalAlerts.alerts.slice(0, 6).map((alert: any, index: number) => (
+                          <div
+                            key={`${alert.id || alert.title || index}`}
+                            className={`rounded-3xl border p-4 ${
+                              alert.severity === "high"
+                                ? "border-rose-200 bg-rose-50"
+                                : alert.severity === "medium"
+                                  ? "border-amber-200 bg-amber-50"
+                                  : "border-slate-200 bg-slate-50"
+                            }`}
+                          >
+                            <div className="text-sm font-semibold text-gray-900">{alert.title || alert.name}</div>
+                            <div className="mt-1 text-sm text-gray-600">{alert.description || alert.detail}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
                 </div>
               ) : (
                 <section className="space-y-5">

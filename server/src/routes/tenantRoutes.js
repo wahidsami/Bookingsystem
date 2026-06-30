@@ -268,6 +268,7 @@ router.get('/reports/customer-analytics', checkTenantFeature('reports'), tenantR
 router.get('/reports/rebookings', checkTenantFeature('reports'), tenantReportsController.getRebookingAnalytics);
 router.get('/reports/refunds', checkTenantFeature('reports'), tenantReportsController.getRefundsReport);
 router.get('/reports/payment-methods', checkTenantFeature('reports'), tenantReportsController.getPaymentMethodsReport);
+router.get('/reports/advanced-analytics', checkTenantFeature('reports'), tenantReportsController.getAdvancedAnalytics);
 
 // Public Page Data
 router.get('/public-page', checkTenantFeature('publicPageCustomization'), tenantPublicPageController.getPublicPageData);
