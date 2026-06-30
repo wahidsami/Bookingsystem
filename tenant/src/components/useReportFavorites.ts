@@ -27,7 +27,7 @@ export function useReportFavorite(userKey: string | null | undefined, reportKey:
   }, [reportKey, userKey]);
 
   const [hydrated, setHydrated] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(() => loadFavoriteValue(storageKey, false));
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     setIsFavorite(loadFavoriteValue(storageKey, false));

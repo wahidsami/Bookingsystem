@@ -39,37 +39,37 @@ export const REPORT_DATE_PRESETS: ReportDatePresetDefinition[] = [
 ];
 
 function cloneDate(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 }
 
 function formatLocalDate(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function addDays(value: Date, amount: number) {
   const next = cloneDate(value);
-  next.setDate(next.getDate() + amount);
+  next.setUTCDate(next.getUTCDate() + amount);
   return next;
 }
 
 function startOfCurrentWeek(value: Date) {
-  const dayIndex = (value.getDay() + 6) % 7;
+  const dayIndex = (value.getUTCDay() + 6) % 7;
   return addDays(cloneDate(value), -dayIndex);
 }
 
 function startOfMonth(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), 1);
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
 }
 
 function endOfMonth(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth() + 1, 0);
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0));
 }
 
 function startOfMonthOffset(value: Date, offsetMonths: number) {
-  return new Date(value.getFullYear(), value.getMonth() + offsetMonths, 1);
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + offsetMonths, 1));
 }
 
 function normalizeRange(startDate: Date, endDate: Date): ReportDateRange {
