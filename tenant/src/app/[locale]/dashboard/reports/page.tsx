@@ -1388,6 +1388,26 @@ export default function ReportsPage() {
                 />
               )}
             </FinanceSectionCard>
+
+            <FinanceSectionCard
+              title={locale === "ar" ? "مركز المالية" : "Financial hub"}
+              subtitle={locale === "ar" ? "افتح مساحات المالية الجديدة." : "Open the new financial workspaces."}
+            >
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/${locale}/dashboard/reports/financial`} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                  {locale === "ar" ? "مركز المالية" : "Financial hub"}
+                </Link>
+                <Link href={`/${locale}/dashboard/reports/financial/summary`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                  {locale === "ar" ? "ملخص المالية" : "Finance summary"}
+                </Link>
+                <Link href={`/${locale}/dashboard/reports/financial/payment-transactions`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                  {locale === "ar" ? "معاملات الدفع" : "Payment transactions"}
+                </Link>
+                <Link href={`/${locale}/dashboard/reports/financial/cash-flow`} className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                  {locale === "ar" ? "التدفق النقدي" : "Cash flow summary"}
+                </Link>
+              </div>
+            </FinanceSectionCard>
           </div>
         );
 

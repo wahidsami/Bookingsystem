@@ -6,5 +6,7 @@ export * from "./ReportingStickyToolbar";
 export * from "./ReportFiltersDrawer";
 export * from "./SalesReportWorkspaceShell";
 export * from "./SalesReportFiltersPanel";
+export * from "./FinancialReportWorkspaceShell";
+export * from "./FinancialReportFiltersPanel";
 export * from "./useReportFavorites";
 export * from "./useReportingDateRange";
