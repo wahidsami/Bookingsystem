@@ -248,6 +248,7 @@ router.post('/settings/cover', settingsUpload.single('coverImage'), tenantSettin
 
 // Reports and analytics
 router.get('/reports/summary', checkTenantFeature('reports'), tenantReportsController.getDashboardSummary);
+router.get('/reports/builder/options', checkTenantFeature('reports'), tenantReportsController.getReportBuilderOptions);
 router.get('/reports/full', checkTenantFeature('reports'), tenantReportsController.getFullReport);
 router.get('/reports/pdf', checkTenantFeature('reports'), tenantReportsController.downloadReportPdf);
 router.get('/reports/saved', checkTenantFeature('reports'), tenantReportsController.getSavedReports);
@@ -255,6 +256,10 @@ router.get('/reports/saved/:id', checkTenantFeature('reports'), tenantReportsCon
 router.post('/reports/saved', checkTenantFeature('reports'), tenantReportsController.createSavedReport);
 router.put('/reports/saved/:id', checkTenantFeature('reports'), tenantReportsController.updateSavedReport);
 router.delete('/reports/saved/:id', checkTenantFeature('reports'), tenantReportsController.deleteSavedReport);
+router.post('/reports/saved/:id/run', checkTenantFeature('reports'), tenantReportsController.runSavedReport);
+router.get('/reports/saved/:id/preview', checkTenantFeature('reports'), tenantReportsController.previewSavedReport);
+router.post('/reports/saved/:id/deliver', checkTenantFeature('reports'), tenantReportsController.deliverSavedReport);
+router.get('/reports/saved/:id/history', checkTenantFeature('reports'), tenantReportsController.getSavedReportHistory);
 router.get('/reports/booking-trends', checkTenantFeature('reports'), tenantReportsController.getBookingTrends);
 router.get('/reports/service-performance', checkTenantFeature('reports'), tenantReportsController.getServicePerformance);
 router.get('/reports/employee-performance', checkTenantFeature('reports'), tenantReportsController.getEmployeePerformance);

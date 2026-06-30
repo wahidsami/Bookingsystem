@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { buildReportStorageKey } from "@/lib/reportConfiguration";
 
 function buildStorageKey(userKey: string, reportKey: string) {
-  return `rifah:reporting-v2:favorites:${userKey}:${reportKey}`;
+  return buildReportStorageKey(userKey, reportKey, "favorite");
 }
 
 function loadFavoriteValue(storageKey: string | null, fallback = false) {

@@ -13,6 +13,11 @@ const {
     sanitizeFileNamePart,
     safePlainClone
 } = require('../services/tenantReportPdfService');
+const {
+    deliverTenantSavedReport,
+    normalizeDeliveryChannels,
+    normalizeExportFormats
+} = require('../services/tenantReportDeliveryService');
 
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
@@ -113,6 +118,75 @@ function normalizePaymentMethodGroup(paymentMethod) {
     if (['gift_card_code'].includes(method)) return 'gift_card';
     if (method === 'split') return 'split';
     return 'other';
+}
+
+function normalizeScheduleConfig(scheduleConfig = {}) {
+    const cadence = `${scheduleConfig.cadence || 'daily'}`.trim().toLowerCase();
+    const normalizedCadence = cadence === 'weekly' || cadence === 'monthly' ? cadence : 'daily';
+    const deliveryChannels = normalizeDeliveryChannels(scheduleConfig);
+    const exportFormats = normalizeExportFormats(scheduleConfig);
+
+    return {
+        enabled: Boolean(scheduleConfig.enabled),
+        cadence: normalizedCadence,
+        timeOfDay: `${scheduleConfig.timeOfDay || '09:00'}`.trim() || '09:00',
+        dayOfWeek: Number.isInteger(scheduleConfig.dayOfWeek) ? scheduleConfig.dayOfWeek : null,
+        dayOfMonth: Number.isInteger(scheduleConfig.dayOfMonth) ? scheduleConfig.dayOfMonth : null,
+        recipients: Array.isArray(scheduleConfig.recipients) ? scheduleConfig.recipients.map((value) => `${value}`.trim()).filter(Boolean) : [],
+        deliveryChannels,
+        exportFormats,
+        customIntervalMinutes: Number.isFinite(Number.parseInt(scheduleConfig.customIntervalMinutes, 10))
+            ? Number.parseInt(scheduleConfig.customIntervalMinutes, 10)
+            : null
+    };
+}
+
+function calcNextRunAt(scheduleConfig = {}, fromDate = new Date()) {
+    if (!scheduleConfig.enabled) return null;
+
+    const cadence = `${scheduleConfig.cadence || 'daily'}`.toLowerCase();
+    const timeOfDay = `${scheduleConfig.timeOfDay || '09:00'}`;
+    const [hours, minutes] = timeOfDay.split(':').map((part) => parseInt(part, 10));
+    const next = new Date(fromDate);
+    next.setSeconds(0, 0);
+    next.setHours(Number.isFinite(hours) ? hours : 9, Number.isFinite(minutes) ? minutes : 0, 0, 0);
+
+    if (next <= fromDate) {
+        if (cadence === 'weekly') {
+            next.setDate(next.getDate() + 7);
+        } else if (cadence === 'monthly') {
+            next.setMonth(next.getMonth() + 1);
+        } else if (cadence === 'custom') {
+            const intervalMinutes = Number.parseInt(scheduleConfig.customIntervalMinutes, 10);
+            next.setTime(next.getTime() + (Number.isFinite(intervalMinutes) && intervalMinutes > 0 ? intervalMinutes : 1440) * 60000);
+        } else {
+            next.setDate(next.getDate() + 1);
+        }
+    }
+
+    if (cadence === 'weekly' && Number.isInteger(scheduleConfig.dayOfWeek)) {
+        while (next.getDay() !== scheduleConfig.dayOfWeek) {
+            next.setDate(next.getDate() + 1);
+        }
+    }
+
+    if (cadence === 'monthly' && Number.isInteger(scheduleConfig.dayOfMonth)) {
+        const safeDay = Math.min(Math.max(scheduleConfig.dayOfMonth, 1), 28);
+        next.setDate(safeDay);
+        if (next <= fromDate) {
+            next.setMonth(next.getMonth() + 1);
+            next.setDate(safeDay);
+        }
+    }
+
+    if (cadence === 'custom') {
+        const intervalMinutes = Number.parseInt(scheduleConfig.customIntervalMinutes, 10);
+        if (Number.isFinite(intervalMinutes) && intervalMinutes > 0) {
+            return new Date(fromDate.getTime() + intervalMinutes * 60000);
+        }
+    }
+
+    return next;
 }
 
 function getRefundModeLabel(amount, referenceAmount) {
@@ -1340,10 +1414,22 @@ function normalizeSavedReportSections(sections, fallback = ['overview']) {
 
 function buildSavedReportConfigFromBody(body = {}, fallback = {}) {
     const reportType = `${body.reportType || fallback.reportType || 'overview'}`.trim();
+    const datePreset = `${body.datePreset || body.reportConfig?.datePreset || fallback.datePreset || 'custom'}`.trim() || 'custom';
+    const startDate = `${body.startDate || body.reportConfig?.startDate || fallback.startDate || ''}`.trim();
+    const endDate = `${body.endDate || body.reportConfig?.endDate || fallback.endDate || ''}`.trim();
     const sections = normalizeSavedReportSections(body.sections || fallback.sections || []);
     const filters = body.filters && typeof body.filters === 'object' && !Array.isArray(body.filters)
         ? body.filters
         : fallback.filters || {};
+    const columns = Array.isArray(body.columns)
+        ? body.columns.map((column) => `${column}`.trim()).filter(Boolean)
+        : Array.isArray(fallback.columns)
+            ? fallback.columns.map((column) => `${column}`.trim()).filter(Boolean)
+            : Array.isArray(body.selectedMetrics)
+                ? body.selectedMetrics.map((metric) => `${metric}`.trim()).filter(Boolean)
+                : Array.isArray(fallback.selectedMetrics)
+                    ? fallback.selectedMetrics
+                    : [];
     const selectedMetrics = Array.isArray(body.selectedMetrics)
         ? body.selectedMetrics.map((metric) => `${metric}`.trim()).filter(Boolean)
         : Array.isArray(fallback.selectedMetrics)
@@ -1359,16 +1445,24 @@ function buildSavedReportConfigFromBody(body = {}, fallback = {}) {
 
     return {
         reportType,
+        datePreset,
+        startDate,
+        endDate,
         sections,
         filters,
+        columns,
         selectedMetrics,
         sorting,
         grouping,
         reportConfig: {
             ...reportConfig,
             reportType,
+            datePreset,
+            startDate,
+            endDate,
             sections,
             filters,
+            columns,
             selectedMetrics,
             sorting,
             grouping
@@ -1394,16 +1488,72 @@ function serializeSavedReport(savedReport) {
         description: savedReport.description,
         sections: Array.isArray(savedReport.sections) ? savedReport.sections : [],
         filters: savedReport.filters || {},
+        columns: Array.isArray(savedReport.columns) ? savedReport.columns : Array.isArray(savedReport.selectedMetrics) ? savedReport.selectedMetrics : [],
         selectedMetrics: Array.isArray(savedReport.selectedMetrics) ? savedReport.selectedMetrics : [],
         grouping: savedReport.grouping || null,
         sorting: savedReport.sorting || {},
         reportConfig: savedReport.reportConfig || {},
+        scheduleConfig: savedReport.scheduleConfig || {},
         isFavorite: Boolean(savedReport.isFavorite),
         duplicatedFromId: savedReport.duplicatedFromId || null,
         lastOpenedAt: savedReport.lastOpenedAt || null,
+        lastRunAt: savedReport.lastRunAt || null,
+        nextRunAt: savedReport.nextRunAt || null,
+        lastRunResult: savedReport.lastRunResult || {},
+        runHistory: Array.isArray(savedReport.runHistory) ? savedReport.runHistory : [],
         createdAt: savedReport.createdAt,
         updatedAt: savedReport.updatedAt
     };
+}
+
+function appendRunHistory(savedReport, preview, runType = 'manual', delivery = null) {
+    const history = Array.isArray(savedReport.runHistory) ? savedReport.runHistory : [];
+    history.unshift({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        runType,
+        ranAt: new Date().toISOString(),
+        rows: preview?.totals?.rows || 0,
+        recordCount: preview?.totals?.recordCount || 0,
+        summary: preview?.summary || {},
+        delivery: delivery || null
+    });
+    savedReport.runHistory = history.slice(0, 20);
+}
+
+async function runTenantSavedReport(savedReport, runType = 'manual', deliveryOptions = null) {
+    const config = savedReport.reportConfig || {};
+    const sections = Array.isArray(savedReport.sections) && savedReport.sections.length
+        ? savedReport.sections
+        : Array.isArray(config.sections) && config.sections.length
+            ? config.sections
+            : ['overview'];
+    const startDate = config.startDate || savedReport.filters?.startDate || null;
+    const endDate = config.endDate || savedReport.filters?.endDate || null;
+
+    const preview = await buildFullReportData({
+        tenantId: savedReport.tenantId,
+        userId: savedReport.createdByUserId,
+        query: { startDate, endDate },
+        tenant: null
+    }, sections, startDate, endDate);
+
+    const nextRunAt = savedReport.scheduleConfig?.enabled ? calcNextRunAt(savedReport.scheduleConfig, new Date()) : null;
+    let delivery = null;
+
+    if (deliveryOptions?.deliver) {
+        delivery = await deliverTenantSavedReport(savedReport, preview, deliveryOptions);
+    }
+
+    savedReport.lastRunAt = new Date();
+    savedReport.lastRunResult = {
+        ...safePlainClone(preview),
+        delivery
+    };
+    appendRunHistory(savedReport, preview, runType, delivery);
+    savedReport.nextRunAt = nextRunAt;
+    await savedReport.save();
+
+    return { preview, delivery };
 }
 
 async function findTenantSavedReport(tenantId, reportId) {
@@ -1518,6 +1668,42 @@ exports.getPaymentMethodsReport = async (req, res) => {
     }
 };
 
+exports.getReportBuilderOptions = async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            data: {
+                reportTypes: Array.from(SAVED_REPORT_SECTION_IDS).map((value) => ({ id: value, label: value })),
+                groupings: ['day', 'week', 'month', 'year', 'type', 'category', 'item', 'teamMember', 'customer'],
+                datePresets: ['today', 'yesterday', 'last_7_days', 'last_30_days', 'last_90_days', 'last_week', 'last_month', 'last_3_months', 'last_6_months', 'custom'],
+                scheduleCadences: ['daily', 'weekly', 'monthly'],
+                deliveryChannels: ['email', 'dashboard_inbox'],
+                exportFormats: ['csv', 'xlsx', 'pdf'],
+                datasets: [
+                    { id: 'sales', label: 'Sales' },
+                    { id: 'financial', label: 'Financial' },
+                    { id: 'appointments', label: 'Appointments' },
+                    { id: 'rebookings', label: 'Rebookings' },
+                    { id: 'employees', label: 'Employees' },
+                    { id: 'services', label: 'Services' },
+                    { id: 'products', label: 'Products' },
+                    { id: 'discounts', label: 'Discounts' },
+                    { id: 'refunds', label: 'Refunds' },
+                    { id: 'paymentMethods', label: 'Payment methods' },
+                    { id: 'customerSales', label: 'Customer sales' }
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Get report builder options error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load report builder options',
+            error: error.message
+        });
+    }
+};
+
 exports.getSavedReports = async (req, res) => {
     try {
         const savedReports = await db.TenantSavedReport.findAll({
@@ -1548,6 +1734,127 @@ exports.getSavedReports = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to load saved reports',
+            error: error.message
+        });
+    }
+};
+
+exports.runSavedReport = async (req, res) => {
+    try {
+        const savedReport = await findTenantSavedReport(req.tenantId, req.params.id);
+        if (!savedReport) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        const { preview } = await runTenantSavedReport(savedReport, 'manual');
+        res.json({
+            success: true,
+            data: {
+                report: serializeSavedReport(savedReport),
+                preview
+            }
+        });
+    } catch (error) {
+        console.error('Run saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to run saved report',
+            error: error.message
+        });
+    }
+};
+
+exports.previewSavedReport = async (req, res) => {
+    try {
+        const savedReport = await findTenantSavedReport(req.tenantId, req.params.id);
+        if (!savedReport) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        const sections = Array.isArray(savedReport.sections) && savedReport.sections.length
+            ? savedReport.sections
+            : ['overview'];
+        const startDate = savedReport.reportConfig?.startDate || savedReport.filters?.startDate || null;
+        const endDate = savedReport.reportConfig?.endDate || savedReport.filters?.endDate || null;
+        const preview = await buildFullReportData({
+            tenantId: req.tenantId,
+            userId: req.userId,
+            query: { startDate, endDate },
+            tenant: null
+        }, sections, startDate, endDate);
+
+        res.json({
+            success: true,
+            data: preview
+        });
+    } catch (error) {
+        console.error('Preview saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to preview saved report',
+            error: error.message
+        });
+    }
+};
+
+exports.deliverSavedReport = async (req, res) => {
+    try {
+        const savedReport = await findTenantSavedReport(req.tenantId, req.params.id);
+        if (!savedReport) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        const { preview, delivery } = await runTenantSavedReport(savedReport, 'manual_delivery', {
+            deliver: true,
+            recipientId: req.userId || savedReport.createdByUserId || null
+        });
+
+        res.json({
+            success: true,
+            data: {
+                report: serializeSavedReport(savedReport),
+                preview,
+                delivery
+            }
+        });
+    } catch (error) {
+        console.error('Deliver saved report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to deliver saved report',
+            error: error.message
+        });
+    }
+};
+
+exports.getSavedReportHistory = async (req, res) => {
+    try {
+        const savedReport = await findTenantSavedReport(req.tenantId, req.params.id);
+        if (!savedReport) {
+            return res.status(404).json({
+                success: false,
+                message: 'Saved report not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: Array.isArray(savedReport.runHistory) ? savedReport.runHistory : []
+        });
+    } catch (error) {
+        console.error('Get saved report history error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load saved report history',
             error: error.message
         });
     }
@@ -1598,10 +1905,12 @@ exports.createSavedReport = async (req, res) => {
                 description: source.description,
                 sections: source.sections,
                 filters: source.filters,
+                columns: source.columns,
                 selectedMetrics: source.selectedMetrics,
                 grouping: source.grouping,
                 sorting: source.sorting,
-                reportConfig: source.reportConfig
+                reportConfig: source.reportConfig,
+                scheduleConfig: source.scheduleConfig
             };
         }
 
@@ -1623,12 +1932,15 @@ exports.createSavedReport = async (req, res) => {
             description: req.body?.description ?? fallback.description ?? null,
             sections: normalized.sections,
             filters: normalized.filters,
+            columns: normalized.columns,
             selectedMetrics: normalized.selectedMetrics,
             grouping: normalized.grouping,
             sorting: normalized.sorting,
             reportConfig: normalized.reportConfig,
+            scheduleConfig: normalizeScheduleConfig(req.body?.scheduleConfig || fallback.scheduleConfig || {}),
             isFavorite: Boolean(req.body?.isFavorite ?? fallback.isFavorite ?? false),
-            duplicatedFromId
+            duplicatedFromId,
+            nextRunAt: calcNextRunAt(normalizeScheduleConfig(req.body?.scheduleConfig || fallback.scheduleConfig || {}), new Date())
         });
 
         const withCreator = await findTenantSavedReport(req.tenantId, savedReport.id);
@@ -1664,15 +1976,20 @@ exports.updateSavedReport = async (req, res) => {
         }
         savedReport.sections = normalized.sections;
         savedReport.filters = normalized.filters;
+        savedReport.columns = normalized.columns;
         savedReport.selectedMetrics = normalized.selectedMetrics;
         savedReport.grouping = normalized.grouping;
         savedReport.sorting = normalized.sorting;
         savedReport.reportConfig = normalized.reportConfig;
+        savedReport.scheduleConfig = normalizeScheduleConfig(req.body?.scheduleConfig || savedReport.scheduleConfig || {});
         if (req.body?.isFavorite !== undefined) savedReport.isFavorite = Boolean(req.body.isFavorite);
         if (req.body?.lastOpenedAt !== undefined) {
             const parsed = req.body.lastOpenedAt ? new Date(req.body.lastOpenedAt) : null;
             savedReport.lastOpenedAt = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
         }
+        savedReport.nextRunAt = savedReport.scheduleConfig?.enabled
+            ? calcNextRunAt(savedReport.scheduleConfig, new Date())
+            : null;
 
         await savedReport.save();
 

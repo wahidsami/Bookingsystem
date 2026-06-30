@@ -63,6 +63,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: {}
         },
+        columns: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: []
+        },
         selectedMetrics: {
             type: DataTypes.JSONB,
             allowNull: false,
@@ -78,6 +83,11 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: {}
         },
         reportConfig: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: {}
+        },
+        scheduleConfig: {
             type: DataTypes.JSONB,
             allowNull: false,
             defaultValue: {}
@@ -98,6 +108,24 @@ module.exports = (sequelize, DataTypes) => {
         lastOpenedAt: {
             type: DataTypes.DATE,
             allowNull: true
+        },
+        lastRunAt: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
+        nextRunAt: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
+        lastRunResult: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: {}
+        },
+        runHistory: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: []
         }
     }, {
         sequelize,

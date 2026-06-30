@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { buildReportStorageKey } from "@/lib/reportConfiguration";
 
 export type ReportColumnPreference = {
   id: string;
@@ -17,7 +18,7 @@ type UseReportColumnPreferencesInput = {
 };
 
 function buildStorageKey(userKey: string, reportKey: string) {
-  return `rifah:reporting-v2:columns:${userKey}:${reportKey}`;
+  return buildReportStorageKey(userKey, reportKey, "columns");
 }
 
 function cloneColumns(columns: ReportColumnPreference[]) {

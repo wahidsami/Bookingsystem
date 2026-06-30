@@ -2053,16 +2053,25 @@ class TenantApiClient {
     return this.get(`/tenant/reports/saved/${id}`);
   }
 
+  async getReportBuilderOptions(): Promise<any> {
+    return this.get('/tenant/reports/builder/options');
+  }
+
   async createSavedReport(data: {
     reportType: string;
     title: string;
     description?: string | null;
+    datePreset?: string;
+    startDate?: string;
+    endDate?: string;
     sections?: string[];
     filters?: Record<string, any>;
+    columns?: string[];
     selectedMetrics?: string[];
     grouping?: string | null;
     sorting?: Record<string, any>;
     reportConfig?: Record<string, any>;
+    scheduleConfig?: Record<string, any>;
     isFavorite?: boolean;
     duplicatedFromId?: string | null;
   }): Promise<any> {
@@ -2073,12 +2082,17 @@ class TenantApiClient {
     reportType?: string;
     title?: string;
     description?: string | null;
+    datePreset?: string;
+    startDate?: string;
+    endDate?: string;
     sections?: string[];
     filters?: Record<string, any>;
+    columns?: string[];
     selectedMetrics?: string[];
     grouping?: string | null;
     sorting?: Record<string, any>;
     reportConfig?: Record<string, any>;
+    scheduleConfig?: Record<string, any>;
     isFavorite?: boolean;
     duplicatedFromId?: string | null;
     lastOpenedAt?: string | null;
@@ -2088,6 +2102,22 @@ class TenantApiClient {
 
   async deleteSavedReport(id: string): Promise<any> {
     return this.delete(`/tenant/reports/saved/${id}`);
+  }
+
+  async runSavedReport(id: string): Promise<any> {
+    return this.post(`/tenant/reports/saved/${id}/run`, {});
+  }
+
+  async previewSavedReport(id: string): Promise<any> {
+    return this.get(`/tenant/reports/saved/${id}/preview`);
+  }
+
+  async deliverSavedReport(id: string): Promise<any> {
+    return this.post(`/tenant/reports/saved/${id}/deliver`, {});
+  }
+
+  async getSavedReportHistory(id: string): Promise<any> {
+    return this.get(`/tenant/reports/saved/${id}/history`);
   }
 
   /**
