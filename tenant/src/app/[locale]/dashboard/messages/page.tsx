@@ -193,463 +193,236 @@ export default function MessagesPage() {
 
     return (
         <TenantLayout>
-            <div style={{ direction: isRTL ? "rtl" : "ltr" }}>
-                {/* Header */}
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 24,
-                        flexDirection: isRTL ? "row-reverse" : "row",
-                    }}
-                >
-                    <div style={{ textAlign: isRTL ? "right" : "left" }}>
-                        <h1
-                            style={{
-                                fontSize: 24,
-                                fontWeight: "bold",
-                                color: "#1f2937",
-                                margin: 0,
-                            }}
+            <div
+                className="min-h-screen space-y-6 bg-slate-950 text-slate-100"
+                dir={isRTL ? "rtl" : "ltr"}
+            >
+                <section className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 shadow-[0_28px_100px_rgba(2,6,23,0.45)]">
+                    <div className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between lg:p-8">
+                        <div className="max-w-2xl">
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                                <span>✉️</span>
+                                {t("title")}
+                            </div>
+                            <h1 className="text-3xl font-black tracking-tight text-white lg:text-4xl">
+                                {t("title")}
+                            </h1>
+                            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                                {t("subtitle")}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowCompose(true)}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:brightness-110"
                         >
-                            {t("title")}
-                        </h1>
-                        <p style={{ fontSize: 14, color: "#6b7280", marginTop: 4 }}>
-                            {t("subtitle")}
-                        </p>
+                            <span>✉️</span>
+                            {t("compose")}
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setShowCompose(true)}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "12px 20px",
-                            backgroundColor: "#8B5ADF",
-                            color: "white",
-                            border: "none",
-                            borderRadius: 12,
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            boxShadow: "0 4px 14px rgba(139, 90, 223, 0.3)",
-                            flexDirection: isRTL ? "row-reverse" : "row",
-                        }}
-                    >
-                        <span>✉️</span> {t("compose")}
-                    </button>
-                </div>
 
-                {/* Compose Modal */}
+                    <div className="grid gap-4 border-t border-white/10 p-6 sm:grid-cols-3 lg:p-8">
+                        {[
+                            { label: t("noMessages"), value: messages.length.toString(), accent: "from-cyan-500/20 to-cyan-500/5" },
+                            { label: t("pinned"), value: messages.filter((message) => message.isPinned).length.toString(), accent: "from-amber-500/20 to-amber-500/5" },
+                            { label: t("readBy"), value: employees.length.toString(), accent: "from-emerald-500/20 to-emerald-500/5" },
+                        ].map((item) => (
+                            <div key={item.label} className={`rounded-3xl border border-white/10 bg-gradient-to-br ${item.accent} p-5`}>
+                                <p className="text-xs font-medium uppercase tracking-[0.24em] text-slate-400">
+                                    {item.label}
+                                </p>
+                                <p className="mt-3 text-3xl font-black text-white">{item.value}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
                 {showCompose && (
                     <div
-                        style={{
-                            position: "fixed",
-                            inset: 0,
-                            zIndex: 999,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            backgroundColor: "rgba(0,0,0,0.5)",
-                        }}
+                        className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm"
                         onClick={(e) => {
                             if (e.target === e.currentTarget) setShowCompose(false);
                         }}
                     >
-                        <div
-                            style={{
-                                backgroundColor: "white",
-                                borderRadius: 16,
-                                padding: 32,
-                                width: "100%",
-                                maxWidth: 560,
-                                boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
-                                direction: isRTL ? "rtl" : "ltr",
-                            }}
-                        >
-                            <h2
-                                style={{
-                                    fontSize: 20,
-                                    fontWeight: "bold",
-                                    color: "#1f2937",
-                                    marginBottom: 24,
-                                    textAlign: isRTL ? "right" : "left",
-                                }}
-                            >
-                                {t("compose")}
-                            </h2>
-
-                            {/* Recipient */}
-                            <div style={{ marginBottom: 16 }}>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        color: "#374151",
-                                        marginBottom: 6,
-                                        textAlign: isRTL ? "right" : "left",
-                                    }}
-                                >
-                                    {t("sendTo")}
-                                </label>
-                                <select
-                                    value={recipientId}
-                                    onChange={(e) => setRecipientId(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        padding: "10px 14px",
-                                        borderRadius: 8,
-                                        border: "1px solid #d1d5db",
-                                        fontSize: 14,
-                                        color: "#1f2937",
-                                        backgroundColor: "#f9fafb",
-                                        direction: isRTL ? "rtl" : "ltr",
-                                    }}
-                                >
-                                    <option value="all">{t("allEmployees")}</option>
-                                    {employees.map((emp) => (
-                                        <option key={emp.id} value={emp.id}>
-                                            {emp.name} ({emp.email})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Subject */}
-                            <div style={{ marginBottom: 16 }}>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        color: "#374151",
-                                        marginBottom: 6,
-                                        textAlign: isRTL ? "right" : "left",
-                                    }}
-                                >
-                                    {t("subject")}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={subject}
-                                    onChange={(e) => setSubject(e.target.value)}
-                                    placeholder={t("subjectPlaceholder")}
-                                    style={{
-                                        width: "100%",
-                                        padding: "10px 14px",
-                                        borderRadius: 8,
-                                        border: "1px solid #d1d5db",
-                                        fontSize: 14,
-                                        color: "#1f2937",
-                                        backgroundColor: "#f9fafb",
-                                        direction: isRTL ? "rtl" : "ltr",
-                                        textAlign: isRTL ? "right" : "left",
-                                    }}
-                                />
-                            </div>
-
-                            {/* Body */}
-                            <div style={{ marginBottom: 16 }}>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        color: "#374151",
-                                        marginBottom: 6,
-                                        textAlign: isRTL ? "right" : "left",
-                                    }}
-                                >
-                                    {t("message")} *
-                                </label>
-                                <textarea
-                                    value={body}
-                                    onChange={(e) => setBody(e.target.value)}
-                                    placeholder={t("messagePlaceholder")}
-                                    rows={5}
-                                    style={{
-                                        width: "100%",
-                                        padding: "10px 14px",
-                                        borderRadius: 8,
-                                        border: "1px solid #d1d5db",
-                                        fontSize: 14,
-                                        color: "#1f2937",
-                                        backgroundColor: "#f9fafb",
-                                        resize: "vertical",
-                                        direction: isRTL ? "rtl" : "ltr",
-                                        textAlign: isRTL ? "right" : "left",
-                                    }}
-                                />
-                            </div>
-
-                            {/* Pin Toggle */}
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    marginBottom: 24,
-                                    flexDirection: isRTL ? "row-reverse" : "row",
-                                }}
-                            >
-                                <input
-                                    type="checkbox"
-                                    id="pin-toggle"
-                                    checked={isPinned}
-                                    onChange={(e) => setIsPinned(e.target.checked)}
-                                    style={{ width: 18, height: 18, accentColor: "#8B5ADF" }}
-                                />
-                                <label
-                                    htmlFor="pin-toggle"
-                                    style={{
-                                        fontSize: 13,
-                                        color: "#4b5563",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    📌 {t("pinMessage")}
-                                </label>
-                            </div>
-
-                            {/* Actions */}
-                            <div
-                                style={{
-                                    display: "flex",
-                                    gap: 12,
-                                    justifyContent: "flex-end",
-                                    flexDirection: isRTL ? "row-reverse" : "row",
-                                }}
-                            >
+                        <div className="w-full max-w-2xl rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_28px_100px_rgba(2,6,23,0.65)] lg:p-8">
+                            <div className="mb-6 flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-black text-white">{t("compose")}</h2>
+                                    <p className="mt-2 text-sm text-slate-400">{t("subtitle")}</p>
+                                </div>
                                 <button
+                                    type="button"
                                     onClick={() => setShowCompose(false)}
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: "#f3f4f6",
-                                        color: "#4b5563",
-                                        border: "none",
-                                        borderRadius: 8,
-                                        fontSize: 14,
-                                        fontWeight: 500,
-                                        cursor: "pointer",
-                                    }}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/10 hover:text-white"
                                 >
                                     {t("cancel")}
                                 </button>
-                                <button
-                                    onClick={handleSend}
-                                    disabled={!body.trim() || sending}
-                                    style={{
-                                        padding: "10px 24px",
-                                        backgroundColor: !body.trim() || sending ? "#c4b5fd" : "#8B5ADF",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: 8,
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        cursor: !body.trim() || sending ? "not-allowed" : "pointer",
-                                    }}
-                                >
-                                    {sending ? t("sending") : t("send")}
-                                </button>
+                            </div>
+
+                            <div className="space-y-5">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                                        {t("sendTo")}
+                                    </label>
+                                    <select
+                                        value={recipientId}
+                                        onChange={(e) => setRecipientId(e.target.value)}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+                                    >
+                                        <option value="all">{t("allEmployees")}</option>
+                                        {employees.map((emp) => (
+                                            <option key={emp.id} value={emp.id}>
+                                                {emp.name} ({emp.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                                        {t("subject")}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={subject}
+                                        onChange={(e) => setSubject(e.target.value)}
+                                        placeholder={t("subjectPlaceholder")}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                                        {t("message")} *
+                                    </label>
+                                    <textarea
+                                        value={body}
+                                        onChange={(e) => setBody(e.target.value)}
+                                        placeholder={t("messagePlaceholder")}
+                                        rows={6}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+                                    />
+                                </div>
+
+                                <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+                                    <input
+                                        type="checkbox"
+                                        id="pin-toggle"
+                                        checked={isPinned}
+                                        onChange={(e) => setIsPinned(e.target.checked)}
+                                        className="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-500 accent-cyan-500"
+                                    />
+                                    <span>{t("pinMessage")}</span>
+                                </label>
+
+                                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCompose(false)}
+                                        className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                                    >
+                                        {t("cancel")}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSend}
+                                        disabled={!body.trim() || sending}
+                                        className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {sending ? t("sending") : t("send")}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Messages List */}
                 {loading ? (
-                    <div
-                        style={{
-                            textAlign: "center",
-                            padding: 60,
-                            color: "#9ca3af",
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: 40,
-                                height: 40,
-                                border: "3px solid #e5e7eb",
-                                borderTopColor: "#8B5ADF",
-                                borderRadius: "50%",
-                                animation: "spin 0.8s linear infinite",
-                                margin: "0 auto 16px",
-                            }}
-                        />
-                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <div className="flex items-center justify-center rounded-[28px] border border-white/10 bg-slate-900 py-20">
+                        <div className="h-11 w-11 animate-spin rounded-full border-2 border-cyan-400/20 border-t-cyan-400" />
                     </div>
                 ) : messages.length === 0 ? (
-                    <div
-                        style={{
-                            textAlign: "center",
-                            padding: 60,
-                            backgroundColor: "white",
-                            borderRadius: 16,
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                        }}
-                    >
-                        <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
-                        <h3
-                            style={{
-                                fontSize: 18,
-                                fontWeight: "bold",
-                                color: "#4b5563",
-                                marginBottom: 8,
-                            }}
-                        >
-                            {t("noMessages")}
-                        </h3>
-                        <p style={{ fontSize: 14, color: "#9ca3af" }}>{t("noMessagesSub")}</p>
+                    <div className="rounded-[28px] border border-white/10 bg-slate-900 px-6 py-16 text-center shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-4xl">
+                            📬
+                        </div>
+                        <h3 className="text-2xl font-bold text-white">{t("noMessages")}</h3>
+                        <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">{t("noMessagesSub")}</p>
                     </div>
                 ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                style={{
-                                    backgroundColor: "white",
-                                    borderRadius: 16,
-                                    padding: 20,
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                                    borderRight: isRTL ? `4px solid ${msg.isPinned ? "#f59e0b" : "#8B5ADF"}` : "none",
-                                    borderLeft: !isRTL ? `4px solid ${msg.isPinned ? "#f59e0b" : "#8B5ADF"}` : "none",
-                                }}
-                            >
-                                {/* Header Row */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "flex-start",
-                                        marginBottom: 10,
-                                        flexDirection: isRTL ? "row-reverse" : "row",
-                                    }}
+                    <div className="grid gap-4 xl:grid-cols-2">
+                        {messages.map((msg) => {
+                            const recipientName = getRecipientName(msg);
+                            const readCount = msg.readBy?.length || 0;
+                            const readRatio = employees.length ? Math.round((readCount / employees.length) * 100) : 0;
+
+                            return (
+                                <article
+                                    key={msg.id}
+                                    className={`overflow-hidden rounded-[28px] border bg-slate-900 shadow-[0_20px_80px_rgba(2,6,23,0.35)] ${
+                                        msg.isPinned ? "border-amber-400/30" : "border-white/10"
+                                    }`}
                                 >
-                                    <div style={{ textAlign: isRTL ? "right" : "left" }}>
-                                        {msg.subject && (
-                                            <h3
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: "bold",
-                                                    color: "#1f2937",
-                                                    margin: "0 0 4px",
-                                                }}
-                                            >
-                                                {msg.subject}
-                                            </h3>
-                                        )}
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                gap: 8,
-                                                alignItems: "center",
-                                                flexDirection: isRTL ? "row-reverse" : "row",
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: "#8B5ADF",
-                                                    fontWeight: 600,
-                                                    backgroundColor: "#f3e8ff",
-                                                    padding: "2px 8px",
-                                                    borderRadius: 6,
-                                                }}
-                                            >
-                                                {t("sentTo")}: {getRecipientName(msg)}
-                                            </span>
-                                            {msg.isPinned && (
-                                                <span
-                                                    style={{
-                                                        fontSize: 11,
-                                                        color: "#f59e0b",
-                                                        fontWeight: 600,
-                                                    }}
+                                    <div className={`h-1 ${msg.isPinned ? "bg-gradient-to-r from-amber-400 to-orange-400" : "bg-gradient-to-r from-cyan-500 to-blue-500"}`} />
+                                    <div className="p-6">
+                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                            <div className="space-y-3">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
+                                                        {formatDate(msg.createdAt)}
+                                                    </span>
+                                                    {msg.isPinned && (
+                                                        <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-200">
+                                                            {t("pinned")}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-medium uppercase tracking-[0.24em] text-cyan-300">
+                                                        {t("sentTo")}
+                                                    </p>
+                                                    <h3 className="mt-2 text-2xl font-black text-white">
+                                                        {msg.subject?.trim() || t("allEmployees")}
+                                                    </h3>
+                                                    <p className="mt-2 text-sm text-slate-400">{recipientName}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDelete(msg.id)}
+                                                    disabled={deletingId === msg.id}
+                                                    className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                                                 >
-                                                    {t("pinned")}
-                                                </span>
-                                            )}
+                                                    {deletingId === msg.id ? t("deleting") : t("delete")}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <p className="mt-6 whitespace-pre-wrap rounded-3xl border border-white/10 bg-slate-950/80 p-5 text-sm leading-7 text-slate-200">
+                                            {msg.body}
+                                        </p>
+
+                                        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t("readBy")}</p>
+                                                <p className="mt-2 text-xl font-bold text-white">
+                                                    {readCount} <span className="text-sm font-medium text-slate-400">{t("of")} {employees.length}</span>
+                                                </p>
+                                            </div>
+                                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t("employees")}</p>
+                                                <p className="mt-2 text-xl font-bold text-white">{employees.length}</p>
+                                            </div>
+                                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{isRTL ? "نسبة القراءة" : "Read rate"}</p>
+                                                <p className="mt-2 text-xl font-bold text-white">{readRatio}%</p>
+                                            </div>
                                         </div>
                                     </div>
-
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            gap: 8,
-                                            alignItems: "center",
-                                            flexDirection: isRTL ? "row-reverse" : "row",
-                                        }}
-                                    >
-                                        <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                                            {formatDate(msg.createdAt)}
-                                        </span>
-                                        <button
-                                            onClick={() => handleDelete(msg.id)}
-                                            disabled={deletingId === msg.id}
-                                            style={{
-                                                padding: "4px 10px",
-                                                backgroundColor: "#fef2f2",
-                                                color: "#ef4444",
-                                                border: "none",
-                                                borderRadius: 6,
-                                                fontSize: 12,
-                                                fontWeight: 500,
-                                                cursor: deletingId === msg.id ? "not-allowed" : "pointer",
-                                                opacity: deletingId === msg.id ? 0.5 : 1,
-                                            }}
-                                        >
-                                            {deletingId === msg.id ? "..." : t("delete")}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Body */}
-                                <p
-                                    style={{
-                                        fontSize: 14,
-                                        color: "#4b5563",
-                                        lineHeight: 1.6,
-                                        margin: "8px 0",
-                                        whiteSpace: "pre-wrap",
-                                        textAlign: isRTL ? "right" : "left",
-                                    }}
-                                >
-                                    {msg.body}
-                                </p>
-
-                                {/* Read Status */}
-                                {!msg.recipientId && (
-                                    <div
-                                        style={{
-                                            fontSize: 12,
-                                            color: "#9ca3af",
-                                            marginTop: 8,
-                                            textAlign: isRTL ? "right" : "left",
-                                        }}
-                                    >
-                                        ✅ {t("readBy")} {(msg.readBy || []).length} {t("of")}{" "}
-                                        {employees.length} {t("employees")}
-                                    </div>
-                                )}
-                                {msg.recipientId && (
-                                    <div
-                                        style={{
-                                            fontSize: 12,
-                                            color:
-                                                (msg.readBy || []).length > 0 ? "#10b981" : "#f59e0b",
-                                            marginTop: 8,
-                                            textAlign: isRTL ? "right" : "left",
-                                        }}
-                                    >
-                                        {(msg.readBy || []).length > 0
-                                            ? "✅ " + (locale === "ar" ? "تمت القراءة" : "Read")
-                                            : "⏳ " + (locale === "ar" ? "لم تُقرأ بعد" : "Unread")}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                </article>
+                            );
+                        })}
                     </div>
                 )}
             </div>

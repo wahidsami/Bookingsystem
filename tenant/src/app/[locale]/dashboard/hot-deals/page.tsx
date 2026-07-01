@@ -81,77 +81,68 @@ export default function HotDealsPage() {
 
     return (
         <TenantLayout>
-            <div className={`p-6 animate-fade-in ${isRTL ? 'text-right' : 'text-left'}`}>
-                {/* Header */}
-                <div className={`flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
-                    <div>
-                        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
-                        <p className="text-dark-300 mt-1">{t('subtitle')}</p>
+            <div className="space-y-6 bg-slate-950 text-slate-100" dir={isRTL ? 'rtl' : 'ltr'}>
+                <section className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 shadow-[0_28px_100px_rgba(2,6,23,0.45)]">
+                    <div className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between lg:p-8">
+                        <div className="max-w-2xl">
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-1 text-xs font-semibold text-fuchsia-200">
+                                <span>🔥</span>
+                                {t('title')}
+                            </div>
+                            <h1 className="text-3xl font-black tracking-tight text-white lg:text-4xl">{t('title')}</h1>
+                            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">{t('subtitle')}</p>
+                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                router.push(`/${locale}/dashboard/hot-deals/new`);
+                            }}
+                            disabled={!canCreate && packageLimits !== null}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <span>+</span>
+                            {t('createDeal')}
+                        </button>
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.preventDefault();
-                            router.push(`/${locale}/dashboard/hot-deals/new`);
-                        }}
-                        disabled={!canCreate && packageLimits !== null}
-                        className="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-purple-900/20 whitespace-nowrap"
-                    >
-                        + {t('createDeal')}
-                    </button>
-                </div>
 
-                {/* Package Limits Info */}
-                {packageLimits && (
-                    <div className="bg-dark-800 rounded-lg shadow-md p-5 border border-dark-700 mb-6 hover:border-dark-600 transition-colors">
-                        <div className={`flex flex-wrap items-center gap-6 md:gap-12 ${isRTL ? 'flex-row-reverse' : ''}`} dir={isRTL ? 'rtl' : 'ltr'}>
-                            <div>
-                                <p className="text-sm font-medium text-dark-400 mb-1">{t('package')}</p>
-                                <p className="text-white font-semibold flex items-center gap-2">
-                                    <span className="text-purple-400">❖</span>
-                                    {packageLimits.packageName}
-                                </p>
-                            </div>
-                            <div className="h-10 w-px bg-dark-700 hidden md:block"></div>
-                            <div>
-                                <p className="text-sm font-medium text-dark-400 mb-1">{t('dealsLimit')}</p>
-                                <p className="text-white font-semibold">
-                                    <span className="text-purple-400">{deals.length}</span> / {packageLimits.maxHotDeals === -1 ? t('unlimited') : packageLimits.maxHotDeals}
-                                </p>
-                            </div>
-                            {packageLimits.autoApprove && (
-                                <>
-                                    <div className="h-10 w-px bg-dark-700 hidden md:block"></div>
-                                    <div className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded-md text-sm font-medium flex items-center gap-2">
-                                        ⚡ {t('autoApproved')}
-                                    </div>
-                                </>
-                            )}
+                    <div className="grid gap-4 border-t border-white/10 p-6 sm:grid-cols-3 lg:p-8">
+                        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{t('package')}</p>
+                            <p className="mt-3 text-lg font-bold text-white">{packageLimits?.packageName || '—'}</p>
+                        </div>
+                        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{t('dealsLimit')}</p>
+                            <p className="mt-3 text-lg font-bold text-white">
+                                <span className="text-fuchsia-300">{deals.length}</span> / {packageLimits?.maxHotDeals === -1 ? t('unlimited') : packageLimits?.maxHotDeals ?? '—'}
+                            </p>
+                        </div>
+                        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{t('autoApproved')}</p>
+                            <p className="mt-3 text-lg font-bold text-white">{packageLimits?.autoApprove ? 'Enabled' : '—'}</p>
                         </div>
                     </div>
-                )}
+                </section>
 
-                {/* Loading */}
                 {loading && (
-                    <div className="flex justify-center py-20">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
+                    <div className="flex justify-center rounded-[28px] border border-white/10 bg-slate-900 py-20">
+                        <div className="h-11 w-11 animate-spin rounded-full border-2 border-fuchsia-400/20 border-t-fuchsia-400" />
                     </div>
                 )}
 
-                {/* Empty State */}
                 {!loading && deals.length === 0 && (
-                    <div className="bg-dark-800 rounded-lg shadow-md p-16 border border-dark-700 text-center flex flex-col items-center">
-                        <div className="w-20 h-20 bg-dark-900 rounded-full flex items-center justify-center mb-6 border-4 border-dark-800 shadow-xl">
-                            <span className="text-4xl text-purple-400">🔥</span>
+                    <div className="rounded-[28px] border border-white/10 bg-slate-900 px-6 py-16 text-center shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-4xl">
+                            🔥
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-2">{t('noDealsYet')}</h3>
-                        <p className="text-dark-300 mb-8 max-w-sm">{t('noDealsDesc')}</p>
+                        <h3 className="text-2xl font-bold text-white">{t('noDealsYet')}</h3>
+                        <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">{t('noDealsDesc')}</p>
                         {(canCreate || packageLimits === null) && (
                             <button
                                 onClick={(e) => {
                                     e.preventDefault();
                                     router.push(`/${locale}/dashboard/hot-deals/new`);
                                 }}
-                                className="px-8 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 transition-colors shadow-lg shadow-purple-900/20"
+                                className="mt-8 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:brightness-110"
                             >
                                 {t('createNewDeal')}
                             </button>
@@ -159,90 +150,81 @@ export default function HotDealsPage() {
                     </div>
                 )}
 
-                {/* Deals List */}
                 {!loading && deals.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" dir={isRTL ? 'rtl' : 'ltr'}>
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                         {deals.map((deal) => {
                             const title = isRTL ? deal.title_ar : deal.title_en;
                             const serviceName = deal.service ? (isRTL ? deal.service.name_ar : deal.service.name_en) : '';
                             const statusKey = deal.status as any;
 
                             return (
-                                <div key={deal.id} className="bg-dark-800 rounded-xl shadow-lg border border-dark-700 hover:border-purple-500/50 transition-all duration-300 overflow-hidden group flex flex-col">
-
-                                    {/* Thumbnail Image Header */}
-                                    <div className="h-40 w-full bg-dark-900 relative">
+                                <article key={deal.id} className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-900 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                                    <div className="relative h-44 bg-slate-950">
                                         {deal.image ? (
                                             <img
                                                 src={getImageUrl(deal.image)}
                                                 alt={title}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                className="h-full w-full object-cover"
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-dark-900">
-                                                <span className="text-4xl opacity-20">🔥</span>
+                                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-900/40 to-slate-950">
+                                                <span className="text-5xl opacity-20">🔥</span>
                                             </div>
                                         )}
-
-                                        {/* Overlay Badges */}
-                                        <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                                            <span className={`px-2.5 py-1 text-[11px] font-bold tracking-wider rounded border border-white/10 shadow-sm backdrop-blur-sm ${getStatusBadge(deal.status)}`}>
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                                        <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-3">
+                                            <span className={`rounded-full border border-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] backdrop-blur ${getStatusBadge(deal.status)}`}>
                                                 {t(`status.${statusKey}`)}
                                             </span>
-
-                                            <div className="px-2.5 py-1 bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold rounded shadow-sm border border-red-400/30">
+                                            <span className="rounded-full border border-rose-400/20 bg-rose-500/90 px-3 py-1 text-xs font-bold text-white">
                                                 {deal.discountType === 'percentage' ? `-${deal.discountValue}%` : `-${deal.discountValue} SAR`}
-                                            </div>
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <div className="p-5 flex-1 flex flex-col">
-                                        {/* Deal Info */}
-                                        <h3 className="text-lg font-bold text-white mb-1 line-clamp-1">{title}</h3>
-                                        <p className="text-sm font-medium text-purple-400 mb-4 line-clamp-1">{serviceName}</p>
+                                    <div className="p-6">
+                                        <h3 className="text-xl font-black text-white">{title}</h3>
+                                        <p className="mt-1 text-sm font-medium text-fuchsia-300">{serviceName}</p>
 
-                                        {/* Pricing */}
-                                        <div className="flex items-baseline gap-3 mb-4">
-                                            <span className="text-2xl font-black text-white">{deal.discountedPrice} <span className="text-sm text-dark-400 font-medium">SAR</span></span>
-                                            <span className="text-sm text-dark-500 font-medium line-through">{deal.originalPrice} SAR</span>
+                                        <div className="mt-5 flex items-baseline gap-3">
+                                            <span className="text-3xl font-black text-white">
+                                                {deal.discountedPrice}
+                                                <span className="ml-2 text-sm font-medium text-slate-400">SAR</span>
+                                            </span>
+                                            <span className="text-sm font-medium text-slate-500 line-through">{deal.originalPrice} SAR</span>
                                         </div>
 
-                                        {/* Limits & Validity */}
-                                        <div className="space-y-2 mb-6 flex-1">
+                                        <div className="mt-5 space-y-2">
                                             {deal.status === 'active' && (
-                                                <div className="flex items-center gap-2 text-xs font-medium text-dark-300 bg-dark-900/50 p-2 rounded">
-                                                    <span className="text-purple-400">⚡</span>
+                                                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-medium text-slate-300">
                                                     {deal.redemptionCount || 0} / {deal.maxRedemptions === -1 ? t('unlimited') : deal.maxRedemptions} {t('used')}
                                                 </div>
                                             )}
-                                            <div className="flex items-center gap-2 text-xs font-medium text-dark-300 bg-dark-900/50 p-2 rounded">
-                                                <span className="text-dark-400">📅</span>
+                                            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-medium text-slate-300">
                                                 {t('valid')}: {new Date(deal.validFrom).toLocaleDateString(locale)} - {new Date(deal.validUntil).toLocaleDateString(locale)}
                                             </div>
                                         </div>
 
-                                        {/* Rejection Reason */}
                                         {deal.status === 'rejected' && deal.rejectionReason && (
-                                            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                                <p className="text-xs font-medium text-red-400">
+                                            <div className="mt-5 rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4">
+                                                <p className="text-xs font-medium text-rose-200">
                                                     <strong>{t('rejectedReason')}:</strong> {deal.rejectionReason}
                                                 </p>
                                             </div>
                                         )}
 
-                                        {/* Actions */}
-                                        <div className="flex gap-3 justify-end pt-4 border-t border-dark-700">
+                                        <div className="mt-6 flex flex-wrap gap-3">
                                             {deal.status === 'pending' && (
-                                                <button className="flex-1 px-4 py-2 bg-dark-700/50 text-yellow-500/70 font-medium rounded-lg text-sm border border-yellow-500/10 cursor-not-allowed">
+                                                <button className="flex-1 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200">
                                                     {t('pendingReview')}
                                                 </button>
                                             )}
                                             {deal.status === 'active' && (
                                                 <button
                                                     onClick={() => handleDealAction(deal.id, 'pause')}
-                                                disabled={actionLoadingId === deal.id}
-                                                className="px-4 py-2 bg-sky-500/10 text-sky-300 font-medium rounded-lg hover:bg-sky-500/20 transition-colors text-sm border border-sky-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
+                                                    disabled={actionLoadingId === deal.id}
+                                                    className="rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
                                                     {actionLoadingId === deal.id ? (isRTL ? 'جاري...' : 'Loading...') : t('pause')}
                                                 </button>
                                             )}
@@ -250,20 +232,20 @@ export default function HotDealsPage() {
                                                 <button
                                                     onClick={() => handleDealAction(deal.id, 'publish')}
                                                     disabled={actionLoadingId === deal.id}
-                                                    className="px-4 py-2 bg-green-500/10 text-green-300 font-medium rounded-lg hover:bg-green-500/20 transition-colors text-sm border border-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                                                 >
                                                     {actionLoadingId === deal.id ? (isRTL ? 'جاري...' : 'Loading...') : t('publish')}
                                                 </button>
                                             )}
                                             <button
                                                 onClick={() => router.push(`/${locale}/dashboard/hot-deals/${deal.id}`)}
-                                                className={`px-6 py-2 bg-dark-700 text-white font-medium rounded-lg hover:bg-dark-600 transition-colors text-sm ${deal.status === 'pending' ? 'flex-1' : ''}`}
+                                                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                                             >
                                                 {t('viewDetails')}
                                             </button>
                                         </div>
                                     </div>
-                                </div>
+                                </article>
                             );
                         })}
                     </div>

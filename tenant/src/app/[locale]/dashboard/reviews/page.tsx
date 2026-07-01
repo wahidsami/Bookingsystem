@@ -171,271 +171,267 @@ export default function ReviewsPage() {
 
     return (
         <TenantLayout>
-            {/* Header */}
-            <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">{t("title") || "Reviews"}</h2>
-                <p className="text-gray-600">{t("subtitle") || "View and manage customer feedback for your team."}</p>
-            </div>
+            <div className="space-y-6 bg-slate-950 text-slate-100" dir={locale === "ar" ? "rtl" : "ltr"}>
+                <section className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 shadow-[0_28px_100px_rgba(2,6,23,0.45)]">
+                    <div className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between lg:p-8">
+                        <div className="max-w-2xl">
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                                <span>⭐</span>
+                                {t("title") || "Reviews"}
+                            </div>
+                            <h1 className="text-3xl font-black tracking-tight text-white lg:text-4xl">{t("title") || "Reviews"}</h1>
+                            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                                {t("subtitle") || "View and manage customer feedback for your team."}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="grid gap-4 border-t border-white/10 p-6 sm:grid-cols-3 lg:p-8">
+                        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{t("avgRating") || "Average Rating"}</p>
+                            <p className="mt-3 text-3xl font-black text-white">{avgRating || "—"}</p>
+                        </div>
+                        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{t("totalReviews") || "Total Reviews"}</p>
+                            <p className="mt-3 text-3xl font-black text-white">{totalCount}</p>
+                        </div>
+                        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{t("visibleReviews") || "Visible"}</p>
+                            <p className="mt-3 text-3xl font-black text-white">{reviews.filter(r => r.isVisible).length}</p>
+                        </div>
+                    </div>
+                </section>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="card p-5 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center text-2xl">⭐</div>
-                    <div>
-                        <p className="text-sm text-gray-500 font-medium">{t("avgRating") || "Average Rating"}</p>
-                        <p className="text-2xl font-bold text-gray-900">{avgRating || "—"}</p>
-                    </div>
-                </div>
-                <div className="card p-5 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl">💬</div>
-                    <div>
-                        <p className="text-sm text-gray-500 font-medium">{t("totalReviews") || "Total Reviews"}</p>
-                        <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
-                    </div>
-                </div>
-                <div className="card p-5 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center text-2xl">👁️</div>
-                    <div>
-                        <p className="text-sm text-gray-500 font-medium">{t("visibleReviews") || "Visible"}</p>
-                        <p className="text-2xl font-bold text-gray-900">{reviews.filter(r => r.isVisible).length}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="card mb-6">
-                <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
-                    {filterTabs.map(tab => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setFilter(tab.key)}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${filter === tab.key
-                                    ? "bg-white text-gray-900 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
+                <section className="rounded-[28px] border border-white/10 bg-slate-900 p-4 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                    <div className="flex gap-2 overflow-x-auto">
+                        {filterTabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setFilter(tab.key)}
+                                className={`whitespace-nowrap rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                                    filter === tab.key ? "bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/20" : "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
                                 }`}
+                            >
+                                {tab.label} ({tab.count})
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                <section className="rounded-[28px] border border-white/10 bg-slate-900 p-5 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-6">
+                        <input
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder={locale === "ar" ? "بحث في الاسم أو التعليق..." : "Search name or comment..."}
+                            className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20 lg:col-span-2"
+                        />
+                        <select
+                            value={selectedStaffId}
+                            onChange={(e) => setSelectedStaffId(e.target.value)}
+                            className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
                         >
-                            {tab.label} ({tab.count})
+                            <option value="all">{locale === "ar" ? "كل الموظفين" : "All Staff"}</option>
+                            {staffOptions.map((staff) => (
+                                <option key={staff.id} value={staff.id}>{staff.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={selectedRating}
+                            onChange={(e) => setSelectedRating(e.target.value)}
+                            className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                        >
+                            <option value="all">{locale === "ar" ? "كل التقييمات" : "All Ratings"}</option>
+                            {[5, 4, 3, 2, 1].map((value) => (
+                                <option key={value} value={String(value)}>{value} ★</option>
+                            ))}
+                        </select>
+                        <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20 [color-scheme:dark]"
+                        />
+                        <input
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20 [color-scheme:dark]"
+                        />
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setQuickFilter("none")}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${quickFilter === "none" ? "border-fuchsia-400/30 bg-fuchsia-500/15 text-fuchsia-200" : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"}`}
+                        >
+                            {locale === "ar" ? "بدون فلتر سريع" : "No quick filter"}
                         </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Advanced Filters */}
-            <div className="card mb-6 p-4">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-6">
-                    <input
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder={locale === "ar" ? "بحث في الاسم أو التعليق..." : "Search name or comment..."}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 lg:col-span-2"
-                    />
-                    <select
-                        value={selectedStaffId}
-                        onChange={(e) => setSelectedStaffId(e.target.value)}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                    >
-                        <option value="all">{locale === "ar" ? "كل الموظفين" : "All Staff"}</option>
-                        {staffOptions.map((staff) => (
-                            <option key={staff.id} value={staff.id}>{staff.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={selectedRating}
-                        onChange={(e) => setSelectedRating(e.target.value)}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                    >
-                        <option value="all">{locale === "ar" ? "كل التقييمات" : "All Ratings"}</option>
-                        {[5, 4, 3, 2, 1].map((value) => (
-                            <option key={value} value={String(value)}>{value} ★</option>
-                        ))}
-                    </select>
-                    <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                    />
-                    <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                    />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setQuickFilter("none")}
-                        className={`rounded-full px-3 py-1 text-xs font-medium border ${quickFilter === "none" ? "bg-primary-100 text-primary-700 border-primary-200" : "bg-white text-gray-600 border-gray-200"}`}
-                    >
-                        {locale === "ar" ? "بدون فلتر سريع" : "No quick filter"}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setQuickFilter("needs_reply")}
-                        className={`rounded-full px-3 py-1 text-xs font-medium border ${quickFilter === "needs_reply" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-white text-gray-600 border-gray-200"}`}
-                    >
-                        {locale === "ar" ? `تحتاج رد (${needsReplyCount})` : `Needs reply (${needsReplyCount})`}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setQuickFilter("low_rated")}
-                        className={`rounded-full px-3 py-1 text-xs font-medium border ${quickFilter === "low_rated" ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-white text-gray-600 border-gray-200"}`}
-                    >
-                        {locale === "ar" ? `منخفضة (${lowRatedCount})` : `Low rated (${lowRatedCount})`}
-                    </button>
-                    <span className="text-xs text-gray-500 ml-auto">
-                        {locale === "ar"
-                            ? `تم الرد على ${repliedCount} من أصل ${reviews.length}`
-                            : `${repliedCount} / ${reviews.length} have replies`}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setSearchTerm("");
-                            setSelectedStaffId("all");
-                            setSelectedRating("all");
-                            setDateFrom("");
-                            setDateTo("");
-                            setQuickFilter("none");
-                        }}
-                        className="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                        {locale === "ar" ? "تصفير الفلاتر" : "Reset filters"}
-                    </button>
-                </div>
-            </div>
-
-            {/* Error */}
-            {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
-            )}
-
-            {/* Reviews List */}
-            <div className="card overflow-hidden">
-                {loading ? (
-                    <div className="text-center py-12">
-                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <button
+                            type="button"
+                            onClick={() => setQuickFilter("needs_reply")}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${quickFilter === "needs_reply" ? "border-amber-400/30 bg-amber-500/15 text-amber-200" : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"}`}
+                        >
+                            {locale === "ar" ? `تحتاج رد (${needsReplyCount})` : `Needs reply (${needsReplyCount})`}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setQuickFilter("low_rated")}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${quickFilter === "low_rated" ? "border-rose-400/30 bg-rose-500/15 text-rose-200" : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"}`}
+                        >
+                            {locale === "ar" ? `منخفضة (${lowRatedCount})` : `Low rated (${lowRatedCount})`}
+                        </button>
+                        <span className="ml-auto text-xs text-slate-400">
+                            {locale === "ar"
+                                ? `تم الرد على ${repliedCount} من أصل ${reviews.length}`
+                                : `${repliedCount} / ${reviews.length} have replies`}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearchTerm("");
+                                setSelectedStaffId("all");
+                                setSelectedRating("all");
+                                setDateFrom("");
+                                setDateTo("");
+                                setQuickFilter("none");
+                            }}
+                            className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                        >
+                            {locale === "ar" ? "تصفير الفلاتر" : "Reset filters"}
+                        </button>
                     </div>
-                ) : filteredReviews.length === 0 ? (
-                    <div className="text-center py-12">
-                        <div className="text-5xl mb-4">⭐</div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{t("noReviews") || "No reviews yet"}</h3>
-                        <p className="text-gray-600">{t("noReviewsDesc") || "Customer reviews will appear here once submitted."}</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                    <th className="px-6 py-4 font-semibold text-gray-700">{t("customer") || "Customer"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700">{t("rating") || "Rating"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700">{t("employee") || "Employee"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700 max-w-xs">{t("comment") || "Comment"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700">{t("staffReply") || "Staff Reply"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700">{t("date") || "Date"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700 text-center">{t("visibility") || "Visibility"}</th>
-                                    <th className="px-6 py-4 font-semibold text-gray-700">{t("reply") || "Reply"}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredReviews.map((r) => (
-                                    <React.Fragment key={r.id}>
-                                        <tr className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-gray-900">
-                                                {r.customerName || t("anonymous") || "Anonymous"}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-1">
-                                                    {renderStars(r.rating)}
-                                                    <span className="text-sm text-gray-500 ml-1">({r.rating})</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-600">
-                                                {r.staff?.name || "—"}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={r.comment || ""}>
-                                                {r.comment || "—"}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm">
-                                                {r.staffReply ? (
-                                                    <div>
-                                                        <p className="text-gray-700 italic">"{r.staffReply}"</p>
-                                                        {r.staffRepliedAt && (
-                                                            <p className="text-xs text-gray-400 mt-1">
-                                                                {new Date(r.staffRepliedAt).toLocaleDateString(locale)}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-400 italic">{t("noReply") || "No reply"}</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {new Date(r.createdAt).toLocaleDateString(locale)}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <button
-                                                    onClick={() => toggleVisibility(r.id, r.isVisible)}
-                                                    className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors ${r.isVisible
-                                                            ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
-                                                            : "bg-red-100 text-red-700 border-red-200 hover:bg-red-200"
-                                                        }`}
-                                                >
-                                                    {r.isVisible ? (t("hide") || "Hide") : (t("publish") || "Publish")}
-                                                </button>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openReply(r)}
-                                                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                                                >
-                                                    {r.staffReply ? (t("editReply") || "Edit reply") : (t("reply") || "Reply")}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {replyingToId === r.id && (
-                                            <tr key={`${r.id}-reply-form`} className="bg-gray-50">
-                                                <td colSpan={8} className="px-6 py-4">
-                                                    <div className="space-y-2 max-w-2xl">
-                                                        <label className="block text-sm font-medium text-gray-700">
-                                                            {t("yourReply") || "Your reply (public, visible to customers)"}
-                                                        </label>
-                                                        <textarea
-                                                            value={replyDraft}
-                                                            onChange={(e) => setReplyDraft(e.target.value)}
-                                                            placeholder={t("replyPlaceholder") || "Thank you for your feedback..."}
-                                                            rows={3}
-                                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                                                        />
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={submitReply}
-                                                                disabled={submittingReply}
-                                                                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
-                                                            >
-                                                                {submittingReply ? (t("saving") || "Saving...") : (t("submitReply") || "Submit reply")}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={cancelReply}
-                                                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium"
-                                                            >
-                                                                {t("cancel") || "Cancel"}
-                                                            </button>
-                                                        </div>
+                </section>
+
+                {error && (
+                    <div className="rounded-[24px] border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
+                )}
+
+                <section className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-900 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                    {loading ? (
+                        <div className="py-16 text-center">
+                            <div className="inline-block h-11 w-11 animate-spin rounded-full border-2 border-fuchsia-400/20 border-t-fuchsia-400" />
+                        </div>
+                    ) : filteredReviews.length === 0 ? (
+                        <div className="py-16 text-center">
+                            <div className="mb-4 text-5xl">⭐</div>
+                            <h3 className="text-xl font-semibold text-white mb-2">{t("noReviews") || "No reviews yet"}</h3>
+                            <p className="text-slate-400">{t("noReviewsDesc") || "Customer reviews will appear here once submitted."}</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-left text-sm">
+                                <thead>
+                                    <tr className="border-b border-white/10 bg-white/5 text-slate-300">
+                                        <th className="px-6 py-4 font-semibold">{t("customer") || "Customer"}</th>
+                                        <th className="px-6 py-4 font-semibold">{t("rating") || "Rating"}</th>
+                                        <th className="px-6 py-4 font-semibold">{t("employee") || "Employee"}</th>
+                                        <th className="px-6 py-4 font-semibold max-w-xs">{t("comment") || "Comment"}</th>
+                                        <th className="px-6 py-4 font-semibold">{t("staffReply") || "Staff Reply"}</th>
+                                        <th className="px-6 py-4 font-semibold">{t("date") || "Date"}</th>
+                                        <th className="px-6 py-4 font-semibold text-center">{t("visibility") || "Visibility"}</th>
+                                        <th className="px-6 py-4 font-semibold">{t("reply") || "Reply"}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/10">
+                                    {filteredReviews.map((r) => (
+                                        <React.Fragment key={r.id}>
+                                            <tr className="hover:bg-white/5">
+                                                <td className="px-6 py-4 font-medium text-white">
+                                                    {r.customerName || t("anonymous") || "Anonymous"}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-1">
+                                                        {renderStars(r.rating)}
+                                                        <span className="ml-1 text-sm text-slate-400">({r.rating})</span>
                                                     </div>
                                                 </td>
+                                                <td className="px-6 py-4 text-sm text-slate-300">
+                                                    {r.staff?.name || "—"}
+                                                </td>
+                                                <td className="max-w-xs px-6 py-4 text-sm text-slate-300" title={r.comment || ""}>
+                                                    {r.comment || "—"}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-300">
+                                                    {r.staffReply ? (
+                                                        <div>
+                                                            <p className="italic text-white">"{r.staffReply}"</p>
+                                                            {r.staffRepliedAt && (
+                                                                <p className="mt-1 text-xs text-slate-500">
+                                                                    {new Date(r.staffRepliedAt).toLocaleDateString(locale)}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="italic text-slate-500">{t("noReply") || "No reply"}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-400">
+                                                    {new Date(r.createdAt).toLocaleDateString(locale)}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button
+                                                        onClick={() => toggleVisibility(r.id, r.isVisible)}
+                                                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                                                            r.isVisible
+                                                                ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                                                                : "border-rose-400/20 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                                                        }`}
+                                                    >
+                                                        {r.isVisible ? (t("hide") || "Hide") : (t("publish") || "Publish")}
+                                                    </button>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openReply(r)}
+                                                        className="text-sm font-semibold text-fuchsia-300 transition hover:text-fuchsia-200"
+                                                    >
+                                                        {r.staffReply ? (t("editReply") || "Edit reply") : (t("reply") || "Reply")}
+                                                    </button>
+                                                </td>
                                             </tr>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                            {replyingToId === r.id && (
+                                                <tr key={`${r.id}-reply-form`} className="bg-white/5">
+                                                    <td colSpan={8} className="px-6 py-4">
+                                                        <div className="max-w-2xl space-y-3">
+                                                            <label className="block text-sm font-medium text-slate-300">
+                                                                {t("yourReply") || "Your reply (public, visible to customers)"}
+                                                            </label>
+                                                            <textarea
+                                                                value={replyDraft}
+                                                                onChange={(e) => setReplyDraft(e.target.value)}
+                                                                placeholder={t("replyPlaceholder") || "Thank you for your feedback..."}
+                                                                rows={3}
+                                                                className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                                            />
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={submitReply}
+                                                                    disabled={submittingReply}
+                                                                    className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                >
+                                                                    {submittingReply ? (t("saving") || "Saving...") : (t("submitReply") || "Submit reply")}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={cancelReply}
+                                                                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                                                                >
+                                                                    {t("cancel") || "Cancel"}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
             </div>
         </TenantLayout>
     );

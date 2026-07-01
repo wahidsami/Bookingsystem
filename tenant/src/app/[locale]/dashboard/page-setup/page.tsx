@@ -259,42 +259,58 @@ export default function PageSetupPage() {
 
   return (
     <TenantLayout>
-      <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{locale === 'ar' ? 'إعداد الصفحة' : 'Page Setup'}</h1>
-          <p className="mt-1 text-gray-600">
-            {locale === 'ar'
-              ? 'تحكم بما يظهر في صفحة مركزك داخل تطبيق العميل'
-              : 'Control what appears on your center page in the customer app'}
-          </p>
-        </div>
+      <div className="space-y-6 bg-slate-950 text-slate-100" dir={isRTL ? 'rtl' : 'ltr'}>
+        <section className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 shadow-[0_28px_100px_rgba(2,6,23,0.45)]">
+          <div className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between lg:p-8">
+            <div className="max-w-2xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                <span>🖼️</span>
+                {locale === 'ar' ? 'إعداد الصفحة' : 'Page Setup'}
+              </div>
+              <h1 className="text-3xl font-black tracking-tight text-white lg:text-4xl">{locale === 'ar' ? 'إعداد الصفحة' : 'Page Setup'}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                {locale === 'ar'
+                  ? 'تحكم بما يظهر في صفحة مركزك داخل تطبيق العميل'
+                  : 'Control what appears on your center page in the customer app'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? (locale === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (locale === 'ar' ? 'حفظ' : 'Save')}
+            </button>
+          </div>
+        </section>
 
-        {message ? <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-700">{message}</div> : null}
-        {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</div> : null}
+        {message ? <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-emerald-100">{message}</div> : null}
+        {error ? <div className="rounded-[24px] border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-rose-100">{error}</div> : null}
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'صورة الغلاف' : 'Tenant Cover Image'}</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+          <h2 className="text-xl font-bold text-white">{locale === 'ar' ? 'صورة الغلاف' : 'Tenant Cover Image'}</h2>
+          <p className="mt-2 text-sm text-slate-400">
             {locale === 'ar'
               ? 'تظهر هذه الصورة في أعلى صفحة المركز داخل تطبيق العميل.'
               : 'This image appears at the top of your center page in the customer app.'}
           </p>
 
-          <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+          <div className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-slate-950">
             {businessInfo.coverImage ? (
               <img
                 src={businessInfo.coverImage.startsWith('http') ? businessInfo.coverImage : getImageUrl(businessInfo.coverImage)}
-                className="h-52 w-full object-cover"
+                className="h-60 w-full object-cover"
                 alt={locale === 'ar' ? 'صورة الغلاف' : 'Cover image'}
               />
             ) : (
-              <div className="flex h-52 items-center justify-center text-sm text-gray-500">
+              <div className="flex h-60 items-center justify-center text-sm text-slate-400">
                 {locale === 'ar' ? 'لا توجد صورة غلاف حالياً' : 'No cover image uploaded yet'}
               </div>
             )}
           </div>
 
-          <label className="mt-4 inline-flex cursor-pointer items-center rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary/90">
+          <label className="mt-5 inline-flex cursor-pointer items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white">
             {coverUploading
               ? (locale === 'ar' ? 'جارٍ الرفع...' : 'Uploading...')
               : (locale === 'ar' ? 'رفع / استبدال الغلاف' : 'Upload / Replace Cover')}
@@ -302,21 +318,21 @@ export default function PageSetupPage() {
           </label>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'إظهار التبويبات' : 'Tab Visibility'}</h2>
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+          <h2 className="text-xl font-bold text-white">{locale === 'ar' ? 'إظهار التبويبات' : 'Tab Visibility'}</h2>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
             {([
               ['services', locale === 'ar' ? 'الخدمات' : 'Services'],
               ['products', locale === 'ar' ? 'المنتجات' : 'Products'],
               ['reviews', locale === 'ar' ? 'التقييمات' : 'Reviews'],
               ['about', locale === 'ar' ? 'حول المركز' : 'About'],
             ] as Array<[keyof SectionToggles, string]>).map(([key, label]) => (
-              <label key={key} className="flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
-                <span className="font-medium text-gray-800">{label}</span>
+              <label key={key} className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <span className="font-medium text-slate-200">{label}</span>
                 <button
                   type="button"
                   onClick={() => updateSection(key)}
-                  className={`h-7 w-12 rounded-full p-1 transition ${sections[key] ? 'bg-primary' : 'bg-gray-300'}`}
+                  className={`h-7 w-12 rounded-full p-1 transition ${sections[key] ? 'bg-fuchsia-500' : 'bg-slate-700'}`}
                 >
                   <span className={`block h-5 w-5 rounded-full bg-white transition ${sections[key] ? 'translate-x-5' : ''}`} />
                 </button>
@@ -325,9 +341,9 @@ export default function PageSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'محتوى قسم حول المركز' : 'About Section Content'}</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+          <h2 className="text-xl font-bold text-white">{locale === 'ar' ? 'محتوى قسم حول المركز' : 'About Section Content'}</h2>
+          <p className="mt-2 text-sm text-slate-400">
             {locale === 'ar'
               ? 'اكتب المحتوى باللغة التي تريدها (حقل واحد فقط).'
               : 'Use one text field only. You can write in any language.'}
@@ -336,35 +352,35 @@ export default function PageSetupPage() {
             value={aboutText}
             onChange={(event) => setAboutText(event.target.value)}
             rows={6}
-            className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary focus:outline-none"
+            className="mt-4 w-full rounded-3xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
             placeholder={locale === 'ar' ? 'نبذة عن المركز...' : 'Tell customers about your center...'}
           />
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'صور المركز (المعرض)' : 'Center Gallery Images'}</h2>
-          <p className="mt-1 text-sm text-gray-500">{locale === 'ar' ? 'حتى 10 صور' : 'Up to 10 images'}</p>
+        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+          <h2 className="text-xl font-bold text-white">{locale === 'ar' ? 'صور المركز (المعرض)' : 'Center Gallery Images'}</h2>
+          <p className="mt-2 text-sm text-slate-400">{locale === 'ar' ? 'حتى 10 صور' : 'Up to 10 images'}</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
             {existingGallery.map((image, index) => (
-              <div key={`existing-${index}`} className="relative overflow-hidden rounded-lg border">
+              <div key={`existing-${index}`} className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950">
                 <img src={image.startsWith('http') ? image : getImageUrl(image)} className="h-28 w-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeExistingImage(index)}
-                  className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-xs text-white"
+                  className="absolute right-2 top-2 rounded-full border border-white/10 bg-slate-950/80 px-2 py-1 text-xs text-white"
                 >
                   {locale === 'ar' ? 'حذف' : 'Remove'}
                 </button>
               </div>
             ))}
             {newGalleryFiles.map((_file, index) => (
-              <div key={`new-${index}`} className="relative overflow-hidden rounded-lg border">
+              <div key={`new-${index}`} className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950">
                 <img src={galleryPreviews[existingGallery.length + index]} className="h-28 w-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeNewImage(index)}
-                  className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-xs text-white"
+                  className="absolute right-2 top-2 rounded-full border border-white/10 bg-slate-950/80 px-2 py-1 text-xs text-white"
                 >
                   {locale === 'ar' ? 'حذف' : 'Remove'}
                 </button>
@@ -372,76 +388,65 @@ export default function PageSetupPage() {
             ))}
           </div>
 
-          <label className="mt-4 inline-flex cursor-pointer items-center rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary/90">
+          <label className="mt-5 inline-flex cursor-pointer items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white">
             {locale === 'ar' ? 'إضافة صور' : 'Add Images'}
             <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryFiles} />
           </label>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">{locale === 'ar' ? 'العنوان والتواصل' : 'Location & Contact'}</h2>
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+          <h2 className="text-xl font-bold text-white">{locale === 'ar' ? 'العنوان والتواصل' : 'Location & Contact'}</h2>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
             <input
               value={businessInfo.addressText}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, addressText: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder={locale === 'ar' ? 'العنوان' : 'Address'}
             />
             <input
               value={businessInfo.googleMapLink}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, googleMapLink: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder={locale === 'ar' ? 'رابط خرائط Google' : 'Google Maps link'}
             />
             <input
               value={businessInfo.phone}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, phone: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder={locale === 'ar' ? 'الهاتف' : 'Phone'}
             />
             <input
               value={businessInfo.email}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, email: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder={locale === 'ar' ? 'البريد الإلكتروني' : 'Email'}
             />
             <input
               value={businessInfo.website}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, website: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder={locale === 'ar' ? 'الموقع الإلكتروني' : 'Website'}
             />
             <input
               value={businessInfo.instagramUrl}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, instagramUrl: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder="Instagram URL"
             />
             <input
               value={businessInfo.tiktokUrl}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, tiktokUrl: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder="TikTok URL"
             />
             <input
               value={businessInfo.twitterUrl}
               onChange={(event) => setBusinessInfo((prev) => ({ ...prev, twitterUrl: event.target.value }))}
-              className="rounded-lg border border-gray-300 px-4 py-2"
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
               placeholder="X / Twitter URL"
             />
           </div>
         </section>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-lg bg-primary px-6 py-3 font-semibold text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {saving ? (locale === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (locale === 'ar' ? 'حفظ' : 'Save')}
-          </button>
-        </div>
       </div>
     </TenantLayout>
   );

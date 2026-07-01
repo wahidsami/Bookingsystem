@@ -177,38 +177,43 @@ export default function NewHotDealPage() {
 
     return (
         <TenantLayout>
-            <div className={`p-6 max-w-4xl animate-fade-in ${isRTL ? 'text-right' : 'text-left'}`}>
-                {/* Header */}
-                <div className="mb-6">
+            <div className="space-y-6 bg-slate-950 text-slate-100" dir={isRTL ? 'rtl' : 'ltr'}>
+                <section className="rounded-[28px] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 shadow-[0_28px_100px_rgba(2,6,23,0.45)] lg:p-8">
                     <button
+                        type="button"
                         onClick={() => router.back()}
-                        className="text-dark-400 hover:text-white mb-4 flex items-center gap-2 transition-colors"
-                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
                     >
                         <span>{isRTL ? '→' : '←'}</span>
                         <span>{t('backToList')}</span>
                     </button>
-                    <h1 className="text-2xl font-bold text-white">{isEditing ? t('editDeal') : t('createDeal')}</h1>
-                    <p className="text-dark-300 mt-1">{isEditing ? t('editSubtitle') : t('createSubtitle')}</p>
-                </div>
+                    <div className="mt-5 flex flex-col gap-3">
+                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-1 text-xs font-semibold text-fuchsia-200">
+                            {isEditing ? t('editDeal') : t('createDeal')}
+                        </div>
+                        <h1 className="text-3xl font-black tracking-tight text-white lg:text-4xl">
+                            {isEditing ? t('editDeal') : t('createDeal')}
+                        </h1>
+                        <p className="max-w-2xl text-sm leading-6 text-slate-300">
+                            {isEditing ? t('editSubtitle') : t('createSubtitle')}
+                        </p>
+                    </div>
+                </section>
 
-                {(loadingDeal && isEditing) ? (
-                    <div className="flex justify-center py-20">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
+                {loadingDeal && isEditing ? (
+                    <div className="flex justify-center rounded-[28px] border border-white/10 bg-slate-900 py-20">
+                        <div className="h-11 w-11 animate-spin rounded-full border-2 border-fuchsia-400/20 border-t-fuchsia-400" />
                     </div>
                 ) : (
-                <form onSubmit={handleSubmit} className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-
-                    {/* Image Upload Section */}
-                    <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700 hover:border-dark-600 transition-colors">
-                        <h2 className="text-lg font-semibold text-white mb-4">{t('form.image')}</h2>
-                        <div className="space-y-4">
-                            <p className="text-sm font-medium text-dark-300 mb-1">{t('form.imageHint')}</p>
-
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                            <h2 className="mb-4 text-xl font-bold text-white">{t('form.image')}</h2>
+                            <p className="mb-4 text-sm text-slate-400">{t('form.imageHint')}</p>
                             <div
                                 onClick={() => fileInputRef.current?.click()}
-                                className={`border-2 border-dashed border-dark-600 rounded-lg p-8 cursor-pointer hover:border-purple-500 transition-colors
-                                  ${imagePreview ? 'bg-dark-900 border-purple-500/50' : 'bg-dark-800'}`}
+                                className={`cursor-pointer rounded-[24px] border-2 border-dashed p-6 transition ${
+                                    imagePreview ? 'border-fuchsia-400/40 bg-white/5' : 'border-white/10 bg-slate-950/70 hover:border-fuchsia-400/40'
+                                }`}
                             >
                                 <input
                                     type="file"
@@ -219,40 +224,35 @@ export default function NewHotDealPage() {
                                 />
 
                                 {imagePreview ? (
-                                    <div className="flex flex-col items-center">
-                                        <div className="w-full h-48 rounded-lg overflow-hidden mb-4 bg-dark-950">
-                                            <img
-                                                src={imagePreview}
-                                                alt="Preview"
-                                                className="w-full h-full object-cover"
-                                            />
+                                    <div className="space-y-4">
+                                        <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950">
+                                            <img src={imagePreview} alt="Preview" className="h-64 w-full object-cover" />
                                         </div>
-                                        <span className="text-purple-400 font-medium hover:text-purple-300">
-                                            {t('form.changeImage')}
-                                        </span>
+                                        <p className="text-sm font-semibold text-fuchsia-300">{t('form.changeImage')}</p>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-col items-center justify-center py-6 text-dark-400">
-                                        <span className="text-4xl mb-4">📸</span>
-                                        <p className="font-medium text-white mb-1"><span className="text-purple-500">{t('form.clickToUpload')}</span> {t('form.dragDrop')}</p>
+                                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-4xl">
+                                            📸
+                                        </div>
+                                        <p className="text-sm font-semibold text-white">
+                                            <span className="text-fuchsia-300">{t('form.clickToUpload')}</span> {t('form.dragDrop')}
+                                        </p>
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Service Selection */}
-                    <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700 hover:border-dark-600 transition-colors">
-                        <h2 className="text-lg font-semibold text-white mb-4">{t('form.service')}</h2>
-                        <div>
-                            <label className="block text-sm font-medium text-dark-300 mb-2">
+                        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                            <h2 className="mb-5 text-xl font-bold text-white">{t('form.service')}</h2>
+                            <label className="mb-2 block text-sm font-medium text-slate-300">
                                 {t('form.selectService')}
                             </label>
                             <select
                                 required
                                 value={formData.serviceId}
                                 onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
-                                className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-shadow transition-colors"
+                                className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
                             >
                                 <option value="">{t('form.chooseService')}</option>
                                 {services.map((service) => (
@@ -261,180 +261,153 @@ export default function NewHotDealPage() {
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Deal Information */}
-                    <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700 hover:border-dark-600 transition-colors">
-                        <h2 className="text-lg font-semibold text-white mb-4">{t('form.dealInfo')}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.titleEn')}
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.title_en}
-                                    onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow"
-                                    placeholder="e.g., Summer Special"
-                                    dir="ltr"
-                                />
+                        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                            <h2 className="mb-5 text-xl font-bold text-white">{t('form.dealInfo')}</h2>
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.titleEn')}</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.title_en}
+                                        onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                        placeholder="e.g., Summer Special"
+                                        dir="ltr"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.titleAr')}</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.title_ar}
+                                        onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                        dir="rtl"
+                                        placeholder="مثال: عرض الصيف الخاص"
+                                    />
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.descEn')}</label>
+                                    <textarea
+                                        value={formData.description_en}
+                                        onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+                                        rows={4}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                        dir="ltr"
+                                        placeholder="Brief description of your offer"
+                                    />
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.descAr')}</label>
+                                    <textarea
+                                        value={formData.description_ar}
+                                        onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
+                                        rows={4}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                        dir="rtl"
+                                        placeholder="وصف موجز لعرضك"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.titleAr')}
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.title_ar}
-                                    onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow"
-                                    dir="rtl"
-                                    placeholder="مثال: عرض الصيف الخاص"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.descEn')}
-                                </label>
-                                <textarea
-                                    value={formData.description_en}
-                                    onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
-                                    rows={3}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow resize-none"
-                                    dir="ltr"
-                                    placeholder="Brief description of your offer"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.descAr')}
-                                </label>
-                                <textarea
-                                    value={formData.description_ar}
-                                    onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                                    rows={3}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow resize-none"
-                                    dir="rtl"
-                                    placeholder="وصف موجز لعرضك"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Discount Settings */}
-                    <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700 hover:border-dark-600 transition-colors">
-                        <h2 className="text-lg font-semibold text-white mb-4">{t('form.discountSettings')}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.discountType')}
-                                </label>
-                                <select
-                                    value={formData.discountType}
-                                    onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow"
-                                >
-                                    <option value="percentage">{t('form.perc')}</option>
-                                    <option value="fixed_amount">{t('form.fixed')}</option>
-                                </select>
+                        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                            <h2 className="mb-5 text-xl font-bold text-white">{t('form.discountSettings')}</h2>
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.discountType')}</label>
+                                    <select
+                                        value={formData.discountType}
+                                        onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                    >
+                                        <option value="percentage">{t('form.perc')}</option>
+                                        <option value="fixed_amount">{t('form.fixed')}</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.discountValue')}</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        step="0.01"
+                                        value={formData.discountValue}
+                                        onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                        placeholder={formData.discountType === 'percentage' ? '20' : '50'}
+                                    />
+                                    <p className="text-xs text-slate-400">{t('form.maxDiscountHint')}</p>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.discountValue')}
-                                </label>
-                                <input
-                                    type="number"
-                                    required
-                                    step="0.01"
-                                    value={formData.discountValue}
-                                    onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow"
-                                    placeholder={formData.discountType === 'percentage' ? '20' : '50'}
-                                />
-                                <p className="text-xs text-dark-400 mt-2">
-                                    {t('form.maxDiscountHint')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Validity Period */}
-                    <div className="bg-dark-800 rounded-lg shadow-md p-6 border border-dark-700 hover:border-dark-600 transition-colors">
-                        <h2 className="text-lg font-semibold text-white mb-4">{t('form.validity')}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.validFrom')}
-                                </label>
-                                <input
-                                    type="date"
-                                    required
-                                    value={formData.validFrom}
-                                    onChange={(e) => handleDateChange('validFrom', e.target.value)}
-                                    className={`w-full px-4 py-3 bg-dark-900 border rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow [color-scheme:dark] ${
-                                        isInvalidDateRange ? 'border-red-500' : 'border-dark-600'
-                                    }`}
-                                />
+                        <section className="rounded-[28px] border border-white/10 bg-slate-900 p-6 shadow-[0_20px_80px_rgba(2,6,23,0.35)]">
+                            <h2 className="mb-5 text-xl font-bold text-white">{t('form.validity')}</h2>
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.validFrom')}</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.validFrom}
+                                        onChange={(e) => handleDateChange('validFrom', e.target.value)}
+                                        className={`w-full rounded-2xl border bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20 [color-scheme:dark] ${
+                                            isInvalidDateRange ? 'border-rose-500' : 'border-white/10'
+                                        }`}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.validUntil')}</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.validUntil}
+                                        onChange={(e) => handleDateChange('validUntil', e.target.value)}
+                                        className={`w-full rounded-2xl border bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20 [color-scheme:dark] ${
+                                            isInvalidDateRange ? 'border-rose-500' : 'border-white/10'
+                                        }`}
+                                    />
+                                </div>
+                                {dateRangeError && (
+                                    <p className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 md:col-span-2">
+                                        {dateRangeError}
+                                    </p>
+                                )}
+                                <div className="space-y-2 md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-300">{t('form.maxRedemptions')}</label>
+                                    <input
+                                        type="number"
+                                        value={formData.maxRedemptions}
+                                        onChange={(e) => setFormData({ ...formData, maxRedemptions: e.target.value })}
+                                        className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+                                        placeholder="50"
+                                    />
+                                    <p className="text-xs text-slate-400">{t('form.maxRedemptionsHint')}</p>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.validUntil')}
-                                </label>
-                                <input
-                                    type="date"
-                                    required
-                                    value={formData.validUntil}
-                                    onChange={(e) => handleDateChange('validUntil', e.target.value)}
-                                    className={`w-full px-4 py-3 bg-dark-900 border rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow [color-scheme:dark] ${
-                                        isInvalidDateRange ? 'border-red-500' : 'border-dark-600'
-                                    }`}
-                                />
-                            </div>
-                            {dateRangeError && (
-                                <p className="md:col-span-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-                                    {dateRangeError}
-                                </p>
-                            )}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-dark-300 mb-2">
-                                    {t('form.maxRedemptions')}
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.maxRedemptions}
-                                    onChange={(e) => setFormData({ ...formData, maxRedemptions: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 transition-shadow"
-                                    placeholder="50"
-                                />
-                                <p className="text-xs text-dark-400 mt-2">
-                                    {t('form.maxRedemptionsHint')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Submit Buttons */}
-                    <div className="flex gap-4 pt-4 pb-12">
-                        <button
-                            type="button"
-                            onClick={() => router.back()}
-                            className="px-8 py-3 bg-dark-800 border-2 border-dark-700 rounded-lg text-dark-300 font-semibold hover:bg-dark-700 hover:text-white transition-colors"
-                        >
-                            {t('form.cancel')}
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading || isInvalidDateRange}
-                            className="flex-1 px-8 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-purple-900/20"
-                        >
-                            {loading ? t('form.creating') : (isEditing ? t('form.updateBtn') : t('form.createBtn'))}
-                        </button>
-                    </div>
-                </form>
+                        <div className="flex flex-col gap-3 pb-12 pt-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => router.back()}
+                                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                            >
+                                {t('form.cancel')}
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading || isInvalidDateRange}
+                                className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {loading ? t('form.creating') : (isEditing ? t('form.updateBtn') : t('form.createBtn'))}
+                            </button>
+                        </div>
+                    </form>
                 )}
             </div>
         </TenantLayout>
