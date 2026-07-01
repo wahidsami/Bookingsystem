@@ -11,3 +11,4 @@ export * from "./FinancialReportFiltersPanel";
 export * from "./useReportFavorites";
 export * from "./useReportingDateRange";
 export * from "../lib/reportConfiguration";
+export * from "./ReportingEngine";

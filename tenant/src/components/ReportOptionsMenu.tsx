@@ -20,7 +20,7 @@ type MenuAction = {
   tone?: "default" | "danger" | "accent";
 };
 
-type ReportOptionsMenuProps = {
+export type ReportOptionsMenuProps = {
   locale: string;
   isFavorite?: boolean;
   onDuplicate?: () => void | Promise<void>;

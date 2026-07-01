@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
-type ReportFiltersDrawerProps = {
+export type ReportFiltersDrawerProps = {
   open: boolean;
   locale: string;
   title?: string;

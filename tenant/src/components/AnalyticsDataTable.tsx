@@ -12,7 +12,7 @@ type TableColumn = {
 
 type TableRow = ReactNode[];
 
-type AnalyticsDataTableProps = {
+export type AnalyticsDataTableProps = {
   title?: ReactNode;
   subtitle?: ReactNode;
   columns: TableColumn[];

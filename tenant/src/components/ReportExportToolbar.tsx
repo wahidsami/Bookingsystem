@@ -39,6 +39,21 @@ function ToolbarButton({ label, onClick, disabled, href, tone = 'secondary' }: T
   );
 }
 
+export type ReportExportToolbarProps = {
+  locale: string;
+  previewHref?: string;
+  onExportPdf: () => void | Promise<void>;
+  onExportCsv: () => void | Promise<void>;
+  onExportExcel: () => void | Promise<void>;
+  onPrint: () => void | Promise<void>;
+  disabled?: boolean;
+  previewLabel?: string;
+  pdfLabel?: string;
+  csvLabel?: string;
+  excelLabel?: string;
+  printLabel?: string;
+};
+
 export function ReportExportToolbar({
   locale,
   previewHref,
@@ -52,20 +67,7 @@ export function ReportExportToolbar({
   csvLabel,
   excelLabel,
   printLabel
-}: {
-  locale: string;
-  previewHref?: string;
-  onExportPdf: () => void | Promise<void>;
-  onExportCsv: () => void | Promise<void>;
-  onExportExcel: () => void | Promise<void>;
-  onPrint: () => void | Promise<void>;
-  disabled?: boolean;
-  previewLabel?: string;
-  pdfLabel?: string;
-  csvLabel?: string;
-  excelLabel?: string;
-  printLabel?: string;
-}) {
+}: ReportExportToolbarProps) {
   const isRTL = locale === 'ar';
 
   const buttons: ReactNode[] = [

@@ -15,7 +15,7 @@ type DetailTab = {
   badge?: ReactNode;
 };
 
-type AnalyticsDetailsDrawerProps = {
+export type AnalyticsDetailsDrawerProps = {
   open: boolean;
   title: ReactNode;
   subtitle?: ReactNode;

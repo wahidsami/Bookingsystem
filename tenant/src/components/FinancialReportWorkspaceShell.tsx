@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { ReportingStickyToolbar } from "./ReportingStickyToolbar";
+import { ReportingWorkspaceEngine } from "./ReportingEngine";
 import type { ReportDatePresetKey } from "./ReportDatePresets";
 import type { FinancialReportNavItem } from "@/lib/financialReportConfig";
 
@@ -43,56 +42,25 @@ export function FinancialReportWorkspaceShell({
   actions,
   children
 }: FinancialReportWorkspaceShellProps) {
-  const isRTL = locale === "ar";
-
   return (
-    <div className="space-y-5" dir={isRTL ? "rtl" : "ltr"}>
-      <ReportingStickyToolbar
-        locale={locale}
-        title={title}
-        subtitle={subtitle}
-        selectedPreset={selectedPreset}
-        startDate={startDate}
-        endDate={endDate}
-        onPresetChange={onPresetChange}
-        onStartDateChange={onStartDateChange}
-        onEndDateChange={onEndDateChange}
-        onFiltersClick={onFiltersClick}
-        onSettingsClick={onSettingsClick}
-        optionsMenu={optionsMenu}
-        actions={actions}
-      />
-
-      <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className={`mb-4 flex flex-wrap items-center gap-2 ${isRTL ? "flex-row-reverse justify-end" : ""}`}>
-          {navItems.map((item) => {
-            const active = item.id === activeReportId;
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`group inline-flex min-h-16 min-w-[180px] flex-1 flex-col rounded-2xl border px-4 py-3 transition ${
-                  active
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <span className={`text-sm font-semibold ${active ? "text-primary-700" : "text-gray-900"}`}>
-                  {item.label}
-                </span>
-                {item.description ? (
-                  <span className="mt-1 text-xs leading-5 text-gray-500">{item.description}</span>
-                ) : null}
-                {item.badge !== undefined ? (
-                  <span className="mt-2 text-xs font-semibold text-gray-500">{item.badge}</span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="space-y-5">{children}</div>
-      </section>
-    </div>
+    <ReportingWorkspaceEngine
+      locale={locale}
+      title={title}
+      subtitle={subtitle}
+      navItems={navItems}
+      activeReportId={activeReportId}
+      selectedPreset={selectedPreset}
+      startDate={startDate}
+      endDate={endDate}
+      onPresetChange={onPresetChange}
+      onStartDateChange={onStartDateChange}
+      onEndDateChange={onEndDateChange}
+      onFiltersClick={onFiltersClick}
+      onSettingsClick={onSettingsClick}
+      optionsMenu={optionsMenu}
+      actions={actions}
+    >
+      {children}
+    </ReportingWorkspaceEngine>
   );
 }

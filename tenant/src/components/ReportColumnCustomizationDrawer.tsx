@@ -14,7 +14,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ReportColumnPreference } from "./useReportColumnPreferences";
 
-type ReportColumnCustomizationDrawerProps = {
+export type ReportColumnCustomizationDrawerProps = {
   open: boolean;
   locale: string;
   title?: string;
@@ -259,4 +259,3 @@ export function ReportColumnCustomizationDrawer({
 
   return typeof document !== "undefined" ? createPortal(content, document.body) : content;
 }
-
