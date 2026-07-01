@@ -1667,8 +1667,13 @@ export default function AppointmentsPage() {
   if (!hydrated) {
     return (
       <TenantLayout fullWidth>
-        <div className="py-12 text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+        <div className="flex min-h-[60vh] items-center justify-center bg-slate-50/60 px-4 py-12">
+          <div className="rounded-[2rem] border border-slate-200 bg-white px-8 py-7 shadow-xl shadow-slate-950/5">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
+            <p className="mt-4 text-sm font-medium text-slate-600">
+              {locale === "ar" ? "جارٍ تحميل لوحة المواعيد..." : "Loading the appointment workspace..."}
+            </p>
+          </div>
         </div>
       </TenantLayout>
     );
@@ -1676,21 +1681,25 @@ export default function AppointmentsPage() {
 
   return (
     <TenantLayout fullWidth>
-      <div className={`fixed inset-0 z-[500] transition ${showFilters ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(99,102,241,0.12),_transparent_28%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent_18%)] px-4 py-6 sm:px-6 lg:px-8">
+        <div className={`fixed inset-0 z-[500] transition ${showFilters ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div
-          className={`absolute inset-0 bg-slate-950/35 backdrop-blur-[1px] transition-opacity duration-300 ${showFilters ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 bg-slate-950/45 backdrop-blur-sm transition-opacity duration-300 ${showFilters ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setShowFilters(false)}
         />
 
         <aside
-          className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[28rem] border-l border-gray-200 bg-white shadow-2xl transition-transform duration-300 ${showFilters ? 'translate-x-0' : isRTL ? '-translate-x-full' : 'translate-x-full'}`}
+          className={`absolute top-0 ${isRTL ? 'left-0' : 'right-0'} h-full w-full max-w-[28rem] border-l border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.24)] transition-transform duration-300 ${showFilters ? 'translate-x-0' : isRTL ? '-translate-x-full' : 'translate-x-full'}`}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
           <div className="flex h-full flex-col">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{locale === 'ar' ? 'أدوات المواعيد' : 'Appointment Tools'}</h3>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+                  {locale === 'ar' ? 'مركز التحكم' : 'Control center'}
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-slate-950">{locale === 'ar' ? 'أدوات المواعيد' : 'Appointment Tools'}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
                   {locale === 'ar'
                     ? 'الفلترة، التنقل اليومي، والإجراءات السريعة.'
                     : 'Filters, day navigation, and quick actions.'}
@@ -1699,14 +1708,14 @@ export default function AppointmentsPage() {
               <button
                 type="button"
                 onClick={() => setShowFilters(false)}
-                className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
+                className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50"
                 aria-label={locale === 'ar' ? 'إغلاق' : 'Close'}
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
               <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
@@ -1714,7 +1723,7 @@ export default function AppointmentsPage() {
                     setViewMode('calendar');
                     setShowFilters(false);
                   }}
-                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'calendar' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'calendar' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
                   {locale === 'ar' ? 'اللوحة' : 'Board'}
                 </button>
@@ -1724,7 +1733,7 @@ export default function AppointmentsPage() {
                     setViewMode('list');
                     setShowFilters(false);
                   }}
-                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'list' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
                   {t("listView")}
                 </button>
@@ -1734,23 +1743,23 @@ export default function AppointmentsPage() {
                     setViewMode('cancelled');
                     setShowFilters(false);
                   }}
-                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'cancelled' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${viewMode === 'cancelled' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
                   {locale === 'ar' ? 'الملغاة' : 'Cancelled'}
                 </button>
               </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-4">
+              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-semibold text-slate-950">
                       {locale === 'ar' ? 'حجم الشبكة' : 'Grid size'}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       {locale === 'ar' ? 'كبر أو صغر ارتفاع الجدول' : 'Increase or decrease the calendar row height'}
                     </p>
                   </div>
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                     {gridHourHeight}px
                   </span>
                 </div>
@@ -1763,7 +1772,7 @@ export default function AppointmentsPage() {
                   onChange={(event) => setGridHourHeight(Number(event.target.value))}
                   className="mt-4 w-full accent-primary"
                 />
-                <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                   <span>{locale === 'ar' ? 'مضغوط' : 'Compact'}</span>
                   <span>{locale === 'ar' ? 'واسع' : 'Spacious'}</span>
                 </div>
@@ -1772,29 +1781,29 @@ export default function AppointmentsPage() {
               <button
                 type="button"
                 onClick={() => openQuickAppointmentDrawer()}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition hover:bg-primary/90"
               >
                 <PlusIcon className="h-5 w-5" />
                 <span>{locale === 'ar' ? 'موعد جديد' : 'New Appointment'}</span>
               </button>
 
-              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <CalendarDaysIcon className="h-5 w-5 text-primary" />
-                    <p className="text-sm font-semibold text-gray-900">{locale === 'ar' ? 'التاريخ' : 'Date'}</p>
+                    <p className="text-sm font-semibold text-slate-950">{locale === 'ar' ? 'التاريخ' : 'Date'}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedDate(new Date());
                     }}
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     {locale === 'ar' ? 'اليوم' : 'Today'}
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">{locale === 'ar' ? 'تنقّل بين الأيام' : 'Move between days'}</p>
+                <p className="mt-2 text-xs text-slate-500">{locale === 'ar' ? 'تنقّل بين الأيام' : 'Move between days'}</p>
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     type="button"
@@ -1803,7 +1812,7 @@ export default function AppointmentsPage() {
                       next.setDate(next.getDate() - 1);
                       setSelectedDate(next);
                     }}
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     {isRTL ? '›' : '‹'}
                   </button>
@@ -1814,11 +1823,11 @@ export default function AppointmentsPage() {
                       next.setDate(next.getDate() + 1);
                       setSelectedDate(next);
                     }}
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     {isRTL ? '‹' : '›'}
                   </button>
-                  <div className="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-900 ring-1 ring-gray-200">
+                  <div className="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-medium text-slate-950 ring-1 ring-slate-200">
                     {selectedDate.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
                       weekday: 'short',
                       month: 'short',
@@ -1839,7 +1848,7 @@ export default function AppointmentsPage() {
                       loadAppointments();
                     }
                   }}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <ArrowPathIcon className="h-5 w-5" />
                   <span>{locale === 'ar' ? 'تحديث' : 'Refresh'}</span>
@@ -1854,44 +1863,44 @@ export default function AppointmentsPage() {
                       loadAppointments();
                     }
                   }}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <FunnelIcon className="h-5 w-5" />
                   <span>{locale === 'ar' ? 'إعادة الضبط' : 'Reset'}</span>
                 </button>
               </div>
 
-              <div className="space-y-4 rounded-3xl border border-gray-200 bg-white p-4">
+              <div className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("startDate")}
                   </label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("endDate")}
                   </label>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("employee")}
                   </label>
                   <select
                     value={filterStaffId}
                     onChange={(e) => setFilterStaffId(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
                     <option value="">{t("allEmployees")}</option>
@@ -1901,13 +1910,13 @@ export default function AppointmentsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("service")}
                   </label>
                   <select
                     value={filterServiceId}
                     onChange={(e) => setFilterServiceId(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
                     <option value="">{t("allServices")}</option>
@@ -1919,13 +1928,13 @@ export default function AppointmentsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("statusLabel")}
                   </label>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
                     <option value="">{t("allStatuses")}</option>
@@ -1939,13 +1948,13 @@ export default function AppointmentsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                     {t("paymentStatus") || "Payment"}
                   </label>
                   <select
                     value={filterPaymentStatus}
                     onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
                     style={{ textAlign: isRTL ? 'right' : 'left' }}
                   >
                     <option value="">{t("allPayments") || "All"}</option>
@@ -1956,13 +1965,13 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                <p className="text-sm font-semibold text-gray-900">{locale === 'ar' ? 'الملخص' : 'Summary'}</p>
+              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-950">{locale === 'ar' ? 'الملخص' : 'Summary'}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {filterSummary.map((item, index) => (
                     <span
                       key={`${item}-${index}`}
-                      className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+                      className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
                     >
                       {item}
                     </span>
@@ -1970,36 +1979,36 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                <p className="text-sm font-semibold text-gray-900">{locale === 'ar' ? 'الدليل' : 'Legend'}</p>
+              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-950">{locale === 'ar' ? 'الدليل' : 'Legend'}</p>
                 <div className="mt-3 space-y-2 text-xs">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                    <span className="text-gray-700">{locale === 'ar' ? 'مدفوع بالكامل' : 'Fully paid'}</span>
+                    <span className="text-slate-700">{locale === 'ar' ? 'مدفوع بالكامل' : 'Fully paid'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
-                    <span className="text-gray-700">{locale === 'ar' ? 'عربون' : 'Deposit'}</span>
+                    <span className="text-slate-700">{locale === 'ar' ? 'عربون' : 'Deposit'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
-                    <span className="text-gray-700">{locale === 'ar' ? 'بانتظار الدفع' : 'Pending payment'}</span>
+                    <span className="text-slate-700">{locale === 'ar' ? 'بانتظار الدفع' : 'Pending payment'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-500 text-[10px] font-bold text-white">A</span>
-                    <span className="text-gray-700">{locale === 'ar' ? 'تعيين تلقائي' : 'Auto-assigned'}</span>
+                    <span className="text-slate-700">{locale === 'ar' ? 'تعيين تلقائي' : 'Auto-assigned'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">S</span>
-                    <span className="text-gray-700">{locale === 'ar' ? 'اختيار العميل للموظف' : 'Customer picked staff'}</span>
+                    <span className="text-slate-700">{locale === 'ar' ? 'اختيار العميل للموظف' : 'Customer picked staff'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-200 text-[10px] font-bold text-rose-700">B</span>
-                    <span className="text-gray-700">{locale === 'ar' ? 'استراحة' : 'Break'}</span>
-                  </div>
+                    <span className="text-slate-700">{locale === 'ar' ? 'استراحة' : 'Break'}</span>
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </aside>
       </div>
@@ -2827,6 +2836,7 @@ export default function AppointmentsPage() {
           }
         }}
       />
+      </div>
     </TenantLayout>
   );
 }
