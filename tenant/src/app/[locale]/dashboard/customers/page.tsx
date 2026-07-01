@@ -176,119 +176,111 @@ export default function CustomersPage() {
 
   return (
     <TenantLayout>
-      <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t('title')}
-            </h1>
-            <p className="text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t('subtitle')}
-            </p>
-          </div>
-          <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-            <button
-              onClick={handleExport}
-              className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <ArrowDownTrayIcon className="w-5 h-5 mx-2" />
-              {t('export')}
-            </button>
-          </div>
-        </div>
+      <div className="relative space-y-8 pb-8" dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(99,102,241,0.10),_transparent_30%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent_60%)]" />
 
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('totalCustomers')}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalCustomers}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <UserGroupIcon className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
+        <section className="card overflow-hidden border border-slate-200/80 bg-slate-950 text-white shadow-2xl shadow-slate-950/10">
+          <div className="flex flex-col gap-6 p-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/80">
+                {locale === 'ar' ? 'CRM' : 'CRM'}
+              </p>
+              <h1 className="text-4xl font-black tracking-tight" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {t('title')}
+              </h1>
+              <p className="max-w-2xl text-sm leading-6 text-slate-300" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {t('subtitle')}
+              </p>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('newThisMonth')}</p>
-                  <p className="text-2xl font-bold text-green-600">+{stats.newCustomersThisMonth}</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <UserPlusIcon className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('returningRate')}</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.returningRate}%</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <ArrowPathIcon className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{t('avgBookings')}</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.averageBookingsPerCustomer}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <StarIcon className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <button
+                onClick={handleExport}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <ArrowDownTrayIcon className="h-5 w-5" />
+                {t('export')}
+              </button>
             </div>
           </div>
+        </section>
+
+        {stats && (
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="card border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-950/5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('totalCustomers')}</p>
+                  <p className="mt-3 text-4xl font-black text-slate-950">{stats.totalCustomers}</p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-600">
+                  <UserGroupIcon className="h-7 w-7" />
+                </div>
+              </div>
+            </div>
+            <div className="card border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-950/5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('newThisMonth')}</p>
+                  <p className="mt-3 text-4xl font-black text-emerald-600">+{stats.newCustomersThisMonth}</p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
+                  <UserPlusIcon className="h-7 w-7" />
+                </div>
+              </div>
+            </div>
+            <div className="card border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-950/5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('returningRate')}</p>
+                  <p className="mt-3 text-4xl font-black text-violet-600">{stats.returningRate}%</p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600">
+                  <ArrowPathIcon className="h-7 w-7" />
+                </div>
+              </div>
+            </div>
+            <div className="card border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-950/5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('avgBookings')}</p>
+                  <p className="mt-3 text-4xl font-black text-amber-600">{stats.averageBookingsPerCustomer}</p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+                  <StarIcon className="h-7 w-7" />
+                </div>
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* Search & Filters */}
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <MagnifyingGlassIcon className={`w-5 h-5 text-gray-400 absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3' : 'left-3'}`} />
+        <section className="card border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-950/5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 ${isRTL ? 'right-4' : 'left-4'}`} />
               <input
                 type="text"
                 placeholder={t('searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className={`w-full ${isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500`}
+                className={`w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 text-sm text-slate-950 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
                 style={{ textAlign: isRTL ? 'right' : 'left' }}
               />
             </div>
-            <div className="flex gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
+            <div className="flex flex-wrap gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                 <option value="lastVisit">{t('sortByLastVisit')}</option>
                 <option value="totalSpent">{t('sortBySpent')}</option>
                 <option value="totalBookings">{t('sortByBookings')}</option>
                 <option value="firstName">{t('sortByName')}</option>
               </select>
-              <select
-                value={loyaltyFilter}
-                onChange={(e) => setLoyaltyFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
+              <select value={loyaltyFilter} onChange={(e) => setLoyaltyFilter(e.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                 <option value="">{t('allTiers')}</option>
                 <option value="platinum">{t('platinum')}</option>
                 <option value="gold">{t('gold')}</option>
                 <option value="silver">{t('silver')}</option>
                 <option value="bronze">{t('bronze')}</option>
               </select>
-              <select
-                value={customerTypeFilter}
-                onChange={(e) => setCustomerTypeFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
+              <select value={customerTypeFilter} onChange={(e) => setCustomerTypeFilter(e.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                 <option value="">{t('allTypes')}</option>
                 <option value="walk_in">{locale === 'ar' ? 'عملاء حضوري' : 'Walk-ins'}</option>
                 <option value="service_only">{t('servicesOnly')}</option>
@@ -297,105 +289,71 @@ export default function CustomersPage() {
               </select>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Customer List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <section className="card overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <div className="flex min-h-[24rem] items-center justify-center">
+              <div className="spinner" />
             </div>
           ) : error ? (
-            <div className="flex items-center justify-center h-64 text-red-500">
+            <div className="flex min-h-[24rem] items-center justify-center px-4 text-center text-rose-600">
               {error}
             </div>
           ) : customers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-              <UserGroupIcon className="w-12 h-12 mb-4" />
+            <div className="flex min-h-[24rem] flex-col items-center justify-center px-4 text-center text-slate-500">
+              <UserGroupIcon className="mb-4 h-12 w-12 text-slate-300" />
               <p>{t('noCustomers')}</p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-slate-950 text-white">
                     <tr>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('customer')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('type')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('contact')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('bookings')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('orders')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('spent')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('loyalty')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t('lastVisit')}
-                      </th>
-                      <th className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {locale === 'ar' ? 'الإجراء' : 'Action'}
-                      </th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('customer')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('type')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('contact')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('bookings')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('orders')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('spent')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('loyalty')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{t('lastVisit')}</th>
+                      <th className={`px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] ${isRTL ? 'text-right' : 'text-left'}`}>{locale === 'ar' ? 'الإجراء' : 'Action'}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-slate-200">
                     {customers.map((customer) => (
-                      <tr
-                        key={customer.id}
-                        onClick={() => router.push(`/${locale}/dashboard/customers/${customer.id}`)}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                            <div className={`w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center ${isRTL ? 'ml-3' : 'mr-3'} relative`}>
+                      <tr key={customer.id} onClick={() => router.push(`/${locale}/dashboard/customers/${customer.id}`)} className="cursor-pointer transition hover:bg-slate-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary font-semibold">
                               {customer.photo ? (
-                                <>
-                                  <img
-                                    src={customer.photo.startsWith('http') ? customer.photo : getImageUrl(customer.photo)}
-                                    alt={`${customer.firstName} ${customer.lastName}`}
-                                    className="w-10 h-10 rounded-full object-cover"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                      if (fallback) fallback.style.display = 'flex';
-                                    }}
-                                  />
-                                  <span className="text-primary-600 font-medium hidden absolute inset-0 items-center justify-center">
-                                    {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
-                                  </span>
-                                </>
+                                <img
+                                  src={customer.photo.startsWith('http') ? customer.photo : getImageUrl(customer.photo)}
+                                  alt={`${customer.firstName} ${customer.lastName}`}
+                                  className="h-12 w-12 rounded-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
                               ) : (
-                                <span className="text-primary-600 font-medium">
-                                  {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
-                                </span>
+                                <span>{customer.firstName.charAt(0)}{customer.lastName.charAt(0)}</span>
                               )}
                             </div>
                             <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
                               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                <p className="font-medium text-gray-900">
-                                  {customer.firstName} {customer.lastName}
-                                </p>
+                                <p className="font-semibold text-slate-950">{customer.firstName} {customer.lastName}</p>
                                 {isWalkInCustomer(customer) && (
-                                  <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800">
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
                                     {locale === 'ar' ? 'عميل حضوري' : 'Walk-in'}
                                   </span>
                                 )}
                               </div>
                               {customer.tags.length > 0 && (
-                                <div className="flex gap-1 mt-1" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                <div className="mt-1 flex flex-wrap gap-1" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                   {customer.tags.slice(0, 2).map((tag, i) => (
-                                    <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                                    <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                                       {tag}
                                     </span>
                                   ))}
@@ -404,76 +362,44 @@ export default function CustomersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          {customer.customerType === 'both' && (
-                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                              📅🛍️ {t('both')}
-                            </span>
-                          )}
-                          {customer.customerType === 'service_only' && (
-                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                              📅 {t('services')}
-                            </span>
-                          )}
-                          {customer.customerType === 'product_only' && (
-                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                              🛍️ {t('products')}
-                            </span>
-                          )}
+                        <td className="px-6 py-4">
+                          {customer.customerType === 'both' && <span className="badge badge-info">📅🛍️ {t('both')}</span>}
+                          {customer.customerType === 'service_only' && <span className="badge badge-secondary">📅 {t('services')}</span>}
+                          {customer.customerType === 'product_only' && <span className="badge badge-success">🛍️ {t('products')}</span>}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                            <div className="flex items-center text-sm text-gray-600" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                              <EnvelopeIcon className={`w-4 h-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
-                              {customer.email}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600 mt-1" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                              <PhoneIcon className={`w-4 h-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
-                              {customer.phone}
-                            </div>
+                        <td className="px-6 py-4 text-sm text-slate-600">
+                          <div className="flex items-center gap-1" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                            <EnvelopeIcon className="h-4 w-4 text-slate-400" />
+                            {customer.email}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                            <PhoneIcon className="h-4 w-4 text-slate-400" />
+                            {customer.phone}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <span className="font-medium text-gray-900">{customer.totalBookings}</span>
-                          {customer.noShowCount > 0 && (
-                            <span className="text-xs text-red-500 block">
-                              {customer.noShowCount} {t('noShows')}
-                            </span>
-                          )}
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-950">{customer.totalBookings}</span>
+                          {customer.noShowCount > 0 && <span className="mt-1 block text-xs text-rose-500">{customer.noShowCount} {t('noShows')}</span>}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <span className="font-medium text-gray-900">{customer.totalOrders || 0}</span>
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-950">{customer.totalOrders || 0}</span>
                           {customer.totalProductsPurchased && customer.totalProductsPurchased > 0 && (
-                            <span className="text-xs text-gray-500 block">
-                              {customer.totalProductsPurchased} {t('items')}
-                            </span>
+                            <span className="mt-1 block text-xs text-slate-500">{customer.totalProductsPurchased} {t('items')}</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <Currency amount={customer.totalSpent} className="font-medium text-gray-900" />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getLoyaltyColor(customer.loyaltyTier)}`}>
-                            {t(customer.loyaltyTier)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                          {formatDate(customer.lastVisit)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        <td className="px-6 py-4"><Currency amount={customer.totalSpent} className="font-semibold text-slate-950" /></td>
+                        <td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLoyaltyColor(customer.loyaltyTier)}`}>{t(customer.loyaltyTier)}</span></td>
+                        <td className="px-6 py-4 text-sm text-slate-500">{formatDate(customer.lastVisit)}</td>
+                        <td className="px-6 py-4">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               router.push(`/${locale}/dashboard/customers/${customer.id}`);
                             }}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                            className="inline-flex items-center gap-2 rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15"
                           >
-                            <PencilSquareIcon className="w-4 h-4" />
-                            <span className="text-sm font-medium">
-                              {isWalkInCustomer(customer)
-                                ? (locale === 'ar' ? 'تعديل الحضوري' : 'Edit walk-in')
-                                : (locale === 'ar' ? 'عرض/تعديل' : 'View / Edit')}
-                            </span>
+                            <PencilSquareIcon className="h-4 w-4" />
+                            <span>{isWalkInCustomer(customer) ? (locale === 'ar' ? 'تعديل الحضوري' : 'Edit walk-in') : (locale === 'ar' ? 'عرض/تعديل' : 'View / Edit')}</span>
                           </button>
                         </td>
                       </tr>
@@ -482,31 +408,22 @@ export default function CustomersPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
-              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-                <p className="text-sm text-gray-500">
+              <div className="flex items-center justify-between gap-4 border-t border-slate-200 px-6 py-4">
+                <p className="text-sm text-slate-500">
                   {t('showing')} {(page - 1) * 20 + 1}-{Math.min(page * 20, totalCustomers)} {t('of')} {totalCustomers}
                 </p>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    {isRTL ? <ChevronRightIcon className="w-5 h-5" /> : <ChevronLeftIcon className="w-5 h-5" />}
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isRTL ? <ChevronRightIcon className="h-5 w-5" /> : <ChevronLeftIcon className="h-5 w-5" />}
                   </button>
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    {isRTL ? <ChevronLeftIcon className="w-5 h-5" /> : <ChevronRightIcon className="w-5 h-5" />}
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isRTL ? <ChevronLeftIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
             </>
           )}
-        </div>
+        </section>
       </div>
     </TenantLayout>
   );
