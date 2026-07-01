@@ -270,261 +270,264 @@ export default function ProductsPage() {
 
   return (
     <TenantLayout>
-      <div className="mb-6 animate-fade-in space-y-4">
-        <div className={`flex items-start justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div className="space-y-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            <h2 className="text-3xl font-bold text-gray-900">{t("title")}</h2>
-            <p className="text-sm text-gray-600">{t("subtitle")}</p>
-          </div>
-          {limits && (
-            <div className={`rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm ${isRTL ? 'text-right' : 'text-left'}`}>
-              <div className="text-gray-500">{locale === 'ar' ? 'الحد المسموح' : 'Limit'}</div>
-              <div className={`font-semibold ${!limits.allowed ? 'text-red-600' : 'text-gray-900'}`}>
-                {limits.current} / {limits.limit}
+      <div className="space-y-6 animate-fade-in">
+        <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-5 text-white shadow-[0_28px_100px_rgba(15,23,42,0.3)] sm:p-6">
+          <div className={`flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between ${isRTL ? 'lg:flex-row-reverse' : ''}`}>
+            <div className="max-w-3xl space-y-3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                {locale === 'ar' ? 'واجهة المنتجات' : 'Products shell'}
               </div>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("title")}</h2>
+              <p className="max-w-2xl text-sm leading-6 text-slate-300">{t("subtitle")}</p>
             </div>
-          )}
-        </div>
-
-        <div className={`card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between ${isRTL ? 'lg:flex-row-reverse' : ''}`}>
-          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder={t("searchPlaceholder")}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                style={{ textAlign: isRTL ? 'right' : 'left' }}
-              />
-            </div>
-            <div className="w-full lg:w-72">
-              <select
-                value={filterMode}
-                onChange={(e) => setFilterMode(e.target.value as ProductFilterMode)}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                style={{ textAlign: isRTL ? 'right' : 'left' }}
-              >
-                {filterOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {limits && (
+              <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 shadow-[0_18px_60px_rgba(15,23,42,0.18)] backdrop-blur">
+                <div className="text-slate-400">{locale === 'ar' ? 'الحد المسموح' : 'Limit'}</div>
+                <div className={`text-xl font-semibold ${!limits.allowed ? 'text-red-300' : 'text-white'}`}>
+                  {limits.current} / {limits.limit}
+                </div>
+              </div>
+            )}
           </div>
 
-          <Link
-            href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/products/new`}
-            className={`btn btn-primary inline-flex items-center gap-2 whitespace-nowrap ${limits && !limits.allowed ? 'pointer-events-none opacity-50' : ''}`}
-            onClick={(e) => {
-              if (limits && !limits.allowed) {
-                e.preventDefault();
-                dialog.alert({
-                  title: locale === 'ar' ? 'الحد وصل' : 'Limit reached',
-                  message: locale === 'ar' ? 'تم الوصول للحد الأقصى في الباقة الحالية.' : 'You have reached your current package limit.',
-                  tone: 'danger'
-                });
-              }
-            }}
-          >
-            <PlusIcon className="h-5 w-5" />
-            <span>{t("addProduct")}</span>
-          </Link>
-        </div>
-      </div>
+          <div className={`mt-5 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur lg:flex-row lg:items-center lg:justify-between ${isRTL ? 'lg:flex-row-reverse' : ''}`}>
+            <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder={t("searchPlaceholder")}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-400/20"
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                />
+              </div>
+              <div className="w-full lg:w-72">
+                <select
+                  value={filterMode}
+                  onChange={(e) => setFilterMode(e.target.value as ProductFilterMode)}
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-400/20"
+                  style={{ textAlign: isRTL ? 'right' : 'left' }}
+                >
+                  {filterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-      {error && (
-        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
-            <ArrowPathIcon className="h-5 w-5 animate-spin text-primary" />
-            <p className="text-sm text-gray-600">{t("loading")}</p>
+            <Link
+              href={limits && !limits.allowed ? '#' : `/${locale}/dashboard/products/new`}
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:from-cyan-400 hover:to-blue-400 ${limits && !limits.allowed ? 'pointer-events-none opacity-50' : ''}`}
+              onClick={(e) => {
+                if (limits && !limits.allowed) {
+                  e.preventDefault();
+                  dialog.alert({
+                    title: locale === 'ar' ? 'الحد وصل' : 'Limit reached',
+                    message: locale === 'ar' ? 'تم الوصول للحد الأقصى في الباقة الحالية.' : 'You have reached your current package limit.',
+                    tone: 'danger'
+                  });
+                }
+              }}
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>{t("addProduct")}</span>
+            </Link>
           </div>
         </div>
-      ) : products.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-16 text-center">
-          <PhotoIcon className="mb-4 h-14 w-14 text-gray-300" />
-          <h3 className="text-xl font-semibold text-gray-900">{t("noProducts")}</h3>
-          <p className="mt-2 max-w-md text-sm text-gray-600">{t("noProductsDesc")}</p>
-          <Link href={`/${locale}/dashboard/products/new`} className="btn btn-primary mt-6 inline-flex items-center gap-2">
-            <PlusIcon className="h-5 w-5" />
-            <span>{t("addFirstProduct")}</span>
-          </Link>
-        </div>
-      ) : (
-        <div className={`grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] ${isRTL ? 'lg:[direction:rtl]' : ''}`}>
-          <aside className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              <h3 className="text-lg font-bold text-gray-900">{locale === 'ar' ? 'الفئات' : 'Categories'}</h3>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {categories.length - 1}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {categories.map((category) => {
-                const active = selectedCategory === category.key;
-                return (
-                  <button
-                    key={category.key}
-                    type="button"
-                    onClick={() => setSelectedCategory(category.key)}
-                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
-                      active
-                        ? 'border-primary bg-primary/5 text-primary shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
-                  >
-                    <span className="font-medium">{category.name}</span>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
-                      {category.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
 
-          <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-              <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                <h3 className="text-xl font-bold text-gray-900">{currentCategoryLabel}</h3>
-                <p className="text-sm text-gray-600">
-                  {visibleProducts.length} {locale === 'ar' ? 'منتج' : 'products'}
-                </p>
+        {error && (
+          <div className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-slate-200 shadow-[0_18px_60px_rgba(15,23,42,0.18)] backdrop-blur">
+              <ArrowPathIcon className="h-5 w-5 animate-spin text-cyan-300" />
+              <p className="text-sm text-slate-300">{t("loading")}</p>
+            </div>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 py-16 text-center text-slate-100 shadow-[0_18px_60px_rgba(15,23,42,0.18)] backdrop-blur">
+            <PhotoIcon className="mb-4 h-14 w-14 text-slate-500" />
+            <h3 className="text-xl font-semibold text-white">{t("noProducts")}</h3>
+            <p className="mt-2 max-w-md text-sm text-slate-300">{t("noProductsDesc")}</p>
+            <Link href={`/${locale}/dashboard/products/new`} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:from-cyan-400 hover:to-blue-400">
+              <PlusIcon className="h-5 w-5" />
+              <span>{t("addFirstProduct")}</span>
+            </Link>
+          </div>
+        ) : (
+          <div className={`grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] ${isRTL ? 'lg:[direction:rtl]' : ''}`}>
+            <aside className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4 text-slate-100 shadow-[0_18px_60px_rgba(15,23,42,0.18)] backdrop-blur">
+              <div className="mb-4 flex items-center justify-between" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <h3 className="text-lg font-bold text-white">{locale === 'ar' ? 'الفئات' : 'Categories'}</h3>
+                <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                  {categories.length - 1}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => loadProducts()}
-                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                <ArrowPathIcon className="h-4 w-4" />
-                <span>{locale === 'ar' ? 'تحديث' : 'Refresh'}</span>
-              </button>
-            </div>
-
-            {visibleProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-gray-200 py-16 text-center">
-                <PhotoIcon className="h-14 w-14 text-gray-300" />
-                <h4 className="mt-4 text-lg font-semibold text-gray-900">{t("noProducts")}</h4>
-                <p className="mt-2 text-sm text-gray-600">{t("noProductsDesc")}</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleProducts.map((product) => {
-                  const stock = Number(product.stock || 0);
-                  const stockLabel = stock <= 0
-                    ? (locale === 'ar' ? 'نفد المخزون' : 'Out of stock')
-                    : stock <= 10
-                      ? (locale === 'ar' ? 'مخزون منخفض' : 'Low stock')
-                      : (locale === 'ar' ? 'متوفر' : 'In stock');
-
+              <div className="space-y-2">
+                {categories.map((category) => {
+                  const active = selectedCategory === category.key;
                   return (
-                    <div
-                      key={product.id}
-                      className="rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm transition hover:shadow-md"
+                    <button
+                      key={category.key}
+                      type="button"
+                      onClick={() => setSelectedCategory(category.key)}
+                      className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                        active
+                          ? 'border-cyan-300/40 bg-cyan-400/10 text-cyan-100 shadow-[0_10px_30px_rgba(6,182,212,0.12)]'
+                          : 'border-white/10 bg-slate-950/40 text-slate-200 hover:border-cyan-300/30 hover:bg-white/10'
+                      }`}
+                      style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                     >
-                      <div className={`flex flex-col gap-4 xl:flex-row xl:items-center ${isRTL ? 'xl:flex-row-reverse' : ''}`}>
-                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
-                            {product.image ? (
-                              <img
-                                src={getImageUrl(product.image)}
-                                alt={locale === 'ar' ? product.name_ar : product.name_en}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center">
-                                <PhotoIcon className="h-8 w-8 text-gray-300" />
-                              </div>
-                            )}
-                          </div>
+                      <span className="font-medium">{category.name}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${active ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-slate-200'}`}>
+                        {category.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
 
-                          <div className="min-w-0 flex-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                            <div className="min-w-0">
-                              <h4 className="truncate text-lg font-bold text-gray-900">
+            <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4 text-slate-100 shadow-[0_18px_60px_rgba(15,23,42,0.18)] backdrop-blur">
+              <div className="mb-4 flex items-center justify-between gap-4" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <h3 className="text-xl font-bold text-white">{currentCategoryLabel}</h3>
+                  <p className="text-sm text-slate-300">
+                    {visibleProducts.length} {locale === 'ar' ? 'منتج' : 'products'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadProducts()}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-cyan-300/40 hover:bg-white/10"
+                >
+                  <ArrowPathIcon className="h-4 w-4" />
+                  <span>{locale === 'ar' ? 'تحديث' : 'Refresh'}</span>
+                </button>
+              </div>
+
+              {visibleProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 py-16 text-center">
+                  <PhotoIcon className="h-14 w-14 text-slate-500" />
+                  <h4 className="mt-4 text-lg font-semibold text-white">{t("noProducts")}</h4>
+                  <p className="mt-2 text-sm text-slate-300">{t("noProductsDesc")}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {visibleProducts.map((product) => {
+                    const stock = Number(product.stock || 0);
+                    const stockLabel = stock <= 0
+                      ? (locale === 'ar' ? 'نفد المخزون' : 'Out of stock')
+                      : stock <= 10
+                        ? (locale === 'ar' ? 'مخزون منخفض' : 'Low stock')
+                        : (locale === 'ar' ? 'متوفر' : 'In stock');
+
+                    return (
+                      <div
+                        key={product.id}
+                        className="rounded-[1.75rem] border border-white/10 bg-slate-950/45 p-4 shadow-[0_12px_40px_rgba(15,23,42,0.14)] transition hover:border-cyan-300/20 hover:shadow-[0_18px_60px_rgba(15,23,42,0.22)]"
+                      >
+                        <div className={`flex flex-col gap-4 xl:flex-row xl:items-center ${isRTL ? 'xl:flex-row-reverse' : ''}`}>
+                          <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-white/10">
+                              {product.image ? (
+                                <img
+                                  src={getImageUrl(product.image)}
+                                  alt={locale === 'ar' ? product.name_ar : product.name_en}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center">
+                                  <PhotoIcon className="h-8 w-8 text-slate-500" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                              <h4 className="truncate text-lg font-bold text-white">
                                 {locale === 'ar' ? product.name_ar : product.name_en}
                               </h4>
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-medium">
                                   {locale === 'ar' ? 'المخزون' : 'Stock'}: {product.stock} {t("units")}
                                 </span>
-                                <span className="inline-flex items-center rounded-full bg-white px-2.5 py-1 font-medium shadow-sm ring-1 ring-gray-200">
+                                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-medium">
                                   {locale === 'ar' ? 'الفئة' : 'Category'}: {(product.category || "").trim() || (locale === "ar" ? "غير مصنف" : "Uncategorized")}
                                 </span>
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${product.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${product.isAvailable ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/10 text-slate-300'}`}>
                                   {product.isAvailable ? t("available") : t("unavailable")}
                                 </span>
                                 {product.isFeatured && (
-                                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
+                                  <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-1 font-semibold text-amber-200">
                                     {t("featured")}
                                   </span>
                                 )}
                               </div>
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
                                 {product.brand && <span>{locale === 'ar' ? 'العلامة' : 'Brand'}: {product.brand}</span>}
                                 {product.sku && <span>• SKU: {product.sku}</span>}
                                 <span>• {stockLabel}</span>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex shrink-0 items-center justify-between gap-4 xl:flex-col xl:items-end">
-                          <div className="text-right">
-                            <div className="text-xs uppercase tracking-[0.16em] text-gray-500">
-                              {t("price")}
+                          <div className="flex shrink-0 items-center justify-between gap-4 xl:flex-col xl:items-end">
+                            <div className="text-right">
+                              <div className="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                {t("price")}
+                              </div>
+                              <div className={`text-2xl font-bold ${getProductStockTone(stock)}`}>
+                                <Currency amount={product.price} />
+                              </div>
                             </div>
-                            <div className={`text-2xl font-bold ${getProductStockTone(stock)}`}>
-                              <Currency amount={product.price} />
-                            </div>
-                          </div>
 
-                          <div className="flex items-center gap-2">
-                            <Link
-                              href={`/${locale}/dashboard/products/${product.id}`}
-                              title={t("edit")}
-                              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
-                            >
-                              <PencilSquareIcon className="h-5 w-5" />
-                            </Link>
-                            <button
-                              type="button"
-                              title={product.isAvailable ? (locale === 'ar' ? 'إيقاف' : 'Deactivate') : (locale === 'ar' ? 'تفعيل' : 'Activate')}
-                              onClick={() => handleToggleAvailability(product)}
-                              className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
-                                product.isAvailable
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary hover:text-primary'
-                              }`}
-                            >
-                              <PowerIcon className="h-5 w-5" />
-                            </button>
-                            <button
-                              type="button"
-                              title={t("delete")}
-                              onClick={() => handleDelete(product.id, locale === 'ar' ? product.name_ar : product.name_en)}
-                              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
-                            >
-                              <TrashIcon className="h-5 w-5" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <Link
+                                href={`/${locale}/dashboard/products/${product.id}`}
+                                title={t("edit")}
+                                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 transition hover:border-cyan-300/40 hover:text-cyan-200"
+                              >
+                                <PencilSquareIcon className="h-5 w-5" />
+                              </Link>
+                              <button
+                                type="button"
+                                title={product.isAvailable ? (locale === 'ar' ? 'إيقاف' : 'Deactivate') : (locale === 'ar' ? 'تفعيل' : 'Activate')}
+                                onClick={() => handleToggleAvailability(product)}
+                                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
+                                  product.isAvailable
+                                    ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15'
+                                    : 'border-white/10 bg-white/5 text-slate-200 hover:border-cyan-300/40 hover:text-cyan-200'
+                                }`}
+                              >
+                                <PowerIcon className="h-5 w-5" />
+                              </button>
+                              <button
+                                type="button"
+                                title={t("delete")}
+                                onClick={() => handleDelete(product.id, locale === 'ar' ? product.name_ar : product.name_en)}
+                                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-red-400/30 bg-red-500/10 text-red-200 transition hover:bg-red-500/15"
+                              >
+                                <TrashIcon className="h-5 w-5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        </div>
-      )}
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
     </TenantLayout>
   );
 }
