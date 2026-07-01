@@ -17,9 +17,13 @@
 /* Base Layer Customization */
 @layer base {
   body {
-    @apply bg-[#FAFAF9] text-gray-900;
+    @apply bg-[#f6f3ee] text-slate-900;
     font-family: 'Cairo', sans-serif;
     direction: rtl; /* Default to RTL for Arabic */
+    background-image:
+      radial-gradient(circle at top right, rgba(254, 1, 171, 0.08), transparent 24%),
+      radial-gradient(circle at bottom left, rgba(139, 90, 223, 0.08), transparent 26%);
+    background-attachment: fixed;
   }
 
   /* LTR for English */
@@ -68,54 +72,79 @@
 
 /* Card Styles */
 .card {
-  @apply bg-white rounded-xl shadow-lg border border-gray-100 p-6;
+  @apply rounded-[1.75rem] border border-white/70 bg-white/95 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl;
 }
 
 .card-header {
-  @apply border-b border-gray-200 pb-4 mb-4;
+  @apply mb-4 border-b border-slate-200/80 pb-4;
 }
 
 /* Button Styles */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold tracking-tight transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-sm {
+  @apply rounded-xl px-3 py-2 text-xs;
+}
+
+.btn-lg {
+  @apply rounded-2xl px-6 py-3 text-base;
+}
+
 .btn-primary {
-  @apply px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply text-white shadow-[0_16px_35px_rgba(139,90,223,0.28)] hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(139,90,223,0.34)];
+  background: linear-gradient(135deg, #8b5adf 0%, #fe01ab 100%);
 }
 
 .btn-secondary {
-  @apply px-6 py-3 bg-secondary text-dark rounded-lg font-semibold hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply border border-slate-200 bg-white text-slate-700 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50;
 }
 
 .btn-outline {
-  @apply px-6 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply border border-primary/30 bg-white text-primary shadow-sm hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/5;
+}
+
+.btn-success {
+  @apply border border-emerald-200 bg-emerald-500 text-white shadow-[0_14px_30px_rgba(16,185,129,0.24)] hover:-translate-y-0.5 hover:bg-emerald-600;
+}
+
+.btn-error {
+  @apply border border-rose-200 bg-rose-500 text-white shadow-[0_14px_30px_rgba(244,63,94,0.24)] hover:-translate-y-0.5 hover:bg-rose-600;
+}
+
+.btn-ghost {
+  @apply bg-transparent text-slate-700 hover:bg-slate-100;
 }
 
 /* Input Styles */
 .input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all;
+  @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15;
 }
 
 .input-error {
-  @apply border-red-500 focus:ring-red-500;
+  @apply border-rose-400 focus:border-rose-500 focus:ring-rose-500/15;
 }
 
 /* Badge Styles */
 .badge {
-  @apply px-3 py-1 rounded-full text-sm font-medium;
+  @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-tight;
 }
 
 .badge-success {
-  @apply bg-green-100 text-green-800;
+  @apply bg-emerald-100 text-emerald-700;
 }
 
 .badge-warning {
-  @apply bg-yellow-100 text-yellow-800;
+  @apply bg-amber-100 text-amber-800;
 }
 
 .badge-error {
-  @apply bg-red-100 text-red-800;
+  @apply bg-rose-100 text-rose-700;
 }
 
 .badge-info {
-  @apply bg-blue-100 text-blue-800;
+  @apply bg-sky-100 text-sky-700;
 }
 
 /* Animation */
@@ -136,6 +165,8 @@
 
 /* Loading Spinner */
 .spinner {
-  @apply inline-block w-8 h-8 border-4 border-gray-200 border-t-primary rounded-full animate-spin;
+  @apply inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200;
+  border-top-color: #8b5adf;
+  border-right-color: #fe01ab;
 }
 

@@ -175,52 +175,56 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       {children}
 
       {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-white/70 bg-white p-6 shadow-2xl">
-            <div className={`mb-4 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${toneClasses}`}>
-              {dialog.type === "confirm" ? "Confirm" : dialog.type === "prompt" ? "Input" : "Message"}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-xl">
+          <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-white/70 bg-white/96 shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 px-6 py-5 text-white">
+              <div className={`mb-4 inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] ${toneClasses}`}>
+                {dialog.type === "confirm" ? "Confirm" : dialog.type === "prompt" ? "Input" : "Message"}
+              </div>
+              <h3 className="text-xl font-bold tracking-tight">{dialog.title}</h3>
             </div>
-            <h3 className="text-xl font-bold text-gray-900">{dialog.title}</h3>
-            <p className="mt-3 text-sm leading-6 text-gray-600">{dialog.message}</p>
+            <div className="px-6 py-5">
+              <p className="text-sm leading-6 text-slate-600">{dialog.message}</p>
 
-            {dialog.type === "prompt" && (
-              <input
-                ref={inputRef}
-                type="text"
-                value={dialog.value}
-                onChange={(event) =>
-                  setDialog((current) =>
-                    current ? { ...current, value: event.target.value } : current
-                  )
-                }
-                placeholder={dialog.placeholder}
-                className="mt-4 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-              />
-            )}
+              {dialog.type === "prompt" && (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={dialog.value}
+                  onChange={(event) =>
+                    setDialog((current) =>
+                      current ? { ...current, value: event.target.value } : current
+                    )
+                  }
+                  placeholder={dialog.placeholder}
+                  className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              )}
 
-            <div className="mt-6 flex justify-end gap-3">
-              {dialog.type !== "alert" && (
+              <div className="mt-6 flex justify-end gap-3">
+                {dialog.type !== "alert" && (
+                  <button
+                    type="button"
+                    onClick={() => closeDialog(getDismissResult(dialog))}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {dialog.cancelText}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => closeDialog(getDismissResult(dialog))}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                  onClick={() => closeDialog(dialog.type === "prompt" ? dialog.value : true)}
+                  className={`rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition ${
+                    dialog.tone === "danger"
+                      ? "bg-rose-600 hover:bg-rose-500"
+                      : dialog.tone === "success"
+                        ? "bg-emerald-600 hover:bg-emerald-500"
+                        : "bg-primary hover:bg-primary/90"
+                  }`}
                 >
-                  {dialog.cancelText}
+                  {dialog.confirmText}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => closeDialog(dialog.type === "prompt" ? dialog.value : true)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold text-white transition ${
-                  dialog.tone === "danger"
-                    ? "bg-red-600 hover:bg-red-500"
-                    : dialog.tone === "success"
-                      ? "bg-emerald-600 hover:bg-emerald-500"
-                      : "bg-primary hover:bg-primary/90"
-                }`}
-              >
-                {dialog.confirmText}
-              </button>
+              </div>
             </div>
           </div>
         </div>

@@ -26,6 +26,7 @@ import {
   InformationCircleIcon,
   LifebuoyIcon,
   MegaphoneIcon,
+  MagnifyingGlassIcon,
   ShoppingBagIcon,
   SparklesIcon,
   UserGroupIcon,
@@ -89,6 +90,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationButtonRef = useRef<HTMLButtonElement | null>(null);
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
+  const shellSearchInputRef = useRef<HTMLInputElement | null>(null);
   const [entitlements, setEntitlements] = useState<Record<string, any> | null>(null);
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
   const [entitlementsLoadFailed, setEntitlementsLoadFailed] = useState(false);
@@ -104,6 +106,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
   const [notificationPanelPosition, setNotificationPanelPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
   const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; left?: number; right?: number }>({ top: 0 });
+  const [shellSearchOpen, setShellSearchOpen] = useState(false);
+  const [shellSearchQuery, setShellSearchQuery] = useState("");
   const announcedAppointmentAlertIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedAppointmentAlertsRef = useRef(false);
 
@@ -358,10 +362,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
           setUserMenuOpen(false);
           setNotificationMenuOpen((current) => !current);
         }}
-        className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+        className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-white/15"
         aria-label={locale === 'ar' ? 'الإشعارات' : 'Notifications'}
       >
-          <BellIcon className="h-5 w-5 text-gray-600" />
+          <BellIcon className="h-5 w-5 text-white" />
           {notificationBadgeCount > 0 ? (
             <span className={`absolute -top-1 ${isRTL ? '-left-1' : '-right-1'} flex min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold text-white`}>
             {notificationBadgeCount > 99 ? '99+' : notificationBadgeCount}
@@ -373,20 +377,20 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         typeof document !== 'undefined' ? createPortal(
           <div
             ref={notificationPanelRef}
-            className="fixed isolate z-[5000] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            className="fixed isolate z-[5000] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/95 text-slate-100 shadow-[0_28px_80px_rgba(15,23,42,0.45)] backdrop-blur-xl"
             style={{
               top: notificationPanelPosition.top,
               left: notificationPanelPosition.left,
               right: notificationPanelPosition.right
             }}
           >
-            <div className="border-b border-gray-100 px-4 py-4">
+            <div className="border-b border-white/10 px-4 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm font-semibold text-white">
                     {locale === 'ar' ? 'الإشعارات' : 'Notifications'}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-400">
                     {notificationCount > 0
                       ? (locale === 'ar' ? `${notificationCount} إشعار` : `${notificationCount} item(s)`)
                       : (locale === 'ar' ? 'لا توجد إشعارات جديدة' : 'No new notifications')}
@@ -396,7 +400,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                   type="button"
                   onClick={markAllNotificationsAsRead}
                   disabled={markingNotificationsRead || notificationCount === 0}
-                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {markingNotificationsRead
                     ? (locale === 'ar' ? 'جارٍ التحديث...' : 'Marking...')
@@ -405,7 +409,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                 <button
                   type="button"
                   onClick={() => setNotificationMenuOpen(false)}
-                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-white hover:bg-white/15"
                 >
                   {locale === 'ar' ? 'إغلاق' : 'Close'}
                 </button>
@@ -413,31 +417,31 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             </div>
             <div className="max-h-[420px] overflow-y-auto p-2">
               {notificationFeed.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-slate-300">
                   {locale === 'ar' ? 'لا توجد إشعارات حالياً' : 'No notifications right now'}
                 </div>
               ) : notificationFeed.map((item) => (
                 <div
                   key={item.key}
                   className={`mb-2 rounded-xl border px-3 py-3 ${
-                    item.severity === 'high' ? 'border-rose-200 bg-rose-50' : 'border-gray-200 bg-white'
+                    item.severity === 'high' ? 'border-rose-400/20 bg-rose-500/10' : 'border-white/10 bg-white/5'
                   }`}
                   style={{ textAlign: isRTL ? 'right' : 'left' }}
                 >
                   <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-gray-600">{item.message}</p>
+                      <p className="text-sm font-semibold text-white">{item.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-300">{item.message}</p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                         item.kind === 'pos'
-                          ? 'bg-sky-100 text-sky-700'
+                          ? 'bg-sky-500/15 text-sky-200'
                           : item.kind === 'appointment'
-                            ? 'bg-amber-100 text-amber-700'
+                            ? 'bg-amber-500/15 text-amber-200'
                             : item.kind === 'review'
-                              ? 'bg-violet-100 text-violet-700'
-                            : 'bg-amber-100 text-amber-700'
+                              ? 'bg-violet-500/15 text-violet-200'
+                            : 'bg-amber-500/15 text-amber-200'
                       }`}>
                         {item.kind === 'pos'
                           ? (locale === 'ar' ? 'تحصيل' : 'POS')
@@ -450,7 +454,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                       <button
                         type="button"
                         onClick={() => handleDismissNotification(item)}
-                        className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
+                        className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 hover:bg-white/15"
                       >
                         {locale === 'ar' ? 'إخفاء' : 'Dismiss'}
                       </button>
@@ -460,7 +464,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                     <Link
                       href={`/${locale}${item.detailPath}`}
                       onClick={() => setNotificationMenuOpen(false)}
-                      className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline"
+                      className="mt-3 inline-flex text-xs font-semibold text-amber-200 hover:underline"
                     >
                       {locale === 'ar' ? 'فتح التفاصيل' : 'Open details'}
                     </Link>
@@ -490,16 +494,16 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   const renderUserMenuPanel = () => (
     <div
       ref={userMenuPanelRef}
-      className="fixed isolate z-[10001] w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+      className="fixed isolate z-[10001] w-72 overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/95 text-slate-100 shadow-[0_28px_80px_rgba(15,23,42,0.45)] backdrop-blur-xl"
       style={{
         top: userMenuPosition.top,
         left: userMenuPosition.left,
         right: userMenuPosition.right
       }}
     >
-      <div className="border-b border-gray-100 px-4 py-4">
-        <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-        <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
+      <div className="border-b border-white/10 px-4 py-4">
+        <p className="text-sm font-semibold text-white">{displayName}</p>
+        <p className="mt-1 text-xs text-slate-400">{user?.email}</p>
       </div>
       <div className="p-2">
         <button
@@ -508,27 +512,27 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             setUserMenuOpen(false);
             router.push(`/${locale}/dashboard/settings`);
           }}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-slate-200 hover:bg-white/10"
         >
-          <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
+          <Cog6ToothIcon className="h-5 w-5 text-slate-400" />
           <span>{locale === 'ar' ? 'الإعدادات' : 'Settings'}</span>
         </button>
         <button
           type="button"
           disabled
           title={locale === 'ar' ? 'سيتم تفعيلها لاحقاً' : 'Coming soon'}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+          className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-slate-500 cursor-not-allowed"
         >
-          <LifebuoyIcon className="h-5 w-5 text-gray-400" />
+          <LifebuoyIcon className="h-5 w-5 text-slate-500" />
           <span>{locale === 'ar' ? 'مركز المساعدة' : 'Help Desk'}</span>
         </button>
         <button
           type="button"
           disabled
           title={locale === 'ar' ? 'سيتم تفعيله لاحقاً' : 'Coming soon'}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+          className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-slate-500 cursor-not-allowed"
         >
-          <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+          <InformationCircleIcon className="h-5 w-5 text-slate-500" />
           <span>{locale === 'ar' ? 'حول' : 'About'}</span>
         </button>
         <button
@@ -540,13 +544,86 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
               window.location.href = `/${locale}/login`;
             }
           }}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+          className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-rose-300 hover:bg-rose-500/10"
         >
-          <ArrowRightOnRectangleIcon className="h-5 w-5 text-red-500" />
+          <ArrowRightOnRectangleIcon className="h-5 w-5 text-rose-300" />
           <span>{locale === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
         </button>
       </div>
     </div>
+  );
+
+  const renderShellSearchPanel = () => (
+    shellSearchOpen && typeof document !== 'undefined' ? createPortal(
+      <div
+        className="fixed inset-0 z-[12000] flex items-start justify-center bg-slate-950/55 p-4 pt-20 backdrop-blur-xl"
+        onClick={() => {
+          setShellSearchOpen(false);
+          setShellSearchQuery("");
+        }}
+      >
+        <div
+          className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/95 shadow-[0_30px_90px_rgba(15,23,42,0.5)]"
+          onClick={(event) => event.stopPropagation()}
+          dir={isRTL ? "rtl" : "ltr"}
+        >
+          <div className="border-b border-white/10 p-4">
+            <div className={`flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
+              <input
+                ref={shellSearchInputRef}
+                value={shellSearchQuery}
+                onChange={(event) => setShellSearchQuery(event.target.value)}
+                placeholder={locale === "ar" ? "ابحث في الأقسام والصفحات..." : "Search sections and pages..."}
+                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+              />
+              <kbd className="hidden rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:inline-flex">
+                {locale === "ar" ? "Esc" : "Esc"}
+              </kbd>
+            </div>
+          </div>
+
+          <div className="max-h-[28rem] overflow-y-auto p-3">
+            {shellSearchResults.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-slate-300">
+                {locale === "ar" ? "لا توجد نتائج مطابقة" : "No matching results"}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {shellSearchResults.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => {
+                        setShellSearchOpen(false);
+                        setShellSearchQuery("");
+                      }}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 transition hover:border-white/20 hover:bg-white/10"
+                    >
+                      <div className={`flex min-w-0 items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-slate-200">
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-white">{item.name}</p>
+                          <p className="mt-0.5 truncate text-xs text-slate-400">
+                            {item.group ? item.group : locale === "ar" ? "رابط مباشر" : "Direct link"}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="h-4 w-4 text-slate-500" />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>,
+      document.body
+    ) : null
   );
   useEffect(() => {
     if (!notificationMenuOpen) return;
@@ -653,6 +730,8 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       if (event.key === 'Escape') {
         setUserMenuOpen(false);
         setNotificationMenuOpen(false);
+        setShellSearchOpen(false);
+        setShellSearchQuery("");
       }
     };
 
@@ -663,6 +742,29 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
+  }, []);
+
+  useEffect(() => {
+    if (!shellSearchOpen) return;
+
+    const focusInput = window.requestAnimationFrame(() => {
+      shellSearchInputRef.current?.focus();
+      shellSearchInputRef.current?.select();
+    });
+
+    return () => window.cancelAnimationFrame(focusInput);
+  }, [shellSearchOpen]);
+
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setShellSearchOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
   }, []);
 
   const catalogChildren = useMemo<NavigationLeafItem[]>(() => {
@@ -749,6 +851,42 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
       return [item];
     });
   }, [canAccessPermission, navigation]);
+
+  const shellSearchItems = useMemo(() => {
+    const items = navigation.flatMap((item) => {
+      if (item.kind === "group") {
+        return item.children
+          .filter((child) => child.visible !== false && canAccessPermission(child.permissionKey))
+          .map((child) => ({
+            name: child.name,
+            href: child.href,
+            icon: child.icon,
+            group: item.name
+          }));
+      }
+
+      return [{
+        name: item.name,
+        href: item.href,
+        icon: item.icon,
+        group: null as string | null
+      }];
+    });
+
+    return items;
+  }, [canAccessPermission, navigation]);
+
+  const shellSearchResults = useMemo(() => {
+    const query = shellSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return shellSearchItems.slice(0, 10);
+    }
+
+    return shellSearchItems.filter((item) => {
+      return [item.name, item.group || "", item.href]
+        .some((value) => value.toLowerCase().includes(query));
+    }).slice(0, 12);
+  }, [shellSearchItems, shellSearchQuery]);
 
   useEffect(() => {
     if (!entitlementsLoaded || entitlementsLoadFailed || entitlements === null || !pathname) return;
@@ -862,29 +1000,29 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         href={item.href}
         title={sidebarCollapsed ? item.name : undefined}
         aria-label={item.name}
-        className={`group relative flex items-center rounded-xl transition-all ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${!sidebarCollapsed && options?.nested ? (isRTL ? 'mr-3' : 'ml-3') : ''} ${
+        className={`group relative flex items-center rounded-2xl border transition-all duration-200 ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${!sidebarCollapsed && options?.nested ? (isRTL ? 'mr-3' : 'ml-3') : ''} ${
           active
-            ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
-            : "text-gray-700 hover:bg-gray-100"
+            ? "border-white/10 bg-gradient-to-r from-primary via-secondary to-secondary text-white shadow-lg shadow-primary/20"
+            : "border-transparent bg-white/0 text-slate-300 hover:border-white/10 hover:bg-white/5 hover:text-white"
         }`}
       >
         {sidebarCollapsed ? (
-          <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+          <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
         ) : isRTL ? (
           <>
             <span className="flex-1 font-medium text-right">{item.name}</span>
-            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
           </>
         ) : (
           <>
-            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
             <span className="flex-1 font-medium">{item.name}</span>
           </>
         )}
         {!sidebarCollapsed && item.badgeCount ? (
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-              active ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+              active ? 'bg-white/20 text-white' : 'bg-rose-500/15 text-rose-200'
             }`}
           >
             {item.badgeCount > 99 ? '99+' : item.badgeCount}
@@ -916,31 +1054,31 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             }
             toggleNavGroup(item.key);
           }}
-          className={`group relative flex w-full items-center rounded-xl transition-all ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${
+          className={`group relative flex w-full items-center rounded-2xl border transition-all duration-200 ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'} ${
             active
-              ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "border-white/10 bg-gradient-to-r from-primary via-secondary to-secondary text-white shadow-lg shadow-primary/20"
+              : "border-transparent bg-white/0 text-slate-300 hover:border-white/10 hover:bg-white/5 hover:text-white"
           }`}
         >
           {sidebarCollapsed ? (
-            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+            <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
           ) : isRTL ? (
             <>
-              <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-gray-400'}`} />
+              <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-slate-400'}`} />
               <span className="flex-1 font-medium text-right">{item.name}</span>
-              <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+              <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
             </>
           ) : (
             <>
-              <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+              <Icon className={`h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
               <span className="flex-1 font-medium">{item.name}</span>
-              <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-gray-400'}`} />
+              <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-slate-400'}`} />
             </>
           )}
         </button>
 
         {!sidebarCollapsed && expanded ? (
-          <div className={`space-y-1 ${isRTL ? 'mr-3' : 'ml-3'}`}>
+          <div className={`space-y-1 rounded-2xl border border-white/5 bg-white/5 p-2 ${isRTL ? 'mr-3' : 'ml-3'}`}>
             {item.children
               .filter((child) => child.visible !== false && canAccessPermission(child.permissionKey))
               .map((child) => renderSidebarNavItem(child, { nested: true }))}
@@ -951,23 +1089,35 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 lg:h-dvh lg:overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_right,_rgba(254,1,171,0.12),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(139,90,223,0.14),_transparent_30%),linear-gradient(180deg,_#050816_0%,_#0f172a_100%)] text-slate-100 lg:h-dvh">
+      <div className="pointer-events-none absolute inset-0 opacity-60">
+        <div className="absolute -top-32 right-0 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl" />
+      </div>
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white/90 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
+      <header className="lg:hidden sticky top-0 z-[60] border-b border-white/10 bg-slate-950/85 text-slate-100 shadow-[0_18px_45px_rgba(15,23,42,0.35)] backdrop-blur-2xl">
         <div
-          className="px-4 py-4 flex items-center justify-between"
+          className="flex items-center justify-between px-4 py-4"
           style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
         >
           <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
-            <h1 className="text-xl font-bold text-gray-900">{t("dashboard")}</h1>
-            <p className="text-sm text-gray-600">{user?.businessName}</p>
+            <h1 className="text-xl font-black tracking-tight text-white">{t("dashboard")}</h1>
+            <p className="text-sm text-slate-400">{user?.businessName}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShellSearchOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+            >
+              <MagnifyingGlassIcon className="h-4 w-4" />
+              <span>{locale === 'ar' ? 'بحث' : 'Search'}</span>
+            </button>
             {renderNotificationMenu()}
             {/* Language Switcher */}
             <Link
               href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+              className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15"
             >
               {locale === 'ar' ? 'EN' : 'عربي'}
             </Link>
@@ -977,7 +1127,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
 
       <div className="hidden lg:grid" style={{ ...shellGridStyle, direction: 'ltr', height: '100dvh', overflow: 'hidden' }}>
         <div
-          className="h-full overflow-hidden border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="h-full overflow-hidden border-b border-white/10 bg-slate-950/85 text-slate-100 shadow-[0_18px_45px_rgba(15,23,42,0.35)] backdrop-blur-2xl"
           style={{ gridArea: 'logo' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -998,10 +1148,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
               )}
               {!sidebarCollapsed && (
                 <div className="min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  <p className="truncate text-base font-bold text-gray-900">
+                  <p className="truncate text-base font-bold text-white">
                     {user?.businessName || (locale === 'ar' ? 'اسم المركز' : 'Business name')}
                   </p>
-                  <p className="truncate text-xs text-gray-600">
+                  <p className="truncate text-xs text-slate-400">
                     {Array.isArray(user?.businessType)
                       ? user.businessType.map((item: string) => item.replace('_', ' ')).join(', ')
                       : user?.businessType || 'Salon'}
@@ -1013,7 +1163,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             <button
               type="button"
               onClick={() => setSidebarCollapsed((current) => !current)}
-              className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
+              className="rounded-2xl border border-white/10 bg-white/10 p-2 text-white hover:bg-white/15"
               aria-label={sidebarCollapsed ? (locale === 'ar' ? 'توسيع القائمة' : 'Expand sidebar') : (locale === 'ar' ? 'تصغير القائمة' : 'Collapse sidebar')}
             >
               {sidebarCollapsed
@@ -1024,7 +1174,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         </div>
 
         <header
-          className="relative z-[2000] h-full overflow-visible border-b border-gray-200 bg-white/90 backdrop-blur-lg shadow-sm"
+          className="relative z-[2000] h-full overflow-visible border-b border-white/10 bg-slate-950/85 text-slate-100 shadow-[0_18px_45px_rgba(15,23,42,0.35)] backdrop-blur-2xl"
           style={{ gridArea: 'header' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
@@ -1034,12 +1184,21 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             {isRTL ? (
               <>
                 <div className="flex items-center justify-start gap-3" style={{ flexDirection: 'row' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShellSearchOpen(true)}
+                    className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-white/15"
+                    aria-label={locale === 'ar' ? 'بحث سريع' : 'Quick search'}
+                  >
+                    <MagnifyingGlassIcon className="h-5 w-5" />
+                    <span className="hidden xl:inline">{locale === 'ar' ? 'بحث سريع' : 'Search'}</span>
+                  </button>
                   {renderConsultantShortcut()}
                   {renderNotificationMenu()}
 
                   <Link
                     href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
-                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
                   >
                     {locale === 'ar' ? 'EN' : 'عربي'}
                   </Link>
@@ -1052,7 +1211,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                         setNotificationMenuOpen(false);
                         setUserMenuOpen((current) => !current);
                       }}
-                      className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
+                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 shadow-lg shadow-slate-950/10 hover:bg-white/15"
                     >
                       {user?.profileImage || user?.logo ? (
                         <img
@@ -1066,10 +1225,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                         </div>
                       )}
                       <div className="min-w-0 text-right">
-                        <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
-                        <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
+                        <p className="max-w-[180px] truncate text-sm font-semibold text-white">{displayName}</p>
+                        <p className="text-xs text-slate-400">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
                       </div>
-                      <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDownIcon className={`h-4 w-4 text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {userMenuOpen && (typeof document !== 'undefined' ? createPortal(renderUserMenuPanel(), document.body) : null)}
@@ -1077,13 +1236,13 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                 </div>
 
                 <div className="flex items-center justify-end gap-3 min-w-0">
-                  <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 text-right">
+                  <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white text-right">
                     <ClockIcon className="inline-block h-4 w-4 ml-2 align-[-2px]" />
                     <span suppressHydrationWarning>{hasMounted ? currentDateTimeLabel : (locale === 'ar' ? '—' : '--')}</span>
                   </div>
-                  <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
-                    <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-white shadow-sm">
+                    <span className="truncate text-sm font-semibold text-white">{currentSection}</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
                     </span>
                   </div>
@@ -1092,15 +1251,24 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
             ) : (
               <>
                 <div className="flex items-center justify-start gap-3 min-w-0">
-                  <div className="rounded-2xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => setShellSearchOpen(true)}
+                    className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-white/15"
+                    aria-label={locale === 'ar' ? 'بحث سريع' : 'Quick search'}
+                  >
+                    <MagnifyingGlassIcon className="h-5 w-5" />
+                    <span className="hidden xl:inline">{locale === 'ar' ? 'بحث سريع' : 'Search'}</span>
+                  </button>
+                  <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white">
                     <ClockIcon className="inline-block h-4 w-4 mr-2 align-[-2px]" />
                     <span suppressHydrationWarning>{hasMounted ? currentDateTimeLabel : (locale === 'ar' ? '—' : '--')}</span>
                   </div>
-                  <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  <div className="hidden xl:flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-white shadow-sm">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       {locale === 'ar' ? 'القسم الحالي' : 'Current section'}
                     </span>
-                    <span className="truncate text-sm font-semibold text-gray-900">{currentSection}</span>
+                    <span className="truncate text-sm font-semibold text-white">{currentSection}</span>
                   </div>
                 </div>
 
@@ -1110,7 +1278,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
 
                   <Link
                     href={locale === 'ar' ? pathname?.replace('/ar', '/en') || '/en' : pathname?.replace('/en', '/ar') || '/ar'}
-                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
                   >
                     {locale === 'ar' ? 'EN' : 'عربي'}
                   </Link>
@@ -1123,7 +1291,7 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                         setNotificationMenuOpen(false);
                         setUserMenuOpen((current) => !current);
                       }}
-                      className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50"
+                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 shadow-lg shadow-slate-950/10 hover:bg-white/15"
                     >
                       {user?.profileImage || user?.logo ? (
                         <img
@@ -1137,10 +1305,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
                         </div>
                       )}
                       <div className="min-w-0 text-left">
-                        <p className="max-w-[180px] truncate text-sm font-semibold text-gray-900">{displayName}</p>
-                        <p className="text-xs text-gray-500">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
+                        <p className="max-w-[180px] truncate text-sm font-semibold text-white">{displayName}</p>
+                        <p className="text-xs text-slate-400">{locale === 'ar' ? 'حساب المركز' : 'Tenant account'}</p>
                       </div>
-                      <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDownIcon className={`h-4 w-4 text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {userMenuOpen && (typeof document !== 'undefined' ? createPortal(renderUserMenuPanel(), document.body) : null)}
@@ -1152,19 +1320,19 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         </header>
 
         <aside
-          className={`relative z-40 h-full flex flex-col bg-white/90 backdrop-blur-lg shadow-xl border-gray-200 overflow-hidden transition-all duration-200 ${
+          className={`relative z-40 h-full flex flex-col overflow-hidden border-white/10 bg-slate-950/90 text-slate-100 shadow-[0_24px_70px_rgba(15,23,42,0.45)] backdrop-blur-2xl transition-all duration-200 ${
               isRTL ? 'border-l' : 'border-r'
             }`}
           style={{ gridArea: 'sidebar' }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
-          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3">
             {navigation.map((item) => item.kind === "group" ? renderSidebarGroupItem(item) : renderSidebarNavItem(item))}
           </nav>
         </aside>
 
-        <main className="relative z-0 min-w-0 h-full overflow-y-auto" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
-          <div className={fullWidth ? 'p-4 lg:p-6' : 'p-4 lg:p-8'}>
+        <main className="relative z-0 min-w-0 h-full overflow-y-auto px-4 py-4" style={{ gridArea: 'content', minHeight: 0 }} dir={isRTL ? 'rtl' : 'ltr'}>
+          <div className={`h-full rounded-[2rem] border border-white/10 bg-white/96 text-slate-900 shadow-[0_24px_100px_rgba(15,23,42,0.22)] ${fullWidth ? 'p-4 lg:p-6' : 'p-4 lg:p-8'}`}>
             <div className={`mx-auto w-full ${fullWidth ? 'max-w-none' : 'max-w-[1600px]'}`}>
               {children}
             </div>
@@ -1172,8 +1340,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
         </main>
       </div>
 
+      {renderShellSearchPanel()}
+
       {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-lg z-50">
+      <nav className="lg:hidden fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-slate-950/90 shadow-[0_-10px_30px_rgba(15,23,42,0.35)] backdrop-blur-2xl">
         <div className="grid grid-cols-5 gap-1 p-2">
           {mobileNavigation.slice(0, 5).map((item) => {
             const active = isActive(item.href);
@@ -1182,10 +1352,10 @@ export function TenantLayout({ children, fullWidth = true }: TenantLayoutProps) 
               <Link
                 key={item.name}
                 href={item.href}
-                className={`relative flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${active ? "bg-primary/10 text-primary" : "text-gray-600"
+                className={`relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 transition-colors ${active ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"
                   }`}
               >
-                <Icon className={`h-5 w-5 ${active ? 'text-primary' : 'text-gray-500'}`} />
+                <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-slate-400'}`} />
                 <span className="text-xs font-medium truncate w-full text-center">
                   {item.name}
                 </span>
