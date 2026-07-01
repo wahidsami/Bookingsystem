@@ -310,39 +310,45 @@ export default function NewEmployeePage() {
 
   return (
     <TenantLayout>
-      <div className="mb-6 animate-fade-in">
-        <div className={`flex flex-col gap-4 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
-          <div className="flex-1">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {t("addEmployee")}
-            </h2>
-            <p className="text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-              {locale === 'ar' ? 'أضف موظفاً جديداً إلى فريقك' : 'Add a new employee to your team'}
-            </p>
+      <div className="relative space-y-8 pb-8" dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[240px] bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.12),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(99,102,241,0.10),_transparent_30%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent_60%)]" />
+
+        <section className="card overflow-hidden border border-slate-200/80 bg-slate-950 text-white shadow-2xl shadow-slate-950/10">
+          <div className="grid gap-6 p-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/80">
+                {locale === 'ar' ? 'إدارة الفريق' : 'Team management'}
+              </p>
+              <h1 className="text-4xl font-black tracking-tight" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {t("addEmployee")}
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-slate-300" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                {locale === 'ar' ? 'أضف موظفاً جديداً إلى فريقك' : 'Add a new employee to your team'}
+              </p>
+            </div>
+
+            <div className={`flex flex-wrap gap-3 ${isRTL ? 'justify-start xl:justify-end' : 'justify-start xl:justify-end'}`}>
+              <Link href={`/${locale}/dashboard/employees`} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+                {t("cancel")}
+              </Link>
+              <button type="submit" form="employee-editor-form" disabled={loading} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-950/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60">
+                {loading ? t("loading") : t("save")}
+              </button>
+            </div>
           </div>
+        </section>
 
-          <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-            <Link href={`/${locale}/dashboard/employees`} className="btn btn-secondary">
-              {t("cancel")}
-            </Link>
-            <button type="submit" form="employee-editor-form" disabled={loading} className="btn btn-primary">
-              {loading ? t("loading") : t("save")}
-            </button>
+        {error && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 shadow-sm">
+            {error}
           </div>
-        </div>
-      </div>
+        )}
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-          {error}
-        </div>
-      )}
-
-      <form id="employee-editor-form" onSubmit={handleSubmit} noValidate className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
-          <aside className="sticky top-6 self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+        <form id="employee-editor-form" onSubmit={handleSubmit} noValidate className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[300px,minmax(0,1fr)]">
+            <aside className="sticky top-6 self-start rounded-[2rem] border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-950/5">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 {locale === 'ar' ? 'أقسام التحرير' : 'Editor Sections'}
               </p>
             </div>
@@ -360,19 +366,19 @@ export default function NewEmployeePage() {
                     key={item.id}
                     type="button"
                     onClick={() => scrollToSection(item.id)}
-                    className={`w-full rounded-xl border px-3 py-3 text-start transition-all ${
+                    className={`w-full rounded-2xl border px-3 py-3 text-start transition-all ${
                       active
-                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-gray-50'
+                        ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-slate-50'
                     }`}
                   >
                     <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
                       <span className="font-medium">{item.label}</span>
-                      <span className="text-xs font-semibold text-gray-500">{item.status}</span>
+                      <span className="text-xs font-semibold text-slate-500">{item.status}</span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className="h-full rounded-full bg-primary transition-all"
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all"
                         style={{
                           width: `${
                             item.id === 'basic'
@@ -383,7 +389,7 @@ export default function NewEmployeePage() {
                                   ? Math.round((sectionProgress.finance.filled / sectionProgress.finance.total) * 100)
                                   : item.id === 'schedule'
                                     ? Math.round((sectionProgress.schedule.filled / sectionProgress.schedule.total) * 100)
-                                    : Math.round((sectionProgress.access.filled / sectionProgress.access.total) * 100)
+                              : Math.round((sectionProgress.access.filled / sectionProgress.access.total) * 100)
                           }%`
                         }}
                       />
@@ -392,10 +398,10 @@ export default function NewEmployeePage() {
                 );
               })}
             </div>
-          </aside>
+            </aside>
 
-          <div className="space-y-6">
-            <section id="employee-section-basic" className={`${activeSection === 'basic' ? 'card scroll-mt-6' : 'hidden'}`}>
+            <div className="space-y-6">
+            <section id="employee-section-basic" className={`${activeSection === 'basic' ? 'card scroll-mt-6 overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5' : 'hidden'}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -479,7 +485,7 @@ export default function NewEmployeePage() {
               </div>
             </section>
 
-            <section id="employee-section-bio" className={`${activeSection === 'bio' ? 'card scroll-mt-6' : 'hidden'}`}>
+            <section id="employee-section-bio" className={`${activeSection === 'bio' ? 'card scroll-mt-6 overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5' : 'hidden'}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -621,7 +627,7 @@ export default function NewEmployeePage() {
               </div>
             </section>
 
-            <section id="employee-section-finance" className={`${activeSection === 'finance' ? 'card scroll-mt-6' : 'hidden'}`}>
+            <section id="employee-section-finance" className={`${activeSection === 'finance' ? 'card scroll-mt-6 overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5' : 'hidden'}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -704,7 +710,7 @@ export default function NewEmployeePage() {
               </div>
             </section>
 
-            <section id="employee-section-schedule" className={`${activeSection === 'schedule' ? 'card scroll-mt-6 space-y-4' : 'hidden'}`}>
+            <section id="employee-section-schedule" className={`${activeSection === 'schedule' ? 'card scroll-mt-6 space-y-4 overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5' : 'hidden'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -815,7 +821,7 @@ export default function NewEmployeePage() {
               </div>
             </section>
 
-            <section id="employee-section-access" className={`${activeSection === 'access' ? 'card scroll-mt-6' : 'hidden'}`}>
+            <section id="employee-section-access" className={`${activeSection === 'access' ? 'card scroll-mt-6 overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5' : 'hidden'}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
@@ -906,7 +912,7 @@ export default function NewEmployeePage() {
               )}
             </section>
 
-            <div className="card">
+            <div className="card overflow-hidden border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5">
               <div className="flex items-center gap-2" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <input
                   type="checkbox"
@@ -919,8 +925,9 @@ export default function NewEmployeePage() {
               </div>
             </div>
           </div>
-        </div>
-      </form>
+          </div>
+        </form>
+      </div>
     </TenantLayout>
   );
 }

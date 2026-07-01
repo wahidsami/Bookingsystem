@@ -643,16 +643,16 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
 
   if (!employeeId && !isDraftMode) {
     return (
-      <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-6">
+      <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-6 shadow-sm">
         <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-          <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+          <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">
             <CalendarIcon className="h-6 w-6" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-lg font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            <h4 className="text-lg font-semibold text-slate-950" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {locale === "ar" ? "الجدول الأسبوعي" : "Weekly schedule"}
             </h4>
-            <p className="mt-1 text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+            <p className="mt-1 text-sm text-slate-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
               {locale === "ar"
                 ? "احفظ الموظف أولاً حتى نتمكن من إدارة الورديات الأسبوعية من داخل هذه الصفحة."
                 : "Save the employee first so we can manage weekly shifts directly in this section."}
@@ -665,18 +665,18 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
 
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+      <div className="rounded-[2rem] border border-slate-200/80 bg-gradient-to-br from-white to-slate-50 p-5 shadow-xl shadow-slate-950/5">
         <div className={`flex flex-col gap-4 ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'} lg:items-center lg:justify-between`}>
           <div className="min-w-0">
             <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-              <span className="rounded-2xl bg-primary/10 p-3 text-primary">
+              <span className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">
                 <CalendarIcon className="h-5 w-5" />
               </span>
               <div>
-                <h4 className="text-xl font-semibold text-gray-900" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <h4 className="text-xl font-semibold text-slate-950" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {locale === "ar" ? "الجدول الأسبوعي" : "Weekly schedule"}
                 </h4>
-                <p className="text-sm text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <p className="text-sm text-slate-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   {employeeName
                     ? (locale === "ar"
                       ? `إدارة ورديات ${employeeName} الأسبوعية من داخل الملف مباشرة.`
@@ -722,14 +722,14 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
         </div>
 
         {loading ? (
-          <div className="mt-5 rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
             {locale === "ar" ? "جارٍ تحميل الورديات..." : "Loading shifts..."}
           </div>
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-[1.3fr,1fr,1fr,0.9fr,0.9fr] gap-0 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+      <div className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-xl shadow-slate-950/5">
+        <div className="grid grid-cols-[1.3fr,1fr,1fr,0.9fr,0.9fr] gap-0 border-b border-slate-200 bg-slate-950 px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
           <div>{locale === "ar" ? "اليوم" : "Day"}</div>
           <div className="text-center">{locale === "ar" ? "من" : "From"}</div>
           <div className="text-center">{locale === "ar" ? "إلى" : "To"}</div>
@@ -737,7 +737,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
           <div className={isRTL ? "text-left" : "text-right"}>{locale === "ar" ? "إجراءات" : "Actions"}</div>
         </div>
 
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-slate-100">
           {WEEK_DAYS.map((day) => {
             const dayShifts = groupedShifts.get(day.value) || [];
             const visibleShifts = dayShifts.filter((shift) => shift.isDraft || shift.isActive !== false);
@@ -755,14 +755,14 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                       type="checkbox"
                       checked={enabled}
                       onChange={(event) => void handleToggleDay(day.value, event.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
                       disabled={Boolean(savingKey)}
                     />
                     <div>
-                      <div className="font-semibold text-gray-900">
+                      <div className="font-semibold text-slate-950">
                         {locale === "ar" ? day.labelAr : day.labelEn}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-500">
                         {hasVisibleRows
                           ? (locale === "ar" ? `${dayShifts.length} وردية` : `${dayShifts.length} shift${dayShifts.length === 1 ? "" : "s"}`)
                           : (locale === "ar" ? "غير عامل" : "Not working")}
@@ -776,7 +776,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                         value={mainShift.startTime}
                         onChange={(event) => updateLocalShift(mainShift.id, (current) => ({ ...current, startTime: event.target.value }))}
                         onBlur={() => void saveShiftRow(mainShift)}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
                         disabled={Boolean(savingKey)}
                       >
                         {TIME_OPTIONS.map((option) => (
@@ -786,7 +786,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                         ))}
                       </select>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-500">
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
                         {locale === "ar" ? "غير عامل" : "Not working"}
                       </div>
                     )}
@@ -798,7 +798,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                         value={mainShift.endTime}
                         onChange={(event) => updateLocalShift(mainShift.id, (current) => ({ ...current, endTime: event.target.value }))}
                         onBlur={() => void saveShiftRow(mainShift)}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
                         disabled={Boolean(savingKey)}
                       >
                         {TIME_OPTIONS.map((option) => (
@@ -808,7 +808,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                         ))}
                       </select>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-500">
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
                         {locale === "ar" ? "غير عامل" : "Not working"}
                       </div>
                     )}
@@ -818,7 +818,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                     <button
                       type="button"
                       onClick={() => createDraftSubShift(day.value)}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 transition hover:border-primary hover:text-primary"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700"
                       disabled={Boolean(savingKey) || !hasVisibleRows}
                       aria-label={locale === "ar" ? "إضافة وردية فرعية" : "Add sub shift"}
                     >
@@ -831,7 +831,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                       <button
                         type="button"
                         onClick={() => void handleDeleteShift(mainShift.id)}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
                         disabled={Boolean(savingKey)}
                         aria-label={locale === "ar" ? "حذف الوردية" : "Delete shift"}
                       >
@@ -842,18 +842,18 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                 </div>
 
                 {nestedShifts.length > 0 ? (
-                  <div className="mt-4 space-y-3 border-t border-dashed border-gray-200 pt-4">
+                  <div className="mt-4 space-y-3 border-t border-dashed border-slate-200 pt-4">
                     {nestedShifts.map((shift) => (
-                      <div key={shift.id} className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[1.1fr,1fr,1fr,0.8fr,0.8fr]">
+                      <div key={shift.id} className="grid gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[1.1fr,1fr,1fr,0.8fr,0.8fr]">
                         <div className="flex items-center gap-3">
-                          <div className="h-px w-10 bg-gray-300" />
+                          <div className="h-px w-10 bg-slate-300" />
                         <input
                           type="text"
                           value={shift.label || ""}
                           onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, label: event.target.value }))}
                           onBlur={() => !shift.isDraft && void saveShiftRow(shift)}
                           placeholder={locale === "ar" ? "عنوان الوردية" : "Shift title"}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
                           disabled={Boolean(savingKey)}
                           style={{ textAlign: isRTL ? 'right' : 'left' }}
                         />
@@ -863,7 +863,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                           value={shift.startTime}
                           onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, startTime: event.target.value }))}
                           onBlur={() => !shift.isDraft && void saveShiftRow(shift)}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
                           disabled={Boolean(savingKey)}
                         >
                           {TIME_OPTIONS.map((option) => (
@@ -877,7 +877,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                           value={shift.endTime}
                           onChange={(event) => updateLocalShift(shift.id, (current) => ({ ...current, endTime: event.target.value }))}
                           onBlur={() => !shift.isDraft && void saveShiftRow(shift)}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-100"
                           disabled={Boolean(savingKey)}
                         >
                           {TIME_OPTIONS.map((option) => (
@@ -911,7 +911,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
                           <button
                             type="button"
                             onClick={() => void handleDeleteShift(shift.id)}
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
                             disabled={Boolean(savingKey)}
                             aria-label={locale === "ar" ? "حذف الوردية الفرعية" : "Delete sub shift"}
                           >
@@ -929,7 +929,7 @@ export const EmployeeWeeklyScheduleEditor = React.forwardRef<EmployeeWeeklySched
       </div>
 
       {oneTimeShiftCount > 0 ? (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           {locale === "ar"
             ? "هناك ورديات لمرة واحدة موجودة بالفعل. سيستمر عرضها وإدارتها من صفحة الجداول الحالية."
             : "One-time shifts already exist. They remain available in the standalone schedules page for now."}
