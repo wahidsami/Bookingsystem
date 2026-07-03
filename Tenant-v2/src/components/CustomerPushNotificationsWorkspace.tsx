@@ -5,7 +5,7 @@ import {
   Search, Check, ShieldAlert, Code, Clock, Upload, ArrowRight, ArrowLeft,
   X, HelpCircle, Database, Smartphone, FileJson, Layers3, Flame
 } from 'lucide-react';
-import { mockCustomers, mockServices } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface PushNotificationsWorkspaceProps {
   lang: 'ar' | 'en';
@@ -81,6 +81,8 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
   });
   const [history, setHistory] = useState<NotificationHistoryItem[]>([]);
   const [hotDeals, setHotDeals] = useState<HotDeal[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
 
   // Composer Form States
   const [title, setTitle] = useState<string>('');
@@ -159,6 +161,19 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
       } catch (e) {
         console.warn("Hot deals endpoint not fully accessible", e);
       }
+
+      // Fetch Dependencies (Customers & Services)
+      const customersRes = await tenantApiAdapter.getCustomers({ limit: 1000 });
+      const customersMapped = (customersRes.data || []).map((c: any) => ({
+        ...c,
+        name: c.nameEn || c.nameAr || 'Unknown',
+        phone: c.phone || 'No Phone',
+        email: c.email || 'No Email',
+        appointmentsCount: c.stats?.totalAppointments || 0
+      }));
+      setCustomers(customersMapped);
+      const servicesData = await tenantApiAdapter.getServices();
+      setServices(servicesData);
 
     } catch (err: any) {
       setError(err.message || "Failed to synchronise data with push service.");
@@ -248,10 +263,10 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
   };
 
   const toggleSelectAllCustomers = () => {
-    if (selectedCustomerIds.length === mockCustomers.length) {
+    if (selectedCustomerIds.length === customers.length) {
       setSelectedCustomerIds([]);
     } else {
-      setSelectedCustomerIds(mockCustomers.map(c => c.id));
+      setSelectedCustomerIds(customers.map(c => c.id));
     }
   };
 
@@ -321,7 +336,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
   };
 
   // Customer Filtering Search
-  const filteredCustomers = mockCustomers.filter(c => 
+  const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
     c.phone.includes(customerSearch) ||
     c.email.toLowerCase().includes(customerSearch.toLowerCase())
@@ -535,7 +550,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
                     }`}
                   >
                     <option value="">{isRtl ? '-- اختر الخدمة --' : '-- Select Service --'}</option>
-                    {mockServices.map(srv => (
+                    {services.map(srv => (
                       <option key={srv.id} value={srv.id}>
                         {isRtl ? srv.nameAr : srv.nameEn} ({srv.price} {isRtl ? 'ر.س' : 'SAR'})
                       </option>
@@ -733,15 +748,15 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
                 <div className="flex justify-between items-center text-[10px] text-zinc-400 px-1">
                   <span>
                     {isRtl 
-                      ? `تم تحديد ${selectedCustomerIds.length} من أصل ${mockCustomers.length}` 
-                      : `${selectedCustomerIds.length} selected out of ${mockCustomers.length}`}
+                      ? `تم تحديد ${selectedCustomerIds.length} من أصل ${customers.length}` 
+                      : `${selectedCustomerIds.length} selected out of ${customers.length}`}
                   </span>
                   <button
                     type="button"
                     onClick={toggleSelectAllCustomers}
                     className="text-brand-500 font-bold hover:underline cursor-pointer"
                   >
-                    {selectedCustomerIds.length === mockCustomers.length 
+                    {selectedCustomerIds.length === customers.length 
                       ? (isRtl ? 'إلغاء تحديد الكل' : 'Deselect All') 
                       : (isRtl ? 'تحديد الكل' : 'Select All')}
                   </button>

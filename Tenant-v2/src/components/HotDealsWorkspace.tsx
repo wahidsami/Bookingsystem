@@ -4,7 +4,7 @@ import {
   Percent, X, Pause, Play, Check, Upload, Image as ImageIcon, 
   ArrowLeft, Clock, ArrowRight, Lock, CheckCircle 
 } from 'lucide-react';
-import { mockServices } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface HotDealsWorkspaceProps {
   lang: 'ar' | 'en';
@@ -71,6 +71,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
   // Data states from API
   const [deals, setDeals] = useState<HotDeal[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [limits, setLimits] = useState<PackageLimits | null>(null);
   
   // Statuses
@@ -144,10 +145,13 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       setLoading(true);
       setError(null);
       
-      const [dealsRes, limitsRes] = await Promise.all([
+      const [dealsRes, limitsRes, servicesData] = await Promise.all([
         fetch('/api/v1/tenant/hot-deals'),
-        fetch('/api/v1/tenant/hot-deals/limits')
+        fetch('/api/v1/tenant/hot-deals/limits'),
+        tenantApiAdapter.getServices()
       ]);
+
+      setServices(servicesData);
 
       if (!dealsRes.ok || !limitsRes.ok) {
         throw new Error("Failed to communicate with full-stack endpoints");
@@ -400,7 +404,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
     }
 
     // Additional guard: fixed value cannot exceed original price
-    const selectedSrv = mockServices.find(s => s.id === serviceId);
+    const selectedSrv = services.find(s => s.id === serviceId);
     if (selectedSrv && discountType === 'fixed_amount' && Number(discountValue) >= selectedSrv.price) {
       triggerNotification(
         `قيمة الخصم الثابت لا يمكن أن تعادل أو تزيد عن السعر الأصلي للخدمة (${selectedSrv.price} ر.س).`,
@@ -468,7 +472,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   // COMPUTATIONAL / MATH RENDERING HELPERS
   // ----------------------------------------------------
   const getSelectedServiceDetails = () => {
-    return mockServices.find(s => s.id === serviceId);
+    return services.find(s => s.id === serviceId);
   };
 
   const calculateDiscountedPrice = () => {
@@ -498,7 +502,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   const getFilteredDeals = () => {
     return deals.filter(deal => {
       // 1. Search Query Match (Title Ar/En or Promo code or Service name)
-      const serviceObj = mockServices.find(s => s.id === deal.serviceId);
+      const serviceObj = services.find(s => s.id === deal.serviceId);
       const srvNameAr = serviceObj?.nameAr || '';
       const srvNameEn = serviceObj?.nameEn || '';
       const q = searchQuery.toLowerCase().trim();
@@ -727,7 +731,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="hot-deals-grid">
               {filteredDeals.map((deal) => {
-                const srv = mockServices.find(s => s.id === deal.serviceId);
+                const srv = services.find(s => s.id === deal.serviceId);
                 const srvName = srv ? (isRtl ? srv.nameAr : srv.nameEn) : (isRtl ? "خدمة غير معروفة" : "Unknown Service");
                 const originalPrice = srv ? srv.price : 0;
                 
@@ -1092,7 +1096,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     }`}
                   >
                     <option value="">-- {isRtl ? 'اختر خدمة للبدء' : 'Select Service to bind'} --</option>
-                    {mockServices.map((s) => (
+                    {services.map((s) => (
                       <option key={s.id} value={s.id}>
                         {isRtl ? s.nameAr : s.nameEn} ({s.price} SAR - {s.duration} mins)
                       </option>
