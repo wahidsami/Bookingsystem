@@ -450,62 +450,69 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
         if (!res.ok) throw new Error("Failed to load VVIP client file");
         const data = await res.json();
         
-        // Hydrate rich sub-tab datasets using logical fallbacks to guarantee absolute detail
         const profile: CustomerProfileData = {
           ...data,
-          birthdate: data.birthdate || '1995-04-12',
-          assignedStylist: data.assignedStylist || 'Nadeen Al-Harbi',
-          assignedStylistAr: data.assignedStylistAr || 'نادين الحربي',
-          visitsCount: data.totalBookings ?? 5,
-          noShowsCount: data.noShowCount ?? 0,
-          spentServices: data.spentServices ?? Math.round((data.totalSpent || 1000) * 0.8),
-          spentProducts: data.spentProducts ?? Math.round((data.totalSpent || 1000) * 0.2),
-          avgTicket: data.avgTicket || 350,
-          unpaidBalance: data.unpaidBalance ?? 0,
-          prefDrink: data.prefDrink || 'Espresso, single',
-          prefDrinkAr: data.prefDrinkAr || 'إسبريسو سينجل',
-          prefTemp: data.prefTemp || 'Standard room temp',
-          prefTempAr: data.prefTempAr || 'درجة حرارة غرف معتدلة',
-          prefChat: data.prefChat || 'Moderate chit-chat',
-          prefChatAr: data.prefChatAr || 'تبادل أطراف حديث معتدل',
-          allergies: data.allergies || 'None recorded',
-          allergiesAr: data.allergiesAr || 'لا توجد أي حساسية مسجلة',
-          favServices: data.favServices || ["Royal Swedish Massage", "Manicure Deluxe"],
-          favServicesAr: data.favServicesAr || ["جلسة مساج السويدي الملكي", "باديكير مانيكير ديلوكس"],
-          communication: data.communication || [
-            { id: 'c1', date: '2026-06-25', type: 'whatsapp', sender: 'FronDesk', textEn: 'Appointment confirmation for Saturday', textAr: 'تأكيد الحجز ليوم السبت القادم' },
-            { id: 'c2', date: '2026-06-15', type: 'sms', sender: 'RefahSalon', textEn: 'Thank you for your premium visit!', textAr: 'نشكرك لزيارتك لصالون رفاه!' }
-          ],
-          appointments: data.appointments || [
-            { id: 'a1', service: 'Royal Swedish Massage', serviceAr: 'جلسة مساج السويدي الملكي', stylist: 'Layla Al-Asiri', stylistAr: 'ليلى العسيري', date: '2026-06-25', time: '11:00 AM', price: 350, status: 'completed' },
-            { id: 'a2', service: 'Platinum Hydrafacial', serviceAr: 'تنظيف بشرة هيدرافيشال بلاتينيوم', stylist: 'Layla Al-Asiri', stylistAr: 'ليلى العسيري', date: '2026-06-20', time: '02:00 PM', price: 650, status: 'completed' }
-          ],
-          transactions: data.transactions || [
-            { id: 't1', date: '2026-06-25', type: 'Service', typeAr: 'فاتورة خدمات صالون', amount: 350, method: 'Apple Pay', methodAr: 'مدى Apple Pay', status: 'paid' },
-            { id: 't2', date: '2026-06-20', type: 'Service + Product', typeAr: 'فاتورة خدمات ومنتجات تجميل', amount: 850, method: 'Credit Card', methodAr: 'بطاقة ائتمانية', status: 'paid' }
-          ],
-          walletBalance: data.walletBalance ?? 150,
-          walletCashback: data.walletCashback ?? 45,
-          loyaltyPoints: data.loyaltyPoints ?? 340,
-          reviews: data.reviews || [
-            { id: 'r1', date: '2026-06-25', service: 'Royal Swedish Massage', serviceAr: 'جلسة مساج السويدي الملكي', rating: 5, comment: 'Incredible service, very professional therapist.', commentAr: 'خدمة رائعة جداً وأخصائية محترفة للغاية.' }
-          ],
-          notes: data.notes || ['Requires soft music during treatment.', 'Prefers chamomile tea on warm days.'],
-          tags: data.tags || ['VIP Royal', 'Massage Fan', 'Loves Tea'],
-          documents: data.documents || [
-            { id: 'd1', name: 'Skin_Diagnosis_Report_June.pdf', date: '2026-06-20', size: '1.2 MB', type: 'PDF' }
-          ]
+          name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Guest',
+          nameAr: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'ضيف',
+          birthdate: data.dateOfBirth || data.birthdate || null,
+          assignedStylist: data.preferredStaff?.[0]?.name || 'Unassigned',
+          assignedStylistAr: data.preferredStaff?.[0]?.name || 'غير محدد',
+          visitsCount: data.totalBookings || 0,
+          noShowsCount: data.noShowCount || 0,
+          spentServices: data.totalSpent || 0,
+          spentProducts: data.totalProductsPurchased || 0,
+          avgTicket: data.averageBookingValue || 0,
+          unpaidBalance: data.unpaidBalance || 0,
+          prefDrink: '',
+          prefDrinkAr: '',
+          prefTemp: '',
+          prefTempAr: '',
+          prefChat: '',
+          prefChatAr: '',
+          allergies: '',
+          allergiesAr: '',
+          favServices: (data.favoriteServices || []).map((s: any) => s.name),
+          favServicesAr: (data.favoriteServices || []).map((s: any) => s.name),
+          communication: data.communication || [],
+          appointments: (data.recentAppointments || []).map((a: any) => ({
+            id: a.id,
+            service: a.service?.name_en || 'Service',
+            serviceAr: a.service?.name_ar || 'الخدمة',
+            stylist: a.staff?.name || 'Stylist',
+            stylistAr: a.staff?.name || 'خبير التجميل',
+            date: a.date?.split('T')[0] || a.date,
+            time: new Date(a.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: parseFloat(a.price || 0),
+            status: a.status
+          })),
+          transactions: (data.recentOrders || []).map((o: any) => ({
+            id: o.id,
+            date: o.date?.split('T')[0] || o.date,
+            type: 'Order ' + o.orderNumber,
+            typeAr: 'طلب ' + o.orderNumber,
+            amount: parseFloat(o.totalAmount || 0),
+            method: o.paymentStatus || 'Unknown',
+            methodAr: o.paymentStatus || 'غير معروف',
+            status: o.status === 'completed' ? 'paid' : 'pending'
+          })),
+          walletBalance: data.walletBalance || 0,
+          walletCashback: data.walletCashback || 0,
+          loyaltyPoints: data.loyaltyPoints || 0,
+          reviews: data.reviews || [],
+          notes: data.notes || [],
+          tags: data.tags || [],
+          documents: data.documents || []
         };
         setInspectedCustomer(profile);
         setIsPermissionDenied(false);
         
         // Prefill form states on load
-        setEditFirstName(profile.firstName || profile.name.split(' ')[0] || '');
-        setEditLastName(profile.lastName || profile.name.split(' ')[1] || '');
+        setEditFirstName(profile.firstName || '');
+        setEditLastName(profile.lastName || '');
         setEditEmail(profile.email || '');
         setEditPhone(profile.phone || '');
         setEditGender(profile.gender || 'Female');
-        setEditBirthdate(profile.birthdate || '1995-04-12');
+        setEditBirthdate(profile.birthdate || '');
         setEditPreferredLanguage(profile.preferredLanguage || 'ar');
       } catch (err) {
         console.error(err);
