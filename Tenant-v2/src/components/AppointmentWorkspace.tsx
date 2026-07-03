@@ -619,7 +619,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setDrawerOpen(true);
   };
 
-  const handleCheckoutPayment = () => {
+  const handleCheckoutPayment = async () => {
     if (!activeAppointment) return;
     
     // Calculate totals
@@ -640,32 +640,55 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       if (parts.length > 0) paymentMethodSummary = parts.join(' | ');
     }
 
-    const receipt = {
-      orderId: `REF-APT-${Math.floor(100000 + Math.random() * 900000)}`,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
-      serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
-      servicePrice: serviceSubtotal,
-      products: [...checkoutProducts],
-      subtotal,
-      discount,
-      vat,
-      total,
-      paymentSummary: paymentMethodSummary
-    };
+    try {
+      // 1. Mark appointment as paid
+      await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
+        paymentStatus: 'paid',
+        paymentMethod: paymentMethodSummary,
+        splitAmounts: isSplitActive ? splitAmounts : undefined,
+        totalPaid: total
+      });
 
-    setCheckoutReceiptData(receipt);
-    setShowReceiptModal(true);
+      // 2. Checkout any added products
+      if (checkoutProducts.length > 0) {
+        await tenantApiAdapter.checkoutProducts({
+          items: checkoutProducts.map(p => ({ productId: p.id, quantity: p.quantity, price: p.price })),
+          customerId: activeAppointment.customerId || undefined,
+          customerName: activeAppointment.customerNameEn || activeAppointment.customerNameAr || 'Walk-in',
+          paymentMethod: paymentMethodSummary
+        });
+      }
 
-    // Update appointment state in dashboard schedule
-    setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'completed', paymentStatus: 'paid' } : a));
-    setActiveAppointment(prev => prev ? { ...prev, status: 'completed', paymentStatus: 'paid' } : null);
-    
-    addLocalToast(
-      'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
-      'Session invoice settled and customer checked out successfully! 🧾',
-      'success'
-    );
+      const receipt = {
+        orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
+        serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
+        servicePrice: serviceSubtotal,
+        products: [...checkoutProducts],
+        subtotal,
+        discount,
+        vat,
+        total,
+        paymentSummary: paymentMethodSummary
+      };
+
+      setCheckoutReceiptData(receipt);
+      setShowReceiptModal(true);
+
+      // Update appointment state in dashboard schedule
+      setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'completed', paymentStatus: 'paid' } : a));
+      setActiveAppointment(prev => prev ? { ...prev, status: 'completed', paymentStatus: 'paid' } : null);
+      
+      addLocalToast(
+        'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
+        'Session invoice settled and customer checked out successfully! 🧾',
+        'success'
+      );
+    } catch (err) {
+      console.error('Checkout failed', err);
+      addLocalToast('فشل إتمام الدفع', 'Checkout failed. Try again.', 'error');
+    }
   };
 
   const handleAddWalletBalance = () => {
@@ -947,16 +970,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     ));
   };
 
-  const handleProcessPosCheckout = () => {
+  const handleProcessPosCheckout = async () => {
     if (cartItems.length === 0) {
       addLocalToast('سلة المبيعات فارغة، لا يمكن إتمام عملية الشراء', 'Sales cart is empty. Cannot checkout', 'warning');
       return;
     }
 
     let buyerName = isRtl ? 'زائر مجهول / Walk-in' : 'Walk-in Guest / زائر مجهول';
+    let customerId: string | undefined = undefined;
     if (posCustMode === 'existing') {
       const cust = liveCustomers.find(c => c.id === posSelectedCustId);
-      if (cust) buyerName = cust.name;
+      if (cust) {
+        buyerName = cust.name;
+        customerId = cust.id;
+      }
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -964,7 +991,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const total = subtotal + vat;
 
     let paymentMethodSummary = isRtl ? 'أطراف مدى المشتركة' : 'Mada Unified Terminals';
+    let allocations = undefined;
     if (posSplitActive) {
+      allocations = {
+        card: posSplitAmounts.card,
+        cash: posSplitAmounts.cash,
+        wallet: posSplitAmounts.wallet,
+        bank: posSplitAmounts.bank
+      };
       const parts = [];
       if (posSplitAmounts.card > 0) parts.push(`مدى: ${posSplitAmounts.card} ر.س`);
       if (posSplitAmounts.cash > 0) parts.push(`نقداً: ${posSplitAmounts.cash} ر.س`);
@@ -975,26 +1009,57 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       paymentMethodSummary = isRtl ? 'مدفوع بالكامل بالبطاقة الرقمية' : 'Paid in full via credit card terminal';
     }
 
-    setCompletedOrder({
-      orderId: `REF-POS-${Math.floor(100000 + Math.random() * 900000)}`,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      customerName: buyerName,
-      items: [...cartItems],
-      subtotal,
-      vat,
-      total,
-      paymentSummary: paymentMethodSummary
-    });
+    try {
+      const productItems = cartItems.filter(i => i.type === 'product');
+      const giftCardItems = cartItems.filter(i => i.type === 'giftcard');
+      let orderId = `REF-POS-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    setCartItems([]);
-    setPosSplitActive(false);
-    setPosSplitAmounts({ card: 0, cash: 0, wallet: 0, bank: 0 });
+      if (productItems.length > 0) {
+        const prodRes = await tenantApiAdapter.checkoutProducts({
+          items: productItems.map(p => ({ productId: p.id, quantity: p.quantity, price: p.price })),
+          customerId,
+          customerName: buyerName,
+          paymentMethod: paymentMethodSummary,
+          paymentAllocations: allocations
+        });
+        if (prodRes.orderId || prodRes.transactionRef) orderId = prodRes.orderId || prodRes.transactionRef;
+      }
 
-    addLocalToast(
-      'تمت فوترة المبيعات وتأكيد السداد بنجاح! 🧾',
-      'POS Sale billed and settled successfully! 🧾',
-      'success'
-    );
+      if (giftCardItems.length > 0) {
+        const gcRes = await tenantApiAdapter.checkoutGiftCards({
+          items: giftCardItems.map(g => ({ giftCardId: g.id, quantity: g.quantity, price: g.price })),
+          customerId,
+          customerName: buyerName,
+          paymentMethod: paymentMethodSummary,
+          paymentAllocations: allocations
+        });
+        if (gcRes.orderId || gcRes.transactionRef) orderId = gcRes.orderId || gcRes.transactionRef;
+      }
+
+      setCompletedOrder({
+        orderId: orderId,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        customerName: buyerName,
+        items: [...cartItems],
+        subtotal,
+        vat,
+        total,
+        paymentSummary: paymentMethodSummary
+      });
+
+      setCartItems([]);
+      setPosSplitActive(false);
+      setPosSplitAmounts({ card: 0, cash: 0, wallet: 0, bank: 0 });
+
+      addLocalToast(
+        'تمت فوترة المبيعات وتأكيد السداد بنجاح! 🧾',
+        'POS Sale billed and settled successfully! 🧾',
+        'success'
+      );
+    } catch (err) {
+      console.error('POS Checkout failed', err);
+      addLocalToast('خطأ في إتمام الطلب', 'POS Checkout error', 'error');
+    }
   };
 
   // Helper to calculate active 4-day block for Week view

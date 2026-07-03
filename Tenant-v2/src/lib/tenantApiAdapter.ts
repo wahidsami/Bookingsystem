@@ -593,6 +593,19 @@ class TenantApiAdapter {
   async getPaymentMethodsReport(startDate: string, endDate: string): Promise<any> {
     return this.get(`/tenant/reports/payment-methods?startDate=${startDate}&endDate=${endDate}`);
   }
+
+  // --- POS & Cart Checkout ---
+  async checkoutProducts(payload: any): Promise<any> {
+    return this.post('/tenant/cart/products/purchase', payload);
+  }
+
+  async checkoutGiftCards(payload: any): Promise<any> {
+    return this.post('/tenant/cart/gift-cards/purchase', payload);
+  }
+
+  async updateAppointmentPaymentStatus(id: string, payload: any): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/payment`, payload);
+  }
 }
 
 export const tenantApiAdapter = new TenantApiAdapter();
