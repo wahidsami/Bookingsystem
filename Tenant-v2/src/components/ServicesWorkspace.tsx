@@ -64,7 +64,23 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
         tenantApiAdapter.getEmployees(),
         tenantApiAdapter.getProducts()
       ]);
-      setServices((srvRes as any).services || []);
+      const normalizedServices: EnhancedService[] = ((srvRes as any).services || []).map((srv: any) => ({
+        ...srv,
+        descriptionAr: srv.descriptionAr ?? srv.description_ar ?? '',
+        descriptionEn: srv.descriptionEn ?? srv.description_en ?? '',
+        image: srv.image ?? srv.photo ?? defaultImage,
+        includes: Array.isArray(srv.includes) ? srv.includes : [],
+        variants: Array.isArray(srv.variants) ? srv.variants : [],
+        paymentOptions: Array.isArray(srv.paymentOptions) ? srv.paymentOptions : ['online', 'center'],
+        employeeAssignments: Array.isArray(srv.employeeAssignments) ? srv.employeeAssignments : [],
+        hasOffer: Boolean(srv.hasOffer || srv.offerDiscountPct),
+        hasGift: Boolean(srv.hasGift),
+        isActive: typeof srv.isActive === 'boolean' ? srv.isActive : true,
+        availableInCenter: typeof srv.availableInCenter === 'boolean' ? srv.availableInCenter : true,
+        availableHomeVisit: typeof srv.availableHomeVisit === 'boolean' ? srv.availableHomeVisit : false,
+        allowReschedule: typeof srv.allowReschedule === 'boolean' ? srv.allowReschedule : true
+      }));
+      setServices(normalizedServices);
       setEmployees((empRes as any).employees || []);
       setProducts((prdRes as any).products || []);
     } catch (err) {
@@ -900,7 +916,7 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
                                   <span className="w-1 h-1 rounded-full bg-neutral-300" />
                                   <span className="flex items-center gap-1">
                                     <Users size={12} className="text-indigo-500" />
-                                    <span>{srv.employeeAssignments.length} {isRtl ? 'أخصائيات معتمدات' : 'specialists'}</span>
+                                    <span>{(srv.employeeAssignments || []).length} {isRtl ? 'أخصائيات معتمدات' : 'specialists'}</span>
                                   </span>
                                 </div>
 
