@@ -125,6 +125,12 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
   const NODE_ENV = process.env.NODE_ENV || 'production';
 
+  // Real backend API base URL — set via VITE_API_URL env var at build time,
+  // but also read at runtime for server-side proxying.
+  const REAL_API_BASE =
+    (process.env.VITE_API_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
+  const REAL_API_ORIGIN = REAL_API_BASE.replace(/\/api\/v1\/?$/, '');
+
   app.use(express.json({ limit: '10mb' }));
 
   app.get('/health', (_req, res) => {
@@ -3121,6 +3127,51 @@ async function startServer() {
     }
   });
 
+
+  // ==========================================
+  // REVERSE PROXY — Forward real backend routes
+  // ==========================================
+  // All /api/v1/* and /auth/tenant/* requests NOT handled by the Tenant-v2
+  // exclusive routes above (hot-deals, notifications, gift-cards) are proxied
+  // to the real production backend so real data is returned.
+  app.use(['/api/v1', '/auth/tenant'], async (req, res) => {
+    try {
+      const targetBase = req.path.startsWith('/auth/tenant')
+        ? REAL_API_ORIGIN
+        : REAL_API_BASE;
+
+      const targetUrl = `${targetBase}${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Forward auth token if present
+      const authHeader = req.headers['authorization'];
+      if (authHeader) headers['Authorization'] = authHeader as string;
+
+      const fetchOptions: RequestInit = {
+        method: req.method,
+        headers,
+      };
+
+      if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+        fetchOptions.body = JSON.stringify(req.body);
+      }
+
+      const proxyRes = await fetch(targetUrl, fetchOptions);
+      const contentType = proxyRes.headers.get('content-type') || 'application/json';
+
+      res.status(proxyRes.status);
+      res.setHeader('Content-Type', contentType);
+
+      const text = await proxyRes.text();
+      res.send(text);
+    } catch (err: any) {
+      console.error('[Proxy Error]', req.method, req.path, err.message);
+      res.status(502).json({ error: 'Proxy error', message: err.message });
+    }
+  });
 
   // Serve frontend files via Vite in dev mode or static files in production mode
   if (process.env.NODE_ENV !== "production") {
