@@ -442,6 +442,14 @@ class TenantApiAdapter {
   async patchAppointment(id: string, data: Record<string, any>): Promise<any> {
     return this.patch(`/tenant/appointments/${id}`, data);
   }
+
+  async getDashboardStats(): Promise<any> {
+    return this.get('/tenant/dashboard/stats');
+  }
+
+  async getTodaysAppointments(): Promise<any> {
+    return this.get('/tenant/dashboard/todays-appointments');
+  }
 }
 
 export const tenantApiAdapter = new TenantApiAdapter();

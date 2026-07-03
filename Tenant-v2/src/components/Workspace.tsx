@@ -8,10 +8,11 @@ import {
 import { Language, ViewType } from '../types';
 import { translations, navigationItems } from '../data/translations';
 import { 
-  mockStats, mockAppointments, mockCustomers, mockEmployees, 
+  mockCustomers, mockEmployees, 
   mockServices, mockProducts, mockTransactions, mockCampaigns, 
   mockGiftCards, mockLoyalty, mockReviews, mockInvoices 
 } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import LucideIcon from './LucideIcon';
 import AppointmentWorkspace from './AppointmentWorkspace';
 import ReportsWorkspace from './ReportsWorkspace';
@@ -76,16 +77,48 @@ export default function Workspace({
   const [newViewName, setNewViewName] = useState('');
   const [showSavedViewModal, setShowSavedViewModal] = useState(false);
 
+  // Real Data State
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [todaysAppointments, setTodaysAppointments] = useState<any[]>([]);
+
   // Simulated Loading State to display skeleton loading on view change (gives premium feel)
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 400); // Fast, snappy loader simulation
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    const loadView = async () => {
+      setIsLoading(true);
+      if (view === 'dashboard') {
+        try {
+          const [statsRes, apptsRes] = await Promise.all([
+            tenantApiAdapter.getDashboardStats(),
+            tenantApiAdapter.getTodaysAppointments()
+          ]);
+          if (isMounted) {
+            if (statsRes?.success) setDashboardStats(statsRes.stats);
+            if (apptsRes?.success) setTodaysAppointments(apptsRes.appointments);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
+      if (isMounted) setIsLoading(false);
+    };
+    loadView();
+    return () => { isMounted = false; };
   }, [view]);
+
+  // Helper to compute growth
+  const computeGrowth = (today: number, yesterday: number) => {
+    if (yesterday === 0) return today > 0 ? '+100%' : '0%';
+    const pct = ((today - yesterday) / yesterday) * 100;
+    return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  };
+  
+  const revenueGrowth = dashboardStats ? computeGrowth(dashboardStats.todaysRevenue, dashboardStats.yesterdayRevenue) : '0%';
+  const bookingsGrowth = dashboardStats ? computeGrowth(dashboardStats.todaysBookings, dashboardStats.yesterdayBookings) : '0%';
 
   // POS operations
   const handleAddToPosCart = (item: any) => {
@@ -340,9 +373,9 @@ export default function Workspace({
                   }`}>
                     <div>
                       <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'إجمالي المبيعات' : 'Total Revenue'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{mockStats.revenueSAR.toLocaleString()} {t.riyal}</p>
+                      <p className="text-2xl font-black mt-1 font-mono">{(dashboardStats?.todaysRevenue || 0).toLocaleString()} {t.riyal}</p>
                       <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {mockStats.revenueGrowth} {isRtl ? 'عن الشهر الماضي' : 'vs last month'}
+                        {revenueGrowth} {isRtl ? 'عن أمس' : 'vs yesterday'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
@@ -363,10 +396,10 @@ export default function Workspace({
                     darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
                   }`}>
                     <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'حجوزات مؤكدة' : 'Confirmed Bookings'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{mockStats.appointmentsCount}</p>
+                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'حجوزات اليوم' : 'Today\'s Bookings'}</span>
+                      <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.todaysBookings || 0}</p>
                       <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {mockStats.appointmentsGrowth} {isRtl ? 'هذا الأسبوع' : 'this week'}
+                        {bookingsGrowth} {isRtl ? 'مقارنة بأمس' : 'vs yesterday'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
@@ -386,10 +419,10 @@ export default function Workspace({
                     darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
                   }`}>
                     <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'العملاء الجدد' : 'New Customers'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{mockStats.newCustomers}</p>
+                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'إجمالي العملاء' : 'Total Customers'}</span>
+                      <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.totalCustomers || 0}</p>
                       <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {mockStats.newCustomersGrowth} {isRtl ? 'مقارنة بأمس' : 'vs yesterday'}
+                        {isRtl ? 'قاعدة العملاء' : 'Active Client Base'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
@@ -409,10 +442,10 @@ export default function Workspace({
                     darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
                   }`}>
                     <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'معدل إشغال الكراسي' : 'Seat Occupancy'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{mockStats.occupancyRate}</p>
+                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'فريق العمل النشط' : 'Active Team Members'}</span>
+                      <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.activeEmployees || 0}</p>
                       <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {mockStats.occupancyGrowth} {isRtl ? 'تصاعدي' : 'upward trend'}
+                        {isRtl ? 'متاحين للخدمة' : 'Ready to serve'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
@@ -476,23 +509,29 @@ export default function Workspace({
                 <span className="text-xs text-brand-600 hover:underline cursor-pointer">{isRtl ? 'عرض جدول المواعيد كاملاً' : 'View Calendar'}</span>
               </div>
               <div className="space-y-3">
-                {mockAppointments.slice(0, 3).map((apt) => (
-                  <div key={apt.id} className={`p-3 border rounded-xl transition-all flex items-center justify-between ${
-                    darkMode ? 'border-zinc-800 hover:border-brand-500' : 'border-neutral-100 hover:border-brand-200'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold">{apt.customerName}</p>
-                        <p className="text-xs text-neutral-400">{apt.serviceName} • {apt.employeeName}</p>
+                {todaysAppointments.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-neutral-400 border rounded-xl border-dashed">
+                    {isRtl ? 'لا توجد مواعيد نشطة اليوم' : 'No active appointments today'}
+                  </div>
+                ) : (
+                  todaysAppointments.slice(0, 3).map((apt: any) => (
+                    <div key={apt.id} className={`p-3 border rounded-xl transition-all flex items-center justify-between ${
+                      darkMode ? 'border-zinc-800 hover:border-brand-500' : 'border-neutral-100 hover:border-brand-200'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${apt.status === 'completed' ? 'bg-emerald-500' : apt.status === 'confirmed' ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                        <div>
+                          <p className="text-sm font-semibold">{apt.customerName}</p>
+                          <p className="text-xs text-neutral-400">{isRtl ? (apt.serviceName_ar || apt.serviceName) : apt.serviceName} • {apt.employeeName}</p>
+                        </div>
+                      </div>
+                      <div className="text-end">
+                        <span className="text-xs font-bold block font-mono">{apt.startTime}</span>
+                        <span className="text-[10px] text-neutral-400 block font-mono">{apt.endTime}</span>
                       </div>
                     </div>
-                    <div className="text-end">
-                      <span className="text-xs font-bold block font-mono">{apt.time}</span>
-                      <span className="text-[10px] text-neutral-400 block font-mono">{apt.duration}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
