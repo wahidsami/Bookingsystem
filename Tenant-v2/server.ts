@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 
 // Hot Deal interface matching requirements
 interface HotDeal {
@@ -3206,7 +3205,8 @@ async function startServer() {
 
   // Serve frontend files via Vite in dev mode or static files in production mode
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    const { createServer } = await import("vite");
+    const vite = await createServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
