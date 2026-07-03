@@ -198,6 +198,13 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const parseApiResponse = (payload: any) => {
+    if (!payload) return null;
+    if (payload.success === false && payload.error) return null;
+    if (payload.data && typeof payload.data === 'object') return payload.data;
+    return payload;
+  };
+
   // Load KPI Stats
   const loadStats = async () => {
     setIsLoadingStats(true);
@@ -212,7 +219,8 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
         return;
       }
       if (!res.ok) throw new Error("Stats fetch failed");
-      const data = await res.json();
+      const rawData = await res.json();
+      const data = parseApiResponse(rawData);
       setStats(data || null);
       setIsPermissionDenied(false);
     } catch (err) {
@@ -246,9 +254,10 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
         return;
       }
       if (!res.ok) throw new Error("Failed to load customer catalog");
-      const data = await res.json();
-      const customers = Array.isArray(data?.customers) ? data.customers : [];
-      const pagination = data?.pagination || {};
+      const rawData = await res.json();
+      const data = parseApiResponse(rawData) || {};
+      const customers = Array.isArray(data.customers) ? data.customers : [];
+      const pagination = data.pagination || {};
       setCustomersList(customers);
       setTotalPages(typeof pagination.totalPages === 'number' ? pagination.totalPages : 1);
       setTotalRecords(typeof pagination.total === 'number' ? pagination.total : customers.length);
