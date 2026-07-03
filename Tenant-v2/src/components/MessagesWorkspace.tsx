@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { 
   Inbox, Pin, Megaphone, Users, Archive, Search, SlidersHorizontal, 
   Plus, Send, ArrowLeft, ArrowRight, Star, Paperclip, Trash2, 
@@ -144,15 +145,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
 
-  const initialStaffMembers = [
-    { id: 'st-1', nameAr: 'أحمد الحارثي', nameEn: 'Ahmad Al-Harthi', roleAr: 'مدير عام الفرع', roleEn: 'General Manager', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80' },
-    { id: 'st-2', nameAr: 'سارة الأحمد', nameEn: 'Sarah Al-Ahmad', roleAr: 'مشرفة قسم الاسترخاء', roleEn: 'Spa Supervisor', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80' },
-    { id: 'st-3', nameAr: 'ريم الدوسري', nameEn: 'Reem Al-Dossari', roleAr: 'مسؤولة الاستقبال الفخم', roleEn: 'Prestige Receptionist', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80' },
-    { id: 'st-4', nameAr: 'نورة السليمان', nameEn: 'Noura Al-Sulaiman', roleAr: 'خبير التصفيف الملكي', roleEn: 'Royal Stylist', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80' },
-    { id: 'st-5', nameAr: 'خالد العنزي', nameEn: 'Khalid Al-Anazi', roleAr: 'المدير المالي للمنشأة', roleEn: 'Finance Director', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80' }
-  ];
-
-  const [staffMembers, setStaffMembers] = useState<any[]>(initialStaffMembers);
+  const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [messages, setMessages] = useState<MessageThread[]>([]);
 
   // Load initial workspace data from API endpoints
@@ -162,15 +155,10 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
       setIsLoading(true);
       setIsError(false);
       try {
-        const [messagesRes, employeesRes] = await Promise.all([
-          fetch('/api/v1/tenant/messages'),
-          fetch('/api/v1/tenant/employees')
+        const [messagesData, employeesData] = await Promise.all([
+          tenantApiAdapter.getMessages(),
+          tenantApiAdapter.getEmployees()
         ]);
-        if (!messagesRes.ok || !employeesRes.ok) {
-          throw new Error('Failed to load workspace data');
-        }
-        const messagesData = await messagesRes.json();
-        const employeesData = await employeesRes.json();
         if (active) {
           setMessages(messagesData);
           setStaffMembers(employeesData);
@@ -477,12 +465,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
     }
 
     try {
-      const res = await fetch(`/api/v1/tenant/messages/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        throw new Error('Failed to delete message from backend');
-      }
+      await tenantApiAdapter.deleteMessage(id);
     } catch (err) {
       console.error('Error deleting message:', err);
       showToast(isRtl ? '⚠️ فشل حذف الرسالة من الخادم. تم التراجع.' : '⚠️ Failed to delete message from server. Rolled back.');
@@ -498,15 +481,10 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
     setIsDetailsOpen(false);
     setIsError(false);
     try {
-      const [messagesRes, employeesRes] = await Promise.all([
-        fetch('/api/v1/tenant/messages'),
-        fetch('/api/v1/tenant/employees')
+      const [messagesData, employeesData] = await Promise.all([
+        tenantApiAdapter.getMessages(),
+        tenantApiAdapter.getEmployees()
       ]);
-      if (!messagesRes.ok || !employeesRes.ok) {
-        throw new Error('Failed to load workspace data');
-      }
-      const messagesData = await messagesRes.json();
-      const employeesData = await employeesRes.json();
       setMessages(messagesData);
       setStaffMembers(employeesData);
       if (messagesData.length > 0) {
@@ -619,24 +597,11 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
     setMobileActivePanel('detail');
 
     try {
-      const res = await fetch('/api/v1/tenant/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newMsg),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to post message to backend');
-      }
+      await tenantApiAdapter.createMessage(newMsg);
 
       // Re-fetch list to ensure sync
-      const messagesRes = await fetch('/api/v1/tenant/messages');
-      if (messagesRes.ok) {
-        const messagesData = await messagesRes.json();
-        setMessages(messagesData);
-      }
+      const messagesData = await tenantApiAdapter.getMessages();
+      setMessages(messagesData);
     } catch (err) {
       console.error('Error posting message:', err);
       showToast(isRtl ? '⚠️ فشل إرسال الرسالة إلى الخادم. تم التراجع.' : '⚠️ Failed to send message to server. Rolled back.');

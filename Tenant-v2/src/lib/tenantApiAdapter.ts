@@ -433,6 +433,18 @@ class TenantApiAdapter {
     return this.delete(`/tenant/employees/${id}`);
   }
 
+  async getMessages(): Promise<any[]> {
+    return this.get('/tenant/messages');
+  }
+
+  async createMessage(data: Record<string, any>): Promise<any> {
+    return this.post('/tenant/messages', data);
+  }
+
+  async deleteMessage(id: string): Promise<any> {
+    return this.delete(`/tenant/messages/${id}`);
+  }
+
   async getServices(): Promise<any[]> {
     return this.get('/tenant/services');
   }
