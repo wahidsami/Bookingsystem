@@ -556,6 +556,43 @@ class TenantApiAdapter {
   async getTodaysAppointments(): Promise<any> {
     return this.get('/tenant/dashboard/todays-appointments');
   }
+
+  // --- Reports ---
+  async getDashboardSummary(): Promise<any> {
+    return this.get('/tenant/reports/summary');
+  }
+
+  async getFullReport(startDate: string, endDate: string, sections: string[] = []): Promise<any> {
+    const params = new URLSearchParams({ startDate, endDate });
+    if (sections.length > 0) {
+      params.append('sections', sections.join(','));
+    }
+    return this.get(`/tenant/reports/full?${params.toString()}`);
+  }
+
+  async getServicePerformance(startDate: string, endDate: string): Promise<any> {
+    return this.get(`/tenant/reports/service-performance?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  async getEmployeePerformance(startDate: string, endDate: string): Promise<any> {
+    return this.get(`/tenant/reports/employee-performance?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  async getCustomerAnalytics(startDate: string, endDate: string): Promise<any> {
+    return this.get(`/tenant/reports/customer-analytics?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  async getRebookingAnalytics(startDate: string, endDate: string): Promise<any> {
+    return this.get(`/tenant/reports/rebookings?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  async getRefundsReport(startDate: string, endDate: string): Promise<any> {
+    return this.get(`/tenant/reports/refunds?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  async getPaymentMethodsReport(startDate: string, endDate: string): Promise<any> {
+    return this.get(`/tenant/reports/payment-methods?startDate=${startDate}&endDate=${endDate}`);
+  }
 }
 
 export const tenantApiAdapter = new TenantApiAdapter();

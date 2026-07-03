@@ -9,6 +9,7 @@ import {
   FileText, ArrowUpRight, ArrowDownRight, RefreshCw, CalendarDays, CheckCircle2
 } from 'lucide-react';
 import { Language } from '../types';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface ReportsWorkspaceProps {
   lang: Language;
@@ -59,13 +60,52 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     }, 4000);
   };
 
+  const [employeesList, setEmployeesList] = useState<any[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<any[]>([]);
+  const [reportData, setReportData] = useState<any>({});
+  const [overviewStats, setOverviewStats] = useState<any>(null);
+
   // Trigger loading effect when switching reports or filters
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 400);
-    return () => clearTimeout(timer);
+    async function fetchReportData() {
+      setIsLoading(true);
+      try {
+        const [empRes, srvRes, summaryRes, fullReport] = await Promise.all([
+          tenantApiAdapter.getEmployees(),
+          tenantApiAdapter.getServices(),
+          tenantApiAdapter.getDashboardSummary(),
+          tenantApiAdapter.getFullReport(
+            dateRange === 'today' ? new Date().toISOString() : '2026-01-01', 
+            new Date().toISOString(), 
+            [activeTab]
+          )
+        ]);
+        
+        setEmployeesList([
+          { id: 'all', nameEn: 'All Staff', nameAr: 'جميع الموظفات' },
+          ...empRes.map((e: any) => ({
+            id: e.id,
+            nameEn: `${e.firstName} ${e.lastName}`,
+            nameAr: `${e.firstName} ${e.lastName}`,
+            ...e
+          }))
+        ]);
+
+        const uniqueCats = Array.from(new Set(srvRes.map((s: any) => s.categoryEn || 'Uncategorized')));
+        setServiceCategories([
+          { id: 'all', nameEn: 'All Categories', nameAr: 'جميع التصنيفات' },
+          ...uniqueCats.map((c: any) => ({ id: (c as string).toLowerCase(), nameEn: c, nameAr: c }))
+        ]);
+
+        setOverviewStats(summaryRes.data || summaryRes.overview || summaryRes);
+        setReportData(fullReport.data || {});
+      } catch (err) {
+        console.error('Error fetching report data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchReportData();
   }, [activeTab, dateRange, selectedEmployee, selectedService, selectedPaymentMethod]);
 
   // Translations
@@ -123,30 +163,6 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     next: isRtl ? 'التالي' : 'Next'
   };
 
-  // Mock data generator for different reports
-  const mockEmployeesList = [
-    { id: 'all', nameEn: 'All Staff', nameAr: 'جميع الموظفات' },
-    { id: 'st-1', nameEn: 'Nadeen Al-Harbi', nameAr: 'نادين الحربي' },
-    { id: 'st-2', nameEn: 'Layla Al-Asiri', nameAr: 'ليلى العسيري' },
-    { id: 'st-3', nameEn: 'Elena Vasily', nameAr: 'إيلينا فاسيلي' },
-    { id: 'st-4', nameEn: 'Mona Al-Ruwaiti', nameAr: 'منى الرويلي' }
-  ];
-
-  const mockServiceCategories = [
-    { id: 'all', nameEn: 'All Categories', nameAr: 'جميع التصنيفات' },
-    { id: 'hair', nameEn: 'Hair & Styling', nameAr: 'الشعر والتسريحات' },
-    { id: 'spa', nameEn: 'Skincare & Spa', nameAr: 'العناية بالبشرة والسبا' },
-    { id: 'nails', nameEn: 'Nail Art', nameAr: 'الأظافر والمساج' }
-  ];
-
-  const mockPaymentMethodsList = [
-    { id: 'all', nameEn: 'All Methods', nameAr: 'جميع القنوات' },
-    { id: 'mada', nameEn: 'Mada Debit', nameAr: 'مدى Mada' },
-    { id: 'card', nameEn: 'Credit Card', nameAr: 'بطاقة ائتمانية' },
-    { id: 'cash', nameEn: 'Cash', nameAr: 'نقدي Cash' },
-    { id: 'wallet', nameEn: 'Wallet', nameAr: 'المحفظة الرقمية' }
-  ];
-
   const mockDateRanges = [
     { id: 'today', labelEn: 'Today', labelAr: 'اليوم' },
     { id: 'yesterday', labelEn: 'Yesterday', labelAr: 'الأمس' },
@@ -157,6 +173,14 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     { id: 'custom', labelEn: 'Custom Date', labelAr: 'تاريخ مخصص' }
   ];
 
+  const mockPaymentMethodsList = [
+    { id: 'all', nameEn: 'All Methods', nameAr: 'جميع القنوات' },
+    { id: 'mada', nameEn: 'Mada Debit', nameAr: 'مدى Mada' },
+    { id: 'card', nameEn: 'Credit Card', nameAr: 'بطاقة ائتمانية' },
+    { id: 'cash', nameEn: 'Cash', nameAr: 'نقدي Cash' },
+    { id: 'wallet', nameEn: 'Wallet', nameAr: 'المحفظة الرقمية' }
+  ];
+
   const mockSavedReports = [
     { id: 'vat_q2', labelEn: 'Q2 VAT Tax Compliance', labelAr: 'إقرار ضريبة القيمة المضافة Q2', tab: 'financial_reports', dateRange: 'this_month' },
     { id: 'emp_comm', labelEn: 'Employee Commission Audit', labelAr: 'تدقيق عمولات الموظفات', tab: 'employee_reports', emp: 'st-1' },
@@ -164,108 +188,21 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     { id: 'discount_limit', labelEn: 'Discount Threshold Review', labelAr: 'مراجعة حدود الخصومات الممنوحة', tab: 'discounts_reports' }
   ];
 
-  // Raw mock records for each tab
-  const dataSales = [
-    { id: 'S-101', date: '2026-06-27', grossSales: 8900, discounts: 300, refunds: 0, netSales: 8600, vat: 1290, total: 9890, transactions: 24, itemSales: '18 services, 6 products' },
-    { id: 'S-102', date: '2026-06-26', grossSales: 12400, discounts: 800, refunds: 450, netSales: 11150, vat: 1672.5, total: 12822.5, transactions: 35, itemSales: '28 services, 7 products' },
-    { id: 'S-103', date: '2026-06-25', grossSales: 7500, discounts: 200, refunds: 0, netSales: 7300, vat: 1095, total: 8395, transactions: 19, itemSales: '15 services, 4 products' },
-    { id: 'S-104', date: '2026-06-24', grossSales: 14500, discounts: 1200, refunds: 0, netSales: 13300, vat: 1995, total: 15295, transactions: 42, itemSales: '35 services, 7 products' },
-    { id: 'S-105', date: '2026-06-23', grossSales: 9800, discounts: 500, refunds: 200, netSales: 9100, vat: 1365, total: 10465, transactions: 28, itemSales: '22 services, 6 products' },
-    { id: 'S-106', date: '2026-06-22', grossSales: 6200, discounts: 100, refunds: 0, netSales: 6100, vat: 915, total: 7015, transactions: 15, itemSales: '12 services, 3 products' },
-    { id: 'S-107', date: '2026-06-21', grossSales: 15800, discounts: 1500, refunds: 800, netSales: 13500, vat: 2025, total: 15525, transactions: 48, itemSales: '38 services, 10 products' }
-  ];
-
-  const dataFinancial = [
-    { id: 'TX-9001', date: '2026-06-27 10:15', customer: 'Fatima Al-Dossary', customerAr: 'فاطمة الدوسري', subtotal: 391.3, vat: 58.7, total: 450, method: 'Mada', methodAr: 'مدى', status: 'Completed', type: 'Service Revenue', invoiceRef: 'INV-2026-0511' },
-    { id: 'TX-9002', date: '2026-06-27 11:30', customer: 'Sarah Al-Ghamdi', customerAr: 'سارة الغامدي', subtotal: 739.1, vat: 110.9, total: 850, method: 'Credit Card', methodAr: 'بطاقة اائتمانية', status: 'Completed', type: 'Service Revenue', invoiceRef: 'INV-2026-0512' },
-    { id: 'TX-9003', date: '2026-06-27 13:40', customer: 'Abeer Bin Laden', customerAr: 'عبير بن لادن', subtotal: 304.3, vat: 45.7, total: 350, method: 'Mada', methodAr: 'مدى', status: 'Completed', type: 'Service Revenue', invoiceRef: 'INV-2026-0513' },
-    { id: 'TX-9004', date: '2026-06-26 15:10', customer: 'Hanan Al-Otaibi', customerAr: 'هنان العتيبي', subtotal: 1304.3, vat: 195.7, total: 1500, method: 'Mada', methodAr: 'مدى', status: 'Completed', type: 'Service Revenue', invoiceRef: 'INV-2026-0514' },
-    { id: 'TX-9005', date: '2026-06-26 16:45', customer: 'Maha Al-Sudairy', customerAr: 'مها السديري', subtotal: 217.4, vat: 32.6, total: 250, method: 'Wallet', methodAr: 'محفظة', status: 'Completed', type: 'Product Sale', invoiceRef: 'INV-2026-0515' },
-    { id: 'TX-9006', date: '2026-06-25 18:20', customer: 'Lujain Al-Hathloul', customerAr: 'لجين الهذلول', subtotal: 478.3, vat: 71.7, total: 550, method: 'Cash', methodAr: 'نقدي', status: 'Completed', type: 'Service Revenue', invoiceRef: 'INV-2026-0516' },
-    { id: 'TX-9007', date: '2026-06-25 19:00', customer: 'Nouf Al-Ruwaiti', customerAr: 'نوف الرويتي', subtotal: -173.9, vat: -26.1, total: -200, method: 'Wallet', methodAr: 'محفظة', status: 'Refunded', type: 'Customer Refund', invoiceRef: 'INV-2026-0504-R' }
-  ];
-
-  const dataAppointments = [
-    { id: 'APT-1209', customer: 'Al-Anoud Al-Saud', customerAr: 'العنود آل سعود', stylist: 'Nadeen Al-Harbi', stylistAr: 'نادين الحربي', service: 'Balayage & Premium Styling', serviceAr: 'بالياج مع تسريح بريميوم', date: '2026-06-27', duration: '150 min', price: 850, status: 'Completed', statusAr: 'مكتمل' },
-    { id: 'APT-1210', customer: 'Rania Al-Mutairi', customerAr: 'رانيا المطيري', stylist: 'Layla Al-Asiri', stylistAr: 'ليلى العسيري', service: 'Royal Hydra-Facial & Glow', serviceAr: 'هيدرافيشال ملكي ونضارة', date: '2026-06-27', duration: '90 min', price: 450, status: 'Arrived', statusAr: 'وصلت' },
-    { id: 'APT-1211', customer: 'Muneera Al-Jasser', customerAr: 'منيرة الجاسر', stylist: 'Elena Vasily', stylistAr: 'إيلينا فاسيلي', service: 'Gel Extension & Chrome Polish', serviceAr: 'تركيب جل مع طلاء كروم', date: '2026-06-27', duration: '75 min', price: 350, status: 'Confirmed', statusAr: 'مؤكد' },
-    { id: 'APT-1212', customer: 'Ghada Al-Qarni', customerAr: 'غادة القرني', stylist: 'Mona Al-Ruwaiti', stylistAr: 'منى الرويلي', service: 'Bridal Updo & Silk Treatment', serviceAr: 'تسريحة زفاف مع علاج الحرير', date: '2026-06-26', duration: '180 min', price: 1500, status: 'Completed', statusAr: 'مكتمل' },
-    { id: 'APT-1213', customer: 'Sarah Al-Dosari', customerAr: 'سارة الدوسري', stylist: 'Layla Al-Asiri', stylistAr: 'ليلى العسيري', service: 'Moroccan Bath Premium', serviceAr: 'حمام مغربي بريميوم', date: '2026-06-26', duration: '60 min', price: 500, status: 'No-Show', statusAr: 'عدم حضور' },
-    { id: 'APT-1214', customer: 'Fay Al-Ahmad', customerAr: 'في الأحمد', stylist: 'Nadeen Al-Harbi', stylistAr: 'نادين الحربي', service: 'Organic Protein Treatment', serviceAr: 'جلسة علاج بروتين عضوي', date: '2026-06-25', duration: '120 min', price: 900, status: 'Cancelled', statusAr: 'ملغية' }
-  ];
-
-  const dataEmployee = [
-    { id: 'EMP-01', name: 'Nadeen Al-Harbi', nameAr: 'نادين الحربي', role: 'Senior Colorist', roleAr: 'خبيرة تلوين الشعر', bookings: 94, utilization: '88%', servicesSales: 48500, productSales: 4200, tips: 1850, totalSales: 52700, rank: 1 },
-    { id: 'EMP-02', name: 'Layla Al-Asiri', nameAr: 'ليلى العسيري', role: 'Spa Therapist', roleAr: 'معالجة سبا', bookings: 76, utilization: '82%', servicesSales: 34200, productSales: 1500, tips: 1200, totalSales: 35700, rank: 2 },
-    { id: 'EMP-03', name: 'Elena Vasily', nameAr: 'إيلينا فاسيلي', role: 'Nail Artist', roleAr: 'فنانة أظافر محترفة', bookings: 112, utilization: '79%', servicesSales: 29800, productSales: 890, tips: 950, totalSales: 30690, rank: 3 },
-    { id: 'EMP-04', name: 'Mona Al-Ruwaiti', nameAr: 'منى الرويلي', role: 'Bridal Designer', roleAr: 'مصممة تسريحات العرايس', bookings: 54, utilization: '91%', servicesSales: 32000, productSales: 2800, tips: 2400, totalSales: 34800, rank: 4 }
-  ];
-
-  const dataService = [
-    { id: 'SRV-01', name: 'Royal Hydra-Facial & Glow', nameAr: 'هيدرافيشال ملكي ونضارة', category: 'Skincare', categoryAr: 'العناية بالبشرة', bookings: 142, avgPrice: 450, totalRevenue: 63900, share: '38.4%', duration: '90 min' },
-    { id: 'SRV-02', name: 'Balayage & Premium Styling', nameAr: 'بالياج مع تسريح بريميوم', category: 'Hair styling', categoryAr: 'الشعر والتسريحات', bookings: 68, avgPrice: 850, totalRevenue: 57800, share: '34.7%', duration: '150 min' },
-    { id: 'SRV-03', name: 'Bridal Updo & Silk Treatment', nameAr: 'تسريحة زفاف مع علاج الحرير', category: 'Hair styling', categoryAr: 'الشعر والتسريحات', bookings: 18, avgPrice: 1500, totalRevenue: 27000, share: '16.2%', duration: '180 min' },
-    { id: 'SRV-04', name: 'Gel Extension & Chrome Polish', nameAr: 'تركيب جل مع طلاء كروم', category: 'Nail Art', categoryAr: 'الأظافر والمساج', bookings: 52, avgPrice: 350, totalRevenue: 18200, share: '10.7%', duration: '75 min' }
-  ];
-
-  const dataProduct = [
-    { id: 'PRD-501', name: 'Olaplex No.3 Hair Perfector', nameAr: 'علاج أولابليكس رقم 3 لتجديد روابط الشعر', sku: 'OL-003-HAIR', category: 'Retail Hair', categoryAr: 'العناية بالشعر التجزئة', sold: 45, unitPrice: 180, revenue: 8100, stock: 12 },
-    { id: 'PRD-502', name: 'Kerastase Elixir Ultime L\'Huile', nameAr: 'زيت كيرستاس إلكسير لتغذية الشعر', sku: 'KE-OIL-GOLD', category: 'Retail Hair', categoryAr: 'العناية بالشعر التجزئة', sold: 38, unitPrice: 240, revenue: 9120, stock: 24 },
-    { id: 'PRD-503', name: 'Sensory Jasmine Massage Essential Oil', nameAr: 'زيت الياسمين العضوي الملكي للمساج', sku: 'SEN-JAS-MASS', category: 'Spa Essentials', categoryAr: 'مستلزمات السبا والمساج', sold: 29, unitPrice: 150, revenue: 4350, stock: 8 },
-    { id: 'PRD-504', name: 'Luxury Rose Quartz Jade Roller Duo', nameAr: 'رولر ومساج حجر الكوارتز الوردي الفخم', sku: 'LUX-ROSE-JADE', category: 'Skincare Tools', categoryAr: 'أدوات العناية بالبشرة', sold: 16, unitPrice: 320, revenue: 5120, stock: 3 }
-  ];
-
-  const dataDiscounts = [
-    { id: 'DSC-01', code: 'EID2026', description: '20% off all hair and dye services', descriptionAr: 'خصم 20% على جميع خدمات صبغ وقص الشعر', appliedCount: 88, avgDiscount: 140, totalDiscount: 12320, category: 'Promotions' },
-    { id: 'DSC-02', code: 'WELCOME-GLOW', description: 'Flat SAR 100 off hydrafacial treatment', descriptionAr: 'خصم ثابت 100 ر.س على جلسات الهيدرافيشال', appliedCount: 45, avgDiscount: 100, totalDiscount: 4500, category: 'First-Time User' },
-    { id: 'DSC-03', code: 'LOYALVIP15', description: '15% off full checkout for Platinum stars', descriptionAr: 'خصم 15% كامل الفاتورة لعملاء فئة البلاتينيوم', appliedCount: 32, avgDiscount: 185, totalDiscount: 5920, category: 'Loyalty Tier' },
-    { id: 'DSC-04', code: 'STAFFCOMP', description: '100% discount complimentary for internal testing', descriptionAr: 'خصم 100% مجاملة للفترات والعمليات الداخلية', appliedCount: 12, avgDiscount: 350, totalDiscount: 4200, category: 'Internal Admin' }
-  ];
-
-  const dataRefund = [
-    { id: 'REF-201', date: '2026-06-25 14:15', invoice: 'INV-2026-0495', customer: 'Lujain Al-Subaie', customerAr: 'لجين السبيعي', item: 'Kerastase Elixir Ultime', itemAr: 'زيت كيرستاس إلكسير', reason: 'Customer allergic reactions', reasonAr: 'حساسية لدى العميل للمنتج', amount: 240 },
-    { id: 'REF-202', date: '2026-06-21 17:30', invoice: 'INV-2026-0480', customer: 'Hessa Al-Thani', customerAr: 'حصة آل ثاني', item: 'Royal Hydra-Facial Treatment', itemAr: 'جلسة هيدرافيشال ملكية', reason: 'Stylist arrived 30 min late', reasonAr: 'تأخر الأخصائية عن الموعد نصف ساعة', amount: 450 },
-    { id: 'REF-203', date: '2026-06-18 11:00', invoice: 'INV-2026-0466', customer: 'Sarah Al-Ghamdi', customerAr: 'سارة الغامدي', item: 'Platinum Nails Art Treatment', itemAr: 'جلسة تجميل أظافر بلاتينيوم', reason: 'Unsatisfactory color match quality', reasonAr: 'عدم الرضا التام عن درجة اللون الفنية', amount: 350 },
-    { id: 'REF-204', date: '2026-06-12 19:40', invoice: 'INV-2026-0432', customer: 'Yara Al-Gosaibi', customerAr: 'يارا القصيبي', item: 'Scalp Renewal Treatment', itemAr: 'علاج تجديد فروة الرأس', reason: 'Double transaction charge error', reasonAr: 'تكرار قيد الخصم لخطأ تقني بنقطة البيع', amount: 160 }
-  ];
-
-  const dataPaymentMethods = [
-    { id: 'PM-01', method: 'Mada Debit Cards', methodAr: 'بطاقات مدى البنكية Mada', transactions: 245, collected: 84350, fees: 674.8, settlement: 83675.2, pct: '56.9%', rating: 'Excellent connectivity' },
-    { id: 'PM-02', method: 'Credit Cards (Visa/MC)', methodAr: 'بطاقات ائتمانية (فيزا/ماستركارد)', transactions: 88, collected: 42100, fees: 842, settlement: 41258, pct: '28.4%', rating: 'Fast settlement' },
-    { id: 'PM-03', method: 'Digital Wallet', methodAr: 'المحفظة الرقمية المسبقة الدفع', transactions: 34, collected: 14600, fees: 0, settlement: 14600, pct: '9.8%', rating: 'Instant transfer' },
-    { id: 'PM-04', method: 'Cash', methodAr: 'نقدي Cash', transactions: 17, collected: 7200, fees: 0, settlement: 7200, pct: '4.9%', rating: 'Requires manual deposit' }
-  ];
-
-  const dataCustomerSales = [
-    { id: 'CS-401', name: 'Najla Al-Saud', nameAr: 'نجلاء آل سعود', tier: 'VIP Royal', visits: 45, spentServices: 15400, spentProducts: 3200, totalSpent: 18600, email: 'najla.as@vip.gov.sa', phone: '+966 50 999 8888' },
-    { id: 'CS-402', name: 'Arwa Al-Otaibi', nameAr: 'أروى العتيبي', tier: 'Gold Star', visits: 22, spentServices: 6500, spentProducts: 620, totalSpent: 7120, email: 'arwa_beauty@yahoo.com', phone: '+966 56 345 6789' },
-    { id: 'CS-403', name: 'Sarah Abdullah', nameAr: 'سارة عبد الله', tier: 'Silver Star', visits: 14, spentServices: 3420, spentProducts: 420, totalSpent: 3840, email: 'sarah.a@gmail.com', phone: '+966 50 123 4567' },
-    { id: 'CS-404', name: 'Maha Al-Shammari', nameAr: 'مها الشمري', tier: 'Silver Star', visits: 8, spentServices: 2150, spentProducts: 300, totalSpent: 2450, email: 'maha.sh@hotmail.com', phone: '+966 54 876 5432' },
-    { id: 'CS-405', name: 'Fatimah Al-Dossary', nameAr: 'فاطمة الدوسري', tier: 'First-Timer', visits: 3, spentServices: 850, spentProducts: 100, totalSpent: 950, email: 'fatimah.d@outlook.com', phone: '+966 55 987 6543' }
-  ];
-
-  const dataRebooking = [
-    { id: 'RB-01', customer: 'Arwa Al-Otaibi', customerAr: 'أروى العتيبي', service: 'Royal Swedish Massage', serviceAr: 'جلسة مساج السويدي الملكي', lastVisit: '2026-05-20', rebookedDate: '2026-06-27', interval: 38, rate: 'Rebooked', rebookAr: 'تمت إعادة الحجز', stylist: 'Elena Vasily', status: 'Completed' },
-    { id: 'RB-02', customer: 'Najla Al-Saud', customerAr: 'نجلاء آل سعود', service: 'Balayage Premium', serviceAr: 'بالياج مع تسريح بريميوم', lastVisit: '2026-05-01', rebookedDate: '2026-06-15', interval: 45, rate: 'Rebooked', rebookAr: 'تمت إعادة الحجز', stylist: 'Nadeen Al-Harbi', status: 'Completed' },
-    { id: 'RB-03', customer: 'Maha Al-Shammari', customerAr: 'مها الشمري', service: 'Platinum Hydrafacial', serviceAr: 'تنظيف بشرة هيدرافيشال بلاتينيوم', lastVisit: '2026-06-10', rebookedDate: '2026-07-12', interval: 32, rate: 'Upcoming Scheduled', rebookAr: 'مجدول مستقبلي', stylist: 'Layla Al-Asiri', status: 'Confirmed' },
-    { id: 'RB-04', customer: 'Sarah Abdullah', customerAr: 'سارة عبد الله', service: 'Royal Hydra-Facial & Glow', serviceAr: 'هيدرافيشال ملكي ونضارة', lastVisit: '2026-06-20', rebookedDate: 'None', interval: 0, rate: 'Expired Alert', rebookAr: 'انتهت الصلاحية', stylist: 'Layla Al-Asiri', status: 'Needs Follow-up' }
-  ];
-
   // Helper to filter and sort the raw records
   const getFilteredData = () => {
     let list: any[] = [];
     switch (activeTab) {
-      case 'sales_reports': list = dataSales; break;
-      case 'financial_reports': list = dataFinancial; break;
-      case 'appointment_reports': list = dataAppointments; break;
-      case 'employee_reports': list = dataEmployee; break;
-      case 'service_reports': list = dataService; break;
-      case 'product_reports': list = dataProduct; break;
-      case 'discounts_reports': list = dataDiscounts; break;
-      case 'refund_reports': list = dataRefund; break;
-      case 'payment_methods': list = dataPaymentMethods; break;
-      case 'customer_sales': list = dataCustomerSales; break;
-      case 'rebooking_analytics': list = dataRebooking; break;
+      case 'sales_reports': list = reportData.sales_reports || []; break;
+      case 'financial_reports': list = reportData.financial_reports || []; break;
+      case 'appointment_reports': list = reportData.appointment_reports || []; break;
+      case 'employee_reports': list = reportData.employee_reports || []; break;
+      case 'service_reports': list = reportData.service_reports || []; break;
+      case 'product_reports': list = reportData.product_reports || []; break;
+      case 'discounts_reports': list = reportData.discounts_reports || []; break;
+      case 'refund_reports': list = reportData.refund_reports || []; break;
+      case 'payment_methods': list = reportData.payment_methods || []; break;
+      case 'customer_sales': list = reportData.customer_sales || []; break;
+      case 'rebooking_analytics': list = reportData.rebooking_analytics || []; break;
       default: list = [];
     }
 
@@ -284,9 +221,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
       if (activeTab === 'employee_reports') {
         list = list.filter(i => i.id === selectedEmployee || i.nameEn?.toLowerCase().includes(selectedEmployee.replace('st-', '')) || i.name?.toLowerCase().includes(selectedEmployee.replace('st-', '')));
       } else if (activeTab === 'appointment_reports') {
-        const staffObj = mockEmployeesList.find(s => s.id === selectedEmployee);
-        if (staffObj) {
-          list = list.filter(i => i.stylist === staffObj.nameEn);
+        if (selectedEmployee !== 'all') {
+          list = list.filter(i => i.stylistId === selectedEmployee || i.stylist === employeesList.find(e => e.id === selectedEmployee)?.nameEn);
         }
       }
     }
@@ -538,7 +474,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
                 <option value="all">👑 {t.allEmployees}</option>
-                {mockEmployeesList.slice(1).map(emp => (
+                {employeesList.slice(1).map(emp => (
                   <option key={emp.id} value={emp.id}>{isRtl ? emp.nameAr : emp.nameEn}</option>
                 ))}
               </select>
@@ -556,7 +492,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
                 <option value="all">✨ {t.allServices}</option>
-                {mockServiceCategories.slice(1).map(cat => (
+                {serviceCategories.slice(1).map(cat => (
                   <option key={cat.id} value={cat.id}>{isRtl ? cat.nameAr : cat.nameEn}</option>
                 ))}
               </select>
