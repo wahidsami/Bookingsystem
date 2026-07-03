@@ -210,8 +210,11 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   }, [loadUser]);
 
   const hasPermission = useCallback(
-    (permissionKey: string) => Boolean(permissions?.[permissionKey]),
-    [permissions]
+    (permissionKey: string) => {
+      if (sessionType === 'tenant_owner') return true;
+      return Boolean(permissions?.[permissionKey]);
+    },
+    [permissions, sessionType]
   );
 
   const value = useMemo<TenantAuthContextValue>(() => ({
