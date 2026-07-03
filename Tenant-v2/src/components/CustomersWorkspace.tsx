@@ -200,12 +200,12 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
 
   // Load KPI Stats
   const loadStats = async () => {
+    setIsLoadingStats(true);
     try {
       if (!hasViewCustomersPermission) {
         setIsPermissionDenied(true);
         return;
       }
-      setIsLoadingStats(true);
       const res = await fetch('/api/v1/tenant/customers/stats');
       if (res.status === 403) {
         setIsPermissionDenied(true);
@@ -213,7 +213,7 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
       }
       if (!res.ok) throw new Error("Stats fetch failed");
       const data = await res.json();
-      setStats(data);
+      setStats(data || null);
       setIsPermissionDenied(false);
     } catch (err) {
       console.error("Error loading stats:", err);
@@ -247,13 +247,18 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
       }
       if (!res.ok) throw new Error("Failed to load customer catalog");
       const data = await res.json();
-      setCustomersList(data.customers);
-      setTotalPages(data.pagination.totalPages);
-      setTotalRecords(data.pagination.total);
+      const customers = Array.isArray(data?.customers) ? data.customers : [];
+      const pagination = data?.pagination || {};
+      setCustomersList(customers);
+      setTotalPages(typeof pagination.totalPages === 'number' ? pagination.totalPages : 1);
+      setTotalRecords(typeof pagination.total === 'number' ? pagination.total : customers.length);
       setIsPermissionDenied(false);
     } catch (err) {
       console.error("Error loading customers:", err);
       setIsError(true);
+      setCustomersList([]);
+      setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setIsLoadingList(false);
     }
