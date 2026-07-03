@@ -7,7 +7,7 @@ import {
   Activity, RotateCw, AlertTriangle, Image
 } from 'lucide-react';
 import { Language, Service, Employee, Product } from '../types';
-import { mockServices as initialMockServices, mockEmployees, mockProducts } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface ServicesWorkspaceProps {
   lang: Language;
@@ -48,70 +48,34 @@ export interface EnhancedService extends Service {
   allowReschedule: boolean;
 }
 
-// Default mock services images mapping
-const serviceImages: Record<string, string> = {
-  'SRV-001': 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?q=80&w=600&auto=format&fit=crop', // massage
-  'SRV-002': 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?q=80&w=600&auto=format&fit=crop', // skincare
-  'SRV-003': 'https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=600&auto=format&fit=crop', // hair
-  'SRV-004': 'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?q=80&w=600&auto=format&fit=crop', // nails
-  'SRV-005': 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=600&auto=format&fit=crop', // hair treat
-};
-
 const defaultImage = 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=600&auto=format&fit=crop';
-
-// Pre-enrich services
-const enrichServices = (): EnhancedService[] => {
-  return initialMockServices.map(srv => ({
-    ...srv,
-    descriptionAr: srv.id === 'SRV-001' 
-      ? 'جلسة تدليك علاجي سويدي باستخدام زيوت الأروما الفاخرة لتنشيط الدورة الدموية وتخفيف آلام المفاصل والتوتر.'
-      : 'عناية متكاملة ببشرتك لإعادة النضارة والحيوية الطبيعية وتحفيز الكولاجين.',
-    descriptionEn: srv.id === 'SRV-001'
-      ? 'Authentic Swedish deep body massage using bespoke organic oils to drain lymphatics, boost blood flow, and release muscle stress.'
-      : 'Multi-layer skincare treatment delivering instant deep cleaning, peeling, hydration, and organic cellular renewal.',
-    image: serviceImages[srv.id] || defaultImage,
-    includes: srv.id === 'SRV-001' 
-      ? ['زيوت الأروما العضوية المعالجة', 'مشروب دافئ منعش مجاني', 'دخول مجاني للساونا وغرفة البخار']
-      : ['تقشير هيدروكسي متطور', 'ماسك فيتامينات مخصص', 'جلسة مساج مهدئ للوجه والأكتاف'],
-    priceType: 'fixed',
-    targetGender: srv.id === 'SRV-003' || srv.id === 'SRV-004' ? 'female' : 'unisex',
-    variants: srv.id === 'SRV-001' ? [
-      { id: 'v1', nameAr: 'ترقية إلى 120 دقيقة', nameEn: 'Extend to 120 Mins', price: 150, duration: 30 },
-      { id: 'v2', nameAr: 'إضافة أحجار بركانية ساخنة', nameEn: 'Add Hot Volcanic Stones', price: 90, duration: 15 }
-    ] : [],
-    hasOffer: srv.id === 'SRV-002',
-    offerDiscountPct: srv.id === 'SRV-002' ? 15 : undefined,
-    offerDetailsAr: srv.id === 'SRV-002' ? 'خصم خاص 15% لحجوزات منتصف الأسبوع' : undefined,
-    offerDetailsEn: srv.id === 'SRV-002' ? 'Special 15% off for active weekday sessions' : undefined,
-    offerFrom: srv.id === 'SRV-002' ? '2026-06-01' : undefined,
-    offerTo: srv.id === 'SRV-002' ? '2026-07-31' : undefined,
-    hasGift: srv.id === 'SRV-001',
-    giftType: 'product',
-    giftDetailsAr: 'لوشن الجسم العضوي بخلاصة لافندر العليا',
-    giftDetailsEn: 'Signature organic lavender body lotion from our luxury spa line',
-    giftProductId: 'prd-1',
-    paymentOptions: ['online', 'center'],
-    employeeAssignments: srv.id === 'SRV-001' ? ['st-1', 'st-3'] : ['st-2', 'st-3', 'st-5'],
-    employeeCommissions: srv.id === 'SRV-001' ? {
-      'st-1': { enabled: true, type: 'percentage', value: 10 },
-      'st-3': { enabled: false, type: 'fixed', value: 20 }
-    } : {
-      'st-2': { enabled: true, type: 'percentage', value: 15 },
-      'st-3': { enabled: true, type: 'fixed', value: 30 }
-    },
-    isActive: true,
-    availableInCenter: true,
-    availableHomeVisit: srv.id === 'SRV-001' || srv.id === 'SRV-002',
-    allowReschedule: true
-  }));
-};
-
 export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
   const isRtl = lang === 'ar';
 
   // 1. Core Services State
-  const [services, setServices] = useState<EnhancedService[]>(enrichServices);
-  
+  const [services, setServices] = useState<EnhancedService[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+
+  const fetchData = async () => {
+    try {
+      const [srvRes, empRes, prdRes] = await Promise.all([
+        tenantApiAdapter.getServices(),
+        tenantApiAdapter.getEmployees(),
+        tenantApiAdapter.getProducts()
+      ]);
+      setServices((srvRes as any).services || []);
+      setEmployees((empRes as any).employees || []);
+      setProducts((prdRes as any).products || []);
+    } catch (err) {
+      console.error('Failed to load services data:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+
   // 2. Navigation & View State
   const [activeView, setActiveView] = useState<'list' | 'form'>('list');
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
@@ -377,16 +341,21 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
   };
 
   // Delete service handler
-  const handleDeleteService = (id: string) => {
+  const handleDeleteService = async (id: string) => {
     const srv = services.find(s => s.id === id);
     if (!srv) return;
     
-    setServices(prev => prev.filter(s => s.id !== id));
-    triggerToast(
-      `Service "${srv.nameEn || srv.nameAr}" deleted successfully from catalog.`,
-      `تم إزالة خدمة "${srv.nameAr || srv.nameEn}" بالكامل من قائمة الخدمات المعتمدة.`,
-      'success'
-    );
+    try {
+      await tenantApiAdapter.deleteService(id);
+      setServices(prev => prev.filter(s => s.id !== id));
+      triggerToast(
+        `Service "${srv.nameEn || srv.nameAr}" deleted successfully from catalog.`,
+        `تم إزالة خدمة "${srv.nameAr || srv.nameEn}" بالكامل من قائمة الخدمات المعتمدة.`,
+        'success'
+      );
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to delete service', 'فشل مسح الخدمة', 'error');
+    }
   };
 
   // Refresh services catalog action
@@ -400,7 +369,7 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
   };
 
   // Save/Deploy Service
-  const handleSaveService = (e: React.FormEvent) => {
+  const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.nameAr && !formData.nameEn) {
@@ -412,34 +381,34 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
     let matchedCat = categories.find(c => c.id === formData.categoryEn || c.labelEn === formData.categoryEn);
     if (!matchedCat) matchedCat = categories[1]; // default to massage
 
-    const finalFormData = {
+    const finalFormData: any = {
       ...formData,
       categoryEn: matchedCat.labelEn,
       categoryAr: matchedCat.labelAr
     };
 
-    if (formMode === 'add') {
-      const newId = `SRV-${Date.now().toString().slice(-3)}`;
-      const newSrv: EnhancedService = {
-        ...finalFormData,
-        id: newId
-      };
-      setServices(prev => [newSrv, ...prev]);
-      triggerToast(
-        `Deployed new service "${newSrv.nameEn || newSrv.nameAr}" successfully!`,
-        `تم إضافة وتنشيط الخدمة الجديدة "${newSrv.nameAr || newSrv.nameEn}" في الكتالوج بنجاح!`,
-        'success'
-      );
-    } else {
-      setServices(prev => prev.map(s => s.id === finalFormData.id ? { ...s, ...finalFormData } : s));
-      triggerToast(
-        `Updated service "${finalFormData.nameEn || finalFormData.nameAr}" details!`,
-        `تم حفظ تحديثات الخدمة "${finalFormData.nameAr || finalFormData.nameEn}" وتثبيتها بنجاح.`,
-        'success'
-      );
+    try {
+      if (formMode === 'add') {
+        const res = await tenantApiAdapter.createService(finalFormData);
+        setServices(prev => [res.service, ...prev]);
+        triggerToast(
+          `Deployed new service successfully!`,
+          `تم إضافة وتنشيط الخدمة الجديدة في الكتالوج بنجاح!`,
+          'success'
+        );
+      } else {
+        const res = await tenantApiAdapter.updateService(finalFormData.id, finalFormData);
+        setServices(prev => prev.map(s => s.id === finalFormData.id ? res.service : s));
+        triggerToast(
+          `Updated service details!`,
+          `تم حفظ تحديثات الخدمة وتثبيتها بنجاح.`,
+          'success'
+        );
+      }
+      setActiveView('list');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to save service', 'فشل حفظ الخدمة', 'error');
     }
-
-    setActiveView('list');
   };
 
   // Include Perks helpers
@@ -1362,7 +1331,7 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
                         </p>
 
                         <div className="space-y-3">
-                          {mockEmployees.map(emp => {
+                          {employees.map(emp => {
                             const assigned = formData.employeeAssignments.includes(emp.id);
                             const comm = formData.employeeCommissions?.[emp.id] || { enabled: false, type: 'percentage', value: 10 };
                             
@@ -1598,7 +1567,7 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
                                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold text-neutral-800 cursor-pointer"
                                 >
                                   <option value="">{isRtl ? '-- حدد منتج عيني --' : '-- Select Retail Product --'}</option>
-                                  {mockProducts.map(prd => (
+                                  {products.map(prd => (
                                     <option key={prd.id} value={prd.id}>
                                       {isRtl ? prd.nameAr : prd.nameEn} ({prd.sku})
                                     </option>

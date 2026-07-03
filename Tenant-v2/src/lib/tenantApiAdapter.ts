@@ -487,6 +487,38 @@ class TenantApiAdapter {
     return this.get('/tenant/services');
   }
 
+  async createService(data: any): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await fetch(`${this.baseUrl}/tenant/services`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.post('/tenant/services', data);
+  }
+
+  async updateService(id: string, data: any): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await fetch(`${this.baseUrl}/tenant/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.put(`/tenant/services/${id}`, data);
+  }
+
+  async deleteService(id: string): Promise<any> {
+    return this.delete(`/tenant/services/${id}`);
+  }
+
   async getAppointmentsBoard(date: string): Promise<any> {
     return this.get(`/tenant/appointments/board?date=${date}`);
   }
