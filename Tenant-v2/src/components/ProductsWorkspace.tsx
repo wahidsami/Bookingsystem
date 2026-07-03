@@ -7,7 +7,7 @@ import {
   Layers, Tag, Percent, Truck, Store, FileText
 } from 'lucide-react';
 import { Language, Product } from '../types';
-import { mockProducts as initialMockProducts } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface ProductsWorkspaceProps {
   lang: Language;
@@ -41,69 +41,6 @@ export interface EnhancedProduct extends Product {
 // Default luxury cosmetics placeholder
 const defaultImagePlaceholder = 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=600&auto=format&fit=crop';
 
-// Pre-enrich mock products with full specification details
-const enrichInitialProducts = (): EnhancedProduct[] => {
-  const imagesMapping: Record<string, string[]> = {
-    'PRD-001': [
-      'https://images.unsplash.com/photo-1608248597481-496100c80836?q=80&w=600&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=600&auto=format&fit=crop'
-    ],
-    'PRD-002': [
-      'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=600&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?q=80&w=600&auto=format&fit=crop'
-    ],
-    'PRD-003': [
-      'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?q=80&w=600&auto=format&fit=crop'
-    ],
-    'PRD-004': [
-      'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop'
-    ],
-    'PRD-005': [
-      'https://images.unsplash.com/photo-1526947425960-945c6e72858f?q=80&w=600&auto=format&fit=crop'
-    ]
-  };
-
-  return initialMockProducts.map(prd => {
-    const images = imagesMapping[prd.id] || [defaultImagePlaceholder];
-    const commissionRate = 10; // 10% Platform fee
-    const taxRate = 15; // 15% VAT
-    const rawPrice = Math.round(prd.price / (1 + (commissionRate / 100)) / (1 + (taxRate / 100)));
-
-    return {
-      ...prd,
-      descriptionAr: prd.id === 'PRD-001' 
-        ? 'زيت معالج بالبروتين النشط لتغذية فروة الرأس وعلاج التقصف وتكثيف الخصلات التالفة.'
-        : prd.id === 'PRD-002'
-        ? 'سيروم حمض الهيالورونيك العضوي النقي بتركيز غني لترطيب فوري وامتلاء خلايا البشرة.'
-        : 'مقشر الأملاح الطبيعية لتقشير خلايا الجلد الميتة وتنعيم البشرة برائحة المهدئ اللافندر.',
-      descriptionEn: prd.id === 'PRD-001'
-        ? 'Active protein treatment oil to deeply nourish the scalp, repair split ends, and volumize damaged strands.'
-        : prd.id === 'PRD-002'
-        ? 'Organic pure Hyaluronic Acid serum at rich concentrations for immediate plumping and cellular hydration.'
-        : 'Natural sea salt scrub designed to exfoliate dead cells, refine skin texture, and infuse soothing lavender extracts.',
-      images,
-      brand: prd.id === 'PRD-001' ? 'Refah Organics' : prd.id === 'PRD-002' ? 'La Colline Laboratories' : 'Spa Essentials',
-      rawPrice,
-      taxRate,
-      commissionRate,
-      size: prd.id === 'PRD-001' ? '100 ml' : prd.id === 'PRD-002' ? '30 ml' : '250 g',
-      color: prd.id === 'PRD-001' ? 'Amber Gold' : prd.id === 'PRD-002' ? 'Clear' : 'Lavender Violet',
-      ingredientsAr: prd.id === 'PRD-001' ? 'زيت الأرغان الطبيعي، بروتين القمح المحلل، مغنيسيوم نشط، فيتامين هـ.' : 'حمض الهيالورونيك النقي ٣٪، ماء الورد المقطر، خلاصة الألوفيرا العضوية.',
-      ingredientsEn: prd.id === 'PRD-001' ? 'Natural argan oil, hydrolyzed wheat protein, active magnesium, Vitamin E.' : '3% pure hyaluronic acid, distilled rosewater, organic Aloe Vera extract.',
-      howToUseAr: 'ضع بضع قطرات على يديك ودلك بلطف على المنطقة المستهدفة مرتين يومياً للحصول على نتائج ملحوظة.',
-      howToUseEn: 'Apply a few drops into your palm and gently massage onto clean target area twice daily.',
-      featuresAr: 'عضوي وطبيعي ١٠٠٪ • معتمد سريرياً • آمن للبشرة الحساسة • نتائج سريعة ملحوظة',
-      featuresEn: '100% Organic & Natural • Clinically Certified • Safe for Sensitive Skin • Quick Visible Results',
-      isAvailable: prd.stock > 0,
-      isFeatured: prd.id === 'PRD-001' || prd.id === 'PRD-002',
-      allowsDelivery: true,
-      allowsPickup: true,
-      soldCount: prd.id === 'PRD-001' ? 84 : 41,
-      usedAsGiftCount: prd.id === 'PRD-001' ? 6 : 2
-    };
-  });
-};
-
 const categoryOptions = [
   { id: 'all', labelAr: 'كل فئات المنتجات', labelEn: 'All Product Categories' },
   { id: 'Hair Products', labelAr: 'منتجات الشعر', labelEn: 'Hair Products' },
@@ -126,10 +63,23 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
   const isRtl = lang === 'ar';
 
   // 1. Core State
-  const [products, setProducts] = useState<EnhancedProduct[]>(enrichInitialProducts);
+  const [products, setProducts] = useState<EnhancedProduct[]>([]);
   const [activeView, setActiveView] = useState<'list' | 'form'>('list');
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [activeSection, setActiveSection] = useState<'basic' | 'details' | 'images' | 'pricing'>('basic');
+
+  const fetchProducts = async () => {
+    try {
+      const res: any = await tenantApiAdapter.getProducts();
+      setProducts(res.products || []);
+    } catch (err) {
+      console.error('Failed to fetch products', err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchProducts();
+  }, []);
 
   // 2. Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -239,15 +189,21 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
 
   // Action: Delete product with confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     const prd = products.find(p => p.id === id);
     if (!prd) return;
-    setProducts(prev => prev.filter(p => p.id !== id));
-    triggerToast(
-      `Product "${prd.nameEn || prd.nameAr}" deleted successfully.`,
-      `تم حذف المنتج "${prd.nameAr || prd.nameEn}" بالكامل من مخزون الكتالوج.`,
-      'success'
-    );
+    
+    try {
+      await tenantApiAdapter.deleteProduct(id);
+      setProducts(prev => prev.filter(p => p.id !== id));
+      triggerToast(
+        `Product "${prd.nameEn || prd.nameAr}" deleted successfully.`,
+        `تم حذف المنتج "${prd.nameAr || prd.nameEn}" بالكامل من مخزون الكتالوج.`,
+        'success'
+      );
+    } catch (err) {
+      triggerToast('Failed to delete product', 'فشل حذف المنتج', 'error');
+    }
     setDeleteConfirmId(null);
   };
 
@@ -422,7 +378,7 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
   };
 
   // Submit Save Product Form
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.nameAr && !formData.nameEn) {
@@ -451,7 +407,7 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
     // Resolve Category objects
     const selectedCat = categoryOptions.find(c => c.id === formData.categoryEn || c.labelEn === formData.categoryEn) || categoryOptions[1];
 
-    const finalProductData: EnhancedProduct = {
+    const finalProductData: any = {
       ...formData,
       categoryEn: selectedCat.id,
       categoryAr: selectedCat.labelAr,
@@ -459,28 +415,29 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
       images: formData.images.length > 0 ? formData.images : [defaultImagePlaceholder]
     };
 
-    if (formMode === 'add') {
-      const newId = `PRD-${Date.now().toString().slice(-3)}`;
-      const newProduct: EnhancedProduct = {
-        ...finalProductData,
-        id: newId
-      };
-      setProducts(prev => [newProduct, ...prev]);
-      triggerToast(
-        `Deployed new product "${newProduct.nameEn || newProduct.nameAr}" successfully!`,
-        `تم إضافة وتنشيط المنتج الجديد "${newProduct.nameAr || newProduct.nameEn}" وتأكيد مخزونه بنجاح!`,
-        'success'
-      );
-    } else {
-      setProducts(prev => prev.map(p => p.id === finalProductData.id ? finalProductData : p));
-      triggerToast(
-        `Updated product "${finalProductData.nameEn || finalProductData.nameAr}" details!`,
-        `تم حفظ تفاصيل وتعديلات المنتج "${finalProductData.nameAr || finalProductData.nameEn}" بنجاح.`,
-        'success'
-      );
+    try {
+      if (formMode === 'add') {
+        // Send to backend
+        const res = await tenantApiAdapter.createProduct(finalProductData);
+        setProducts(prev => [res.product, ...prev]);
+        triggerToast(
+          `Deployed new product successfully!`,
+          `تم إضافة وتنشيط المنتج الجديد وتأكيد مخزونه بنجاح!`,
+          'success'
+        );
+      } else {
+        const res = await tenantApiAdapter.updateProduct(finalProductData.id, finalProductData);
+        setProducts(prev => prev.map(p => p.id === finalProductData.id ? res.product : p));
+        triggerToast(
+          `Updated product details!`,
+          `تم حفظ تفاصيل وتعديلات المنتج بنجاح.`,
+          'success'
+        );
+      }
+      setActiveView('list');
+    } catch (err: any) {
+       triggerToast(err.message || 'Failed to save product', 'فشل حفظ المنتج', 'error');
     }
-
-    setActiveView('list');
   };
 
   return (

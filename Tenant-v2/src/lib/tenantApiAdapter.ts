@@ -433,6 +433,44 @@ class TenantApiAdapter {
     return this.delete(`/tenant/employees/${id}`);
   }
 
+  // --- Products ---
+  async getProducts(): Promise<any[]> {
+    return this.get('/tenant/products');
+  }
+
+  async createProduct(data: any): Promise<any> {
+    // Check if data is FormData
+    if (data instanceof FormData) {
+      const response = await fetch(`${this.baseUrl}/tenant/products`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.post('/tenant/products', data);
+  }
+
+  async updateProduct(id: string, data: any): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await fetch(`${this.baseUrl}/tenant/products/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.put(`/tenant/products/${id}`, data);
+  }
+
+  async deleteProduct(id: string): Promise<any> {
+    return this.delete(`/tenant/products/${id}`);
+  }
+
   async getMessages(): Promise<any[]> {
     return this.get('/tenant/messages');
   }
@@ -447,10 +485,6 @@ class TenantApiAdapter {
 
   async getServices(): Promise<any[]> {
     return this.get('/tenant/services');
-  }
-
-  async getProducts(): Promise<any[]> {
-    return this.get('/tenant/products');
   }
 
   async getAppointmentsBoard(date: string): Promise<any> {
