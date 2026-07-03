@@ -417,6 +417,22 @@ class TenantApiAdapter {
     return this.get(`/tenant/customers/${id}/transactions${q.toString() ? `?${q.toString()}` : ''}`);
   }
 
+  async getEmployees(): Promise<any[]> {
+    return this.get('/tenant/employees');
+  }
+
+  async getServices(): Promise<any[]> {
+    return this.get('/tenant/services');
+  }
+
+  async getProducts(): Promise<any[]> {
+    return this.get('/tenant/products');
+  }
+
+  async getAppointmentsBoard(date: string): Promise<any> {
+    return this.get(`/tenant/appointments/board?date=${date}`);
+  }
+
   async getAppointments(params?: Record<string, string | number | undefined>): Promise<any[]> {
     const q = new URLSearchParams();
     Object.entries(params || {}).forEach(([key, value]) => {

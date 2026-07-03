@@ -10,9 +10,9 @@ import {
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift
 } from 'lucide-react';
 import { Language, Product } from '../types';
-import { mockCustomers, mockServices, mockProducts, mockEmployees } from '../data/mockData';
 import InteractiveDrawers from './InteractiveDrawers';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -57,197 +57,175 @@ interface Appointment {
   date?: string;
 }
 
-const STYLISTS: Stylist[] = [
-  { id: 'st-1', nameEn: 'Nadeen Al-Harbi', nameAr: 'نادين الحربي', roleEn: 'Senior Colorist', roleAr: 'خبيرة تلوين الشعر', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&auto=format&fit=crop', color: 'border-amber-500 bg-amber-500/10 text-amber-900' },
-  { id: 'st-2', nameEn: 'Layla Al-Asiri', nameAr: 'ليلى العسيري', roleEn: 'Spa Therapist', roleAr: 'معالجة سبا', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=100&auto=format&fit=crop', color: 'border-emerald-500 bg-emerald-500/10 text-emerald-900' },
-  { id: 'st-3', nameEn: 'Elena Vasily', nameAr: 'إيلينا فاسيلي', roleEn: 'Nail Artist', roleAr: 'فنانة أظافر محترفة', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=100&auto=format&fit=crop', color: 'border-rose-500 bg-rose-500/10 text-rose-900' },
-  { id: 'st-4', nameEn: 'Mona Al-Ruwaiti', nameAr: 'منى الرويلي', roleEn: 'Bridal Designer', roleAr: 'مصممة تسريحات العرايس', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100&auto=format&fit=crop', color: 'border-blue-500 bg-blue-500/10 text-blue-900' },
-];
-
-const INITIAL_APPOINTMENTS: Appointment[] = [
-  {
-    id: 'apt-1',
-    customerNameEn: 'Fatima Al-Dossary',
-    customerNameAr: 'فاطمة الدوسري',
-    serviceNameEn: 'Royal Hydra-Facial & Glow',
-    serviceNameAr: 'هيدرافيشال ملكي ونضارة',
-    staffId: 'st-2',
-    startTime: 60, // 10:00 AM
-    duration: 90, // 1.5 hours
-    status: 'confirmed',
-    paymentStatus: 'unpaid',
-    isGroupBooking: false,
-    hasNotes: true,
-    notes: 'Sensitive skin. Prefers natural aloe products.',
-    price: 450,
-    tags: ['VIP', 'First-Time'],
-    customerPhone: '+966 50 123 4567',
-    customerEmail: 'fatima@dossary.sa',
-    loyaltyTier: 'VIP Amber',
-    walletBalance: 250,
-    type: 'appointment',
-    serviceCategory: 'spa'
-  },
-  {
-    id: 'apt-2',
-    customerNameEn: 'Sarah Al-Ghamdi',
-    customerNameAr: 'سارة الغامدي',
-    serviceNameEn: 'Balayage & Premium Styling',
-    serviceNameAr: 'بالياج مع تسريح بريميوم',
-    staffId: 'st-1',
-    startTime: 150, // 11:30 AM
-    duration: 150, // 2.5 hours
-    status: 'arrived',
-    paymentStatus: 'partial',
-    isGroupBooking: true,
-    guestCount: 3,
-    hasNotes: false,
-    notes: 'Wants golden undertones.',
-    price: 850,
-    tags: ['Regular', 'Group Booking'],
-    customerPhone: '+966 54 888 1234',
-    customerEmail: 'sarah.g@gmail.com',
-    loyaltyTier: 'Platinum Star',
-    walletBalance: 120,
-    type: 'appointment',
-    serviceCategory: 'hair'
-  },
-  {
-    id: 'apt-3',
-    customerNameEn: 'Abeer Bin Laden',
-    customerNameAr: 'عبير بن لادن',
-    serviceNameEn: 'Gel Extension & Chrome Polish',
-    serviceNameAr: 'تركيب جل مع طلاء كروم',
-    staffId: 'st-3',
-    startTime: 240, // 1:00 PM
-    duration: 75, // 1 hour 15 mins
-    status: 'completed',
-    paymentStatus: 'paid',
-    isGroupBooking: false,
-    hasNotes: true,
-    notes: 'Requested specific gold foil accents.',
-    price: 350,
-    tags: ['VIP'],
-    customerPhone: '+966 55 999 7777',
-    customerEmail: 'abeer.bl@saudi-lux.com',
-    loyaltyTier: 'VIP Gold',
-    walletBalance: 500,
-    type: 'appointment',
-    serviceCategory: 'nails'
-  },
-  {
-    id: 'apt-4',
-    customerNameEn: 'Hanan Al-Otaibi',
-    customerNameAr: 'هنان العتيبي',
-    serviceNameEn: 'Bridal Updo & Silk Treatment',
-    serviceNameAr: 'تسريحة زفاف مع علاج الحرير',
-    staffId: 'st-4',
-    startTime: 360, // 3:00 PM
-    duration: 180, // 3 hours
-    status: 'confirmed',
-    paymentStatus: 'unpaid',
-    isGroupBooking: false,
-    hasNotes: true,
-    notes: 'Wedding at Ritz Carlton. Elena is also booked for nails.',
-    price: 1500,
-    tags: ['Bride', 'Heavy Prep'],
-    customerPhone: '+966 56 444 3322',
-    customerEmail: 'hanan.bride@live.com',
-    loyaltyTier: 'Diamond Royal',
-    walletBalance: 1000,
-    type: 'appointment',
-    serviceCategory: 'hair'
-  },
-  {
-    id: 'block-1',
-    customerNameEn: 'LUNCH BREAK',
-    customerNameAr: 'استراحة غداء',
-    serviceNameEn: 'Staff Recess & Rest',
-    serviceNameAr: 'فترة راحة الطاقم',
-    staffId: 'st-2',
-    startTime: 180, // 12:00 PM
-    duration: 60, // 1 hour
-    status: 'confirmed',
-    paymentStatus: 'paid',
-    isGroupBooking: false,
-    hasNotes: false,
-    price: 0,
-    tags: ['Blocked', 'Internal'],
-    type: 'blocked',
-    blockedType: 'Lunch'
-  },
-  {
-    id: 'block-2',
-    customerNameEn: 'WEEKLY MEETING',
-    customerNameAr: 'الاجتماع الأسبوعي',
-    serviceNameEn: 'Internal Review & Training',
-    serviceNameAr: 'مراجعة وتدريب داخلي',
-    staffId: 'st-1',
-    startTime: 300, // 2:00 PM
-    duration: 60, // 1 hour
-    status: 'confirmed',
-    paymentStatus: 'paid',
-    isGroupBooking: false,
-    hasNotes: false,
-    price: 0,
-    tags: ['Blocked', 'Internal'],
-    type: 'blocked',
-    blockedType: 'Meeting'
-  }
+const API_COLORS = [
+  'border-amber-500 bg-amber-500/10 text-amber-900',
+  'border-emerald-500 bg-emerald-500/10 text-emerald-900',
+  'border-rose-500 bg-rose-500/10 text-rose-900',
+  'border-blue-500 bg-blue-500/10 text-blue-900',
+  'border-indigo-500 bg-indigo-500/10 text-indigo-900',
+  'border-purple-500 bg-purple-500/10 text-purple-900'
 ];
 
 export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   
-  // Workspace states with local persistence (Board context preservation)
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    const saved = localStorage.getItem('refah_appointments_data');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved appointments', e);
-      }
-    }
-    // Set default date for initial appointments
-    return INITIAL_APPOINTMENTS.map(apt => ({
-      ...apt,
-      date: apt.date || '2026-06-28'
-    }));
-  });
+  // New API States replacing mock data
+  const [liveStylists, setLiveStylists] = useState<Stylist[]>([]);
+  const [liveServices, setLiveServices] = useState<any[]>([]);
+  const [liveCustomers, setLiveCustomers] = useState<any[]>([]);
+  const [liveProducts, setLiveProducts] = useState<any[]>([]);
+  
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>(() => {
-    const saved = localStorage.getItem('refah_stylist_statuses');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return {
-      'st-1': 'active',
-      'st-2': 'active',
-      'st-3': 'active',
-      'st-4': 'active',
-    };
-  });
+  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>({});
 
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 5, 28)); // Sunday June 28, 2026
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'agenda'>('day');
 
-  // Persistence effects
+  // Master Data Fetch
   useEffect(() => {
-    localStorage.setItem('refah_appointments_data', JSON.stringify(appointments));
-  }, [appointments]);
+    const fetchMasterData = async () => {
+      try {
+        const [empRes, srvRes, custRes, prodRes] = await Promise.all([
+          tenantApiAdapter.getEmployees(),
+          tenantApiAdapter.getServices(),
+          tenantApiAdapter.getCustomers({ limit: 1000 }),
+          tenantApiAdapter.getProducts()
+        ]);
+        
+        const employees = empRes || [];
+        setLiveStylists(employees.map((emp: any, index: number) => ({
+          id: emp.id,
+          nameEn: emp.name,
+          nameAr: emp.name,
+          roleEn: emp.title || 'Staff',
+          roleAr: emp.title || 'موظف',
+          avatar: emp.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name),
+          color: API_COLORS[index % API_COLORS.length]
+        })));
 
+        const services = srvRes || [];
+        setLiveServices(services.map((s: any) => ({
+          id: s.id,
+          nameEn: s.name_en || s.name || '',
+          nameAr: s.name_ar || s.name || '',
+          duration: s.duration || 60,
+          price: s.finalPrice || s.price || 0,
+          categoryAr: s.category || 'علاجات ومساج',
+          categoryEn: s.category || 'Massage & Therapy'
+        })));
+
+        const customers = custRes?.data?.users || custRes?.users || custRes || [];
+        setLiveCustomers(customers.map((c: any) => ({
+          id: c.id,
+          name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Guest',
+          email: c.email || '',
+          phone: c.phone || '',
+          appointmentsCount: c.appointmentsCount || c.totalBookings || 0,
+          totalSpent: `${c.totalSpent || 0} ر.س`,
+          lastVisit: c.lastVisit || 'N/A'
+        })));
+
+        const products = prodRes || [];
+        setLiveProducts(products.map((p: any) => ({
+          id: p.id,
+          nameAr: p.name_ar || p.name,
+          nameEn: p.name_en || p.name,
+          sku: p.sku || 'SKU-GEN',
+          price: p.finalPrice || p.price || 0,
+          stock: p.stockQuantity || p.stock || 0,
+          categoryAr: p.category || '',
+          categoryEn: p.category || ''
+        })));
+      } catch (err) {
+        console.error('Failed to load master data', err);
+      }
+    };
+    fetchMasterData();
+  }, []);
+
+  // Board Data Fetch
   useEffect(() => {
-    localStorage.setItem('refah_stylist_statuses', JSON.stringify(stylistStatuses));
-  }, [stylistStatuses]);
-  
+    const fetchBoard = async () => {
+      // Small artificial loader delay for UX premium feel
+      setIsLoading(true);
+      try {
+        const dateStr = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD local format
+        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr);
+        if (res && res.success) {
+          const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => {
+            const startDate = new Date(a.startTime);
+            const startMins = startDate.getHours() * 60 + startDate.getMinutes() - 9 * 60;
+            return {
+              id: a.id,
+              customerNameEn: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : 'Walk-in',
+              customerNameAr: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : 'زائرة',
+              serviceNameEn: a.service?.name_en || 'Service',
+              serviceNameAr: a.service?.name_ar || 'الخدمة',
+              staffId: a.staffId,
+              startTime: startMins,
+              duration: a.service?.duration || a.duration || 60,
+              status: a.status,
+              paymentStatus: a.paymentStatus,
+              isGroupBooking: false,
+              hasNotes: !!a.notes,
+              notes: a.notes,
+              price: parseFloat(a.price || 0),
+              tags: [],
+              type: 'appointment',
+              serviceCategory: a.service?.category || 'hair',
+              date: dateStr
+            };
+          });
+          
+          const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => {
+            const [h, m] = (b.startTime || '12:00').split(':');
+            const startMins = parseInt(h) * 60 + parseInt(m) - 9 * 60;
+            const [eh, em] = (b.endTime || '13:00').split(':');
+            const dur = (parseInt(eh) * 60 + parseInt(em)) - (parseInt(h) * 60 + parseInt(m));
+            return {
+              id: b.id,
+              customerNameEn: b.label || b.type,
+              customerNameAr: b.label || b.type,
+              serviceNameEn: 'Staff Break',
+              serviceNameAr: 'فترة راحة',
+              staffId: b.staffId,
+              startTime: startMins,
+              duration: dur,
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              isGroupBooking: false,
+              hasNotes: false,
+              price: 0,
+              tags: ['Blocked'],
+              type: 'blocked',
+              blockedType: b.type
+            };
+          });
+          
+          setAppointments([...mappedApts, ...mappedBreaks]);
+          
+          // Also set stylist statuses based on breaks
+          const newStatuses: Record<string, 'active'|'break'|'off'> = {};
+          (res.breaks || []).forEach((b: any) => {
+             // simplified logic: if there is a break today, mark them as on break. We'll rely on the actual board for accurate visualization anyway.
+             newStatuses[b.staffId] = 'break';
+          });
+          setStylistStatuses(prev => ({...prev, ...newStatuses}));
+        }
+      } catch (err) {
+        console.error('Failed to load board data', err);
+      } finally {
+        setTimeout(() => setIsLoading(false), 300);
+      }
+    };
+    fetchBoard();
+  }, [selectedDate]);
+
   // Interactive hover tracking
   const [hoveredSlot, setHoveredSlot] = useState<{ staffId?: string; date?: string; timeInMinutes: number } | null>(null);
   
@@ -417,7 +395,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
   // Auto load service durations
   useEffect(() => {
-    const srv = mockServices.find(s => s.id === currentServiceId);
+    const srv = liveServices.find(s => s.id === currentServiceId);
     if (srv) {
       setCurrentDuration(srv.duration);
     }
@@ -707,7 +685,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
   // --- OPERATIONS FOR CREATE DRAWER ---
   const handleAddStagedService = () => {
-    const srv = mockServices.find(s => s.id === currentServiceId);
+    const srv = liveServices.find(s => s.id === currentServiceId);
     if (!srv) return;
 
     let nextStartTime = currentStartTime;
@@ -745,7 +723,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     let balance = 0;
 
     if (custMode === 'existing') {
-      const existing = mockCustomers.find(c => c.id === selectedCustId);
+      const existing = liveCustomers.find(c => c.id === selectedCustId);
       if (existing) {
         custNameEn = existing.name;
         custNameAr = existing.name;
@@ -774,7 +752,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
     let finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
-      const srv = mockServices.find(s => s.id === currentServiceId);
+      const srv = liveServices.find(s => s.id === currentServiceId);
       if (srv) {
         finalStaged.push({
           id: `stg-${Date.now()}`,
@@ -802,7 +780,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     let totalDuration = 0;
 
     finalStaged.forEach(item => {
-      const srv = mockServices.find(s => s.id === item.serviceId);
+      const srv = liveServices.find(s => s.id === item.serviceId);
       if (srv) {
         let priceAfterDisc = srv.price;
         if (item.discountType === 'flat') {
@@ -977,7 +955,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
     let buyerName = isRtl ? 'زائر مجهول / Walk-in' : 'Walk-in Guest / زائر مجهول';
     if (posCustMode === 'existing') {
-      const cust = mockCustomers.find(c => c.id === posSelectedCustId);
+      const cust = liveCustomers.find(c => c.id === posSelectedCustId);
       if (cust) buyerName = cust.name;
     }
 
@@ -1260,7 +1238,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </div>
           </div>
 
-          {/* Search & Stylists / Filters Panel */}
+          {/* Search & liveStylists / Filters Panel */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1300,7 +1278,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none appearance-none cursor-pointer"
                 >
                   <option value="all">👑 {t.allStaff}</option>
-                  {STYLISTS.map(s => (
+                  {liveStylists.map(s => (
                     <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
                   ))}
                 </select>
@@ -1435,7 +1413,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   ) : (
                     <div className="space-y-3.5">
                       {filteredAppointments.map((apt) => {
-                        const stylist = STYLISTS.find(s => s.id === apt.staffId);
+                        const stylist = liveStylists.find(s => s.id === apt.staffId);
                         const statusBadgeColor = 
                           apt.status === 'confirmed' ? 'bg-amber-100 text-amber-700 border-amber-200/60' :
                           apt.status === 'arrived' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
@@ -1535,7 +1513,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     {viewMode === 'day' ? (
                       /* Staff columns headers */
                       <div className="col-span-10 grid grid-cols-4 h-full relative">
-                        {STYLISTS.map((stylist) => {
+                        {liveStylists.map((stylist) => {
                           const name = isRtl ? stylist.nameAr : stylist.nameEn;
                           const role = isRtl ? stylist.roleAr : stylist.roleEn;
                           const status = stylistStatuses[stylist.id] || 'active';
@@ -1791,7 +1769,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {/* Interactivity Grid Cell Blocks - Mouse Tracker for 5-minute precision */}
                       <div className="absolute inset-0 grid grid-cols-4">
                         {viewMode === 'day' ? (
-                          STYLISTS.map((stylist) => (
+                          liveStylists.map((stylist) => (
                             <div 
                               key={stylist.id} 
                               className="h-full relative select-none cursor-pointer"
@@ -1833,6 +1811,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 if (aptId && dragOverStaffId && dragOverTime !== null) {
                                   setAppointments(prev => prev.map(a => {
                                     if (a.id === aptId) {
+                                      // Fire and forget patch
+                                      if (!a.id.startsWith('block-')) {
+                                        const patchDate = new Date(selectedDate);
+                                        patchDate.setHours(9 + Math.floor(dragOverTime / 60), dragOverTime % 60, 0, 0);
+                                        // Account for local timezone offset if needed, or send as ISO.
+                                        tenantApiAdapter.patchAppointment(a.id, { 
+                                          staffId: dragOverStaffId, 
+                                          startTime: patchDate.toISOString() 
+                                        }).catch(err => console.error("Optimistic sync failed", err));
+                                      }
                                       return {
                                         ...a,
                                         staffId: dragOverStaffId,
@@ -1914,7 +1902,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {/* GHOST PREVIEW OF DRAGGED APPOINTMENT (Only in Day View) */}
                       {viewMode === 'day' && draggedApt && dragOverStaffId && dragOverTime !== null && (
                         (() => {
-                          const sIdx = STYLISTS.findIndex(s => s.id === dragOverStaffId);
+                          const sIdx = liveStylists.findIndex(s => s.id === dragOverStaffId);
                           if (sIdx === -1) return null;
                           const leftPct = sIdx * 25;
                           const topPos = minutesToTop(dragOverTime);
@@ -1934,7 +1922,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                   MOVE TO: {formatMinutesToTime(dragOverTime)}
                                 </span>
                                 <p className="text-xs font-bold text-amber-900 truncate">{draggedApt.customerNameEn}</p>
-                                <p className="text-[9px] text-amber-700 font-bold truncate">{isRtl ? STYLISTS.find(s=>s.id === dragOverStaffId)?.nameAr : STYLISTS.find(s=>s.id === dragOverStaffId)?.nameEn}</p>
+                                <p className="text-[9px] text-amber-700 font-bold truncate">{isRtl ? liveStylists.find(s=>s.id === dragOverStaffId)?.nameAr : liveStylists.find(s=>s.id === dragOverStaffId)?.nameEn}</p>
                               </div>
                               <span className="text-[9px] text-amber-800 font-bold">{draggedApt.duration} mins</span>
                             </div>
@@ -1947,7 +1935,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         let leftPercent = 0;
                         
                         if (viewMode === 'day') {
-                          const staffIdx = STYLISTS.findIndex(s => s.id === apt.staffId);
+                          const staffIdx = liveStylists.findIndex(s => s.id === apt.staffId);
                           if (staffIdx === -1) return null;
                           leftPercent = staffIdx * 25;
                         } else {
@@ -2334,7 +2322,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             </h4>
                             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                               <Clock size={12} />
-                              <span>{activeAppointment.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? STYLISTS.find(s=>s.id === activeAppointment.staffId)?.nameAr : STYLISTS.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
+                              <span>{activeAppointment.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameAr : liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
                             </p>
                           </div>
                           <span className="text-base font-black text-slate-900 font-mono">
@@ -2391,7 +2379,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
                           <div className="space-y-3">
                             {activeAppointment.guestsDetails.map((guest: any, idx: number) => {
-                              const srv = mockServices.find(s => s.id === guest.serviceId);
+                              const srv = liveServices.find(s => s.id === guest.serviceId);
                               return (
                                 <div key={guest.id || idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200/50 space-y-2 text-xs">
                                   <div className="flex justify-between items-center">
@@ -2457,7 +2445,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             }}
                             className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
                           >
-                            {STYLISTS.map(s => (
+                            {liveStylists.map(s => (
                               <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
                             ))}
                           </select>
@@ -2697,7 +2685,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         
                         {/* Inline list of available mock products to add */}
                         <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
-                          {mockProducts.map(prod => (
+                          {liveProducts.map(prod => (
                             <button
                               key={prod.id}
                               type="button"
@@ -2988,8 +2976,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         isRtl={isRtl}
         staffId={selectedShiftStaffId}
         staffName={isRtl 
-          ? (STYLISTS.find(s => s.id === selectedShiftStaffId)?.nameAr || selectedShiftStaffId)
-          : (STYLISTS.find(s => s.id === selectedShiftStaffId)?.nameEn || selectedShiftStaffId)
+          ? (liveStylists.find(s => s.id === selectedShiftStaffId)?.nameAr || selectedShiftStaffId)
+          : (liveStylists.find(s => s.id === selectedShiftStaffId)?.nameEn || selectedShiftStaffId)
         }
         addLocalToast={addLocalToast}
       />
