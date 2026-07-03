@@ -3169,11 +3169,9 @@ async function startServer() {
   // to the real production backend so real data is returned.
   app.use(['/api/v1', '/auth/tenant'], async (req, res) => {
     try {
-      const targetBase = req.path.startsWith('/auth/tenant')
-        ? REAL_API_ORIGIN
-        : REAL_API_BASE;
-
-      const targetUrl = `${targetBase}${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+      const targetBase = REAL_API_ORIGIN;
+      const queryString = req.originalUrl.includes('?') ? req.originalUrl.split('?')[1] : '';
+      const targetUrl = `${targetBase}${req.path}${queryString ? `?${queryString}` : ''}`;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
