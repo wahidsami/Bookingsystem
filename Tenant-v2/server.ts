@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import { createServer as createViteServer } from "vite";
 
 // Hot Deal interface matching requirements
 interface HotDeal {
@@ -131,7 +132,14 @@ async function startServer() {
     (process.env.VITE_API_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
   const REAL_API_ORIGIN = REAL_API_BASE.replace(/\/api\/v1\/?$/, '');
 
+  const ENABLE_MOCK_CUSTOMERS =
+    String(process.env.ENABLE_MOCK_CUSTOMERS || process.env.USE_MOCK_CUSTOMERS || 'false').toLowerCase() === 'true';
+
   app.use(express.json({ limit: '10mb' }));
+
+  console.log('Tenant-v2 server starting');
+  console.log('  REAL_API_BASE=', REAL_API_BASE);
+  console.log('  ENABLE_MOCK_CUSTOMERS=', ENABLE_MOCK_CUSTOMERS);
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
@@ -2266,7 +2274,18 @@ async function startServer() {
   };
 
   // GET /api/v1/tenant/customers/stats
-  app.get("/api/v1/tenant/customers/stats", checkViewCustomersPermission, (req, res) => {
+  const maybeMockCustomerRoute = (handler: express.RequestHandler) => {
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (!ENABLE_MOCK_CUSTOMERS) {
+        return next();
+      }
+      return handler(req, res, next);
+    };
+  };
+
+  app.get("/api/v1/tenant/customers/stats", maybeMockCustomerRoute(checkViewCustomersPermission), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const activeCustomers = backendCustomers.map(hydrateCustomerInsightAndRules).filter(hasTenantActivity);
       const totalCustomers = activeCustomers.length;
@@ -2294,7 +2313,9 @@ async function startServer() {
   });
 
   // GET /api/v1/tenant/customers/export
-  app.get("/api/v1/tenant/customers/export", checkViewCustomersPermission, (req, res) => {
+  app.get("/api/v1/tenant/customers/export", maybeMockCustomerRoute(checkViewCustomersPermission), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const q = (req.query.search as string || "").toLowerCase().trim();
       const loyaltyTier = req.query.loyaltyTier as string || "all";
@@ -2365,7 +2386,9 @@ async function startServer() {
   });
 
   // GET /api/v1/tenant/customers
-  app.get("/api/v1/tenant/customers", checkViewCustomersPermission, (req, res) => {
+  app.get("/api/v1/tenant/customers", maybeMockCustomerRoute(checkViewCustomersPermission), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const q = (req.query.search as string || "").toLowerCase().trim();
       const loyaltyTier = req.query.loyaltyTier as string || "all";
@@ -2426,7 +2449,9 @@ async function startServer() {
   });
 
   // GET /api/v1/tenant/customers/:id
-  app.get("/api/v1/tenant/customers/:id", checkViewCustomersPermission, (req, res) => {
+  app.get("/api/v1/tenant/customers/:id", maybeMockCustomerRoute(checkViewCustomersPermission), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const { id } = req.params;
       const rawCustomer = backendCustomers.find(c => c.id === id);
@@ -2548,7 +2573,9 @@ async function startServer() {
   });
 
   // PATCH /api/v1/tenant/customers/:id/profile
-  app.patch("/api/v1/tenant/customers/:id/profile", checkViewCustomersPermission, (req, res) => {
+  app.patch("/api/v1/tenant/customers/:id/profile", maybeMockCustomerRoute(checkViewCustomersPermission), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const { id } = req.params;
       const { firstName, lastName, email, phone, gender, birthdate, preferredLanguage } = req.body;
@@ -2599,7 +2626,9 @@ async function startServer() {
   });
 
   // PATCH /api/v1/tenant/customers/:id/notes
-  app.patch("/api/v1/tenant/customers/:id/notes", checkViewCustomersPermission, (req, res) => {
+  app.patch("/api/v1/tenant/customers/:id/notes", maybeMockCustomerRoute(checkViewCustomersPermission), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const { id } = req.params;
       const { notes, tags } = req.body;
@@ -2623,7 +2652,11 @@ async function startServer() {
   });
 
   // GET /api/v1/tenant/customers/:id/history
-  app.get("/api/v1/tenant/customers/:id/history", (req, res) => {
+  app.get("/api/v1/tenant/customers/:id/history", maybeMockCustomerRoute((_req, res, next) => {
+    return next();
+  }), (req, res, next) => {
+    if (!ENABLE_MOCK_CUSTOMERS) return next();
+
     try {
       const { id } = req.params;
       const customer = backendCustomers.find(c => c.id === id);
