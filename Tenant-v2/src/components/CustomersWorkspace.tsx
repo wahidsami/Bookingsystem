@@ -206,6 +206,32 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
     return payload;
   };
 
+  const getCustomerTypeBadge = (customerType?: string) => {
+    switch (customerType) {
+      case 'both':
+        return { label: isRtl ? 'خدمات ومنتجات' : 'Both', classes: 'bg-zinc-100 text-zinc-800', icon: '📅🛍️' };
+      case 'service_only':
+        return { label: isRtl ? 'خدمات' : 'Service', classes: 'bg-indigo-50 text-indigo-700', icon: '📅' };
+      case 'product_only':
+        return { label: isRtl ? 'منتجات' : 'Products', classes: 'bg-rose-50 text-rose-700', icon: '🛍️' };
+      case 'walk_in':
+        return { label: isRtl ? 'عميل حضوري' : 'Walk-in', classes: 'bg-amber-100 text-amber-800', icon: '🚶' };
+      default:
+        return null;
+    }
+  };
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   // Load KPI Stats
   const loadStats = async () => {
     setIsLoadingStats(true);
@@ -1205,7 +1231,8 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
                     ) : (
                       // Populated Table rows
                       customersList.map((client) => {
-                        const initials = client.firstName?.charAt(0) + (client.lastName?.charAt(0) || '');
+                        const initials = `${client.firstName?.charAt(0) || ''}${client.lastName?.charAt(0) || ''}`;
+                        const typeBadge = getCustomerTypeBadge(client.customerType);
                         return (
                           <tr 
                             key={client.id}
@@ -1214,18 +1241,18 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
                           >
                             {/* Avatar or initials + Customer name */}
                             <td className="px-5 py-3.5 flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-zinc-950 text-amber-400 font-extrabold flex items-center justify-center font-mono text-[11px] border border-zinc-850 shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-zinc-950 text-amber-400 font-extrabold flex items-center justify-center font-mono text-[11px] border border-zinc-850 shrink-0 overflow-hidden">
                                 {client.avatar ? (
-                                  <img src={client.avatar} alt={client.name} className="w-full h-full rounded-full object-cover" />
+                                  <img src={client.avatar} alt={`${client.firstName} ${client.lastName}`} className="w-full h-full rounded-full object-cover" />
                                 ) : (
-                                  initials || client.name.charAt(0)
+                                  <span>{initials || (client.firstName?.charAt(0) || client.lastName?.charAt(0) || '')}</span>
                                 )}
                               </div>
                               <div>
                                 <p className="font-extrabold text-neutral-800 text-xs tracking-tight group-hover:text-amber-600 transition-all">
-                                  {isRtl ? (client.nameAr || client.name) : client.name}
+                                  {isRtl ? `${client.lastName || ''} ${client.firstName || ''}`.trim() : `${client.firstName || ''} ${client.lastName || ''}`.trim()}
                                 </p>
-                                <p className="text-[10px] text-neutral-400 font-mono mt-0.5">Joined {client.memberSince}</p>
+                                <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{isRtl ? 'انضم' : 'Joined'} {formatDate(client.memberSince)}</p>
                               </div>
                             </td>
 
@@ -1237,17 +1264,15 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
                                     {isRtl ? 'عابر' : 'Walk-In'}
                                   </span>
                                 )}
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono ${
-                                  client.customerType === 'both' ? 'bg-zinc-100 text-zinc-800' :
-                                  client.customerType === 'service_only' ? 'bg-indigo-50 text-indigo-700' :
-                                  client.customerType === 'product_only' ? 'bg-rose-50 text-rose-700' :
-                                  'bg-neutral-100 text-neutral-600'
-                                }`}>
-                                  {client.customerType === 'both' ? (isRtl ? 'خدمات ومنتجات' : 'Both') :
-                                   client.customerType === 'service_only' ? (isRtl ? 'خدمات' : 'Service') :
-                                   client.customerType === 'product_only' ? (isRtl ? 'منتجات' : 'Products') :
-                                   (isRtl ? 'عابر فقط' : 'Walk-In Only')}
-                                </span>
+                                {typeBadge ? (
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono ${typeBadge.classes}`}>
+                                    {typeBadge.icon} {typeBadge.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono bg-neutral-100 text-neutral-600">
+                                    {isRtl ? 'غير محدد' : 'None'}
+                                  </span>
+                                )}
                               </div>
                             </td>
 
@@ -1266,14 +1291,14 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
                             </td>
 
                             {/* Total orders */}
-                            <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.totalOrders}</td>
+                            <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.totalOrders ?? 0}</td>
 
                             {/* Products purchased */}
-                            <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.productsPurchased}</td>
+                            <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.productsPurchased ?? 0}</td>
 
                             {/* Total spent */}
                             <td className="px-4 py-3.5 text-end font-bold font-mono text-neutral-800">
-                              {client.totalSpent.toLocaleString()} ر.س
+                              {Number(client.totalSpent ?? 0).toLocaleString()} ر.س
                             </td>
 
                             {/* Loyalty tier */}
@@ -1284,12 +1309,12 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
                                 client.loyaltyTier === 'Silver Star' ? 'bg-neutral-50 text-neutral-800 border border-neutral-200' :
                                 'bg-neutral-100 text-neutral-600'
                               }`}>
-                                {client.loyaltyTier}
+                                {client.loyaltyTier || (isRtl ? 'غير محدد' : 'N/A')}
                               </span>
                             </td>
 
                             {/* Last visit */}
-                            <td className="px-4 py-3.5 font-mono text-neutral-500 text-[11px]">{client.lastVisit || 'N/A'}</td>
+                            <td className="px-4 py-3.5 font-mono text-neutral-500 text-[11px]">{formatDate(client.lastVisit)}</td>
 
                             {/* View / Edit Action */}
                             <td className="px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
