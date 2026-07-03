@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Language } from '../types';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface CustomersWorkspaceProps {
   lang: Language;
@@ -178,8 +179,8 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loyaltyTierFilter, setLoyaltyTierFilter] = useState('all');
   const [customerTypeFilter, setCustomerTypeFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState('lastVisit');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -239,15 +240,14 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
       }
       setIsLoadingList(true);
       setIsError(false);
-      const params = new URLSearchParams({
-        search: debouncedSearch,
-        loyaltyTier: loyaltyTierFilter,
-        customerType: customerTypeFilter,
-        sortBy,
-        sortOrder,
-        page: String(page),
-        limit: '20'
-      });
+      const params = new URLSearchParams();
+      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
+      if (loyaltyTierFilter && loyaltyTierFilter !== 'all') params.append('loyaltyTier', loyaltyTierFilter);
+      if (customerTypeFilter && customerTypeFilter !== 'all') params.append('customerType', customerTypeFilter);
+      if (sortBy) params.append('sortBy', sortBy);
+      if (sortOrder) params.append('sortOrder', sortOrder.toUpperCase());
+      params.append('page', String(page));
+      params.append('limit', '20');
       const res = await fetch(`/api/v1/tenant/customers?${params.toString()}`);
       if (res.status === 403) {
         setIsPermissionDenied(true);
@@ -285,13 +285,12 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
   const handleCSVExport = async () => {
     try {
       setIsExporting(true);
-      const params = new URLSearchParams({
-        search: debouncedSearch,
-        loyaltyTier: loyaltyTierFilter,
-        customerType: customerTypeFilter,
-        sortBy,
-        sortOrder
-      });
+      const params = new URLSearchParams();
+      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
+      if (loyaltyTierFilter && loyaltyTierFilter !== 'all') params.append('loyaltyTier', loyaltyTierFilter);
+      if (customerTypeFilter && customerTypeFilter !== 'all') params.append('customerType', customerTypeFilter);
+      if (sortBy) params.append('sortBy', sortBy);
+      if (sortOrder) params.append('sortOrder', sortOrder.toUpperCase());
       const res = await fetch(`/api/v1/tenant/customers/export?${params.toString()}`);
       if (res.status === 403) {
         setIsPermissionDenied(true);
@@ -364,20 +363,13 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
     try {
       setIsLoadingHistory(true);
       setIsErrorHistory(false);
-      const params = new URLSearchParams({
+      const data = await tenantApiAdapter.getCustomerHistory(selectedCustomerId, {
         type: historyType,
         status: historyStatus,
         startDate: historyStartDate,
         endDate: historyEndDate,
-        limit: String(historyLimit)
+        limit: historyLimit
       });
-      const res = await fetch(`/api/v1/tenant/customers/${selectedCustomerId}/history?${params.toString()}`);
-      if (res.status === 403) {
-        setIsPermissionDenied(true);
-        return;
-      }
-      if (!res.ok) throw new Error("Failed to load history workspace");
-      const data = await res.json();
       setHistoryData(data.history || []);
       setHistoryMetrics(data.metrics || null);
       setIsPermissionDenied(false);

@@ -299,44 +299,56 @@ class TenantApiAdapter {
     return this.get('/tenant/profile');
   }
 
-  async getCustomers(params: Record<string, string | number | undefined>): Promise<CustomerListResponse> {
+  private buildQueryString(params?: Record<string, any>): string {
     const q = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && `${value}`.length > 0) {
-        q.set(key, String(value));
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+
+      if (Array.isArray(value)) {
+        const normalizedArray = value
+          .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+          .filter((item) => item.length > 0 && !['all', 'any', 'none', 'select', 'default', '*'].includes(item.toLowerCase()));
+        if (normalizedArray.length === 0) return;
+        value = normalizedArray.join(',');
       }
+
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        if (Object.keys(value).length === 0) return;
+        value = JSON.stringify(value);
+      }
+
+      const normalized = typeof value === 'string' ? value.trim() : String(value);
+      const lower = normalized.toLowerCase();
+      if (
+        normalized.length === 0 ||
+        ['all', 'any', 'none', 'select', 'default', '*'].includes(lower)
+      ) {
+        return;
+      }
+
+      q.set(key, key === 'sortOrder' ? normalized.toUpperCase() : normalized);
     });
-    return this.get(`/tenant/customers${q.toString() ? `?${q.toString()}` : ''}`);
+    return q.toString();
+  }
+
+  async getCustomers(params: Record<string, string | number | undefined>): Promise<CustomerListResponse> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/customers${query ? `?${query}` : ''}`);
   }
 
   async getCustomer(id: string, params?: Record<string, string | number | undefined>): Promise<any> {
-    const q = new URLSearchParams();
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && `${value}`.length > 0) {
-        q.set(key, String(value));
-      }
-    });
-    return this.get(`/tenant/customers/${id}${q.toString() ? `?${q.toString()}` : ''}`);
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/customers/${id}${query ? `?${query}` : ''}`);
   }
 
   async getCustomerHistory(id: string, params?: Record<string, string | number | undefined>): Promise<any> {
-    const q = new URLSearchParams();
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && `${value}`.length > 0) {
-        q.set(key, String(value));
-      }
-    });
-    return this.get(`/tenant/customers/${id}/history${q.toString() ? `?${q.toString()}` : ''}`);
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/customers/${id}/history${query ? `?${query}` : ''}`);
   }
 
   async getCustomerTransactions(id: string, params?: Record<string, string | number | undefined>): Promise<any> {
-    const q = new URLSearchParams();
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && `${value}`.length > 0) {
-        q.set(key, String(value));
-      }
-    });
-    return this.get(`/tenant/customers/${id}/transactions${q.toString() ? `?${q.toString()}` : ''}`);
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/customers/${id}/transactions${query ? `?${query}` : ''}`);
   }
 
   async getEmployees(): Promise<any> {
@@ -442,17 +454,13 @@ class TenantApiAdapter {
   }
 
   async getAppointmentsBoard(date: string): Promise<any> {
-    return this.get(`/tenant/appointments/board?date=${date}`);
+    const query = this.buildQueryString({ date });
+    return this.get(`/tenant/appointments/board${query ? `?${query}` : ''}`);
   }
 
   async getAppointments(params?: Record<string, string | number | undefined>): Promise<any> {
-    const q = new URLSearchParams();
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && `${value}`.length > 0) {
-        q.set(key, String(value));
-      }
-    });
-    return this.get(`/tenant/appointments${q.toString() ? `?${q.toString()}` : ''}`);
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/appointments${query ? `?${query}` : ''}`);
   }
 
   async getAppointment(id: string): Promise<any> {
@@ -485,11 +493,8 @@ class TenantApiAdapter {
   }
 
   async getFullReport(startDate: string, endDate: string, sections: string[] = []): Promise<any> {
-    const params = new URLSearchParams({ startDate, endDate });
-    if (sections.length > 0) {
-      params.append('sections', sections.join(','));
-    }
-    return this.get(`/tenant/reports/full?${params.toString()}`);
+    const query = this.buildQueryString({ startDate, endDate, sections });
+    return this.get(`/tenant/reports/full${query ? `?${query}` : ''}`);
   }
 
   async getServicePerformance(startDate: string, endDate: string): Promise<any> {
