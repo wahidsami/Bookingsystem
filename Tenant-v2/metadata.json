@@ -1,0 +1,6 @@
+{
+  "name": "REFAH",
+  "description": "Premium booking, CRM, POS, and operations platform for beauty salons, spas, and wellness centers in Saudi Arabia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

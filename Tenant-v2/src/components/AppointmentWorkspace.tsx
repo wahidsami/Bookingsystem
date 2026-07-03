@@ -1,0 +1,3128 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X, 
+  ChevronLeft, ChevronRight, CreditCard, Tag, MessageSquare, MapPin, 
+  Activity, Wallet, ChevronDown, Trash, Undo2, AlertCircle, Filter, 
+  SlidersHorizontal, Star, Split, Share2, Printer, CheckCircle2,
+  Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
+  TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy,
+  PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift
+} from 'lucide-react';
+import { Language, Product } from '../types';
+import { mockCustomers, mockServices, mockProducts, mockEmployees } from '../data/mockData';
+import InteractiveDrawers from './InteractiveDrawers';
+import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
+
+interface AppointmentWorkspaceProps {
+  lang: Language;
+  onQuickAction: (type: any) => void;
+}
+
+// Full types
+interface Stylist {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  avatar: string;
+  roleEn: string;
+  roleAr: string;
+  color: string;
+}
+
+interface Appointment {
+  id: string;
+  customerNameEn: string;
+  customerNameAr: string;
+  serviceNameEn: string;
+  serviceNameAr: string;
+  staffId: string;
+  startTime: number; // minutes from 9:00 AM (0 to 720 for 12 hours)
+  duration: number; // minutes
+  status: 'confirmed' | 'arrived' | 'completed' | 'cancelled';
+  paymentStatus: 'paid' | 'unpaid' | 'partial';
+  isGroupBooking: boolean;
+  guestCount?: number;
+  hasNotes: boolean;
+  notes?: string;
+  price: number;
+  tags: string[];
+  customerPhone?: string;
+  customerEmail?: string;
+  loyaltyTier?: string;
+  walletBalance?: number;
+  type?: 'appointment' | 'blocked';
+  blockedType?: 'Break' | 'Lunch' | 'Meeting';
+  serviceCategory?: 'hair' | 'spa' | 'nails';
+  date?: string;
+}
+
+const STYLISTS: Stylist[] = [
+  { id: 'st-1', nameEn: 'Nadeen Al-Harbi', nameAr: 'نادين الحربي', roleEn: 'Senior Colorist', roleAr: 'خبيرة تلوين الشعر', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&auto=format&fit=crop', color: 'border-amber-500 bg-amber-500/10 text-amber-900' },
+  { id: 'st-2', nameEn: 'Layla Al-Asiri', nameAr: 'ليلى العسيري', roleEn: 'Spa Therapist', roleAr: 'معالجة سبا', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=100&auto=format&fit=crop', color: 'border-emerald-500 bg-emerald-500/10 text-emerald-900' },
+  { id: 'st-3', nameEn: 'Elena Vasily', nameAr: 'إيلينا فاسيلي', roleEn: 'Nail Artist', roleAr: 'فنانة أظافر محترفة', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=100&auto=format&fit=crop', color: 'border-rose-500 bg-rose-500/10 text-rose-900' },
+  { id: 'st-4', nameEn: 'Mona Al-Ruwaiti', nameAr: 'منى الرويلي', roleEn: 'Bridal Designer', roleAr: 'مصممة تسريحات العرايس', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100&auto=format&fit=crop', color: 'border-blue-500 bg-blue-500/10 text-blue-900' },
+];
+
+const INITIAL_APPOINTMENTS: Appointment[] = [
+  {
+    id: 'apt-1',
+    customerNameEn: 'Fatima Al-Dossary',
+    customerNameAr: 'فاطمة الدوسري',
+    serviceNameEn: 'Royal Hydra-Facial & Glow',
+    serviceNameAr: 'هيدرافيشال ملكي ونضارة',
+    staffId: 'st-2',
+    startTime: 60, // 10:00 AM
+    duration: 90, // 1.5 hours
+    status: 'confirmed',
+    paymentStatus: 'unpaid',
+    isGroupBooking: false,
+    hasNotes: true,
+    notes: 'Sensitive skin. Prefers natural aloe products.',
+    price: 450,
+    tags: ['VIP', 'First-Time'],
+    customerPhone: '+966 50 123 4567',
+    customerEmail: 'fatima@dossary.sa',
+    loyaltyTier: 'VIP Amber',
+    walletBalance: 250,
+    type: 'appointment',
+    serviceCategory: 'spa'
+  },
+  {
+    id: 'apt-2',
+    customerNameEn: 'Sarah Al-Ghamdi',
+    customerNameAr: 'سارة الغامدي',
+    serviceNameEn: 'Balayage & Premium Styling',
+    serviceNameAr: 'بالياج مع تسريح بريميوم',
+    staffId: 'st-1',
+    startTime: 150, // 11:30 AM
+    duration: 150, // 2.5 hours
+    status: 'arrived',
+    paymentStatus: 'partial',
+    isGroupBooking: true,
+    guestCount: 3,
+    hasNotes: false,
+    notes: 'Wants golden undertones.',
+    price: 850,
+    tags: ['Regular', 'Group Booking'],
+    customerPhone: '+966 54 888 1234',
+    customerEmail: 'sarah.g@gmail.com',
+    loyaltyTier: 'Platinum Star',
+    walletBalance: 120,
+    type: 'appointment',
+    serviceCategory: 'hair'
+  },
+  {
+    id: 'apt-3',
+    customerNameEn: 'Abeer Bin Laden',
+    customerNameAr: 'عبير بن لادن',
+    serviceNameEn: 'Gel Extension & Chrome Polish',
+    serviceNameAr: 'تركيب جل مع طلاء كروم',
+    staffId: 'st-3',
+    startTime: 240, // 1:00 PM
+    duration: 75, // 1 hour 15 mins
+    status: 'completed',
+    paymentStatus: 'paid',
+    isGroupBooking: false,
+    hasNotes: true,
+    notes: 'Requested specific gold foil accents.',
+    price: 350,
+    tags: ['VIP'],
+    customerPhone: '+966 55 999 7777',
+    customerEmail: 'abeer.bl@saudi-lux.com',
+    loyaltyTier: 'VIP Gold',
+    walletBalance: 500,
+    type: 'appointment',
+    serviceCategory: 'nails'
+  },
+  {
+    id: 'apt-4',
+    customerNameEn: 'Hanan Al-Otaibi',
+    customerNameAr: 'هنان العتيبي',
+    serviceNameEn: 'Bridal Updo & Silk Treatment',
+    serviceNameAr: 'تسريحة زفاف مع علاج الحرير',
+    staffId: 'st-4',
+    startTime: 360, // 3:00 PM
+    duration: 180, // 3 hours
+    status: 'confirmed',
+    paymentStatus: 'unpaid',
+    isGroupBooking: false,
+    hasNotes: true,
+    notes: 'Wedding at Ritz Carlton. Elena is also booked for nails.',
+    price: 1500,
+    tags: ['Bride', 'Heavy Prep'],
+    customerPhone: '+966 56 444 3322',
+    customerEmail: 'hanan.bride@live.com',
+    loyaltyTier: 'Diamond Royal',
+    walletBalance: 1000,
+    type: 'appointment',
+    serviceCategory: 'hair'
+  },
+  {
+    id: 'block-1',
+    customerNameEn: 'LUNCH BREAK',
+    customerNameAr: 'استراحة غداء',
+    serviceNameEn: 'Staff Recess & Rest',
+    serviceNameAr: 'فترة راحة الطاقم',
+    staffId: 'st-2',
+    startTime: 180, // 12:00 PM
+    duration: 60, // 1 hour
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    isGroupBooking: false,
+    hasNotes: false,
+    price: 0,
+    tags: ['Blocked', 'Internal'],
+    type: 'blocked',
+    blockedType: 'Lunch'
+  },
+  {
+    id: 'block-2',
+    customerNameEn: 'WEEKLY MEETING',
+    customerNameAr: 'الاجتماع الأسبوعي',
+    serviceNameEn: 'Internal Review & Training',
+    serviceNameAr: 'مراجعة وتدريب داخلي',
+    staffId: 'st-1',
+    startTime: 300, // 2:00 PM
+    duration: 60, // 1 hour
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    isGroupBooking: false,
+    hasNotes: false,
+    price: 0,
+    tags: ['Blocked', 'Internal'],
+    type: 'blocked',
+    blockedType: 'Meeting'
+  }
+];
+
+export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
+  const isRtl = lang === 'ar';
+  
+  // Workspace states with local persistence (Board context preservation)
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    const saved = localStorage.getItem('refah_appointments_data');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Failed to parse saved appointments', e);
+      }
+    }
+    // Set default date for initial appointments
+    return INITIAL_APPOINTMENTS.map(apt => ({
+      ...apt,
+      date: apt.date || '2026-06-28'
+    }));
+  });
+
+  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>(() => {
+    const saved = localStorage.getItem('refah_stylist_statuses');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      'st-1': 'active',
+      'st-2': 'active',
+      'st-3': 'active',
+      'st-4': 'active',
+    };
+  });
+
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 5, 28)); // Sunday June 28, 2026
+  const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
+  const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'agenda'>('day');
+
+  // Persistence effects
+  useEffect(() => {
+    localStorage.setItem('refah_appointments_data', JSON.stringify(appointments));
+  }, [appointments]);
+
+  useEffect(() => {
+    localStorage.setItem('refah_stylist_statuses', JSON.stringify(stylistStatuses));
+  }, [stylistStatuses]);
+  
+  // Interactive hover tracking
+  const [hoveredSlot, setHoveredSlot] = useState<{ staffId?: string; date?: string; timeInMinutes: number } | null>(null);
+  
+  // Selection / Detail Drawer State
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'crm' | 'financials' | 'timeline' | 'reviews'>('crm');
+  const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
+  
+  // Custom Drag State & Interactive Preview
+  const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
+  const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
+  const [dragOverTime, setDragOverTime] = useState<number | null>(null);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    staffId: string;
+    timeInMinutes: number;
+    appointmentId?: string;
+  } | null>(null);
+
+  // Drag State Tracker for Vertical Resizing
+  const [dragState, setDragState] = useState<{
+    appointmentId: string;
+    startMouseY: number;
+    startStartTime: number;
+    originalStaffId: string;
+    isResizing: boolean;
+    startDuration: number;
+  } | null>(null);
+
+  // Split payments demo state
+  const [splitAmounts, setSplitAmounts] = useState<{ card: number; cash: number; wallet: number }>({ card: 0, cash: 0, wallet: 0 });
+  const [isSplitActive, setIsSplitActive] = useState(false);
+
+  // Wallet simulation state
+  const [simulatedWalletTopUp, setSimulatedWalletTopUp] = useState<string>('');
+
+  // Checkout combined products & gift cards state for active appointment
+  const [checkoutProducts, setCheckoutProducts] = useState<{ id: string; nameAr: string; nameEn: string; price: number; quantity: number; sku: string }[]>([]);
+  const [appliedGiftCardCode, setAppliedGiftCardCode] = useState<string>('');
+  const [appliedGiftCardAmount, setAppliedGiftCardAmount] = useState<number>(0);
+  const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
+  const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
+
+  // Skeletons / Refresh Simulation
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Local Animated Toast Feedback System
+  const [localToasts, setLocalToasts] = useState<{ id: string; msgAr: string; msgEn: string; type: 'success' | 'info' | 'warning' }[]>([]);
+  const addLocalToast = (msgAr: string, msgEn: string, type: 'success' | 'info' | 'warning' = 'success') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setLocalToasts(prev => [...prev, { id, msgAr, msgEn, type }]);
+    setTimeout(() => {
+      setLocalToasts(prev => prev.filter(t => t.id !== id));
+    }, 4500);
+  };
+
+  // --- INTERACTIVE ADD APPOINTMENT / BLOCK TIME DRAWER ---
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<'appointment' | 'blocked'>('appointment');
+  const [createStep, setCreateStep] = useState<number>(1);
+  
+  // Step 1: Customer Details State
+  const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
+  const [selectedCustId, setSelectedCustId] = useState<string>('CUST-001');
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustEmail, setNewCustEmail] = useState('');
+  const [newCustDob, setNewCustDob] = useState('1998-05-12');
+  const [newCustGender, setNewCustGender] = useState<'F' | 'M'>('F');
+  const [newCustIsVip, setNewCustIsVip] = useState(false);
+  const [includeGroupGuests, setIncludeGroupGuests] = useState(false);
+  const [guestCount, setGuestCount] = useState<number>(1);
+  const [guestNames, setGuestNames] = useState('');
+
+  // Step 2: Service Configuration & Queue
+  const [currentServiceId, setCurrentServiceId] = useState<string>('SRV-001');
+  const [currentStaffId, setCurrentStaffId] = useState<string>('st-1');
+  const [currentStartTime, setCurrentStartTime] = useState<number>(120); // minutes from 9:00 AM. 120 = 11:00 AM
+  const [currentDuration, setCurrentDuration] = useState<number>(60);
+  const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
+  const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
+  const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
+  
+  // Staged Services queue for multi-service sequence bookings
+  interface StagedService {
+    id: string;
+    serviceId: string;
+    staffId: string;
+    startTime: number;
+    duration: number;
+    discountType: 'none' | 'flat' | 'percent';
+    discountValue: number;
+    notes: string;
+  }
+  const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+
+  // Step 3: Global Checkout notes & Custom Payment Rows
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [notifyWhatsApp, setNotifyWhatsApp] = useState(true);
+  const [createSplitActive, setCreateSplitActive] = useState(false);
+  const [createSplitAmounts, setCreateSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0, bank: 0, gift: 0 });
+  const [giftCardCodeInput, setGiftCardCodeInput] = useState('');
+
+  // Blocked shift breaks
+  const [blockTitleAr, setBlockTitleAr] = useState('استراحة قهوة الموظفين');
+  const [blockTitleEn, setBlockTitleEn] = useState('Staff Espresso Recess');
+  const [blockStaffId, setBlockStaffId] = useState('st-1');
+  const [blockStartTime, setBlockStartTime] = useState<number>(180); // 12:00 PM
+  const [blockDuration, setBlockDuration] = useState<number>(45);
+  const [blockType, setBlockType] = useState<'Break' | 'Lunch' | 'Meeting'>('Break');
+
+  // Shift Editor Modal states
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [selectedShiftStaffId, setSelectedShiftStaffId] = useState('st-1');
+  const [initialCreateMode, setInitialCreateMode] = useState<'appointment' | 'blocked'>('appointment');
+  const [initialCartTab, setInitialCartTab] = useState<'products' | 'giftcards'>('products');
+
+  // --- POS CART & GIFT CARD COUNTER DRAWER ---
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [cartTab, setCartTab] = useState<'products' | 'giftcards'>('products');
+  
+  // Cart items sequence
+  interface CartItem {
+    id: string;
+    type: 'product' | 'giftcard';
+    nameAr: string;
+    nameEn: string;
+    price: number;
+    quantity: number;
+    skuOrCode: string;
+    recipient?: string;
+    sender?: string;
+  }
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  
+  // Gift Card generator
+  const [gcSender, setGcSender] = useState('');
+  const [gcRecipient, setGcRecipient] = useState('');
+  const [gcValue, setGcValue] = useState<number>(500);
+  const [generatedGcCode, setGeneratedGcCode] = useState('REF-GFT-2026-9844');
+  
+  // POS Checkout customer association
+  const [posCustMode, setPosCustMode] = useState<'walkin' | 'existing'>('walkin');
+  const [posSelectedCustId, setPosSelectedCustId] = useState('CUST-001');
+  
+  // POS Split checkout state
+  const [posSplitActive, setPosSplitActive] = useState(false);
+  const [posSplitAmounts, setPosSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0, bank: 0 });
+
+  // Receipt billing report preview modal/pane
+  const [completedOrder, setCompletedOrder] = useState<{
+    orderId: string;
+    date: string;
+    customerName: string;
+    items: CartItem[];
+    subtotal: number;
+    vat: number;
+    total: number;
+    paymentSummary: string;
+  } | null>(null);
+
+  // Auto load service durations
+  useEffect(() => {
+    const srv = mockServices.find(s => s.id === currentServiceId);
+    if (srv) {
+      setCurrentDuration(srv.duration);
+    }
+  }, [currentServiceId]);
+
+  useEffect(() => {
+    // Whenever date changes, show a sleek skeleton reload
+    setIsLoading(true);
+    const timer = setTimeout(() => setIsLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, [selectedDate, viewMode, serviceCategoryFilter]);
+
+  const triggerRefresh = () => {
+    setIsRefreshing(true);
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setIsLoading(false);
+    }, 600);
+  };
+
+  // Translate utilities
+  const t = {
+    today: isRtl ? 'اليوم' : 'Today',
+    allStaff: isRtl ? 'جميع خبيرات التجميل' : 'All Stylists',
+    allStatus: isRtl ? 'جميع الحالات' : 'All Statuses',
+    confirmed: isRtl ? 'مؤكد' : 'Confirmed',
+    arrived: isRtl ? 'وصلت المركز' : 'Arrived',
+    completed: isRtl ? 'اكتملت الخدمة' : 'Completed',
+    cancelled: isRtl ? 'ملغية' : 'Cancelled',
+    paid: isRtl ? 'مدفوعة' : 'Paid',
+    unpaid: isRtl ? 'غير مدفوعة' : 'Unpaid',
+    partial: isRtl ? 'جزئي' : 'Partial Paid',
+    riyal: isRtl ? 'ر.س' : 'SAR',
+    durationMin: isRtl ? 'دقيقة' : 'min',
+    newBooking: isRtl ? 'حجز موعد جديد' : 'New Appointment',
+    blockTime: isRtl ? 'حظر فترة زمنية' : 'Block Time',
+    editShift: isRtl ? 'تعديل نوبة العمل' : 'Edit Shift',
+    addBreak: isRtl ? 'إضافة استراحة غداء/قهوة' : 'Add Break',
+    pasteAppointment: isRtl ? 'لصق حجز منسوخ' : 'Paste Appointment',
+    refreshSchedule: isRtl ? 'تحديث الجدول والربط' : 'Refresh Schedule',
+    reschedule: isRtl ? 'إعادة جدولة الموعد' : 'Reschedule Appointment',
+    checkout: isRtl ? 'دفع سريع وخروج' : 'Checkout & Pay',
+    rebook: isRtl ? 'إعادة حجز فوري' : 'Instant Rebook',
+    walletText: isRtl ? 'محفظة العميل الرقمية' : 'Client Wallet Balance',
+    splitPayments: isRtl ? 'تقسيم المدفوعات' : 'Split Payments',
+    financeSummary: isRtl ? 'الملخص المالي للفاتورة' : 'Invoice Financial Summary',
+    timelineText: isRtl ? 'سجل تفاعل العميل' : 'Client Touchpoint Log',
+    reviewsText: isRtl ? 'تقييمات وملاحظات العميل' : 'Reviews & Comments',
+    quickActionsTitle: isRtl ? 'أدوات التحكم والجدولة' : 'Schedule Controller',
+    slotBookPrompt: isRtl ? '+ حجز في الساعة' : '+ Book at',
+    clearFilters: isRtl ? 'إعادة تعيين الفلاتر' : 'Reset Filters',
+    dragTip: isRtl ? 'اسحب الموعد لتغيير الخبيرة والوقت • اسحب المقبض السفلي لتعديل المدة' : 'Drag card to reschedule • Drag bottom handle to resize duration',
+    emptyStateText: isRtl ? 'لا توجد مواعيد تطابق خيارات البحث الحالية' : 'No appointments found matching filters'
+  };
+
+  // Conversions for layout
+  const SLOT_HEIGHT = 100; // 100px per hour
+  const START_HOUR = 9; // 9:00 AM
+  const END_HOUR = 21; // 9:00 PM (12 hours duration)
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
+
+  const minutesToTop = (mins: number) => {
+    return (mins / 60) * SLOT_HEIGHT;
+  };
+
+  const minutesToHeight = (duration: number) => {
+    return (duration / 60) * SLOT_HEIGHT;
+  };
+
+  const formatMinutesToTime = (totalMins: number) => {
+    const minsFromMidnight = (START_HOUR * 60) + totalMins;
+    let hours = Math.floor(minsFromMidnight / 60);
+    const mins = Math.floor(minsFromMidnight % 60);
+    const ampm = hours >= 12 ? (isRtl ? 'م' : 'PM') : (isRtl ? 'ص' : 'AM');
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 should be 12
+    const minStr = mins < 10 ? '0' + mins : mins;
+    return `${hours}:${minStr} ${ampm}`;
+  };
+
+  const handleDayShift = (days: number) => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+  };
+
+  // Custom Mouse Drag Handling for Resizing
+  const handleMouseDown = (e: React.MouseEvent, aptId: string, isResize: boolean) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const apt = appointments.find(a => a.id === aptId);
+    if (!apt) return;
+
+    setDragState({
+      appointmentId: aptId,
+      startMouseY: e.clientY,
+      startStartTime: apt.startTime,
+      originalStaffId: apt.staffId,
+      isResizing: isResize,
+      startDuration: apt.duration,
+    });
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!dragState) return;
+    
+    const deltaY = e.clientY - dragState.startMouseY;
+    // Each 1 hour is SLOT_HEIGHT (100px). So deltaMinutes = (deltaY / 100) * 60
+    const deltaMinutes = Math.round(((deltaY / SLOT_HEIGHT) * 60) / 5) * 5; // 5 minute precision step
+
+    if (dragState.isResizing) {
+      // Handle resizing duration
+      const newDuration = Math.max(15, dragState.startDuration + deltaMinutes); // min 15 minutes
+      setAppointments(prev => prev.map(a => a.id === dragState.appointmentId ? { ...a, duration: newDuration } : a));
+    }
+  };
+
+  const handleMouseUp = () => {
+    setDragState(null);
+  };
+
+  useEffect(() => {
+    if (dragState) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragState]);
+
+  // Context Menu Helpers
+  const handleContextMenu = (e: React.MouseEvent, staffId: string, timeInMinutes: number, appointmentId?: string) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      staffId,
+      timeInMinutes,
+      appointmentId,
+    });
+  };
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
+
+  // Quick action from Context Menu
+  const triggerContextAction = (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products') => {
+    if (actionType === 'new') {
+      if (contextMenu) {
+        setCurrentStaffId(contextMenu.staffId);
+        setCurrentStartTime(contextMenu.timeInMinutes);
+      }
+      setInitialCreateMode('appointment');
+      setCreateStep(1);
+      setStagedServices([]);
+      setIsCreateDrawerOpen(true);
+    } else if (actionType === 'block') {
+      if (contextMenu) {
+        setBlockStaffId(contextMenu.staffId);
+        setBlockStartTime(contextMenu.timeInMinutes);
+        setBlockTitleAr('فترة استراحة وحظر');
+        setBlockTitleEn('Break Slot');
+        setCurrentStaffId(contextMenu.staffId);
+        setCurrentStartTime(contextMenu.timeInMinutes);
+      }
+      setInitialCreateMode('blocked');
+      setIsCreateDrawerOpen(true);
+    } else if (actionType === 'giftcards') {
+      if (contextMenu) {
+        setCurrentStaffId(contextMenu.staffId);
+      }
+      setInitialCartTab('giftcards');
+      setIsCartDrawerOpen(true);
+    } else if (actionType === 'products') {
+      if (contextMenu) {
+        setCurrentStaffId(contextMenu.staffId);
+      }
+      setInitialCartTab('products');
+      setIsCartDrawerOpen(true);
+    } else if (actionType === 'shift') {
+      if (contextMenu) {
+        setSelectedShiftStaffId(contextMenu.staffId);
+        setIsShiftModalOpen(true);
+      }
+    } else if (actionType === 'refresh') {
+      triggerRefresh();
+    } else {
+      addLocalToast(
+        `تمت محاكاة الإجراء ${actionType.toUpperCase()} بنجاح.`,
+        `Simulated action ${actionType.toUpperCase()} successfully.`,
+        'info'
+      );
+    }
+    setContextMenu(null);
+  };
+
+  // Open Details Drawer
+  const openAppointmentDetails = (apt: Appointment) => {
+    if (apt.type === 'blocked') {
+      // For blocked cards, open a simplified popup or handle beautifully
+      addLocalToast(
+        `فترة محظورة: ${apt.customerNameAr}`,
+        `Blocked time interval: ${apt.customerNameEn}`,
+        'info'
+      );
+      return;
+    }
+    setActiveAppointment(apt);
+    setSplitAmounts({ card: apt.price, cash: 0, wallet: 0 });
+    setIsSplitActive(false);
+    setCheckoutProducts([]);
+    setAppliedGiftCardCode('');
+    setAppliedGiftCardAmount(0);
+    setDrawerOpen(true);
+  };
+
+  const handleCheckoutPayment = () => {
+    if (!activeAppointment) return;
+    
+    // Calculate totals
+    const serviceSubtotal = activeAppointment.price;
+    const productsSubtotal = checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+    const subtotal = serviceSubtotal + productsSubtotal;
+    const discount = appliedGiftCardAmount;
+    const taxableAmount = Math.max(0, subtotal - discount);
+    const vat = taxableAmount * 0.15;
+    const total = taxableAmount + vat;
+
+    let paymentMethodSummary = isRtl ? 'بوابة مدى الرقمية المتكاملة' : 'Integrated Mada Card Terminal';
+    if (isSplitActive) {
+      const parts = [];
+      if (splitAmounts.card > 0) parts.push(`${isRtl ? 'مدى' : 'Mada'}: ${splitAmounts.card} ${t.riyal}`);
+      if (splitAmounts.cash > 0) parts.push(`${isRtl ? 'كاش' : 'Cash'}: ${splitAmounts.cash} ${t.riyal}`);
+      if (splitAmounts.wallet > 0) parts.push(`${isRtl ? 'المحفظة' : 'Wallet'}: ${splitAmounts.wallet} ${t.riyal}`);
+      if (parts.length > 0) paymentMethodSummary = parts.join(' | ');
+    }
+
+    const receipt = {
+      orderId: `REF-APT-${Math.floor(100000 + Math.random() * 900000)}`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
+      serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
+      servicePrice: serviceSubtotal,
+      products: [...checkoutProducts],
+      subtotal,
+      discount,
+      vat,
+      total,
+      paymentSummary: paymentMethodSummary
+    };
+
+    setCheckoutReceiptData(receipt);
+    setShowReceiptModal(true);
+
+    // Update appointment state in dashboard schedule
+    setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'completed', paymentStatus: 'paid' } : a));
+    setActiveAppointment(prev => prev ? { ...prev, status: 'completed', paymentStatus: 'paid' } : null);
+    
+    addLocalToast(
+      'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
+      'Session invoice settled and customer checked out successfully! 🧾',
+      'success'
+    );
+  };
+
+  const handleAddWalletBalance = () => {
+    const amount = parseFloat(simulatedWalletTopUp);
+    if (!isNaN(amount) && amount > 0 && activeAppointment) {
+      const updatedBalance = (activeAppointment.walletBalance || 0) + amount;
+      setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, walletBalance: updatedBalance } : a));
+      setActiveAppointment(prev => prev ? { ...prev, walletBalance: updatedBalance } : null);
+      setSimulatedWalletTopUp('');
+      addLocalToast(
+        `تم شحن محفظة العميل بقيمة ${amount} ر.س بنجاح!`,
+        `Successfully recharged customer wallet with ${amount} SAR!`,
+        'success'
+      );
+    }
+  };
+
+  // --- OPERATIONS FOR CREATE DRAWER ---
+  const handleAddStagedService = () => {
+    const srv = mockServices.find(s => s.id === currentServiceId);
+    if (!srv) return;
+
+    let nextStartTime = currentStartTime;
+    if (stagedServices.length > 0) {
+      const lastItem = stagedServices[stagedServices.length - 1];
+      nextStartTime = lastItem.startTime + lastItem.duration;
+    }
+
+    const newItem: StagedService = {
+      id: `stg-${Date.now()}`,
+      serviceId: currentServiceId,
+      staffId: currentStaffId,
+      startTime: nextStartTime,
+      duration: currentDuration,
+      discountType: currentDiscountType,
+      discountValue: currentDiscountValue,
+      notes: currentServiceNotes,
+    };
+
+    setStagedServices(prev => [...prev, newItem]);
+    setCurrentServiceNotes('');
+    addLocalToast(
+      `تمت إضافة الخدمة "${isRtl ? srv.nameAr : srv.nameEn}" للموعد المجدول.`,
+      `Service "${isRtl ? srv.nameAr : srv.nameEn}" added to session queue.`,
+      'success'
+    );
+  };
+
+  const handleConfirmAppointmentCreation = () => {
+    let custNameEn = '';
+    let custNameAr = '';
+    let custPhone = '';
+    let custEmail = '';
+    let loyalty = 'Standard Guest';
+    let balance = 0;
+
+    if (custMode === 'existing') {
+      const existing = mockCustomers.find(c => c.id === selectedCustId);
+      if (existing) {
+        custNameEn = existing.name;
+        custNameAr = existing.name;
+        custPhone = existing.phone;
+        custEmail = existing.email || '';
+        loyalty = existing.appointmentsCount > 10 ? 'VIP Gold' : 'Loyal Club';
+        balance = 300;
+      }
+    } else if (custMode === 'new') {
+      if (!newCustName || !newCustPhone) {
+        addLocalToast('يرجى تعبئة الاسم ورقم الجوال للعميل الجديد', 'Please fill name and phone for new customer', 'warning');
+        return;
+      }
+      custNameEn = newCustName;
+      custNameAr = newCustName;
+      custPhone = newCustPhone;
+      custEmail = newCustEmail;
+      loyalty = newCustIsVip ? 'Diamond Elite VIP' : 'Classic Base';
+      balance = 0;
+    } else {
+      custNameEn = includeGroupGuests ? `Group Guest (${guestCount} pax)` : 'Walk-in Guest';
+      custNameAr = includeGroupGuests ? `حجز مجموعة زوار (${guestCount} أشخاص)` : 'زائرة زائرة';
+      custPhone = '+966 50 000 0000';
+      loyalty = 'Guest Account';
+    }
+
+    let finalStaged = [...stagedServices];
+    if (finalStaged.length === 0) {
+      const srv = mockServices.find(s => s.id === currentServiceId);
+      if (srv) {
+        finalStaged.push({
+          id: `stg-${Date.now()}`,
+          serviceId: currentServiceId,
+          staffId: currentStaffId,
+          startTime: currentStartTime,
+          duration: currentDuration,
+          discountType: currentDiscountType,
+          discountValue: currentDiscountValue,
+          notes: currentServiceNotes,
+        });
+      }
+    }
+
+    if (finalStaged.length === 0) {
+      addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
+      return;
+    }
+
+    let totalRawPrice = 0;
+    let serviceNamesEn: string[] = [];
+    let serviceNamesAr: string[] = [];
+    let firstStaffId = finalStaged[0].staffId;
+    let earliestStartTime = finalStaged[0].startTime;
+    let totalDuration = 0;
+
+    finalStaged.forEach(item => {
+      const srv = mockServices.find(s => s.id === item.serviceId);
+      if (srv) {
+        let priceAfterDisc = srv.price;
+        if (item.discountType === 'flat') {
+          priceAfterDisc = Math.max(0, srv.price - item.discountValue);
+        } else if (item.discountType === 'percent') {
+          priceAfterDisc = Math.max(0, srv.price - (srv.price * item.discountValue) / 100);
+        }
+        totalRawPrice += priceAfterDisc;
+        serviceNamesEn.push(srv.nameEn);
+        serviceNamesAr.push(srv.nameAr);
+        totalDuration += item.duration;
+      }
+    });
+
+    const finalPrice = Math.max(0, totalRawPrice);
+
+    const newApt: Appointment = {
+      id: `apt-created-${Date.now()}`,
+      customerNameEn: custNameEn,
+      customerNameAr: custNameAr,
+      serviceNameEn: serviceNamesEn.join(' + '),
+      serviceNameAr: serviceNamesAr.join(' + '),
+      staffId: firstStaffId,
+      startTime: earliestStartTime,
+      duration: totalDuration,
+      status: 'confirmed',
+      paymentStatus: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
+      isGroupBooking: custMode === 'walkin' && includeGroupGuests,
+      guestCount: custMode === 'walkin' ? guestCount : undefined,
+      hasNotes: sessionNotes !== '' || finalStaged.some(s => s.notes !== ''),
+      notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
+      price: finalPrice,
+      tags: custMode === 'new' && newCustIsVip ? ['VIP', 'New'] : ['Live Booked'],
+      customerPhone: custPhone,
+      customerEmail: custEmail,
+      loyaltyTier: loyalty,
+      walletBalance: balance,
+      type: 'appointment',
+      serviceCategory: 'spa'
+    };
+
+    setAppointments(prev => [...prev, newApt]);
+    setIsCreateDrawerOpen(false);
+    
+    // Reset fields
+    setStagedServices([]);
+    setCreateStep(1);
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustEmail('');
+    setSessionNotes('');
+    setGiftCardCodeInput('');
+    setCreateSplitActive(false);
+
+    addLocalToast(
+      `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+      `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+      'success'
+    );
+  };
+
+  const handleConfirmBlockCreation = () => {
+    const newBlock: Appointment = {
+      id: `block-created-${Date.now()}`,
+      customerNameEn: blockTitleEn.toUpperCase(),
+      customerNameAr: blockTitleAr,
+      serviceNameEn: 'Reserved Operational Block Interval',
+      serviceNameAr: 'فترة حظر زمني محددة للصيانة/الراحة',
+      staffId: blockStaffId,
+      startTime: blockStartTime,
+      duration: blockDuration,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      isGroupBooking: false,
+      hasNotes: false,
+      price: 0,
+      tags: ['Blocked', blockType],
+      type: 'blocked',
+      blockedType: blockType
+    };
+
+    setAppointments(prev => [...prev, newBlock]);
+    setIsCreateDrawerOpen(false);
+    addLocalToast(
+      `تم حظر الفترة الزمنية (${blockTitleAr}) بنجاح للأخصائية المعنية`,
+      `Successfully blocked time (${blockTitleEn}) for the stylist`,
+      'success'
+    );
+  };
+
+  // --- OPERATIONS FOR POS CART DRAWER ---
+  const handleRegenerateGiftCardCode = () => {
+    const code = 'REF-GFT-2026-' + Math.floor(1000 + Math.random() * 9000);
+    setGeneratedGcCode(code);
+  };
+
+  const handleAddGiftCardToCart = () => {
+    const newItem: CartItem = {
+      id: `gc-item-${Date.now()}`,
+      type: 'giftcard',
+      nameAr: `بطاقة هدايا فاخرة من ${gcSender || 'عميلة رفاه'} لـ ${gcRecipient || 'شخص عزيز'}`,
+      nameEn: `Luxury Gift Card from ${gcSender || 'REFAH Guest'} to ${gcRecipient || 'Dear Guest'}`,
+      price: gcValue,
+      quantity: 1,
+      skuOrCode: generatedGcCode,
+      recipient: gcRecipient,
+      sender: gcSender
+    };
+
+    setCartItems(prev => [...prev, newItem]);
+    setGcSender('');
+    setGcRecipient('');
+    handleRegenerateGiftCardCode();
+    addLocalToast(
+      'تمت إضافة بطاقة الهدايا بنجاح إلى سلة المبيعات الرقمية 🛒',
+      'Gift card added to POS sales cart successfully 🛒',
+      'success'
+    );
+  };
+
+  const handleAddProductToCart = (prod: Product) => {
+    if (prod.stock === 0) {
+      addLocalToast(
+        'عذراً، هذا المنتج غير متوفر بالمخزون حالياً!',
+        'Sorry, this product is currently out of stock!',
+        'warning'
+      );
+      return;
+    }
+
+    setCartItems(prev => {
+      const exists = prev.find(item => item.id === prod.id);
+      if (exists) {
+        return prev.map(item => 
+          item.id === prod.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      } else {
+        return [...prev, {
+          id: prod.id,
+          type: 'product',
+          nameAr: prod.nameAr,
+          nameEn: prod.nameEn,
+          price: prod.price,
+          quantity: 1,
+          skuOrCode: prod.sku
+        }];
+      }
+    });
+
+    addLocalToast(
+      `تمت إضافة "${isRtl ? prod.nameAr : prod.nameEn}" للسلة`,
+      `Added "${isRtl ? prod.nameAr : prod.nameEn}" to cart`,
+      'success'
+    );
+  };
+
+  const handleUpdateCartItemQty = (id: string, newQty: number) => {
+    if (newQty <= 0) {
+      setCartItems(prev => prev.filter(item => item.id !== id));
+      return;
+    }
+    setCartItems(prev => prev.map(item => 
+      item.id === id ? { ...item, quantity: newQty } : item
+    ));
+  };
+
+  const handleProcessPosCheckout = () => {
+    if (cartItems.length === 0) {
+      addLocalToast('سلة المبيعات فارغة، لا يمكن إتمام عملية الشراء', 'Sales cart is empty. Cannot checkout', 'warning');
+      return;
+    }
+
+    let buyerName = isRtl ? 'زائر مجهول / Walk-in' : 'Walk-in Guest / زائر مجهول';
+    if (posCustMode === 'existing') {
+      const cust = mockCustomers.find(c => c.id === posSelectedCustId);
+      if (cust) buyerName = cust.name;
+    }
+
+    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const vat = subtotal * 0.15;
+    const total = subtotal + vat;
+
+    let paymentMethodSummary = isRtl ? 'أطراف مدى المشتركة' : 'Mada Unified Terminals';
+    if (posSplitActive) {
+      const parts = [];
+      if (posSplitAmounts.card > 0) parts.push(`مدى: ${posSplitAmounts.card} ر.س`);
+      if (posSplitAmounts.cash > 0) parts.push(`نقداً: ${posSplitAmounts.cash} ر.س`);
+      if (posSplitAmounts.wallet > 0) parts.push(`المحفظة: ${posSplitAmounts.wallet} ر.س`);
+      if (posSplitAmounts.bank > 0) parts.push(`تحويل: ${posSplitAmounts.bank} ر.س`);
+      paymentMethodSummary = parts.join(' | ');
+    } else {
+      paymentMethodSummary = isRtl ? 'مدفوع بالكامل بالبطاقة الرقمية' : 'Paid in full via credit card terminal';
+    }
+
+    setCompletedOrder({
+      orderId: `REF-POS-${Math.floor(100000 + Math.random() * 900000)}`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      customerName: buyerName,
+      items: [...cartItems],
+      subtotal,
+      vat,
+      total,
+      paymentSummary: paymentMethodSummary
+    });
+
+    setCartItems([]);
+    setPosSplitActive(false);
+    setPosSplitAmounts({ card: 0, cash: 0, wallet: 0, bank: 0 });
+
+    addLocalToast(
+      'تمت فوترة المبيعات وتأكيد السداد بنجاح! 🧾',
+      'POS Sale billed and settled successfully! 🧾',
+      'success'
+    );
+  };
+
+  // Helper to calculate active 4-day block for Week view
+  const getDaysOfActiveBlock = (baseDate: Date) => {
+    const list: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
+      list.push(d.toISOString().split('T')[0]);
+    }
+    return list;
+  };
+
+  // Filters application
+  const filteredAppointments = appointments.filter(apt => {
+    const matchesStaff = selectedStylistFilter === 'all' || apt.staffId === selectedStylistFilter;
+    const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
+    const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
+    const matchesSearch = searchQuery === '' || 
+      apt.customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.customerNameAr.includes(searchQuery) ||
+      apt.serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.serviceNameAr.includes(searchQuery);
+
+    const dateStr = apt.date || '2026-06-28';
+    let matchesDate = false;
+    
+    if (viewMode === 'day') {
+      matchesDate = dateStr === selectedDate.toISOString().split('T')[0];
+    } else if (viewMode === 'week') {
+      const activeBlock = getDaysOfActiveBlock(selectedDate);
+      matchesDate = activeBlock.includes(dateStr);
+    } else {
+      // Agenda view shows all appointments starting from selected date
+      const targetDateStr = selectedDate.toISOString().split('T')[0];
+      matchesDate = dateStr >= targetDateStr;
+    }
+
+    return matchesStaff && matchesStatus && matchesCategory && matchesSearch && matchesDate;
+  });
+
+  // Calculate coordinates of the dragged element's ghost card
+  const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
+
+  return (
+    <div className="space-y-6 select-none font-sans" id="appointments-workspace">
+      
+      {/* 1. COMPREHENSIVE CONTROL BAR & BOARD CONTROLS */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          
+          {/* Unified Tool controls: Prev, Next, Today, Date Picker, Day / Week, Refresh */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            
+            {/* Day Shift Segment */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <button 
+                onClick={() => handleDayShift(-1)} 
+                className="p-1.5 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+                title="Previous Day"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button 
+                onClick={() => setSelectedDate(new Date(2026, 5, 28))} 
+                className="px-3 py-1 font-bold text-xs hover:bg-white rounded-md text-slate-700 transition-all"
+              >
+                {t.today}
+              </button>
+              <button 
+                onClick={() => handleDayShift(1)} 
+                className="p-1.5 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+                title="Next Day"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            {/* Date Picker Input */}
+            <div className="relative flex items-center bg-slate-100 rounded-lg border border-slate-200 p-1 px-2 text-xs font-bold text-slate-700">
+              <CalendarIcon size={13} className="mr-1.5 ml-1.5 text-slate-500" />
+              <input 
+                type="date" 
+                value={selectedDate.toISOString().split('T')[0]} 
+                onChange={(e) => {
+                  const parts = e.target.value.split('-');
+                  if (parts.length === 3) {
+                    setSelectedDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+                  }
+                }}
+                className="bg-transparent border-none outline-none text-xs font-bold font-sans cursor-pointer focus:ring-0 p-0.5" 
+              />
+            </div>
+
+            {/* Day / Week / Agenda views tab */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <button 
+                onClick={() => setViewMode('day')}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                  viewMode === 'day' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {isRtl ? 'يومي' : 'Day'}
+              </button>
+              <button 
+                onClick={() => setViewMode('week')}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                  viewMode === 'week' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {isRtl ? 'أسبوعي' : 'Week'}
+              </button>
+              <button 
+                onClick={() => setViewMode('agenda')}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                  viewMode === 'agenda' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {isRtl ? 'أجندة' : 'Agenda'}
+              </button>
+            </div>
+
+            {/* Refresh button with action */}
+            <button 
+              onClick={triggerRefresh}
+              className="p-2 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer"
+              title="Refresh Schedule"
+            >
+              <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin text-amber-500' : ''}`} />
+            </button>
+
+            {/* Add Appointment Global Trigger */}
+            <button 
+              onClick={() => {
+                setCreateMode('appointment');
+                setCreateStep(1);
+                setStagedServices([]);
+                setIsCreateDrawerOpen(true);
+              }}
+              className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus size={13} className="text-amber-400" />
+              <span>{isRtl ? 'حجز موعد جديد 🗓️' : 'New Appointment 🗓️'}</span>
+            </button>
+
+            {/* POS Cart Counter Trigger */}
+            <button 
+              onClick={() => {
+                setIsCartDrawerOpen(true);
+                setCompletedOrder(null);
+              }}
+              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-zinc-950 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <ShoppingBag size={13} className="text-zinc-950" />
+              <span>{isRtl ? 'صندوق المبيعات والبطاقات 🛒' : 'POS Retail Counter 🛒'}</span>
+            </button>
+
+          </div>
+        </div>
+
+        {/* SERVICE CATEGORY FILTER CHIPS */}
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mr-2">
+            <Filter size={10} className="text-amber-500" />
+            {isRtl ? 'تصنيف الخدمات:' : 'Category Filter:'}
+          </span>
+          {[
+            { id: 'all', labelEn: 'All Services', labelAr: 'جميع الخدمات', color: 'bg-slate-100 border-slate-200 text-slate-700' },
+            { id: 'hair', labelEn: 'Hair Styling & Dye', labelAr: 'الشعر والصبغات', color: 'bg-amber-50 border-amber-200 text-amber-800' },
+            { id: 'spa', labelEn: 'Spa & Hydra-Facial', labelAr: 'العناية بالبشرة والسبا', color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+            { id: 'nails', labelEn: 'Premium Nails Art', labelAr: 'فن العناية بالأظافر', color: 'bg-rose-50 border-rose-200 text-rose-800' }
+          ].map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setServiceCategoryFilter(cat.id)}
+              className={`py-1 px-3 border rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                serviceCategoryFilter === cat.id 
+                  ? 'bg-zinc-900 text-white border-zinc-950 scale-102 shadow-xs' 
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+              }`}
+            >
+              {isRtl ? cat.labelAr : cat.labelEn}
+            </button>
+          ))}
+
+          {/* Helper tip */}
+          <span className="text-[10px] text-slate-400 italic ml-auto flex items-center gap-1">
+            <AlertCircle size={10} className="text-amber-500" />
+            {t.dragTip}
+          </span>
+        </div>
+      </div>
+
+      {/* 2. GRID WORKSPACE: LEFT CONTROLLER & CENTER BOARD */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* LEFT COLUMN: CONTROLS & DATE NAVIGATOR (col-span-3) */}
+        <div className="lg:col-span-3 space-y-5">
+          
+          {/* Quick Date Indicator Widget */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{isRtl ? 'المخطط الزمني للتشغيل' : 'Daily Timeline Navigator'}</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+
+            {/* Selected Date Presentation */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                {selectedDate.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long' })}
+              </p>
+              <p className="text-2xl font-black text-slate-900 font-sans tracking-tight">
+                {selectedDate.getDate()}
+              </p>
+              <p className="text-xs font-bold text-slate-600">
+                {selectedDate.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+
+            {/* Quick mini-strip calendar mapping */}
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {[-3, -2, -1, 0, 1, 2, 3].map((offset) => {
+                const day = new Date(selectedDate);
+                day.setDate(day.getDate() + offset);
+                const isSelected = offset === 0;
+                return (
+                  <button 
+                    key={offset}
+                    onClick={() => handleDayShift(offset)}
+                    className={`p-1.5 rounded-lg text-[11px] font-bold transition-all flex flex-col items-center gap-0.5 ${
+                      isSelected 
+                        ? 'bg-zinc-900 text-white shadow-md scale-105' 
+                        : 'hover:bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <span className="opacity-70">{day.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'narrow' })}</span>
+                    <span className="text-xs">{day.getDate()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Search & Stylists / Filters Panel */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Filter size={12} className="text-amber-500" />
+                {isRtl ? 'البحث والتصفية والفرز' : 'FILTER CONTROL DESK'}
+              </span>
+              <SlidersHorizontal size={13} className="text-slate-400" />
+            </div>
+
+            {/* Search client or service */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">{isRtl ? 'البحث عن حجز' : 'Search'}</label>
+              <div className="relative">
+                <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} size={13} />
+                <input 
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isRtl ? 'اسم العميل، الخدمة...' : 'Client, service name...'}
+                  className={`w-full ${isRtl ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-sans focus:outline-none focus:ring-1 focus:ring-brand-500 transition-all`}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Stylist filter dropdown */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">{isRtl ? 'مقدم الخدمة / الخبيرة' : 'Staff Stylist'}</label>
+              <div className="relative">
+                <select
+                  value={selectedStylistFilter}
+                  onChange={(e) => setSelectedStylistFilter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none appearance-none cursor-pointer"
+                >
+                  <option value="all">👑 {t.allStaff}</option>
+                  {STYLISTS.map(s => (
+                    <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className={`absolute ${isRtl ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none`} />
+              </div>
+            </div>
+
+            {/* Status filtering strip */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">{isRtl ? 'حالة الموعد' : 'Booking Status'}</label>
+              <div className="grid grid-cols-2 gap-1">
+                {[
+                  { id: 'all', label: t.allStatus },
+                  { id: 'confirmed', label: t.confirmed },
+                  { id: 'arrived', label: t.arrived },
+                  { id: 'completed', label: t.completed }
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setStatusFilter(opt.id)}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold text-center border transition-all ${
+                      statusFilter === opt.id 
+                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear filters trigger */}
+            {(selectedStylistFilter !== 'all' || serviceCategoryFilter !== 'all' || statusFilter !== 'all' || searchQuery !== '') && (
+              <button 
+                onClick={() => {
+                  setSelectedStylistFilter('all');
+                  setServiceCategoryFilter('all');
+                  setStatusFilter('all');
+                  setSearchQuery('');
+                }}
+                className="w-full py-2 bg-slate-100 hover:bg-zinc-900 hover:text-white transition-all text-[10px] font-bold text-slate-600 rounded-lg uppercase tracking-wider"
+              >
+                {t.clearFilters}
+              </button>
+            )}
+          </div>
+
+          {/* Real-time ZATCA & Platform Status card */}
+          <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 space-y-3 shadow-md relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Scissors size={80} className="text-white" />
+            </div>
+            <h3 className="text-xs font-bold tracking-wider text-amber-400 uppercase flex items-center gap-1.5">
+              <Sparkles size={12} className="animate-spin text-amber-400" />
+              {isRtl ? 'أدوات تخطيط ذكية' : 'Intelligent Planners'}
+            </h3>
+            <div className="space-y-2 text-xs text-zinc-300">
+              <p className="leading-relaxed">
+                {isRtl 
+                  ? 'الجدول يدعم السحب والإفلات وتغيير مدة المواعيد مباشرة. انقر بالزر الأيمن في أي خلية.' 
+                  : 'Board features live drag & drop rescheduling, vertical handles to stretch duration, and custom context actions.'}
+              </p>
+              <div className="pt-2 border-t border-zinc-800 space-y-1 text-[10px] text-zinc-400">
+                <div className="flex justify-between">
+                  <span>{isRtl ? 'حالة التزامن' : 'Integration Status'}</span>
+                  <span className="font-mono text-emerald-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping" />
+                    Online
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{isRtl ? 'توقيت الخادم' : 'Server Time Zone'}</span>
+                  <span className="font-mono text-zinc-400">UTC+3 (Riyadh)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* CENTER COLUMN: INTERACTIVE SCHEDULER BOARD (col-span-9) */}
+        <div className="lg:col-span-9">
+          
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
+            
+            {/* Timeline Scheduler Navigation Bar */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
+                  {isRtl ? 'مراقبة الصالون والسبا الحية' : 'LIVE SALON ROOM MONITOR'}
+                </span>
+              </div>
+              
+              {/* Layout strip helpers */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase mr-2">{isRtl ? 'مستوى الدقة:' : 'Step Precision:'}</span>
+                <span className="bg-amber-500/10 text-amber-700 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold">5 {isRtl ? 'دقائق' : 'Mins'}</span>
+                <span className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded text-[10px] font-bold">ZATCA Compliant</span>
+              </div>
+            </div>
+
+            {/* THE INTERACTIVE SCHEDULE BOARD CONTAINER */}
+            <div className="overflow-x-auto scrollbar-thin relative" id="interactive-board-scroll">
+              
+              {viewMode === 'agenda' ? (
+                /* 1. COMPREHENSIVE AGENDA SCHEDULE VIEW */
+                <div className="p-6 bg-white min-h-[420px]">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 mb-6 gap-3">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRtl ? 'قائمة أجندة المواعيد النشطة والمستقبلية' : 'AGENDA OF ACTIVE & UPCOMING SESSIONS'}</h3>
+                      <p className="text-[11px] text-slate-400 font-semibold mt-1">
+                        {isRtl 
+                          ? `تعرض الجلسات المجدولة ابتداءً من ${selectedDate.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}` 
+                          : `Displaying scheduling matrix from ${selectedDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })} onwards.`}
+                      </p>
+                    </div>
+                    <span className="bg-zinc-900 text-amber-400 px-3 py-1 rounded-lg text-xs font-mono font-black self-start sm:self-auto shadow-xs">
+                      {filteredAppointments.length} {isRtl ? 'جلسات متبقية' : 'Sessions Listed'}
+                    </span>
+                  </div>
+
+                  {filteredAppointments.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                      <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-4 border border-slate-200">
+                        <CalendarIcon size={32} />
+                      </div>
+                      <p className="text-sm font-black text-slate-700">{isRtl ? 'لا توجد مواعيد مضافة في الأجندة لهذا البحث.' : 'No agenda appointments found matching the current filters.'}</p>
+                      <p className="text-xs text-slate-400 mt-1">{isRtl ? 'حاول إزالة الفلاتر أو تغيير تاريخ البدء.' : 'Try clearing active filters or changing the timeline base date.'}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {filteredAppointments.map((apt) => {
+                        const stylist = STYLISTS.find(s => s.id === apt.staffId);
+                        const statusBadgeColor = 
+                          apt.status === 'confirmed' ? 'bg-amber-100 text-amber-700 border-amber-200/60' :
+                          apt.status === 'arrived' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                          apt.status === 'completed' ? 'bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-rose-100 text-rose-700 border-rose-200';
+
+                        const statusText = 
+                          apt.status === 'confirmed' ? t.confirmed :
+                          apt.status === 'arrived' ? t.arrived :
+                          apt.status === 'completed' ? t.completed : (isRtl ? 'ملغي' : 'Cancelled');
+
+                        return (
+                          <div 
+                            key={apt.id}
+                            className="flex flex-col lg:flex-row lg:items-center justify-between p-4 bg-slate-50/60 hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 rounded-xl hover:shadow-sm transition-all cursor-pointer gap-4"
+                            onClick={() => openAppointmentDetails(apt)}
+                          >
+                            <div className="flex flex-col md:flex-row md:items-center gap-4 min-w-0 flex-1">
+                              {/* Date & Time block */}
+                              <div className="flex md:flex-col items-center md:items-start shrink-0 min-w-[120px] gap-2 md:gap-0.5 border-r md:border-r-0 border-slate-200 pb-2 md:pb-0">
+                                <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider font-mono">{apt.date}</span>
+                                <span className="text-sm font-mono font-black text-slate-800">{formatMinutesToTime(apt.startTime)}</span>
+                                <span className="text-[10px] text-slate-400 font-bold mt-0.5">{apt.duration} {t.durationMin}</span>
+                              </div>
+
+                              {/* Customer and treatment details */}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-xs font-black text-slate-800 truncate">
+                                    {isRtl ? apt.customerNameAr : apt.customerNameEn}
+                                  </h4>
+                                  {apt.isGroupBooking && (
+                                    <span className="bg-zinc-950 text-amber-400 text-[8px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5 leading-none">
+                                      <Users size={8} />
+                                      <span>{isRtl ? `مرافقين (${apt.guestCount || 2})` : `${apt.guestCount || 2} guests`}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] font-semibold text-slate-600 truncate mt-1.5">
+                                  {isRtl ? apt.serviceNameAr : apt.serviceNameEn}
+                                </p>
+                                {apt.notes && (
+                                  <p className="text-[10px] text-slate-400 italic mt-1 truncate max-w-md">
+                                    "{apt.notes}"
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Stylist block */}
+                              {stylist && (
+                                <div className="flex items-center gap-2 shrink-0 bg-white border border-slate-200/60 p-1.5 rounded-lg">
+                                  <div className="w-6 h-6 rounded-full overflow-hidden border border-slate-200">
+                                    <img src={stylist.avatar} alt={stylist.nameEn} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  </div>
+                                  <div className="text-left min-w-0">
+                                    <p className="text-[10px] font-black text-slate-700 leading-none">{isRtl ? stylist.nameAr : stylist.nameEn}</p>
+                                    <p className="text-[8px] text-slate-400 font-bold leading-none mt-1 uppercase tracking-tight">{isRtl ? stylist.roleAr : stylist.roleEn}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Price & Action block */}
+                            <div className="flex items-center justify-between lg:justify-end gap-5 shrink-0 mt-2 lg:mt-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-150">
+                              <div className="text-right">
+                                <span className="text-xs font-black text-slate-800 font-mono">{apt.price} {t.riyal}</span>
+                                <p className="text-[9px] font-bold uppercase tracking-wider mt-1" style={{ color: apt.paymentStatus === 'paid' ? '#059669' : apt.paymentStatus === 'partial' ? '#d97706' : '#dc2626' }}>
+                                  {apt.paymentStatus === 'paid' ? t.paid : apt.paymentStatus === 'partial' ? t.partial : t.unpaid}
+                                </p>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 text-[9px] font-black border rounded-md shadow-2xs ${statusBadgeColor}`}>
+                                  {statusText}
+                                </span>
+                                <button className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-200/65 rounded-lg transition-all cursor-pointer">
+                                  <ChevronRight size={14} className={isRtl ? 'rotate-180' : ''} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* 2. INTERACTIVE TIMELINE SATELLITE BOARD (Day or Week) */
+                <div className="min-w-[840px] relative flex flex-col" style={{ height: `${(TOTAL_HOURS * SLOT_HEIGHT) + 60}px` }}>
+                  
+                  {/* Board Columns Header */}
+                  <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-200 sticky top-0 z-20 h-12 items-center text-center">
+                    {/* Left corner time column header */}
+                    <div className="col-span-2 border-r border-slate-200 h-full flex items-center justify-center font-bold text-xs text-slate-500 bg-slate-50">
+                      {isRtl ? 'الفترة' : 'Time Slot'}
+                    </div>
+
+                    {viewMode === 'day' ? (
+                      /* Staff columns headers */
+                      <div className="col-span-10 grid grid-cols-4 h-full relative">
+                        {STYLISTS.map((stylist) => {
+                          const name = isRtl ? stylist.nameAr : stylist.nameEn;
+                          const role = isRtl ? stylist.roleAr : stylist.roleEn;
+                          const status = stylistStatuses[stylist.id] || 'active';
+                          
+                          // Status mapping helpers
+                          const statusColor = 
+                            status === 'active' ? 'bg-emerald-500' :
+                            status === 'break' ? 'bg-amber-500' : 'bg-rose-500';
+
+                          const statusText = 
+                            status === 'active' ? (isRtl ? 'نشط' : 'Active') :
+                            status === 'break' ? (isRtl ? 'في استراحة' : 'On Break') : (isRtl ? 'خارج العمل' : 'Off-duty');
+
+                          return (
+                            <div 
+                              key={stylist.id} 
+                              className="border-r last:border-r-0 border-slate-200 h-full flex items-center justify-between px-3 bg-white relative min-w-0"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {/* Avatar with status indicator badge */}
+                                <div className="relative w-7 h-7 rounded-full border border-slate-200 shrink-0 select-none">
+                                  <img src={stylist.avatar} alt={name} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${statusColor} border-2 border-white animate-pulse shadow-xs`} />
+                                </div>
+                                
+                                <div className="text-left min-w-0">
+                                  <p className="text-xs font-black text-slate-800 truncate leading-none flex items-center gap-1">
+                                    {name}
+                                  </p>
+                                  <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase leading-none">
+                                    {role} • <span className="font-semibold text-slate-500">{statusText}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Lane Configuration Action Trigger */}
+                              <div className="relative shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveStylistMenuId(activeStylistMenuId === stylist.id ? null : stylist.id);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-all cursor-pointer"
+                                  title={isRtl ? 'تعديل حالة الخبيرة' : 'Lane Actions'}
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+
+                                {/* Dynamic Lane Settings Dropdown Overlay */}
+                                <AnimatePresence>
+                                  {activeStylistMenuId === stylist.id && (
+                                    <>
+                                      {/* Invisible click backdrop to dismiss */}
+                                      <div className="fixed inset-0 z-40" onClick={() => setActiveStylistMenuId(null)} />
+                                      
+                                      <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className={`absolute top-6 ${isRtl ? 'left-0' : 'right-0'} w-40 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 z-50 space-y-1`}
+                                      >
+                                        <div className="px-2 py-1 border-b border-slate-100 mb-1 text-left">
+                                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'تحديث حالة خبيرة التجميل' : 'PROVIDER STATUS'}</p>
+                                        </div>
+                                        
+                                        <button
+                                          onClick={() => {
+                                            setStylistStatuses(prev => ({ ...prev, [stylist.id]: 'active' }));
+                                            setActiveStylistMenuId(null);
+                                            addLocalToast(
+                                              `تم تعيين ${name} في وضع النشاط والجاهزية! 🟢`,
+                                              `${stylist.nameEn} is now marked as Active and ready! 🟢`,
+                                              'success'
+                                            );
+                                          }}
+                                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 cursor-pointer ${
+                                            status === 'active' ? 'text-emerald-700 bg-emerald-50/50' : 'text-slate-700'
+                                          }`}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                          <span>{isRtl ? 'جاهزة ومتاحة (نشط)' : 'Active & Ready'}</span>
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setStylistStatuses(prev => ({ ...prev, [stylist.id]: 'break' }));
+                                            setActiveStylistMenuId(null);
+                                            addLocalToast(
+                                              `تم تعيين ${name} في فترة استراحة مؤقتة ☕`,
+                                              `${stylist.nameEn} is now On Break ☕`,
+                                              'warning'
+                                            );
+                                          }}
+                                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 cursor-pointer ${
+                                            status === 'break' ? 'text-amber-700 bg-amber-50/50' : 'text-slate-700'
+                                          }`}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                          <span>{isRtl ? 'في استراحة قصيرة ☕' : 'On Short Break'}</span>
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setStylistStatuses(prev => ({ ...prev, [stylist.id]: 'off' }));
+                                            setActiveStylistMenuId(null);
+                                            addLocalToast(
+                                              `تم تعيين ${name} كخارج العمل للوردية الحالية 🛑`,
+                                              `${stylist.nameEn} is now marked as Off-duty 🛑`,
+                                              'warning'
+                                            );
+                                          }}
+                                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 cursor-pointer ${
+                                            status === 'off' ? 'text-rose-700 bg-rose-50/50' : 'text-slate-700'
+                                          }`}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                          <span>{isRtl ? 'خارج العمل اليوم 🛑' : 'Off-duty / Shift End'}</span>
+                                        </button>
+                                      </motion.div>
+                                    </>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Date columns headers (Week View) */
+                      <div className="col-span-10 grid grid-cols-4 h-full relative">
+                        {getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => {
+                          const d = new Date(dayStr);
+                          const dayName = d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
+                          const dateFormatted = d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
+                          const isTodayStr = new Date().toISOString().split('T')[0] === dayStr;
+                          
+                          return (
+                            <div 
+                              key={idx} 
+                              className={`border-r last:border-r-0 border-slate-200 h-full flex flex-col items-center justify-center px-2 select-none ${
+                                isTodayStr ? 'bg-amber-500/5' : 'bg-white'
+                              }`}
+                            >
+                              <span className={`text-xs font-black leading-tight ${isTodayStr ? 'text-amber-600' : 'text-slate-800'}`}>
+                                {dayName} {isTodayStr && (isRtl ? '(اليوم)' : '(Today)')}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 mt-0.5 leading-none">{dateFormatted}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Loading Skeleton Overlays */}
+                  <AnimatePresence>
+                    {isLoading && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-white/75 backdrop-blur-xs z-30 flex flex-col justify-center items-center gap-3"
+                      >
+                        <div className="flex gap-1.5">
+                          <span className="w-2.5 h-2.5 bg-zinc-900 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2.5 h-2.5 bg-zinc-900 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2.5 h-2.5 bg-zinc-900 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-600">{isRtl ? 'مزامنة لوحة المواعيد...' : 'Synchronizing schedule...'}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Empty State Overlay if filtered list is empty */}
+                  {filteredAppointments.length === 0 && !isLoading && (
+                    <div className="absolute inset-x-0 bottom-0 top-12 bg-slate-50/80 z-10 flex flex-col justify-center items-center p-8 text-center">
+                      <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-3 border border-slate-200">
+                        <Search size={32} />
+                      </div>
+                      <p className="font-bold text-slate-800 text-sm">{t.emptyStateText}</p>
+                      <p className="text-xs text-slate-500 mt-1">{isRtl ? 'حاول إزالة أو تعديل بعض معايير التصفية والبحث.' : 'Try adjusting your search criteria or stylist selection.'}</p>
+                      <button 
+                        onClick={() => {
+                          setSelectedStylistFilter('all');
+                          setServiceCategoryFilter('all');
+                          setStatusFilter('all');
+                          setSearchQuery('');
+                        }}
+                        className="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-bold hover:bg-zinc-800 cursor-pointer"
+                      >
+                        {t.clearFilters}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Calendar Body Area */}
+                  <div className="flex-1 relative flex">
+                    
+                    {/* LEFT TIME STRIP COLUMN (2 of 12 columns) - STICKY RAIL */}
+                    <div className="w-[16.6666%] border-r border-slate-200 bg-slate-50/50 flex-shrink-0 relative z-10" style={{ height: `${TOTAL_HOURS * SLOT_HEIGHT}px` }}>
+                      {Array.from({ length: TOTAL_HOURS }).map((_, index) => {
+                        const hourNum = START_HOUR + index;
+                        const timeStr = formatMinutesToTime(index * 60);
+                        return (
+                          <div 
+                            key={index} 
+                            className="absolute w-full border-b border-slate-100/80 flex items-start justify-center pt-2 px-2"
+                            style={{ 
+                              top: `${index * SLOT_HEIGHT}px`, 
+                              height: `${SLOT_HEIGHT}px` 
+                            }}
+                          >
+                            <span className="text-[10px] font-black text-slate-400 font-mono tracking-tight">{timeStr}</span>
+                          </div>
+                        );
+                      })}
+
+                      {/* Left Timeline exact active hover zone marker */}
+                      {hoveredSlot && (
+                        <div 
+                          className="absolute left-0 right-0 h-8 bg-amber-500/10 border-r-4 border-amber-500 z-20 flex items-center justify-center pointer-events-none transition-all"
+                          style={{ top: `${(hoveredSlot.timeInMinutes / 60) * SLOT_HEIGHT}px`, marginTop: '-4px' }}
+                        >
+                          <span className="text-[10px] font-bold text-amber-700 font-mono">
+                            {formatMinutesToTime(hoveredSlot.timeInMinutes)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CENTER SCHEDULER GRID (10 of 12 columns) */}
+                    <div className="flex-1 relative" style={{ height: `${TOTAL_HOURS * SLOT_HEIGHT}px` }}>
+                      
+                      {/* Horizontal Hourly gridlines */}
+                      {Array.from({ length: TOTAL_HOURS }).map((_, index) => (
+                        <div 
+                          key={index} 
+                          className="absolute left-0 right-0 border-b border-slate-100 pointer-events-none"
+                          style={{ 
+                            top: `${index * SLOT_HEIGHT}px`, 
+                            height: `${SLOT_HEIGHT}px` 
+                          }}
+                        />
+                      ))}
+
+                      {/* Column Dividers for columns (4 Columns) */}
+                      <div className="absolute inset-0 grid grid-cols-4 pointer-events-none">
+                        {Array.from({ length: 4 }).map((_, colIdx) => (
+                          <div key={colIdx} className="border-r last:border-r-0 border-slate-200/60 h-full" />
+                        ))}
+                      </div>
+
+                      {/* Interactivity Grid Cell Blocks - Mouse Tracker for 5-minute precision */}
+                      <div className="absolute inset-0 grid grid-cols-4">
+                        {viewMode === 'day' ? (
+                          STYLISTS.map((stylist) => (
+                            <div 
+                              key={stylist.id} 
+                              className="h-full relative select-none cursor-pointer"
+                              onMouseMove={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const relativeY = e.clientY - rect.top;
+                                const totalMins = (relativeY / SLOT_HEIGHT) * 60;
+                                const stepMins = Math.round(totalMins / 5) * 5;
+                                setHoveredSlot({ staffId: stylist.id, timeInMinutes: stepMins });
+                              }}
+                              onMouseLeave={() => setHoveredSlot(null)}
+                              onContextMenu={(e) => {
+                                if (hoveredSlot) {
+                                  handleContextMenu(e, stylist.id, hoveredSlot.timeInMinutes);
+                                }
+                              }}
+                              onClick={() => {
+                                if (hoveredSlot) {
+                                  setCurrentStaffId(hoveredSlot.staffId);
+                                  setCurrentStartTime(hoveredSlot.timeInMinutes);
+                                  setCreateMode('appointment');
+                                  setCreateStep(1);
+                                  setStagedServices([]);
+                                  setIsCreateDrawerOpen(true);
+                                }
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const relativeY = e.clientY - rect.top;
+                                const totalMins = (relativeY / SLOT_HEIGHT) * 60;
+                                const stepMins = Math.round(totalMins / 5) * 5;
+                                setDragOverStaffId(stylist.id);
+                                setDragOverTime(stepMins);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const aptId = e.dataTransfer.getData('text/plain');
+                                if (aptId && dragOverStaffId && dragOverTime !== null) {
+                                  setAppointments(prev => prev.map(a => {
+                                    if (a.id === aptId) {
+                                      return {
+                                        ...a,
+                                        staffId: dragOverStaffId,
+                                        startTime: dragOverTime
+                                      };
+                                    }
+                                    return a;
+                                  }));
+                                }
+                                setDraggedAptId(null);
+                                setDragOverStaffId(null);
+                                setDragOverTime(null);
+                              }}
+                            >
+                              {/* 5-minute slot hover indicator */}
+                              {hoveredSlot && hoveredSlot.staffId === stylist.id && (
+                                <div 
+                                  className="absolute left-0 right-0 z-10 pointer-events-none flex justify-end border-t border-amber-500/50"
+                                  style={{ 
+                                    top: `${(hoveredSlot.timeInMinutes / 60) * SLOT_HEIGHT}px`,
+                                    height: '16px',
+                                    backgroundImage: 'repeating-linear-gradient(-45deg, rgba(245, 158, 11, 0.08) 0px, rgba(245, 158, 11, 0.08) 4px, transparent 4px, transparent 8px)'
+                                  }}
+                                >
+                                  <span className="bg-zinc-900 text-amber-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-md -mt-2.5 mr-2 ml-2 tracking-tight">
+                                    {formatMinutesToTime(hoveredSlot.timeInMinutes)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          /* Week view column block listeners */
+                          getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => (
+                            <div 
+                              key={idx} 
+                              className="h-full relative select-none cursor-pointer"
+                              onMouseMove={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const relativeY = e.clientY - rect.top;
+                                const totalMins = (relativeY / SLOT_HEIGHT) * 60;
+                                const stepMins = Math.round(totalMins / 5) * 5;
+                                setHoveredSlot({ date: dayStr, timeInMinutes: stepMins });
+                              }}
+                              onMouseLeave={() => setHoveredSlot(null)}
+                              onClick={() => {
+                                if (hoveredSlot) {
+                                  const d = new Date(dayStr);
+                                  setSelectedDate(d);
+                                  setCurrentStartTime(hoveredSlot.timeInMinutes);
+                                  setCurrentStaffId('st-1'); // default to first stylist
+                                  setCreateMode('appointment');
+                                  setCreateStep(1);
+                                  setStagedServices([]);
+                                  setIsCreateDrawerOpen(true);
+                                }
+                              }}
+                            >
+                              {/* 5-minute slot hover indicator for Week Columns */}
+                              {hoveredSlot && hoveredSlot.date === dayStr && (
+                                <div 
+                                  className="absolute left-0 right-0 z-10 pointer-events-none flex justify-end border-t border-amber-500/50"
+                                  style={{ 
+                                    top: `${(hoveredSlot.timeInMinutes / 60) * SLOT_HEIGHT}px`,
+                                    height: '16px',
+                                    backgroundImage: 'repeating-linear-gradient(-45deg, rgba(245, 158, 11, 0.08) 0px, rgba(245, 158, 11, 0.08) 4px, transparent 4px, transparent 8px)'
+                                  }}
+                                >
+                                  <span className="bg-zinc-900 text-amber-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-md -mt-2.5 mr-2 ml-2 tracking-tight">
+                                    {formatMinutesToTime(hoveredSlot.timeInMinutes)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* GHOST PREVIEW OF DRAGGED APPOINTMENT (Only in Day View) */}
+                      {viewMode === 'day' && draggedApt && dragOverStaffId && dragOverTime !== null && (
+                        (() => {
+                          const sIdx = STYLISTS.findIndex(s => s.id === dragOverStaffId);
+                          if (sIdx === -1) return null;
+                          const leftPct = sIdx * 25;
+                          const topPos = minutesToTop(dragOverTime);
+                          const hPos = minutesToHeight(draggedApt.duration);
+                          return (
+                            <div
+                              className="absolute border-2 border-dashed border-amber-500 bg-amber-500/10 rounded-lg pointer-events-none z-30 flex flex-col justify-between p-2 opacity-85"
+                              style={{
+                                left: `calc(${leftPct}% + 4px)`,
+                                width: 'calc(25% - 8px)',
+                                top: `${topPos}px`,
+                                height: `${hPos}px`,
+                              }}
+                            >
+                              <div className="space-y-1">
+                                <span className="bg-amber-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded uppercase">
+                                  MOVE TO: {formatMinutesToTime(dragOverTime)}
+                                </span>
+                                <p className="text-xs font-bold text-amber-900 truncate">{draggedApt.customerNameEn}</p>
+                                <p className="text-[9px] text-amber-700 font-bold truncate">{isRtl ? STYLISTS.find(s=>s.id === dragOverStaffId)?.nameAr : STYLISTS.find(s=>s.id === dragOverStaffId)?.nameEn}</p>
+                              </div>
+                              <span className="text-[9px] text-amber-800 font-bold">{draggedApt.duration} mins</span>
+                            </div>
+                          );
+                        })()
+                      )}
+
+                      {/* FLOATING APPOINTMENT CARDS (ABSOLUTELY POSITIONED) */}
+                      {filteredAppointments.map((apt) => {
+                        let leftPercent = 0;
+                        
+                        if (viewMode === 'day') {
+                          const staffIdx = STYLISTS.findIndex(s => s.id === apt.staffId);
+                          if (staffIdx === -1) return null;
+                          leftPercent = staffIdx * 25;
+                        } else {
+                          const activeBlock = getDaysOfActiveBlock(selectedDate);
+                          const dayIdx = activeBlock.indexOf(apt.date || '2026-06-28');
+                          if (dayIdx === -1) return null;
+                          leftPercent = dayIdx * 25;
+                        }
+
+                        const cardTop = minutesToTop(apt.startTime);
+                        const cardHeight = minutesToHeight(apt.duration);
+                        const isDragged = draggedAptId === apt.id;
+
+                        // Style variants
+                        let cardStyle = {};
+                        let classNames = "";
+
+                        if (apt.type === 'blocked') {
+                          classNames = "bg-slate-50 text-slate-500 border-slate-200 shadow-none hover:shadow-none";
+                          cardStyle = {
+                            backgroundImage: 'repeating-linear-gradient(45deg, #f1f5f9 0px, #f1f5f9 8px, #f8fafc 8px, #f8fafc 16px)'
+                          };
+                        } else {
+                          // Color categories based on status
+                          if (apt.status === 'confirmed') {
+                            classNames = "bg-amber-50 text-amber-900 border-amber-200/80 shadow-xs hover:border-amber-300";
+                          } else if (apt.status === 'arrived') {
+                            classNames = "bg-emerald-50 text-emerald-900 border-emerald-200 shadow-xs hover:border-emerald-300";
+                          } else if (apt.status === 'completed') {
+                            classNames = "bg-zinc-100 text-zinc-700 border-zinc-200 shadow-xs opacity-90";
+                          } else {
+                            classNames = "bg-rose-50 text-rose-900 border-rose-200 shadow-xs";
+                          }
+                        }
+
+                        return (
+                          <div
+                            key={apt.id}
+                            draggable={viewMode === 'day'}
+                            onDragStart={(e) => {
+                              if (viewMode !== 'day') return;
+                              e.dataTransfer.setData('text/plain', apt.id);
+                              setDraggedAptId(apt.id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedAptId(null);
+                              setDragOverStaffId(null);
+                              setDragOverTime(null);
+                            }}
+                            className={`absolute p-2.5 rounded-xl border transition-all cursor-pointer select-none group flex flex-col justify-between overflow-hidden ${
+                              isDragged ? 'opacity-30 scale-95 ring-2 ring-amber-500 z-0' : 'hover:shadow-md z-10 hover:-translate-y-0.5'
+                            } ${classNames}`}
+                            style={{
+                              left: `calc(${leftPercent}% + 4px)`,
+                              width: 'calc(25% - 8px)',
+                              top: `${cardTop}px`,
+                              height: `${cardHeight}px`,
+                              ...cardStyle
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openAppointmentDetails(apt);
+                            }}
+                            onMouseDown={(e) => {
+                              if (viewMode === 'day') {
+                                handleMouseDown(e, apt.id, false);
+                              }
+                            }}
+                            onContextMenu={(e) => {
+                              if (viewMode === 'day') {
+                                handleContextMenu(e, apt.staffId, apt.startTime, apt.id);
+                              }
+                            }}
+                          >
+                            {/* Inner container to hold items */}
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              
+                              {/* Card Header Info */}
+                              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                                <span className="text-[9px] uppercase font-black tracking-tight bg-zinc-900/10 px-1.5 py-0.5 rounded leading-none">
+                                  {formatMinutesToTime(apt.startTime)}
+                                </span>
+                                
+                                {/* Group booking or notes indicators */}
+                                <div className="flex items-center gap-1 shrink-0 text-slate-500">
+                                  {apt.isGroupBooking && (
+                                    <div className="flex items-center gap-0.5 bg-zinc-900/10 px-1 rounded text-[8px] font-bold">
+                                      <Users size={9} />
+                                      <span>{apt.guestCount || 2}</span>
+                                    </div>
+                                  )}
+                                  {apt.hasNotes && <MessageSquare size={10} className="text-zinc-700" />}
+                                </div>
+                              </div>
+
+                              {/* Customer Name */}
+                              <p className="text-xs font-bold truncate mt-1.5 leading-tight text-slate-900">
+                                {isRtl ? apt.customerNameAr : apt.customerNameEn}
+                              </p>
+
+                              {/* Service name */}
+                              <p className="text-[10px] opacity-90 font-medium truncate leading-tight text-slate-600 mt-0.5">
+                                {isRtl ? apt.serviceNameAr : apt.serviceNameEn}
+                              </p>
+                            </div>
+
+                            {/* Footer Info of Card */}
+                            <div className="flex items-center justify-between gap-1 mt-1 text-[9px] opacity-90 pt-1.5 border-t border-slate-900/5 shrink-0">
+                              <span className="font-bold font-mono text-slate-500">{apt.duration} {t.durationMin}</span>
+                              
+                              {/* Blocked vs Paid status indicators */}
+                              {apt.type === 'blocked' ? (
+                                <span className="bg-zinc-900/5 text-zinc-600 px-1 py-0.5 rounded text-[8px] font-black tracking-wide uppercase">
+                                  {apt.blockedType}
+                                </span>
+                              ) : (
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                  apt.paymentStatus === 'paid' ? 'bg-emerald-500/10 text-emerald-700' : apt.paymentStatus === 'partial' ? 'bg-amber-500/10 text-amber-700' : 'bg-red-500/10 text-red-700'
+                                }`}>
+                                  {apt.paymentStatus === 'paid' ? t.paid : apt.paymentStatus === 'partial' ? t.partial : t.unpaid}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Absolute Bottom resize handle bar (Only in Day View) */}
+                            {viewMode === 'day' && apt.type !== 'blocked' && (
+                              <div
+                                className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/5 hover:bg-black/15 cursor-ns-resize transition-all"
+                                onMouseDown={(e) => handleMouseDown(e, apt.id, true)}
+                                title="Drag to resize duration"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+
+                    </div>
+
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* 3. ABSOLUTE PORTAL POPUP CONTEXT MENU */}
+      <AnimatePresence>
+        {contextMenu && contextMenu.visible && (
+          <div 
+            className="fixed bg-zinc-950 text-white rounded-xl shadow-2xl border border-zinc-800 p-2 py-2.5 z-50 w-56 space-y-0.5 text-xs text-start"
+            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          >
+            <p className="text-[9px] text-zinc-500 font-black tracking-widest uppercase p-1.5 border-b border-zinc-800/80 mb-1">
+              {isRtl ? 'أدوات التحكم السريعة' : 'QUICK BOARD CONTROLS'}
+            </p>
+            
+            <button 
+              onClick={() => triggerContextAction('new')} 
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <Plus size={13} className="text-amber-400" />
+              <span>{isRtl ? 'إضافة حجز جديد' : 'Add New Appointment'}</span>
+            </button>
+            
+            <button 
+              onClick={() => triggerContextAction('giftcards')} 
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <Gift size={13} className="text-pink-400" />
+              <span>{isRtl ? 'بطاقات الهدايا' : 'Gift Cards'}</span>
+            </button>
+
+            <button 
+              onClick={() => triggerContextAction('products')} 
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <ShoppingBag size={13} className="text-teal-400" />
+              <span>{isRtl ? 'المنتجات والمستحضرات' : 'Products'}</span>
+            </button>
+
+            <button 
+              onClick={() => triggerContextAction('block')} 
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <Lock size={13} className="text-neutral-400" />
+              <span>{isRtl ? 'حظر فترة زمنية' : 'Add Blocked Time'}</span>
+            </button>
+
+            <button 
+              onClick={() => triggerContextAction('shift')} 
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <Scissors size={13} className="text-indigo-400" />
+              <span>{isRtl ? 'تعديل شيفت العمل الأسبوعي' : 'Edit Shift'}</span>
+            </button>
+
+            <div className="border-t border-zinc-800/60 my-1" />
+            <button 
+              onClick={() => triggerContextAction('refresh')} 
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2 text-zinc-400"
+            >
+              <RefreshCw size={13} />
+              <span>{isRtl ? 'تحديث اللوحة' : 'Refresh Board'}</span>
+            </button>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. PREMIUM APPOINTMENT DETAILS DRAWER (88vw massive CRM Workspace) */}
+      <AnimatePresence>
+        {drawerOpen && activeAppointment && (
+          <div className="fixed inset-0 z-50 flex overflow-hidden">
+            
+            {/* Backdrop slide dim background */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDrawerOpen(false)}
+              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
+            />
+
+            {/* Slide drawer container spanning 88vw */}
+            <motion.div
+              initial={{ x: isRtl ? '-100%' : '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: isRtl ? '-100%' : '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-[88vw] bg-slate-50 border-${isRtl ? 'r' : 'l'} border-slate-200 shadow-2xl flex flex-col`}
+            >
+              
+              {/* STICKY COMMAND HEADER */}
+              <header className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10 shrink-0 shadow-xs h-16">
+                <div className="flex items-center gap-3">
+                  <span className="p-2 bg-zinc-900 rounded-lg text-amber-400">
+                    <CheckCircle2 size={18} />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 leading-none">
+                      {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT PLATFORM & CRM CONTROL'}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                        activeAppointment.status === 'confirmed' ? 'bg-amber-100 text-amber-700' :
+                        activeAppointment.status === 'arrived' ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-zinc-100 text-zinc-700'
+                      }`}>
+                        {activeAppointment.status === 'confirmed' ? t.confirmed :
+                         activeAppointment.status === 'arrived' ? t.arrived : t.completed}
+                      </span>
+                    </h2>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                      {isRtl ? 'معتمد عبر الفاتورة الإلكترونية هيئة الزكاة والضريبة والجمارك' : 'ZATCA Cryptographic Stamp Compliant • ID: ' + activeAppointment.id}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Operations tools */}
+                <div className="flex items-center gap-2">
+                  <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all cursor-pointer" title="Print Invoice">
+                    <Printer size={15} />
+                  </button>
+                  <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all cursor-pointer" title="Share Touchpoint">
+                    <Share2 size={15} />
+                  </button>
+                  <div className="h-5 w-px bg-slate-200 mx-1" />
+                  <button 
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </header>
+
+              {/* CRM THREE-COLUMN WORKSPACE BODY */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
+                
+                {/* COLUMN 1: STICKY CUSTOMER PROFILE & CRM SUMMARY (col-span-3) */}
+                <div className="xl:col-span-3">
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 sticky top-4">
+                    
+                    {/* Customer Info Card Header */}
+                    <div className="text-center pb-4 border-b border-slate-100">
+                      <div className="w-16 h-16 bg-amber-100 border border-amber-200 rounded-full flex items-center justify-center font-bold text-amber-700 text-xl mx-auto mb-2 select-none shadow-xs">
+                        {activeAppointment.customerNameEn.slice(0, 2).toUpperCase()}
+                      </div>
+                      <h3 className="font-bold text-slate-800 text-sm leading-tight">
+                        {isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn}
+                      </h3>
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-2.5 py-0.5 rounded-full mt-1.5 inline-block">
+                        {activeAppointment.loyaltyTier || 'Regular Member'}
+                      </span>
+                    </div>
+
+                    {/* Quick Profile fields */}
+                    <div className="space-y-3.5 text-xs text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <Phone size={13} className="text-slate-400" />
+                        <span className="font-mono">{activeAppointment.customerPhone || '+966 50 123 4567'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail size={13} className="text-slate-400" />
+                        <span className="truncate">{activeAppointment.customerEmail || 'client@refah.sa'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-slate-400" />
+                        <span>{isRtl ? 'فرع العليا - الرياض' : 'Olaya Branch - Riyadh'}</span>
+                      </div>
+                    </div>
+
+                    {/* Tag chips with manual add option */}
+                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'الوسوم المميزة' : 'CRM Tags'}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {activeAppointment.tags.map((tag, idx) => (
+                          <span key={idx} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sticky notes editor box */}
+                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'تفضيلات وملاحظات خبيرة التجميل' : 'Stylist Notes'}</span>
+                      <div className="bg-amber-50/50 border border-amber-200/40 p-3 rounded-lg text-xs text-amber-900 font-medium leading-relaxed">
+                        {activeAppointment.notes || (isRtl ? 'لا توجد ملاحظات خاصة حتى الآن.' : 'No notes written yet.')}
+                      </div>
+                    </div>
+
+                    {/* Wallet Quick Balance card */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/60 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-semibold">{isRtl ? 'رصيد المحفظة النشط:' : 'Active Wallet:'}</span>
+                        <span className="font-mono font-black text-slate-800">{activeAppointment.walletBalance || 0} {t.riyal}</span>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* COLUMN 2: TABS & ACTION MODULES (col-span-5) */}
+                <div className="xl:col-span-5 space-y-5">
+                  
+                  {/* Sliding Tabs selector header */}
+                  <div className="bg-white p-1 rounded-xl border border-slate-200/60 flex gap-1 shadow-2xs">
+                    {[
+                      { id: 'crm', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
+                      { id: 'timeline', label: isRtl ? 'الخط الزمني' : 'Timeline History' },
+                      { id: 'reviews', label: isRtl ? 'التقييمات والآراء' : 'Reviews Log' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setDrawerTab(tab.id as any)}
+                        className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+                          drawerTab === tab.id 
+                            ? 'bg-zinc-900 text-white' 
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* TAB 1: CORE CRM & WALLET INTERFACE */}
+                  {drawerTab === 'crm' && (
+                    <div className="space-y-5">
+                      
+                      {/* Active service item banner */}
+                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/40 px-2.5 py-0.5 rounded-full uppercase">
+                              {isRtl ? 'الخدمة الرئيسية النشطة' : 'ACTIVE SERVICE LINE'}
+                            </span>
+                            <h4 className="font-bold text-slate-800 text-base mt-2.5">
+                              {isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn}
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                              <Clock size={12} />
+                              <span>{activeAppointment.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? STYLISTS.find(s=>s.id === activeAppointment.staffId)?.nameAr : STYLISTS.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
+                            </p>
+                          </div>
+                          <span className="text-base font-black text-slate-900 font-mono">
+                            {activeAppointment.price} {t.riyal}
+                          </span>
+                        </div>
+
+                        {/* Interactive Rebook / Reschedule tool buttons */}
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                          <button 
+                            onClick={() => {
+                              // Simulate adding a duplicate booking
+                              const clonedApt: Appointment = {
+                                ...activeAppointment,
+                                id: `apt-clone-${Date.now()}`,
+                                startTime: activeAppointment.startTime + 120, // Cloned offset
+                                status: 'confirmed',
+                                paymentStatus: 'unpaid'
+                              };
+                              setAppointments(prev => [...prev, clonedApt]);
+                              alert(isRtl ? 'تمت إضافة موعد مكرر بنجاح على الجدول بعد ساعتين!' : 'Service cloned successfully onto scheduled board +2 hours later!');
+                            }}
+                            className="py-2 border border-slate-200 hover:border-zinc-900 hover:bg-zinc-900 hover:text-white bg-white rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Undo2 size={13} />
+                            <span>{t.rebook}</span>
+                          </button>
+                          
+                          <button 
+                            onClick={() => {
+                              // Cancel simulation
+                              setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'cancelled' } : a));
+                              setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                            }}
+                            className="py-2 border border-rose-200 hover:border-rose-500 hover:bg-rose-50 bg-white rounded-lg text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Trash size={13} />
+                            <span>{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* GROUP GUESTS SESSION SUMMARY */}
+                      {activeAppointment.isGroupBooking && activeAppointment.guestsDetails && (
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4 animate-fadeIn">
+                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                            <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
+                              <Users size={14} />
+                            </span>
+                            <span className="text-xs font-black text-slate-800">
+                              {isRtl ? `قائمة مرافقي الجلسة الجماعية (${activeAppointment.guestCount || activeAppointment.guestsDetails.length} أشخاص)` : `GROUP GUEST DETAILS (${activeAppointment.guestCount || activeAppointment.guestsDetails.length} Pax)`}
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {activeAppointment.guestsDetails.map((guest: any, idx: number) => {
+                              const srv = mockServices.find(s => s.id === guest.serviceId);
+                              return (
+                                <div key={guest.id || idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200/50 space-y-2 text-xs">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                      {guest.name}
+                                    </span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                      guest.isFree ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                                    }`}>
+                                      {guest.isFree ? (isRtl ? 'خدمة مجانية 🎁' : 'Complimentary 🎁') : `${srv?.price || 0} SAR`}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="text-slate-600 text-[11px] space-y-1">
+                                    <p className="font-medium">
+                                      <span className="text-slate-400">{isRtl ? 'الخدمة المطلوبة: ' : 'Treatment: '}</span>
+                                      {isRtl ? srv?.nameAr : srv?.nameEn}
+                                    </p>
+                                    {guest.phone && (
+                                      <p className="font-mono">
+                                        <span className="text-slate-400">{isRtl ? 'الجوال: ' : 'Phone: '}</span>
+                                        {guest.phone}
+                                      </p>
+                                    )}
+                                    {guest.notes && (
+                                      <div className="bg-amber-50/40 p-2 rounded border border-amber-200/30 text-[10px] text-amber-900 leading-normal">
+                                        <span className="font-bold">{isRtl ? 'ملاحظة الضيف: ' : 'Guest Note: '}</span>
+                                        {guest.notes}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* INTERACTIVE REASSIGN & RESCHEDULE WORKSPACE CONTROLS */}
+                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                          <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
+                            <CalendarIcon size={14} />
+                          </span>
+                          <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
+                        </div>
+
+                        {/* Dropdown for Reassignment */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
+                          <select
+                            value={activeAppointment.staffId}
+                            onChange={(e) => {
+                              const newStaffId = e.target.value;
+                              setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, staffId: newStaffId } : a));
+                              setActiveAppointment(prev => prev ? { ...prev, staffId: newStaffId } : null);
+                              addLocalToast(
+                                'تمت إعادة تعيين أخصائية التجميل بنجاح!',
+                                'Stylist successfully reassigned for this session!',
+                                'success'
+                              );
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
+                          >
+                            {STYLISTS.map(s => (
+                              <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Reschedule Time Selection */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
+                            <select
+                              value={activeAppointment.startTime}
+                              onChange={(e) => {
+                                const newTime = parseInt(e.target.value);
+                                setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, startTime: newTime } : a));
+                                setActiveAppointment(prev => prev ? { ...prev, startTime: newTime } : null);
+                                addLocalToast(
+                                  'تم تغيير موعد البدء بنجاح!',
+                                  'Appointment start time successfully updated!',
+                                  'success'
+                                );
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
+                            >
+                              {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => {
+                                const totalMins = idx * 15;
+                                return (
+                                  <option key={idx} value={totalMins}>
+                                    {formatMinutesToTime(totalMins)}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
+                            <input
+                              type="date"
+                              value={activeAppointment.date || '2026-06-28'}
+                              onChange={(e) => {
+                                const newDateStr = e.target.value;
+                                setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, date: newDateStr } : a));
+                                setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
+                                addLocalToast(
+                                  'تم تحديث تاريخ الحجز بنجاح!',
+                                  'Booking session date successfully updated!',
+                                  'success'
+                                );
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Combined Action Reassign + Reschedule */}
+                        <button
+                          onClick={() => {
+                            addLocalToast(
+                              'تم حفظ الموعد بالتعديل الجديد، وجاري إرسال إشعار فوري للزبونة! 💬',
+                              'Session schedule updated. Dynamic CRM push alert successfully dispatched! 💬',
+                              'success'
+                            );
+                          }}
+                          className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Sparkles size={13} className="text-amber-400" />
+                          <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
+                        </button>
+                      </div>
+
+                      {/* CLIENT WALLET INTERACTIVE COMPONENT */}
+                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-md">
+                              <Wallet size={14} />
+                            </span>
+                            <span className="text-xs font-bold text-slate-800">{t.walletText}</span>
+                          </div>
+                          <span className="text-xs font-black text-emerald-600 font-mono">
+                            {activeAppointment.walletBalance || 0} {t.riyal}
+                          </span>
+                        </div>
+
+                        {/* Simulate Wallet Top-up */}
+                        <div className="space-y-2">
+                          <p className="text-[10px] text-slate-400 font-semibold uppercase">{isRtl ? 'شحن رصيد إضافي للمحفظة' : 'CREDIT / TOP-UP SIMULATOR'}</p>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="number"
+                              value={simulatedWalletTopUp}
+                              onChange={(e) => setSimulatedWalletTopUp(e.target.value)}
+                              placeholder={isRtl ? 'المبلغ ر.س...' : 'Amount SAR...'}
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                            <button
+                              onClick={handleAddWalletBalance}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                            >
+                              {isRtl ? 'شحن فوري' : 'Top Up'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CLIENT OTHER ACTIVE TRANSACTION HISTORY SKELETON */}
+                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'سجل العمليات المالية الأخيرة' : 'TRANSACTION HISTORY SKELETON'}</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="font-bold text-slate-800">INV-2026-9081</p>
+                              <p className="text-[9px] text-slate-400">May 15, 2026</p>
+                            </div>
+                            <span className="font-mono text-emerald-600 font-bold">+120.00 {t.riyal}</span>
+                          </div>
+                          <div className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="font-bold text-slate-800">INV-2026-8012</p>
+                              <p className="text-[9px] text-slate-400">April 20, 2026</p>
+                            </div>
+                            <span className="font-mono text-slate-600 font-bold">-450.00 {t.riyal}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* TAB 2: CLIENT TOUCHPOINT LOG */}
+                  {drawerTab === 'timeline' && (
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.timelineText}</h4>
+                      
+                      {/* Timeline entries list */}
+                      <div className="relative border-l border-slate-200 pl-4 space-y-5 py-2 text-xs">
+                        
+                        <div className="relative">
+                          {/* Circle dot marker */}
+                          <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white" />
+                          <div>
+                            <p className="font-bold text-slate-800">{isRtl ? 'تم تأكيد الموعد رقمياً' : 'Automated System Confirmation'}</p>
+                            <p className="text-slate-500 text-[10px] mt-0.5">2026-06-27 • 04:30 PM</p>
+                            <p className="text-slate-500 mt-1 leading-relaxed">
+                              {isRtl ? 'تم إرسال رسالة الواتساب وتأكيد الزبونة المباشر.' : 'Instant WhatsApp alert sent. Authenticated by customer gateway.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
+                          <div>
+                            <p className="font-bold text-slate-800">{isRtl ? 'وصول العميل لصالون رفاه الملكي' : 'Lobby Portal Attendance registered'}</p>
+                            <p className="text-slate-500 text-[10px] mt-0.5">2026-06-27 • 09:12 AM</p>
+                            <p className="text-slate-500 mt-1 leading-relaxed">
+                              {isRtl ? 'تم الترحيب بالضيف وتقديم شاي الضيافة الملكي.' : 'Lounge receptionist check-in completed. Royal greeting service dispatched.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-slate-300 border-2 border-white" />
+                          <div>
+                            <p className="font-bold text-slate-800">{isRtl ? 'ملاحظة تفضيل المنتجات الحساسة' : 'Skin Care Routine Filter Updated'}</p>
+                            <p className="text-slate-500 text-[10px] mt-0.5">2026-06-15 • 11:00 AM</p>
+                            <p className="text-slate-500 mt-1 leading-relaxed">
+                              {isRtl ? 'تفضل استخدام الألوفيرا الطبيعي وتجنب المنتجات العطرية.' : 'Customer highlighted high sensitivity. Prefer organic alternatives.'}
+                            </p>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: REVIEWS LOG */}
+                  {drawerTab === 'reviews' && (
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.reviewsText}</h4>
+                      
+                      <div className="space-y-3.5">
+                        
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-800">{isRtl ? 'تنظيف بشرة هيدرافيشال' : 'HydraFacial Cleansing'}</span>
+                            <div className="flex text-amber-500 gap-0.5">
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                            </div>
+                          </div>
+                          <p className="text-slate-600 leading-relaxed italic">
+                            {isRtl ? '"الخدمة رائعة جداً ونظافة المكان خيالية، نادين خبيرة بكل تفاصيل عملها وتريح الزبونة."' : '"Absolutely phenomenal service. The spa atmosphere was deeply soothing, and Layla made the treatment very relaxing."'}
+                          </p>
+                          <p className="text-[10px] text-slate-400">Reviewed 2 weeks ago</p>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-800">{isRtl ? 'قص وتسريح بريميوم' : 'Premium Cut & Color'}</span>
+                            <div className="flex text-amber-500 gap-0.5">
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                              <Star size={11} fill="currentColor" />
+                            </div>
+                          </div>
+                          <p className="text-slate-600 leading-relaxed italic">
+                            {isRtl ? '"قصة شعر مذهلة كالعادة، دقة عالية في المواعيد."' : '"Stunning haircut as always. Extremely punctual and hospitable team."'}
+                          </p>
+                          <p className="text-[10px] text-slate-400">Reviewed 1 month ago</p>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* COLUMN 3: FINANCIALS & PAYMENT WORKSPACE (col-span-4) */}
+                <div className="xl:col-span-4 space-y-5">
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5">
+                      <CreditCard size={14} className="text-amber-500" />
+                      {t.financeSummary}
+                    </h3>
+
+                    {/* Add Products to Ticket Section */}
+                    {activeAppointment.paymentStatus !== 'paid' && (
+                      <div className="border-b border-slate-100 pb-3 space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {isRtl ? 'إضافة منتجات التجميل للفاتورة 🧴' : 'ADD RETAIL PRODUCTS TO TICKET 🧴'}
+                        </span>
+                        
+                        {/* Inline list of available mock products to add */}
+                        <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+                          {mockProducts.map(prod => (
+                            <button
+                              key={prod.id}
+                              type="button"
+                              onClick={() => {
+                                setCheckoutProducts(prev => {
+                                  const exists = prev.find(p => p.id === prod.id);
+                                  if (exists) {
+                                    return prev.map(p => p.id === prod.id ? { ...p, quantity: p.quantity + 1 } : p);
+                                  } else {
+                                    return [...prev, { id: prod.id, nameAr: prod.nameAr, nameEn: prod.nameEn, price: prod.price, quantity: 1, sku: prod.sku }];
+                                  }
+                                });
+                                addLocalToast(
+                                  `تمت إضافة "${isRtl ? prod.nameAr : prod.nameEn}" لفاتورة الموعد.`,
+                                  `Added "${isRtl ? prod.nameAr : prod.nameEn}" to appointment bill.`,
+                                  'success'
+                                );
+                              }}
+                              className="px-2.5 py-1.5 bg-slate-50 hover:bg-amber-500/10 hover:border-amber-400 border border-slate-200 rounded-lg text-[10px] font-bold shrink-0 text-slate-700 transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>+</span>
+                              <span>{isRtl ? prod.nameAr.split(' ')[0] + ' ' + (prod.nameAr.split(' ')[1] || '') : prod.nameEn.split(' ')[0] + ' ' + (prod.nameEn.split(' ')[1] || '')}</span>
+                              <span className="text-amber-600 font-mono font-black">{prod.price} {t.riyal}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* List of currently added products */}
+                        {checkoutProducts.length > 0 && (
+                          <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/60 space-y-1 text-[11px]">
+                            {checkoutProducts.map(prod => (
+                              <div key={prod.id} className="flex justify-between items-center bg-white p-1.5 rounded-lg border border-slate-150">
+                                <div className="min-w-0 flex-1 pr-1">
+                                  <p className="font-bold text-slate-800 truncate">{isRtl ? prod.nameAr : prod.nameEn}</p>
+                                  <p className="text-[9px] text-slate-400 font-mono">{prod.price} SAR</p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCheckoutProducts(prev => {
+                                        const found = prev.find(p => p.id === prod.id);
+                                        if (found && found.quantity === 1) {
+                                          return prev.filter(p => p.id !== prod.id);
+                                        }
+                                        return prev.map(p => p.id === prod.id ? { ...p, quantity: p.quantity - 1 } : p);
+                                      });
+                                    }}
+                                    className="px-1 bg-slate-100 hover:bg-slate-200 rounded font-black text-slate-600"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-slate-700">{prod.quantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCheckoutProducts(prev => prev.map(p => p.id === prod.id ? { ...p, quantity: p.quantity + 1 } : p));
+                                    }}
+                                    className="px-1 bg-slate-100 hover:bg-slate-200 rounded font-black text-slate-600"
+                                  >
+                                    +
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCheckoutProducts(prev => prev.filter(p => p.id !== prod.id));
+                                    }}
+                                    className="text-slate-300 hover:text-rose-600 ml-1"
+                                  >
+                                    <Trash size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Apply Gift Card Section */}
+                    {activeAppointment.paymentStatus !== 'paid' && (
+                      <div className="border-b border-slate-100 pb-3 space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {isRtl ? 'تطبيق كوبون / بطاقة هدايا 🎁' : 'APPLY VOUCHER / GIFT CARD 🎁'}
+                        </span>
+                        
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={appliedGiftCardCode}
+                            onChange={(e) => setAppliedGiftCardCode(e.target.value)}
+                            placeholder={isRtl ? 'مثال: REF-GFT-9844' : 'e.g. REF-GFT-9844'}
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none uppercase"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!appliedGiftCardCode.trim()) {
+                                addLocalToast('يرجى إدخال رمز بطاقة الهدايا أولاً', 'Please enter a gift card code first', 'warning');
+                                return;
+                              }
+                              const cleanedCode = appliedGiftCardCode.trim().toUpperCase();
+                              if (cleanedCode.includes('GFT') || cleanedCode.length >= 6) {
+                                setAppliedGiftCardAmount(200); // 200 SAR discount
+                                addLocalToast(
+                                  `تم تطبيق بطاقة الهدايا بنجاح! الرصيد المتاح: ٢٠٠ ر.س.`,
+                                  `Gift card applied successfully! Available balance: 200 SAR.`,
+                                  'success'
+                                );
+                              } else {
+                                addLocalToast(
+                                  `الرمز غير مطابق أو منتهي الصلاحية!`,
+                                  `Invalid or expired gift card voucher!`,
+                                  'warning'
+                                );
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                          >
+                            {isRtl ? 'تطبيق' : 'Apply'}
+                          </button>
+                        </div>
+
+                        {appliedGiftCardAmount > 0 && (
+                          <div className="p-2 bg-emerald-500/10 border border-emerald-500 rounded-lg flex justify-between items-center text-[10px] text-emerald-800">
+                            <span className="font-bold">{isRtl ? 'خصم بطاقة الهدايا نشط ✓' : 'Gift card discount active ✓'}</span>
+                            <span className="font-mono font-black">-{appliedGiftCardAmount} {t.riyal}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pricing breakdown */}
+                    {(() => {
+                      const serviceSubtotal = activeAppointment.price;
+                      const productsSubtotal = checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+                      const subtotal = serviceSubtotal + productsSubtotal;
+                      const discount = appliedGiftCardAmount;
+                      const taxableAmount = Math.max(0, subtotal - discount);
+                      const vat = taxableAmount * 0.15;
+                      const total = taxableAmount + vat;
+
+                      return (
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between text-slate-500">
+                            <span>{isRtl ? 'رسوم الخدمة الأساسية' : 'Service Subtotal'}</span>
+                            <span className="font-mono font-bold">{serviceSubtotal} {t.riyal}</span>
+                          </div>
+                          
+                          {checkoutProducts.length > 0 && (
+                            <div className="flex justify-between text-slate-500">
+                              <span>{isRtl ? 'إجمالي منتجات التجزئة' : 'Retail Products Total'}</span>
+                              <span className="font-mono font-bold">+{productsSubtotal.toFixed(2)} {t.riyal}</span>
+                            </div>
+                          )}
+
+                          {discount > 0 && (
+                            <div className="flex justify-between text-emerald-600 font-semibold">
+                              <span>{isRtl ? 'خصم قسيمة الهدايا المطبقة' : 'Applied Gift Card Discount'}</span>
+                              <span className="font-mono font-black">-{discount.toFixed(2)} {t.riyal}</span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between text-slate-500 border-t pt-1.5 border-dashed">
+                            <span>{isRtl ? 'الوعاء الخاضع للضريبة' : 'Taxable Subtotal'}</span>
+                            <span className="font-mono font-bold">{taxableAmount.toFixed(2)} {t.riyal}</span>
+                          </div>
+
+                          <div className="flex justify-between text-slate-500">
+                            <span>{isRtl ? 'ضريبة القيمة المضافة ١٥٪' : 'ZATCA VAT (15%)'}</span>
+                            <span className="font-mono font-bold">{vat.toFixed(2)} {t.riyal}</span>
+                          </div>
+
+                          <div className="h-px bg-slate-100 border-dashed border-b pt-1" />
+                          
+                          <div className="flex justify-between text-sm font-black text-slate-900 pt-1">
+                            <span>{isRtl ? 'المبلغ الكلي المستحق' : 'Total Amount Due'}</span>
+                            <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} {t.riyal}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* SPLIT PAYMENTS COMPONENT CONTAINER */}
+                    <div className="pt-3 border-t border-slate-100 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t.splitPayments}</span>
+                        <button 
+                          onClick={() => setIsSplitActive(!isSplitActive)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all flex items-center gap-1 cursor-pointer ${
+                            isSplitActive ? 'bg-amber-500 text-zinc-950' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <Split size={10} />
+                          <span>{isSplitActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'تفعيل' : 'Activate')}</span>
+                        </button>
+                      </div>
+
+                      {isSplitActive ? (
+                        <div className="space-y-2 text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-500 w-16">{isRtl ? 'مدى / فيزا' : 'Card'}</span>
+                            <input 
+                              type="number" 
+                              value={splitAmounts.card}
+                              onChange={(e) => setSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))}
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded p-1 text-right font-mono text-xs font-bold"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-500 w-16">{isRtl ? 'نقد كاش' : 'Cash'}</span>
+                            <input 
+                              type="number" 
+                              value={splitAmounts.cash}
+                              onChange={(e) => setSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))}
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded p-1 text-right font-mono text-xs font-bold"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-500 w-16">{isRtl ? 'المحفظة' : 'Wallet'}</span>
+                            <input 
+                              type="number" 
+                              value={splitAmounts.wallet}
+                              onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))}
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded p-1 text-right font-mono text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          {isRtl ? 'تسمح هذه الأداة بتقسيم الفاتورة الكلية على أكثر من طريقة دفع (مثل مدى + كاش).' : 'Allows split distribution among multi-payment gateways (Mada, Cash, Credit, Wallet).'}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Checkout and Complete operation */}
+                    <div className="pt-3">
+                      {activeAppointment.paymentStatus === 'paid' ? (
+                        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-3 rounded-lg flex items-center gap-2 text-xs font-bold">
+                          <Check size={16} />
+                          <span>{isRtl ? 'تم سداد الفاتورة بنجاح عبر بوابة مدى الرقمية' : 'Paid successfully via Integrated Mada terminal'}</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleCheckoutPayment}
+                          className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <CheckCircle2 size={15} className="text-amber-400" />
+                          <span>{t.checkout}</span>
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Render modular advanced interactive creation & POS checkout drawers */}
+      <InteractiveDrawers 
+        isRtl={isRtl}
+        isCreateDrawerOpen={isCreateDrawerOpen}
+        setIsCreateDrawerOpen={setIsCreateDrawerOpen}
+        isCartDrawerOpen={isCartDrawerOpen}
+        setIsCartDrawerOpen={setIsCartDrawerOpen}
+        appointments={appointments}
+        setAppointments={setAppointments}
+        addLocalToast={addLocalToast}
+        formatMinutesToTime={formatMinutesToTime}
+        currentStartTime={currentStartTime}
+        setCurrentStartTime={setCurrentStartTime}
+        currentStaffId={currentStaffId}
+        setCurrentStaffId={setCurrentStaffId}
+        initialCreateMode={initialCreateMode}
+        initialCartTab={initialCartTab}
+        selectedDate={selectedDate}
+      />
+
+      {/* Render Roster / Employee Weekly Schedule Editor Modal */}
+      <EmployeeWeeklyScheduleEditor 
+        isOpen={isShiftModalOpen}
+        onClose={() => setIsShiftModalOpen(false)}
+        isRtl={isRtl}
+        staffId={selectedShiftStaffId}
+        staffName={isRtl 
+          ? (STYLISTS.find(s => s.id === selectedShiftStaffId)?.nameAr || selectedShiftStaffId)
+          : (STYLISTS.find(s => s.id === selectedShiftStaffId)?.nameEn || selectedShiftStaffId)
+        }
+        addLocalToast={addLocalToast}
+      />
+
+      {/* SIMULATED THERMAL RECEIPT MODAL FOR APPOINTMENT CHECKOUT */}
+      <AnimatePresence>
+        {showReceiptModal && checkoutReceiptData && (
+          <div className="fixed inset-0 z-[60] bg-slate-900/85 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-5 w-80 font-mono text-xs border text-slate-800 space-y-3 shadow-2xl relative"
+            >
+              <div className="border-t-2 border-b-2 border-dashed border-slate-800 py-3 text-center space-y-1">
+                <span className="font-black text-sm tracking-widest block text-zinc-950">REFAH CRM</span>
+                <p className="text-[9px] text-zinc-400">Simplified VAT Tax Invoice</p>
+                <p className="text-[8px] text-zinc-400">VAT Registration: 31092813100003</p>
+                <div className="h-px border-b border-dashed my-1" />
+                
+                <div className="text-[9px] text-left space-y-0.5 text-slate-600">
+                  <p>INV ID: {checkoutReceiptData.orderId}</p>
+                  <p>DATE: {checkoutReceiptData.date}</p>
+                  <p>BUYER: {checkoutReceiptData.customerName}</p>
+                </div>
+                
+                <div className="h-px border-b border-dashed my-1" />
+                
+                {/* Items List */}
+                <div className="space-y-1">
+                  {/* Service Line */}
+                  <div className="flex justify-between text-[10px] text-slate-800 font-bold">
+                    <span className="truncate flex-1 text-left">{checkoutReceiptData.serviceName}</span>
+                    <span className="shrink-0">{checkoutReceiptData.servicePrice.toFixed(2)} SAR</span>
+                  </div>
+                  
+                  {/* Product Lines */}
+                  {checkoutReceiptData.products.map((it: any) => (
+                    <div key={it.id} className="flex justify-between text-[10px] text-slate-600 pl-2">
+                      <span className="truncate flex-1 text-left">• {it.nameEn} (x{it.quantity})</span>
+                      <span className="shrink-0">{(it.price * it.quantity).toFixed(2)} SAR</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="h-px border-b border-dashed my-1" />
+                
+                {/* Subtotals */}
+                <div className="space-y-0.5 text-[9px] text-left text-slate-600">
+                  <div className="flex justify-between">
+                    <span>SUBTOTAL:</span>
+                    <span>{checkoutReceiptData.subtotal.toFixed(2)} SAR</span>
+                  </div>
+                  {checkoutReceiptData.discount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>DISCOUNT (GIFT CARD):</span>
+                      <span>-{checkoutReceiptData.discount.toFixed(2)} SAR</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>VAT (15%):</span>
+                    <span>{checkoutReceiptData.vat.toFixed(2)} SAR</span>
+                  </div>
+                  <div className="flex justify-between font-black text-black text-[11px] border-t border-slate-300 pt-1 mt-1">
+                    <span>TOTAL NET:</span>
+                    <span>{checkoutReceiptData.total.toFixed(2)} SAR</span>
+                  </div>
+                </div>
+                
+                <div className="h-px border-b border-dashed my-1.5" />
+                
+                <p className="text-[8px] bg-zinc-950 text-white rounded p-0.5 font-bold tracking-wider">
+                  PAID IN FULL - CHECKOUT COMPLETE
+                </p>
+                <p className="text-[8px] text-slate-500 italic mt-1">
+                  Gateways: {checkoutReceiptData.paymentSummary}
+                </p>
+                <p className="text-[8px] text-slate-400 mt-2">
+                  شكراً لزيارتكم صالون رفاه الفاخر 🌸 Thank you
+                </p>
+              </div>
+              
+              <div className="flex gap-2 pt-1">
+                <button 
+                  type="button"
+                  onClick={() => { 
+                    addLocalToast('تمت محاكاة طباعة الفاتورة الضريبية الورقية الملكية لـ ZATCA!', 'Simulated royal paper ZATCA simplified invoice print successfully!', 'success'); 
+                    setShowReceiptModal(false); 
+                  }} 
+                  className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Printer size={12} className="text-amber-400" />
+                  <span>Print Receipt</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)} 
+                  className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SELF-CONTAINED LOCAL FLOATING TOASTS NOTIFICATION PORTAL */}
+      <div className={`fixed bottom-6 z-50 flex flex-col gap-2 max-w-sm ${isRtl ? 'left-6' : 'right-6'}`}>
+        <AnimatePresence>
+          {localToasts.map(toast => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              className={`p-3 rounded-xl shadow-xl flex items-start gap-2 border backdrop-blur-md ${
+                toast.type === 'success' 
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-800' 
+                  : toast.type === 'warning'
+                    ? 'bg-rose-500/10 border-rose-500 text-rose-800'
+                    : 'bg-amber-500/10 border-amber-500 text-amber-800'
+              }`}
+            >
+              <div className="flex-1">
+                <p className="text-xs font-black">{isRtl ? toast.msgAr : toast.msgEn}</p>
+                <p className="text-[9px] opacity-70 mt-0.5">{isRtl ? toast.msgEn : toast.msgAr}</p>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+    </div>
+  );
+}
