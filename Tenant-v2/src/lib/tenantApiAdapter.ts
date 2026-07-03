@@ -74,51 +74,6 @@ function pick<T = any>(value: any, keys: string[]): T | undefined {
   return undefined;
 }
 
-function normalizeCustomerStats(payload: TenantApiResponse | Record<string, any>): NormalizedCustomerStats {
-  return (
-    pick(payload, ['data']) ||
-    payload ||
-    {}
-  );
-}
-
-function normalizeCustomerList(payload: TenantApiResponse | Record<string, any>): CustomerListResponse {
-  const data = pick(payload, ['data']) || payload || {};
-  const customers = pick(data, ['customers', 'items', 'rows']) || [];
-  const pagination = pick(data, ['pagination']) || {
-    total: Array.isArray(customers) ? customers.length : 0,
-    page: 1,
-    limit: Array.isArray(customers) ? customers.length : 0,
-    totalPages: 1
-  };
-
-  return { customers, pagination };
-}
-
-function normalizeEntityPayload(payload: TenantApiResponse | Record<string, any>): any {
-  return pick(payload, ['data']) || payload || {};
-}
-
-function normalizeHistoryPayload(payload: TenantApiResponse | Record<string, any>): any {
-  const data = pick(payload, ['data']) || payload || {};
-  return {
-    history: pick(data, ['history']) || [],
-    metrics: pick(data, ['metrics', 'summary']) || null
-  };
-}
-
-function normalizeMessageList(payload: TenantApiResponse | Record<string, any>): any[] {
-  if (Array.isArray(payload)) return payload;
-  const data = pick(payload, ['data']) || payload || {};
-  return pick(data, ['messages', 'items', 'threads']) || data || [];
-}
-
-function normalizeEmployeeList(payload: TenantApiResponse | Record<string, any>): any[] {
-  if (Array.isArray(payload)) return payload;
-  const data = pick(payload, ['data']) || payload || {};
-  return pick(data, ['employees', 'items']) || data || [];
-}
-
 function translateRequestBody(pathname: string, method: string, body: any): any {
   if (!body || typeof body !== 'object' || body instanceof FormData) {
     return body;
@@ -137,39 +92,6 @@ function translateRequestBody(pathname: string, method: string, body: any): any 
 }
 
 function normalizeResponseForPath(pathname: string, method: string, payload: any): any {
-  if (pathname === '/api/v1/tenant/customers/stats') {
-    return normalizeCustomerStats(payload);
-  }
-
-  if (pathname === '/api/v1/tenant/customers' && method === 'GET') {
-    return normalizeCustomerList(payload);
-  }
-
-  if (/^\/api\/v1\/tenant\/customers\/[^/]+\/history$/.test(pathname) && method === 'GET') {
-    return normalizeHistoryPayload(payload);
-  }
-
-  if (/^\/api\/v1\/tenant\/customers\/[^/]+$/.test(pathname) && method === 'GET') {
-    return normalizeEntityPayload(payload);
-  }
-
-  if (pathname === '/api/v1/tenant/messages' && method === 'GET') {
-    return normalizeMessageList(payload);
-  }
-
-  if (pathname === '/api/v1/tenant/employees' && method === 'GET') {
-    return normalizeEmployeeList(payload);
-  }
-
-  if (pathname === '/api/v1/tenant/appointments' && method === 'GET') {
-    const data = pick(payload, ['data']) || payload || {};
-    return pick(data, ['appointments']) || data || [];
-  }
-
-  if (/^\/api\/v1\/tenant\/appointments\/[^/]+$/.test(pathname) && method === 'GET') {
-    return normalizeEntityPayload(payload);
-  }
-
   return payload;
 }
 
@@ -344,39 +266,6 @@ class TenantApiAdapter {
     return response.json();
   }
 
-  // --- Utility to unwrap { success: true, data: [...] } ---
-  private unwrapArray(res: any, key?: string): any[] {
-    let arr: any[] = [];
-    if (Array.isArray(res)) {
-      arr = res;
-    } else if (res && typeof res === 'object') {
-      if (key && Array.isArray(res[key])) arr = res[key];
-      else if (Array.isArray(res.data)) arr = res.data;
-      else if (Array.isArray(res.employees)) arr = res.employees;
-      else if (Array.isArray(res.services)) arr = res.services;
-      else if (Array.isArray(res.products)) arr = res.products;
-      else if (Array.isArray(res.messages)) arr = res.messages;
-      else if (Array.isArray(res.customers)) arr = res.customers;
-      else if (Array.isArray(res.appointments)) arr = res.appointments;
-      else if (Array.isArray(res.hotDeals)) arr = res.hotDeals;
-      else if (Array.isArray(res.reviews)) arr = res.reviews;
-      else if (Array.isArray(res.giftCards)) arr = res.giftCards;
-      else if (Array.isArray(res.transactions)) arr = res.transactions;
-    }
-    
-    // Fix photo URLs
-    const baseUrl = this.baseUrl.replace('/api/v1', '');
-    arr.forEach(item => {
-      if (item.photo && !item.photo.startsWith('http')) {
-        item.photo = `${baseUrl}/uploads/${item.photo.replace(/^\/+/, '')}`;
-      }
-      if (item.avatar && !item.avatar.startsWith('http')) {
-        item.avatar = `${baseUrl}/uploads/${item.avatar.replace(/^\/+/, '')}`;
-      }
-    });
-    return arr;
-  }
-
   async post<T = any>(endpoint: string, data?: any): Promise<T> {
     const response = await this.request(endpoint, {
       method: 'POST',
@@ -450,9 +339,8 @@ class TenantApiAdapter {
     return this.get(`/tenant/customers/${id}/transactions${q.toString() ? `?${q.toString()}` : ''}`);
   }
 
-  async getEmployees(): Promise<any[]> {
-    const res = await this.get('/tenant/employees');
-    return this.unwrapArray(res, 'employees');
+  async getEmployees(): Promise<any> {
+    return this.get('/tenant/employees');
   }
 
   async createEmployee(data: Record<string, any>): Promise<any> {
@@ -468,9 +356,8 @@ class TenantApiAdapter {
   }
 
   // --- Products ---
-  async getProducts(): Promise<any[]> {
-    const res = await this.get('/tenant/products');
-    return this.unwrapArray(res, 'products');
+  async getProducts(): Promise<any> {
+    return this.get('/tenant/products');
   }
 
   async createProduct(data: any): Promise<any> {
@@ -506,9 +393,8 @@ class TenantApiAdapter {
     return this.delete(`/tenant/products/${id}`);
   }
 
-  async getMessages(): Promise<any[]> {
-    const res = await this.get('/tenant/messages');
-    return this.unwrapArray(res, 'messages');
+  async getMessages(): Promise<any> {
+    return this.get('/tenant/messages');
   }
 
   async createMessage(data: Record<string, any>): Promise<any> {
@@ -519,9 +405,8 @@ class TenantApiAdapter {
     return this.delete(`/tenant/messages/${id}`);
   }
 
-  async getServices(): Promise<any[]> {
-    const res = await this.get('/tenant/services');
-    return this.unwrapArray(res, 'services');
+  async getServices(): Promise<any> {
+    return this.get('/tenant/services');
   }
 
   async createService(data: any): Promise<any> {
@@ -560,15 +445,14 @@ class TenantApiAdapter {
     return this.get(`/tenant/appointments/board?date=${date}`);
   }
 
-  async getAppointments(params?: Record<string, string | number | undefined>): Promise<any[]> {
+  async getAppointments(params?: Record<string, string | number | undefined>): Promise<any> {
     const q = new URLSearchParams();
     Object.entries(params || {}).forEach(([key, value]) => {
       if (value !== undefined && value !== null && `${value}`.length > 0) {
         q.set(key, String(value));
       }
     });
-    const res = await this.get(`/tenant/appointments${q.toString() ? `?${q.toString()}` : ''}`);
-    return this.unwrapArray(res, 'appointments');
+    return this.get(`/tenant/appointments${q.toString() ? `?${q.toString()}` : ''}`);
   }
 
   async getAppointment(id: string): Promise<any> {

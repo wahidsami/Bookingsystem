@@ -160,10 +160,11 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
           tenantApiAdapter.getEmployees()
         ]);
         if (active) {
-          setMessages(messagesData);
-          setStaffMembers(employeesData);
-          if (messagesData.length > 0) {
-            setSelectedMessageId(messagesData[0].id);
+          const loadedMessages = messagesData?.data || [];
+          setMessages(loadedMessages);
+          setStaffMembers(employeesData?.employees || []);
+          if (loadedMessages.length > 0) {
+            setSelectedMessageId(loadedMessages[0].id);
           }
         }
       } catch (err) {
@@ -485,10 +486,11 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
         tenantApiAdapter.getMessages(),
         tenantApiAdapter.getEmployees()
       ]);
-      setMessages(messagesData);
-      setStaffMembers(employeesData);
-      if (messagesData.length > 0) {
-        setSelectedMessageId(messagesData[0].id);
+      const loadedMessages = messagesData?.data || [];
+      setMessages(loadedMessages);
+      setStaffMembers(employeesData?.employees || []);
+      if (loadedMessages.length > 0) {
+        setSelectedMessageId(loadedMessages[0].id);
       } else {
         setSelectedMessageId('');
       }
@@ -601,7 +603,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
 
       // Re-fetch list to ensure sync
       const messagesData = await tenantApiAdapter.getMessages();
-      setMessages(messagesData);
+      setMessages(messagesData?.data || []);
     } catch (err) {
       console.error('Error posting message:', err);
       showToast(isRtl ? '⚠️ فشل إرسال الرسالة إلى الخادم. تم التراجع.' : '⚠️ Failed to send message to server. Rolled back.');

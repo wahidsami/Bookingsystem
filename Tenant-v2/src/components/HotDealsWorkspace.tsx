@@ -151,7 +151,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         tenantApiAdapter.getServices()
       ]);
 
-      setServices(servicesData);
+      setServices(servicesData?.services || []);
 
       if (!dealsRes.ok || !limitsRes.ok) {
         throw new Error("Failed to communicate with full-stack endpoints");

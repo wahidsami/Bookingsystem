@@ -81,9 +81,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           )
         ]);
         
+        const employees = empRes?.employees || [];
         setEmployeesList([
           { id: 'all', nameEn: 'All Staff', nameAr: 'جميع الموظفات' },
-          ...empRes.map((e: any) => ({
+          ...employees.map((e: any) => ({
             id: e.id,
             nameEn: `${e.firstName} ${e.lastName}`,
             nameAr: `${e.firstName} ${e.lastName}`,
@@ -91,7 +92,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           }))
         ]);
 
-        const uniqueCats = Array.from(new Set(srvRes.map((s: any) => s.categoryEn || 'Uncategorized')));
+        const services = srvRes?.services || [];
+        const uniqueCats = Array.from(new Set(services.map((s: any) => s.categoryEn || 'Uncategorized')));
         setServiceCategories([
           { id: 'all', nameEn: 'All Categories', nameAr: 'جميع التصنيفات' },
           ...uniqueCats.map((c: any) => ({ id: (c as string).toLowerCase(), nameEn: c, nameAr: c }))

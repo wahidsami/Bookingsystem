@@ -250,7 +250,7 @@ export default function TeamsWorkspace({
     try {
       setIsLoadingMembers(true);
       const data = await tenantApiAdapter.getEmployees();
-      const mapped: TeamMemberData[] = data.map((emp: any) => ({
+      const mapped: TeamMemberData[] = (data?.employees || []).map((emp: any) => ({
         id: emp.id,
         nameEn: emp.name || '',
         nameAr: emp.name || '',

@@ -97,7 +97,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           tenantApiAdapter.getProducts()
         ]);
         
-        const employees = empRes || [];
+        const employees = empRes?.employees || [];
         setLiveStylists(employees.map((emp: any, index: number) => ({
           id: emp.id,
           nameEn: emp.name,
@@ -108,9 +108,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           color: API_COLORS[index % API_COLORS.length]
         })));
 
-        const services = srvRes || [];
+        const services = srvRes?.services || [];
         setLiveServices(services.map((s: any) => ({
-          id: s.id,
           nameEn: s.name_en || s.name || '',
           nameAr: s.name_ar || s.name || '',
           duration: s.duration || 60,
@@ -119,7 +118,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           categoryEn: s.category || 'Massage & Therapy'
         })));
 
-        const customers = custRes?.data?.users || custRes?.users || custRes || [];
+        const customers = custRes?.data?.customers || custRes?.customers || [];
         setLiveCustomers(customers.map((c: any) => ({
           id: c.id,
           name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Guest',
@@ -130,7 +129,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           lastVisit: c.lastVisit || 'N/A'
         })));
 
-        const products = prodRes || [];
+        const products = prodRes?.products || [];
         setLiveProducts(products.map((p: any) => ({
           id: p.id,
           nameAr: p.name_ar || p.name,

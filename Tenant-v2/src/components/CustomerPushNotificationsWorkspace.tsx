@@ -164,7 +164,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
 
       // Fetch Dependencies (Customers & Services)
       const customersRes = await tenantApiAdapter.getCustomers({ limit: 1000 });
-      const customersMapped = (customersRes.data || []).map((c: any) => ({
+      const customersMapped = (customersRes?.data?.customers || customersRes?.customers || []).map((c: any) => ({
         ...c,
         name: c.nameEn || c.nameAr || 'Unknown',
         phone: c.phone || 'No Phone',
@@ -173,7 +173,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
       }));
       setCustomers(customersMapped);
       const servicesData = await tenantApiAdapter.getServices();
-      setServices(servicesData);
+      setServices(servicesData?.services || []);
 
     } catch (err: any) {
       setError(err.message || "Failed to synchronise data with push service.");
