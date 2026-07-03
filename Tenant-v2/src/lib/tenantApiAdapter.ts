@@ -421,6 +421,18 @@ class TenantApiAdapter {
     return this.get('/tenant/employees');
   }
 
+  async createEmployee(data: Record<string, any>): Promise<any> {
+    return this.post('/tenant/employees', data);
+  }
+
+  async updateEmployee(id: string, data: Record<string, any>): Promise<any> {
+    return this.put(`/tenant/employees/${id}`, data);
+  }
+
+  async deleteEmployee(id: string): Promise<any> {
+    return this.delete(`/tenant/employees/${id}`);
+  }
+
   async getServices(): Promise<any[]> {
     return this.get('/tenant/services');
   }

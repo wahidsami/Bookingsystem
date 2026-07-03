@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { 
   UserCheck, Calendar, TrendingUp, DollarSign, Clock, Star, 
   Settings, Award, Sparkles, Check, X, Download, ShieldCheck, Mail, Phone,
@@ -241,243 +242,76 @@ export default function TeamsWorkspace({
   };
 
   // Raw mock Team members (preserving old dataset and enriching it)
-  const [teamMembers, setTeamMembers] = useState<TeamMemberData[]>([
-    {
-      id: 'emp-1',
-      nameEn: 'Nadeen Al-Harbi',
-      nameAr: 'نادين الحربي',
-      roleEn: 'Senior Master Colorist',
-      roleAr: 'كبار خبيرات تلوين وتسريح الشعر',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200',
-      rating: 4.9,
-      status: 'active',
-      email: 'nadeen.harbi@refah.sa',
-      phone: '+966 54 888 1234',
-      joinedDate: '2023-04-01',
-      bioEn: 'Over 8 years of intensive salon dye & styling expertise. Certified by L’Oréal Professionnel Paris.',
-      bioAr: 'أكثر من 8 سنوات من الخبرة المكثفة في صبغات الشعر المبتكرة والتسريحات. معتمدة دولياً من لوريال باريس.',
-      experienceEn: '8 Years',
-      experienceAr: '٨ سنوات',
-      nationalityAr: 'سعودية',
-      nationalityEn: 'Saudi',
-      gender: 'female',
-      position: 'service-provider',
-      specialtiesEn: ['Balayage Techniques', 'Organic Protein Treatments', 'Bridal Design Updos'],
-      specialtiesAr: ['تقنيات البالياج الحديثة', 'علاجات البروتين العضوي', 'تسريحات العرائس الفخمة'],
-      languagesEn: ['Arabic', 'English'],
-      languagesAr: ['العربية', 'الإنجليزية'],
-      baseSalary: 8500,
-      commissionRatePct: 15,
-      serviceCommissionEnabled: true,
-      productCommissionEnabled: true,
-      scheduleVisibilityWeeks: 4,
-      schedule: [
-        {
-          dayEn: 'Sunday',
-          dayAr: 'الأحد',
-          hours: '10:00 AM - 08:00 PM',
-          status: 'working',
-          slots: [
-            { time: '10:00 AM', customer: 'Najla Al-Saud', service: 'Balayage Premium', status: 'booked' },
-            { time: '01:00 PM', customer: 'None', service: '', status: 'empty' },
-            { time: '04:00 PM', customer: 'Ghada Al-Qarni', service: 'Blowdry Style', status: 'booked' }
-          ]
+  const [teamMembers, setTeamMembers] = useState<TeamMemberData[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchTeamMembers = async () => {
+    try {
+      setIsLoadingMembers(true);
+      const data = await tenantApiAdapter.getEmployees();
+      const mapped: TeamMemberData[] = data.map((emp: any) => ({
+        id: emp.id,
+        nameEn: emp.name || '',
+        nameAr: emp.name || '',
+        roleEn: emp.role_en || emp.position || 'Staff',
+        roleAr: emp.role_ar || emp.position || 'موظف',
+        avatar: emp.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        rating: parseFloat(emp.rating || 5.0),
+        status: emp.isActive ? 'active' : 'off',
+        email: emp.email || '',
+        phone: emp.phone || '',
+        joinedDate: emp.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        bioEn: emp.bio_en || '',
+        bioAr: emp.bio_ar || '',
+        experienceEn: '',
+        experienceAr: '',
+        nationalityAr: emp.nationality || '',
+        nationalityEn: emp.nationality || '',
+        gender: emp.gender === 'male' ? 'male' : 'female',
+        position: emp.position === 'admin' ? 'dashboard-admin' : 'service-provider',
+        specialtiesEn: emp.specialties_en || [],
+        specialtiesAr: emp.specialties_ar || [],
+        languagesEn: emp.languages_en || [],
+        languagesAr: emp.languages_ar || [],
+        baseSalary: parseFloat(emp.baseSalary || 0),
+        commissionRatePct: parseFloat(emp.commissionRate || 0),
+        serviceCommissionEnabled: true,
+        productCommissionEnabled: false,
+        scheduleVisibilityWeeks: 2,
+        schedule: [],
+        bookingsCount: parseInt(emp.reviewsCount || 0),
+        utilizationRate: 100,
+        retentionRate: 100,
+        noShowCount: 0,
+        servicesSales: 0,
+        productSales: 0,
+        tips: 0,
+        dashboardPermissions: {
+          view_dashboard: true,
+          manage_appointments: true,
+          view_employees: true,
+          manage_financials: false,
+          view_reports: false,
+          manage_settings: false
         },
-        {
-          dayEn: 'Monday',
-          dayAr: 'الاثنين',
-          hours: '10:00 AM - 08:00 PM',
-          status: 'working',
-          slots: [
-            { time: '11:00 AM', customer: 'Sarah Abdullah', service: 'Hair Cut & Wash', status: 'booked' },
-            { time: '02:00 PM', customer: 'None', service: '', status: 'empty' }
-          ]
-        },
-        {
-          dayEn: 'Tuesday',
-          dayAr: 'الثلاثاء',
-          hours: 'Day Off',
-          status: 'off',
-          slots: []
-        }
-      ],
-      bookingsCount: 94,
-      utilizationRate: 88,
-      retentionRate: 85,
-      noShowCount: 1,
-      servicesSales: 48500,
-      productSales: 4200,
-      tips: 1850,
-      dashboardPermissions: {
-        view_dashboard: true,
-        manage_appointments: true,
-        view_employees: true,
-        manage_financials: false,
-        view_reports: false,
-        manage_settings: false
-      },
-      reviewsList: [
-        { id: 'rev-1', customer: 'Najla Al-Saud', service: 'Balayage Style', rating: 5, textEn: 'An absolute color wizard! Made my styling look incredible.', textAr: 'ساحرة الألوان بلا منازع! جعلت شعري يبدو مذهلاً وصحياً للغاية.', date: '2026-06-21' },
-        { id: 'rev-2', customer: 'Hessa Al-Subaie', service: 'Organic Protein', rating: 5, textEn: 'Friendly, extremely detailed approach.', textAr: 'ودودة للغاية، طريقتها في العمل تفيض بالدقة والاحترافية.', date: '2026-06-12' }
-      ]
-    },
-    {
-      id: 'emp-2',
-      nameEn: 'Layla Al-Asiri',
-      nameAr: 'ليلى العسيري',
-      roleEn: 'Expert Skincare Therapist',
-      roleAr: 'أخصائية أولى للعناية بالبشرة والسبا',
-      avatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&q=80&w=200',
-      rating: 4.8,
-      status: 'active',
-      email: 'layla.asiri@refah.sa',
-      phone: '+966 56 777 9876',
-      joinedDate: '2024-01-10',
-      bioEn: 'Spa therapist specializing in luxury Hydra-facials, thermal relaxation, and organic skincare.',
-      bioAr: 'معالجة سبا متخصصة في جلسات هيدرافيشال الفخمة، والمساج الحراري، والعناية بالبشرة العضوية.',
-      experienceEn: '5 Years',
-      experienceAr: '٥ سنوات',
-      nationalityAr: 'سعودية',
-      nationalityEn: 'Saudi',
-      gender: 'female',
-      position: 'service-provider',
-      specialtiesEn: ['Royal Hydra-Facials', 'Swedish Therapeutic Massage', 'Aromatherapy'],
-      specialtiesAr: ['هيدرافيشال ملكي عميق', 'مساج سويدي علاجي', 'العلاج بالعطور الطبيعية'],
-      languagesEn: ['Arabic', 'English'],
-      languagesAr: ['العربية', 'الإنجليزية'],
-      baseSalary: 6500,
-      commissionRatePct: 12,
-      serviceCommissionEnabled: true,
-      productCommissionEnabled: false,
-      scheduleVisibilityWeeks: 2,
-      schedule: [
-        {
-          dayEn: 'Sunday',
-          dayAr: 'الأحد',
-          hours: '11:00 AM - 09:00 PM',
-          status: 'working',
-          slots: [
-            { time: '11:00 AM', customer: 'Arwa Al-Otaibi', service: 'Hydrafacial Royal', status: 'booked' },
-            { time: '02:00 PM', customer: 'None', service: '', status: 'empty' }
-          ]
-        }
-      ],
-      bookingsCount: 76,
-      utilizationRate: 82,
-      retentionRate: 78,
-      noShowCount: 3,
-      servicesSales: 34200,
-      productSales: 1500,
-      tips: 1200,
-      dashboardPermissions: {
-        view_dashboard: true,
-        manage_appointments: true,
-        view_employees: true,
-        manage_financials: false,
-        view_reports: false,
-        manage_settings: false
-      },
-      reviewsList: [
-        { id: 'rev-201', customer: 'Arwa Al-Otaibi', service: 'HydraFacial Glow', rating: 5, textEn: 'Laylas facials are a true VIP experience.', textAr: 'جلسات العناية بالبشرة مع ليلى هي تجربة حقيقية لكبار الشخصيات.', date: '2026-06-15' }
-      ]
-    },
-    {
-      id: 'emp-3',
-      nameEn: 'Elena Vasily',
-      nameAr: 'إيلينا فاسيلي',
-      roleEn: 'Nail Art Specialist',
-      roleAr: 'خبيرة تجميل ورسم الأظافر',
-      avatar: 'https://images.unsplash.com/photo-1594744803329-e58b31de215f?auto=format&fit=crop&q=80&w=200',
-      rating: 4.7,
-      status: 'break',
-      email: 'elena.v@refah.sa',
-      phone: '+966 50 112 3456',
-      joinedDate: '2024-07-20',
-      bioEn: 'Nail technician trained in Eastern European nail care. Master of chrome powder and gel building.',
-      bioAr: 'أخصائية أظافر مدربة على أرقى المدارس الأوروبية الشرقية. متمكنة في بناء الجل وتطبيق طلاء الكروم.',
-      experienceEn: '4 Years',
-      experienceAr: '٤ سنوات',
-      nationalityAr: 'روسية',
-      nationalityEn: 'Russian',
-      gender: 'female',
-      position: 'service-provider',
-      specialtiesEn: ['Russian Manicure', 'Gel Overlay Extensions', 'Custom Chrome Designs'],
-      specialtiesAr: ['مناكير على الطريقة الروسية', 'بناء أظافر جل وهلام', 'تصاميم الكروم المخصصة بمستودع رفاه'],
-      languagesEn: ['English', 'Russian'],
-      languagesAr: ['الإنجليزية', 'الروسية'],
-      baseSalary: 5500,
-      commissionRatePct: 10,
-      serviceCommissionEnabled: true,
-      productCommissionEnabled: false,
-      scheduleVisibilityWeeks: 2,
-      schedule: [],
-      bookingsCount: 112,
-      utilizationRate: 79,
-      retentionRate: 72,
-      noShowCount: 2,
-      servicesSales: 29800,
-      productSales: 890,
-      tips: 950,
-      dashboardPermissions: {
-        view_dashboard: true,
-        manage_appointments: true,
-        view_employees: true,
-        manage_financials: false,
-        view_reports: false,
-        manage_settings: false
-      },
-      reviewsList: [
-        { id: 'rev-301', customer: 'Sarah Abdullah', service: 'Russian Manicure', rating: 4.5, textEn: 'Precise technique, really loved the chrome results.', textAr: 'أسلوب فني دقيق للغاية، أحببت نتائج طلاء الكروم اللامع.', date: '2026-06-05' }
-      ]
-    },
-    {
-      id: 'emp-4',
-      nameEn: 'Amal Suleiman',
-      nameAr: 'أمل سليمان',
-      roleEn: 'Operations & Salon Manager',
-      roleAr: 'مديرة عمليات صالون رفاه',
-      avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=200',
-      rating: 5.0,
-      status: 'active',
-      email: 'amal.s@refah.sa',
-      phone: '+966 50 444 9988',
-      joinedDate: '2022-01-15',
-      bioEn: 'Over 10 years of business management in five-star cosmetic centers. Leads operations and schedules.',
-      bioAr: 'أكثر من ١٠ سنوات من الخبرة الإدارية في مراكز التجميل الفاخرة. تتولى قيادة الجداول والعمليات اليومية.',
-      experienceEn: '10 Years',
-      experienceAr: '١٠ سنوات',
-      nationalityAr: 'سعودية',
-      nationalityEn: 'Saudi',
-      gender: 'female',
-      position: 'dashboard-admin',
-      specialtiesEn: ['Staff Scheduling', 'Financial Operations', 'Customer Quality Assurance'],
-      specialtiesAr: ['جدولة الموظفين', 'العمليات المالية والموازنات', 'جودة تجربة العميل والامتثال'],
-      languagesEn: ['Arabic', 'English'],
-      languagesAr: ['العربية', 'الإنجليزية'],
-      baseSalary: 12000,
-      commissionRatePct: 0,
-      serviceCommissionEnabled: false,
-      productCommissionEnabled: false,
-      scheduleVisibilityWeeks: 1,
-      schedule: [],
-      bookingsCount: 0,
-      utilizationRate: 100,
-      retentionRate: 100,
-      noShowCount: 0,
-      servicesSales: 0,
-      productSales: 0,
-      tips: 0,
-      dashboardPermissions: {
-        view_dashboard: true,
-        manage_appointments: true,
-        view_employees: true,
-        manage_financials: true,
-        view_reports: true,
-        manage_settings: true
-      },
-      reviewsList: []
+        reviewsList: []
+      }));
+      setTeamMembers(mapped);
+      if (mapped.length > 0) {
+        setSelectedMemberId(prev => prev === 'emp-1' ? mapped[0].id : prev);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to load team directory', 'فشل في تحميل قائمة الموظفين', 'error');
+    } finally {
+      setIsLoadingMembers(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchTeamMembers();
+  }, []);
 
   // Handle outside trigger to open add form
   useEffect(() => {
@@ -689,7 +523,7 @@ export default function TeamsWorkspace({
   };
 
   // Save Team Member Action
-  const handleSaveMember = (e: React.FormEvent) => {
+  const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.nameEn && !formData.nameAr) {
@@ -701,42 +535,57 @@ export default function TeamsWorkspace({
       return;
     }
 
-    if (formMode === 'add') {
-      const newId = `emp-${Date.now()}`;
-      const newMember: TeamMemberData = {
-        ...formData,
-        id: newId,
-        rating: 5.0,
-        bookingsCount: 0,
-        utilizationRate: 100,
-        retentionRate: 100,
-        noShowCount: 0,
-        servicesSales: 0,
-        productSales: 0,
-        tips: 0,
-        reviewsList: []
+    try {
+      setIsSaving(true);
+      const payload = {
+        name: formData.nameEn || formData.nameAr,
+        email: formData.email,
+        phone: formData.phone,
+        gender: formData.gender,
+        position: formData.position === 'dashboard-admin' ? 'admin' : 'staff',
+        nationality: formData.nationalityEn || formData.nationalityAr,
+        bio_en: formData.bioEn,
+        bio_ar: formData.bioAr,
+        role_en: formData.roleEn,
+        role_ar: formData.roleAr,
+        baseSalary: formData.baseSalary,
+        commissionRate: formData.commissionRatePct,
+        specialties_en: formData.specialtiesEn,
+        specialties_ar: formData.specialtiesAr,
+        languages_en: formData.languagesEn,
+        languages_ar: formData.languagesAr,
+        isActive: formData.status === 'active'
       };
-      setTeamMembers(prev => [newMember, ...prev]);
-      setSelectedMemberId(newId);
-      triggerToast(
-        `Team member "${newMember.nameEn || newMember.nameAr}" added successfully!`,
-        `تم إضافة عضو الفريق الجديد "${newMember.nameAr || newMember.nameEn}" بنجاح!`,
-        'success'
-      );
-    } else {
-      setTeamMembers(prev => prev.map(m => m.id === formData.id ? { ...formData } : m));
-      triggerToast(
-        `Team member "${formData.nameEn || formData.nameAr}" updated successfully!`,
-        `تم تحديث بيانات عضو الفريق "${formData.nameAr || formData.nameEn}" بنجاح!`,
-        'success'
-      );
-    }
 
-    setActiveView('list');
+      if (formMode === 'add') {
+        await tenantApiAdapter.createEmployee(payload);
+        triggerToast(
+          `Team member "${payload.name}" added successfully!`,
+          `تم إضافة عضو الفريق الجديد "${payload.name}" بنجاح!`,
+          'success'
+        );
+      } else {
+        await tenantApiAdapter.updateEmployee(formData.id, payload);
+        triggerToast(
+          `Team member "${payload.name}" updated successfully!`,
+          `تم تحديث بيانات عضو الفريق "${payload.name}" بنجاح!`,
+          'success'
+        );
+      }
+      
+      // Refresh list
+      fetchTeamMembers();
+      setActiveView('list');
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to save team member.', 'حدث خطأ أثناء حفظ بيانات العضو.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Guarded Deletion Action
-  const handleDeleteMember = (id: string) => {
+  const handleDeleteMember = async (id: string) => {
     const target = teamMembers.find(t => t.id === id);
     if (!target) return;
 
@@ -750,20 +599,24 @@ export default function TeamsWorkspace({
       return;
     }
 
-    setTeamMembers(prev => prev.filter(t => t.id !== id));
-    if (selectedMemberId === id) {
-      const remaining = teamMembers.filter(t => t.id !== id);
-      if (remaining.length > 0) {
-        setSelectedMemberId(remaining[0].id);
-      }
+    try {
+      setIsSaving(true);
+      await tenantApiAdapter.deleteEmployee(id);
+      triggerToast(
+        `Staff profile deleted successfully.`,
+        `تم إزالة ملف الموظفة بالكامل من المستودع بنجاح.`,
+        'success'
+      );
+      
+      // Refresh list
+      fetchTeamMembers();
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to delete team member.', 'فشل في حذف العضو.', 'error');
+    } finally {
+      setIsSaving(false);
     }
-    triggerToast(
-      `Staff profile deleted successfully.`,
-      `تم إزالة ملف الموظفة بالكامل من المستودع بنجاح.`,
-      'success'
-    );
   };
-
   // Specialty Helper Adders
   const [newSpecialty, setNewSpecialty] = useState('');
   const handleAddSpecialty = () => {
