@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 
 // Hot Deal interface matching requirements
 interface HotDeal {
@@ -123,9 +122,14 @@ const PACKAGE_LIMITS = {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
+  const NODE_ENV = process.env.NODE_ENV || 'production';
 
   app.use(express.json({ limit: '10mb' }));
+
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
 
   // API Endpoints for Hot Deals module
 
@@ -3133,9 +3137,24 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server started in ${NODE_ENV} mode on port ${PORT}`);
   });
+
+  const shutdown = (signal: string) => {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    server.close((err) => {
+      if (err) {
+        console.error('Server shutdown error:', err);
+        process.exit(1);
+      }
+      console.log('Server stopped');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 startServer();
