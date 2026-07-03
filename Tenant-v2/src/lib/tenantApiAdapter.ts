@@ -208,7 +208,7 @@ class TenantApiAdapter {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
 
-    const response = await this.fetchImpl(`${API_ORIGIN}/auth/tenant/refresh-token`, {
+    const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken })
@@ -224,7 +224,7 @@ class TenantApiAdapter {
   }
 
   async login(email: string, password: string): Promise<any> {
-    const response = await this.fetchImpl(`${API_ORIGIN}/auth/tenant/login`, {
+    const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -258,7 +258,7 @@ class TenantApiAdapter {
     }
 
     if (url.pathname.startsWith('/auth/tenant/')) {
-      return new URL(`${API_ORIGIN}${url.pathname}${url.search}${url.hash}`);
+      return new URL(`${API_BASE_URL}${url.pathname}${url.search}${url.hash}`);
     }
 
     return url;
